@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Affinity board: trip planner sessions</title>
+<style>
+  /* ---------- Base ---------- */
+  :root {
+    --bg: #f5f5f3; --panel: #fff; --line: #d9d9d4; --ink: #1f2328; --muted: #6b6f76;
+    --accent: #3a5a80; --accent-soft: #e6edf5;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); overflow: hidden; }
+  button, input { font: inherit; color: inherit; }
+  button { border: 1px solid var(--line); background: var(--panel); border-radius: 4px; padding: 3px 10px; cursor: pointer; }
+  button:hover { border-color: #b8b8b1; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+
+  /* ---------- Toolbar ---------- */
+  header { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 15px; font-weight: 600; margin: 0 12px 0 0; }
+  .group { display: flex; gap: 4px; align-items: center; }
+  #zoom-level { min-width: 52px; }
+  .spacer { flex: 1; }
+  #status { color: var(--muted); font-size: 13px; margin-right: 6px; }
+
+  /* ---------- Layout ---------- */
+  main { display: grid; grid-template-columns: 1fr 290px; height: calc(100vh - 48px); }
+  #viewport { overflow: auto; position: relative; background: #efefeb; }
+  #sizer { position: relative; }
+  #board { position: absolute; left: 0; top: 0; width: 2000px; height: 1400px; transform-origin: 0 0; background: #f9f9f7; border: 1px solid #e2e2dc; }
+  aside { overflow-y: auto; border-left: 1px solid var(--line); background: var(--panel); padding: 14px 14px 40px; }
+  aside section { margin-bottom: 22px; }
+
+  /* ---------- Clusters ---------- */
+  .cluster { position: absolute; border: 1px solid #c9c9c2; border-radius: 6px; background: rgba(255, 255, 255, .55); }
+  .cluster.focus { border-color: var(--accent); background: rgba(230, 237, 245, .7); }
+  .cluster.dim { opacity: .35; }
+  .cluster-head { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 6px 0 10px; border-bottom: 1px solid #e2e2dc; cursor: grab; user-select: none; }
+  .cluster-title { font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cluster-title input { width: 100%; border: 1px solid var(--accent); border-radius: 3px; padding: 1px 5px; font-weight: 600; }
+  .cluster-count { color: var(--muted); font-size: 12px; }
+  .cluster .del { border: 0; background: none; color: var(--muted); padding: 0 6px; }
+  .grip { position: absolute; right: 3px; bottom: 3px; width: 11px; height: 11px; cursor: nwse-resize; border: solid #a8a8a1; border-width: 0 1px 1px 0; }
+
+  /* ---------- Notes ---------- */
+  .note { position: absolute; width: 160px; height: 100px; padding: 6px 8px; border: 1px solid; border-radius: 4px; font-size: 12.5px; line-height: 1.35;
+    overflow: hidden; cursor: grab; user-select: none; }
+  .note .pid { display: block; font-size: 11px; font-weight: 600; margin-bottom: 2px; }
+  .note:focus { outline: none; }
+  .note.selected { outline: 2px solid var(--accent); outline-offset: 1px; z-index: 5; }
+  .note.dragging { cursor: grabbing; box-shadow: 0 4px 12px rgba(0, 0, 0, .14); z-index: 10; }
+  .note.dim { opacity: .25; }
+
+  /* ---------- Side list: themes and participants ---------- */
+  #themes { list-style: none; margin: 0; padding: 0; }
+  #themes li { margin-bottom: 6px; }
+  .theme-btn { display: block; width: 100%; text-align: left; padding: 6px 9px; }
+  .theme-btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .t-name { display: block; font-weight: 600; }
+  .t-meta { display: block; font-size: 12px; color: var(--muted); }
+  .dots { display: flex; gap: 3px; margin-top: 4px; }
+  .dot { width: 11px; height: 11px; border-radius: 2px; }
+  .legend { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+  .legend li { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .legend .n { margin-left: auto; color: var(--muted); }
+  .muted { color: var(--muted); font-size: 13px; }
+  .keys { font-size: 13px; margin: 0; padding-left: 16px; color: #3c4047; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Trip planner sessions: affinity board</h1>
+  <button id="new-cluster">New cluster</button>
+  <div class="group" aria-label="Zoom">
+    <button id="zoom-out" aria-label="Zoom out">&minus;</button>
+    <button id="zoom-reset" title="Back to 100%"><span id="zoom-level">100%</span></button>
+    <button id="zoom-in" aria-label="Zoom in">+</button>
+    <button id="zoom-fit">Fit all</button>
+  </div>
+  <div class="spacer"></div>
+  <span id="status"></span>
+  <button id="copy-md" class="primary">Copy themes as Markdown</button>
+  <button id="download-md">Download .md</button>
+</header>
+<main>
+  <div id="viewport"><div id="sizer"><div id="board"></div></div></div>
+  <aside>
+    <section>
+      <h2>Themes</h2>
+      <ul id="themes"></ul>
+      <div id="unsorted"></div>
+    </section>
+    <section>
+      <h2>Participants</h2>
+      <ul class="legend" id="legend"></ul>
+    </section>
+    <section>
+      <h2>Keys</h2>
+      <ul class="keys">
+        <li>Arrow keys nudge the selected note; hold Shift for bigger steps</li>
+        <li>Ctrl + scroll zooms around the pointer</li>
+        <li>Double-click a cluster title to rename it</li>
+        <li>Esc clears the selection and the highlight</li>
+      </ul>
+    </section>
+  </aside>
+</main>
+
+<script>
+// ===================== Data: observation notes (synthetic) =====================
+const BOARD_W = 2000, BOARD_H = 1400, NOTE_W = 160, NOTE_H = 100;
+const PEOPLE = {
+  P01: { tint: '#f4ead8', ink: '#8a6420' }, P02: { tint: '#e3ecf5', ink: '#3b628a' },
+  P03: { tint: '#e5f0e3', ink: '#47723f' }, P04: { tint: '#f3e3e1', ink: '#9a4a44' },
+  P05: { tint: '#f1e5ec', ink: '#8a4f72' }, P06: { tint: '#e1efee', ink: '#3d7774' }
+};
+const NOTE_TEXT = [
+  ['P01', "Typed the stop name into the destination field first; expected the app to assume 'from here'."],
+  ['P01', "Scrolled past the 'Leave now / Depart at' toggle twice without seeing it."],
+  ['P01', "Said the walking minutes felt 'made up' after seeing 4 min for a long block."],
+  ['P01', "Wanted to save 'Home' and 'Work' before planning anything."],
+  ['P01', 'Did not notice the alert banner about the detour on line 12.'],
+  ['P02', 'Compared the arrival time with the sign at the stop and trusted the sign.'],
+  ['P02', 'Pinched to zoom the map to check where the stop actually is.'],
+  ['P02', 'Asked whether the fare shown included the transfer.'],
+  ['P02', 'Gave up on the route options list and asked the moderator which was fastest.'],
+  ['P02', 'Tapped the bus icon expecting its live position; got the timetable instead.'],
+  ['P02', 'Said the colours for lines 4 and 14 look the same.'],
+  ['P03', "Screen reader user; route steps read out as 'button, button, button'."],
+  ['P03', 'Could not tell which side of the street to wait on.'],
+  ['P03', "Opened a competitor app 'to double check' the first route."],
+  ['P03', "\"I just want the next bus, not three options.\""],
+  ['P03', 'Missed the fare total because it was below the fold.'],
+  ['P04', "Worried about the last bus home; looked for a 'last departure' option."],
+  ['P04', "Read the delay '+3' as three stops, not three minutes."],
+  ['P04', 'Expected the transfer walk to show on the map, not only in the text.'],
+  ['P04', "Set an alarm in the phone's clock app as a reminder to leave."],
+  ['P05', "Did not trust 'Arriving' because the bus was not visible down the road."],
+  ['P05', 'Tried to pay from the trip screen; there is no link to buying a ticket.'],
+  ['P05', 'Liked that the step list showed the number of stops to ride.'],
+  ['P05', "Typed a landmark ('the library') and got no results."],
+  ['P05', 'Wanted to share the trip with a family member who meets her at the stop.'],
+  ['P06', 'Changed the departure time three times to see if a later bus was quicker.'],
+  ['P06', 'Followed the route on the map and ignored the step list entirely.'],
+  ['P06', 'Assumed the grey line meant the route was cancelled; it meant walking.'],
+  ['P06', "Asked how fresh the 'live' times are."],
+  ['P06', 'Wanted to filter out routes with more than one transfer.']
+];
+// Two clusters were started in the first pass; the rest of the notes are scattered below them.
+const START_CLUSTERS = [
+  { id: 'c1', name: "Doesn't trust the live times", x: 40, y: 40, w: 370, h: 400, notes: [5, 20, 28, 2, 13] },
+  { id: 'c2', name: 'Fare is hard to find', x: 440, y: 40, w: 370, h: 290, notes: [7, 15, 21] }
+];
+
+// ===================== State =====================
+let notes = NOTE_TEXT.map(([pid, text], i) => ({ id: 'n' + (i + 1), pid, text, x: 0, y: 0, cluster: null }));
+let clusters = START_CLUSTERS.map(({ notes: idx, ...c }) => {
+  idx.forEach((ni, k) => Object.assign(notes[ni], { x: c.x + 14 + (k % 2) * (NOTE_W + 16), y: c.y + 46 + Math.floor(k / 2) * (NOTE_H + 12) }));
+  return c;
+});
+const clustered = new Set(START_CLUSTERS.flatMap(c => c.notes));
+notes.filter((n, i) => !clustered.has(i)).forEach((n, k) => {
+  n.x = 60 + (k % 6) * 200 + ((k * 37) % 23) - 11;
+  n.y = 500 + Math.floor(k / 6) * 150 + ((k * 53) % 29) - 14;
+});
+let nextCluster = 3, zoom = 1, selected = null, focusId = null, drag = null;
+
+// ===================== Helpers =====================
+const $ = id => document.getElementById(id);
+const board = $('board'), viewport = $('viewport');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const noteById = id => notes.find(n => n.id === id);
+const clusterById = id => clusters.find(c => c.id === id);
+const members = c => notes.filter(n => n.cluster === c.id);
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+function setStatus(msg) { $('status').textContent = msg; }
+
+// A note belongs to the topmost cluster its centre sits inside.
+function assignClusters() {
+  notes.forEach(n => {
+    const cx = n.x + NOTE_W / 2, cy = n.y + NOTE_H / 2;
+    const hit = [...clusters].reverse().find(c => cx >= c.x && cx <= c.x + c.w && cy >= c.y && cy <= c.y + c.h);
+    n.cluster = hit ? hit.id : null;
+  });
+}
+
+// ===================== Board view: clusters and notes =====================
+function render() {
+  board.innerHTML = clusters.map(clusterHTML).join('') + notes.map(noteHTML).join('');
+  renderSidebar();
+}
+function clusterHTML(c) {
+  const n = members(c).length;
+  const cls = focusId === c.id ? ' focus' : (focusId ? ' dim' : '');
+  return `<div class="cluster${cls}" data-id="${c.id}" style="left:${c.x}px;top:${c.y}px;width:${c.w}px;height:${c.h}px">
+    <div class="cluster-head"><span class="cluster-title" title="Double-click to rename">${esc(c.name)}</span>
+      <span class="cluster-count">${n} note${n === 1 ? '' : 's'}</span>
+      <button class="del" data-del="${c.id}" aria-label="Delete cluster ${esc(c.name)}" title="Delete cluster (its notes stay on the board)">&times;</button></div>
+    <div class="grip" title="Drag to resize"></div></div>`;
+}
+function noteHTML(n) {
+  const p = PEOPLE[n.pid];
+  const dim = focusId && (focusId === 'unsorted' ? n.cluster : n.cluster !== focusId);
+  return `<div class="note${n.id === selected ? ' selected' : ''}${dim ? ' dim' : ''}" data-id="${n.id}" tabindex="0"
+    style="left:${n.x}px;top:${n.y}px;background:${p.tint};border-color:${p.ink}66" aria-label="${n.pid}: ${esc(n.text)}">
+    <span class="pid" style="color:${p.ink}">${n.pid}</span>${esc(n.text)}</div>`;
+}
+function select(id) {
+  selected = id;
+  board.querySelectorAll('.note').forEach(el => el.classList.toggle('selected', el.dataset.id === id));
+}
+
+// ===================== Dragging: notes, clusters, resize =====================
+board.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || e.target.closest('button, input')) return;
+  const noteEl = e.target.closest('.note'), grip = e.target.closest('.grip'), head = e.target.closest('.cluster-head');
+  const start = { x: e.clientX, y: e.clientY };
+  if (noteEl) {
+    const n = noteById(noteEl.dataset.id);
+    select(n.id); noteEl.focus({ preventScroll: true });
+    drag = { kind: 'note', el: noteEl, item: n, start, ox: n.x, oy: n.y, was: n.cluster };
+    noteEl.classList.add('dragging');
+  } else if (grip) {
+    const el = grip.closest('.cluster'), c = clusterById(el.dataset.id);
+    drag = { kind: 'resize', el, item: c, start, ow: c.w, oh: c.h };
+  } else if (head) {
+    const el = head.closest('.cluster'), c = clusterById(el.dataset.id);
+    const along = members(c).map(n => ({ n, ox: n.x, oy: n.y, el: board.querySelector(`.note[data-id="${n.id}"]`) }));
+    drag = { kind: 'cluster', el, item: c, start, ox: c.x, oy: c.y, along };
+  } else { select(null); return; }
+  drag.moved = false;
+  e.preventDefault();
+});
+window.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = (e.clientX - drag.start.x) / zoom, dy = (e.clientY - drag.start.y) / zoom;
+  if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 3) return;
+  drag.moved = true;
+  const it = drag.item;
+  if (drag.kind === 'note') {
+    it.x = clamp(drag.ox + dx, 0, BOARD_W - NOTE_W); it.y = clamp(drag.oy + dy, 0, BOARD_H - NOTE_H);
+    drag.el.style.left = it.x + 'px'; drag.el.style.top = it.y + 'px';
+  } else if (drag.kind === 'cluster') {
+    it.x = clamp(drag.ox + dx, 0, BOARD_W - it.w); it.y = clamp(drag.oy + dy, 0, BOARD_H - it.h);
+    drag.el.style.left = it.x + 'px'; drag.el.style.top = it.y + 'px';
+    drag.along.forEach(m => {
+      m.n.x = m.ox + (it.x - drag.ox); m.n.y = m.oy + (it.y - drag.oy);
+      m.el.style.left = m.n.x + 'px'; m.el.style.top = m.n.y + 'px';
+    });
+  } else {
+    it.w = clamp(drag.ow + dx, 200, BOARD_W - it.x); it.h = clamp(drag.oh + dy, 140, BOARD_H - it.y);
+    drag.el.style.width = it.w + 'px'; drag.el.style.height = it.h + 'px';
+  }
+});
+window.addEventListener('pointerup', () => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  d.el.classList.remove('dragging');
+  if (!d.moved) return;
+  assignClusters(); render();
+  if (d.kind === 'note') reportMove(d.item, d.was);
+});
+function reportMove(n, was) {
+  if (n.cluster === was) return;
+  if (n.cluster) setStatus(`Note moved into “${clusterById(n.cluster).name}”`);
+  else setStatus(`Note taken out of “${clusterById(was).name}”`);
+}
+
+// ===================== Keyboard: nudge selected note =====================
+board.addEventListener('focusin', e => { const el = e.target.closest('.note'); if (el) select(el.dataset.id); });
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input')) return;
+  if (e.key === 'Escape') { select(null); focusId = null; render(); return; }
+  const dirs = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (!selected || !dirs[e.key]) return;
+  e.preventDefault();
+  const n = noteById(selected), step = e.shiftKey ? 40 : 8, was = n.cluster;
+  n.x = clamp(n.x + dirs[e.key][0] * step, 0, BOARD_W - NOTE_W);
+  n.y = clamp(n.y + dirs[e.key][1] * step, 0, BOARD_H - NOTE_H);
+  assignClusters(); render(); reportMove(n, was);
+  board.querySelector(`.note[data-id="${n.id}"]`).focus({ preventScroll: true });
+});
+
+// ===================== Zoom =====================
+function setZoom(z, anchor) {
+  z = clamp(z, 0.3, 2);
+  const ax = anchor ? anchor.x : viewport.clientWidth / 2, ay = anchor ? anchor.y : viewport.clientHeight / 2;
+  const bx = (viewport.scrollLeft + ax) / zoom, by = (viewport.scrollTop + ay) / zoom;
+  zoom = z; applyZoom();
+  viewport.scrollLeft = bx * zoom - ax; viewport.scrollTop = by * zoom - ay;
+}
+function applyZoom() {
+  board.style.transform = `scale(${zoom})`;
+  $('sizer').style.width = BOARD_W * zoom + 'px'; $('sizer').style.height = BOARD_H * zoom + 'px';
+  $('zoom-level').textContent = Math.round(zoom * 100) + '%';
+}
+function fitAll() {
+  const boxes = [...clusters.map(c => [c.x, c.y, c.x + c.w, c.y + c.h]), ...notes.map(n => [n.x, n.y, n.x + NOTE_W, n.y + NOTE_H])];
+  const x0 = Math.min(...boxes.map(b => b[0])) - 20, y0 = Math.min(...boxes.map(b => b[1])) - 20;
+  const x1 = Math.max(...boxes.map(b => b[2])) + 20, y1 = Math.max(...boxes.map(b => b[3])) + 20;
+  zoom = clamp(Math.min(viewport.clientWidth / (x1 - x0), viewport.clientHeight / (y1 - y0)), 0.3, 2);
+  applyZoom();
+  viewport.scrollLeft = x0 * zoom; viewport.scrollTop = y0 * zoom;
+}
+viewport.addEventListener('wheel', e => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const r = viewport.getBoundingClientRect();
+  setZoom(zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1), { x: e.clientX - r.left, y: e.clientY - r.top });
+}, { passive: false });
+$('zoom-in').onclick = () => setZoom(zoom * 1.25);
+$('zoom-out').onclick = () => setZoom(zoom / 1.25);
+$('zoom-reset').onclick = () => setZoom(1);
+$('zoom-fit').onclick = fitAll;
+
+// ===================== Clusters: new, rename, delete =====================
+$('new-cluster').onclick = () => {
+  // Place it right of the existing clusters, or below everything when the row is full, so it starts empty.
+  const w = 370, h = 290;
+  let x = clusters.length ? Math.max(...clusters.map(c => c.x + c.w)) + 30 : 40, y = 40;
+  if (x + w > BOARD_W) {
+    x = 40; y = Math.min(BOARD_H - h, Math.max(...clusters.map(c => c.y + c.h), ...notes.map(n => n.y + NOTE_H)) + 30);
+  }
+  const c = { id: 'c' + nextCluster++, name: 'Untitled', x, y, w, h };
+  clusters.push(c); assignClusters(); render();
+  viewport.scrollLeft = x * zoom - 30; viewport.scrollTop = y * zoom - 30;
+  startRename(c.id);
+};
+board.addEventListener('dblclick', e => {
+  const t = e.target.closest('.cluster-title');
+  if (t && !t.querySelector('input')) startRename(t.closest('.cluster').dataset.id);
+});
+function startRename(id) {
+  const c = clusterById(id);
+  const title = board.querySelector(`.cluster[data-id="${id}"] .cluster-title`);
+  title.innerHTML = `<input value="${esc(c.name)}" aria-label="Cluster name">`;
+  const input = title.querySelector('input');
+  input.focus(); input.select();
+  let done = false;
+  const finish = keep => {
+    if (done) return; done = true;
+    if (keep && input.value.trim()) c.name = input.value.trim();
+    title.textContent = c.name;
+    board.querySelector(`.cluster[data-id="${id}"] .del`).setAttribute('aria-label', 'Delete cluster ' + c.name);
+    renderSidebar();
+  };
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); });
+  input.addEventListener('blur', () => finish(true));
+}
+board.addEventListener('click', e => {
+  const del = e.target.closest('[data-del]'); if (!del) return;
+  const c = clusterById(del.dataset.del);
+  clusters = clusters.filter(x => x !== c);
+  if (focusId === c.id) focusId = null;
+  assignClusters(); render(); setStatus(`Deleted “${c.name}”; its notes are unsorted`);
+});
+
+// ===================== Side list: themes, highlight, participants =====================
+function themeRows() {
+  return clusters.map(c => {
+    const ns = members(c);
+    return { c, ns, ps: [...new Set(ns.map(n => n.pid))].sort() };
+  }).sort((a, b) => b.ns.length - a.ns.length);
+}
+const dot = pid => `<span class="dot" title="${pid}" style="background:${PEOPLE[pid].ink}"></span>`;
+function renderSidebar() {
+  const rows = themeRows(), total = Object.keys(PEOPLE).length;
+  $('themes').innerHTML = rows.length ? rows.map(r => `<li><button class="theme-btn" data-focus="${r.c.id}" aria-pressed="${focusId === r.c.id}">
+      <span class="t-name">${esc(r.c.name)}</span>
+      <span class="t-meta">${r.ns.length} note${r.ns.length === 1 ? '' : 's'}, ${r.ps.length} of ${total} participants</span>
+      <span class="dots">${r.ps.map(dot).join('')}</span></button></li>`).join('')
+    : '<li class="muted">No clusters yet. Add one with New cluster, then drag notes into it.</li>';
+  const un = notes.filter(n => !n.cluster).length;
+  $('unsorted').innerHTML = `<button class="theme-btn" data-focus="unsorted" aria-pressed="${focusId === 'unsorted'}">
+    <span class="t-name">Not in a cluster</span><span class="t-meta">${un} note${un === 1 ? '' : 's'}</span></button>`;
+  $('legend').innerHTML = Object.keys(PEOPLE).map(pid =>
+    `<li>${dot(pid)}${pid}<span class="n">${notes.filter(n => n.pid === pid).length} notes</span></li>`).join('');
+}
+document.querySelector('aside').addEventListener('click', e => {
+  const b = e.target.closest('[data-focus]'); if (!b) return;
+  focusId = focusId === b.dataset.focus ? null : b.dataset.focus;
+  render();
+  const c = focusId && clusterById(focusId);
+  if (c) { viewport.scrollLeft = c.x * zoom - 30; viewport.scrollTop = c.y * zoom - 30; }
+});
+
+// ===================== Export themes as Markdown =====================
+function themesMarkdown() {
+  const order = (a, b) => a.y - b.y || a.x - b.x;
+  let md = '# Trip planner usability sessions: affinity themes\n\n';
+  themeRows().forEach(r => {
+    md += `## ${r.c.name}\n\n${r.ns.length} notes from ${r.ps.join(', ') || 'no participants'}\n\n`;
+    md += r.ns.sort(order).map(n => `- ${n.text} (${n.pid})`).join('\n') + '\n\n';
+  });
+  const un = notes.filter(n => !n.cluster).sort(order);
+  if (un.length) md += '## Not in a cluster\n\n' + un.map(n => `- ${n.text} (${n.pid})`).join('\n') + '\n';
+  return md;
+}
+function downloadMarkdown() {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([themesMarkdown()], { type: 'text/markdown' }));
+  a.download = 'affinity-themes.md'; a.click(); URL.revokeObjectURL(a.href);
+}
+$('copy-md').onclick = async () => {
+  try { await navigator.clipboard.writeText(themesMarkdown()); setStatus(`Copied ${clusters.length} themes as Markdown`); }
+  catch (err) { downloadMarkdown(); setStatus('Clipboard not available here; downloaded the .md instead'); }
+};
+$('download-md').onclick = () => { downloadMarkdown(); setStatus('Downloaded affinity-themes.md'); };
+
+// ===================== Start =====================
+assignClusters();
+applyZoom();
+render();
+</script>
+</body>
+</html>

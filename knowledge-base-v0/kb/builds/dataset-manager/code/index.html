@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab datasets</title>
+<style>
+:root {
+  --bg: #f5f5f2;
+  --panel: #ffffff;
+  --line: #d9d9d3;
+  --soft: #ecece8;
+  --text: #1d1d1b;
+  --muted: #6b6b65;
+  --accent: #2f6db5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { border: 1px solid var(--line); background: var(--panel); border-radius: 5px; padding: 3px 10px; cursor: pointer; }
+button:hover { border-color: #b3b3ac; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.chip { border-radius: 12px; padding: 1px 9px; font-size: 13px; }
+button.chip.on { border-color: var(--accent); color: var(--accent); background: #eef3fa; }
+input[type=search], select, input[type=text], textarea { border: 1px solid var(--line); border-radius: 5px; padding: 4px 7px; background: var(--panel); }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+
+/* ---- Header and toolbar ---- */
+header { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header h1 { font-size: 16px; font-weight: 600; margin: 0; }
+header .spacer { flex: 1; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 10px 16px 6px; }
+.toolbar input[type=search] { width: 280px; max-width: 100%; }
+.toolbar label { display: inline-flex; align-items: center; gap: 6px; }
+.tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; padding: 0 16px 10px; }
+
+/* ---- Bulk actions ---- */
+.bulk { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 16px 8px; padding: 6px 10px; background: #eef3fa; border: 1px solid #c9d8ee; border-radius: 6px; }
+.bulk[hidden] { display: none; }
+
+/* ---- Dataset table ---- */
+.table-wrap { margin: 0 16px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--soft); white-space: nowrap; }
+th { background: #f7f7f4; font-weight: 600; position: sticky; top: 0; }
+th.sortable { cursor: pointer; user-select: none; }
+th .dir { color: var(--accent); }
+td.r, th.r { text-align: right; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: #f6f8fb; }
+tbody tr.open { background: #e6eef9; }
+tbody tr.checked { background: #f1f5fb; }
+.status { display: inline-block; padding: 0 7px; border-radius: 10px; border: 1px solid var(--line); font-size: 12px; }
+.status.archived { color: var(--muted); }
+.tag { display: inline-block; font-size: 12px; color: var(--muted); margin-right: 6px; }
+.paper { color: var(--accent); font-size: 12px; margin-left: 6px; }
+.empty { padding: 24px; text-align: center; color: var(--muted); }
+
+/* ---- Detail drawer ---- */
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 460px; max-width: 100%; background: var(--panel); border-left: 1px solid var(--line); box-shadow: -6px 0 18px rgba(0,0,0,.06); overflow: auto; padding: 14px 18px 24px; }
+.drawer[hidden] { display: none; }
+.drawer-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.drawer h2 { font-size: 16px; margin: 0; word-break: break-all; }
+.drawer h3 { font-size: 13px; margin: 18px 0 6px; }
+.meta { display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; margin: 12px 0 0; font-size: 13px; }
+.meta dt { color: var(--muted); }
+.meta dd { margin: 0; }
+.versions { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 6px; }
+.versions li { padding: 8px 10px; border-bottom: 1px solid var(--soft); font-size: 13px; }
+.versions li:last-child { border-bottom: 0; }
+.versions li.is-paper { background: #f1f5fb; }
+.versions .vhead { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.versions .note { margin: 2px 0 6px; }
+.paper-name { display: flex; gap: 6px; align-items: center; margin-top: 8px; font-size: 13px; }
+.paper-name input { flex: 1; }
+textarea { width: 100%; min-height: 120px; resize: vertical; }
+#saved { font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Lab datasets</h1>
+  <span id="count" class="muted num"></span>
+  <span class="spacer"></span>
+  <button id="exportCsv">Export shown rows as CSV</button>
+  <button id="reset">Reset to sample data</button>
+</header>
+
+<div class="toolbar">
+  <input id="search" type="search" placeholder="Search names, owners, tags, notes">
+  <label>Status
+    <select id="statusFilter">
+      <option value="">Any status</option>
+      <option>raw</option><option>cleaned</option><option>analysed</option><option>archived</option>
+    </select>
+  </label>
+  <label><input id="paperOnly" type="checkbox"> Only datasets with a paper version</label>
+</div>
+<div class="tags" id="tagChips"><span class="muted">Tags:</span></div>
+
+<div class="bulk" id="bulk" hidden>
+  <span id="bulkCount"></span>
+  <label>Set status to
+    <select id="bulkStatus"><option>raw</option><option>cleaned</option><option>analysed</option><option selected>archived</option></select>
+  </label>
+  <button class="primary" id="bulkApply">Apply</button>
+  <button id="bulkClear">Clear selection</button>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th><input type="checkbox" id="checkAll" aria-label="Select all shown datasets"></th>
+      <th class="sortable" data-key="name">Name</th>
+      <th class="sortable" data-key="instrument">Instrument</th>
+      <th class="sortable" data-key="owner">Owner</th>
+      <th class="sortable" data-key="updated">Updated</th>
+      <th class="sortable r" data-key="size">Size</th>
+      <th class="sortable" data-key="version">Version</th>
+      <th class="sortable" data-key="status">Status</th>
+      <th>Tags</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<aside class="drawer" id="drawer" hidden aria-label="Dataset details"></aside>
+
+<script>
+// ===== Sample data: the lab's instrument exports =====
+const STATUSES = ['raw', 'cleaned', 'analysed', 'archived'];
+const FORMATS = { 'Plate reader': '.xlsx export', 'SEC-MALS': 'ASTRA .vaf + .csv', 'Orbitrap MS': '.raw', 'Confocal': '.czi stacks', 'NMR 600': 'Bruker fid folder', 'DLS': '.csv correlation data' };
+const VERSION_NOTES = {
+  'Plate reader': ['raw export from the reader PC', 'blank wells subtracted', 'outlier wells removed (H11, H12)', 'Tm fitted with Boltzmann', 're-fitted after fixing the temperature ramp'],
+  'SEC-MALS': ['raw export from ASTRA', 'baseline reset, peak 1 only', 'dn/dc changed to 0.185', 're-processed with new BSA calibration', 'second peak included', 'trimmed for figure draft'],
+  'Orbitrap MS': ['raw files copied off the instrument', 'converted to mzML', 'searched against UniProt + contaminants', 're-searched with Met oxidation as variable mod', '1% FDR filtered table'],
+  'Confocal': ['raw .czi from the scope', 'max projections', 'background subtracted, rolling ball 50', 'segmentation masks added'],
+  'NMR 600': ['fid from the spectrometer', 'processed in TopSpin, phased', 'peaks picked and assigned'],
+  'DLS': ['raw correlation data', 'cumulants fit', 'regularisation fit, dust runs removed'],
+};
+// name, instrument, owner, first version date, status, tags, number of versions, size of first version in MB
+const SAMPLE = [
+  ['KinB_thermal_shift_plate1', 'Plate reader', 'MR', '2026-02-11', 'analysed', ['kinase-B'], 4, 2.1],
+  ['KinB_thermal_shift_plate2', 'Plate reader', 'MR', '2026-02-12', 'analysed', ['kinase-B', 'replicate'], 3, 2.1],
+  ['KinB_thermal_shift_plate3', 'Plate reader', 'JT', '2026-03-04', 'cleaned', ['kinase-B', 'replicate'], 2, 2.2],
+  ['KinB_WT_vs_D184N_SECMALS', 'SEC-MALS', 'MR', '2026-03-19', 'analysed', ['kinase-B'], 6, 48],
+  ['KinB_intact_mass', 'Orbitrap MS', 'AN', '2026-01-27', 'analysed', ['kinase-B'], 3, 1840],
+  ['KinB_HDX_timecourse', 'Orbitrap MS', 'AN', '2026-04-22', 'cleaned', ['kinase-B'], 5, 22600],
+  ['KinB_ligand_titration_NMR', 'NMR 600', 'PD', '2026-05-08', 'raw', ['kinase-B'], 1, 3100],
+  ['KinB_crystal_hits_imaging', 'Confocal', 'JT', '2026-09-03', 'raw', ['kinase-B', 'pilot'], 1, 6400],
+  ['KinB_DLS_aggregation', 'DLS', 'LH', '2026-09-15', 'raw', ['kinase-B', 'QC-failed'], 1, 6],
+  ['PETase_thermal_shift', 'Plate reader', 'JT', '2025-07-22', 'analysed', ['PETase', 'grant-2024'], 3, 2.0],
+  ['PETase_activity_pH_screen', 'Plate reader', 'JT', '2025-11-03', 'analysed', ['PETase', 'grant-2024'], 3, 4.6],
+  ['PETase_variants_DLS', 'DLS', 'LH', '2025-10-21', 'analysed', ['PETase', 'grant-2024'], 2, 12],
+  ['PETase_SECMALS_oligomer', 'SEC-MALS', 'LH', '2025-09-30', 'analysed', ['PETase', 'grant-2024'], 4, 51],
+  ['PETase_variants_SECMALS_rerun', 'SEC-MALS', 'LH', '2025-11-18', 'analysed', ['PETase', 'grant-2024', 'replicate'], 3, 47],
+  ['PETase_peptide_mapping', 'Orbitrap MS', 'AN', '2025-08-14', 'cleaned', ['PETase', 'grant-2024'], 2, 9800],
+  ['PETase_film_degradation_imaging', 'Confocal', 'SK', '2025-12-02', 'raw', ['PETase', 'grant-2024'], 1, 41200],
+  ['Nb7_ELISA_plate1', 'Plate reader', 'PD', '2026-06-17', 'analysed', ['nanobody-7'], 3, 0.9],
+  ['Nb7_ELISA_plate2', 'Plate reader', 'PD', '2026-06-18', 'cleaned', ['nanobody-7', 'replicate'], 2, 0.9],
+  ['Nb7_intact_mass', 'Orbitrap MS', 'AN', '2026-06-05', 'analysed', ['nanobody-7'], 2, 1650],
+  ['Nb7_SECMALS_complex', 'SEC-MALS', 'MR', '2026-07-01', 'cleaned', ['nanobody-7'], 3, 39],
+  ['Nb7_HSQC_apo', 'NMR 600', 'PD', '2026-06-29', 'analysed', ['nanobody-7'], 2, 2800],
+  ['Nb7_HSQC_bound', 'NMR 600', 'PD', '2026-07-03', 'cleaned', ['nanobody-7'], 2, 2900],
+  ['Nb7_cell_surface_staining', 'Confocal', 'SK', '2026-08-11', 'raw', ['nanobody-7', 'pilot'], 1, 18700],
+  ['LipidBP_liposome_DLS', 'DLS', 'LH', '2026-04-02', 'analysed', ['lipid-binding'], 3, 8],
+  ['LipidBP_liposome_DLS_rerun', 'DLS', 'LH', '2026-04-09', 'cleaned', ['lipid-binding', 'replicate'], 2, 8],
+  ['LipidBP_GUV_imaging', 'Confocal', 'SK', '2026-05-20', 'analysed', ['lipid-binding'], 4, 26300],
+  ['LipidBP_crosslink_MS', 'Orbitrap MS', 'AN', '2026-08-25', 'raw', ['lipid-binding', 'pilot'], 1, 15400],
+  ['SECMALS_BSA_calibration_2026', 'SEC-MALS', 'MR', '2026-01-08', 'cleaned', ['methods'], 2, 18],
+  ['Plate_reader_pathlength_check', 'Plate reader', 'JT', '2026-02-02', 'archived', ['methods', 'QC-failed'], 1, 0.4],
+  ['NMR_temp_calibration_methanol', 'NMR 600', 'PD', '2025-09-12', 'archived', ['methods', 'grant-2024'], 1, 120],
+];
+// versions that already went into a paper: name -> [version, paper]
+const PAPER_SEED = {
+  KinB_WT_vs_D184N_SECMALS: [4, 'KinB stability (in revision)'],
+  KinB_thermal_shift_plate1: [3, 'KinB stability (in revision)'],
+  PETase_SECMALS_oligomer: [3, 'PETase oligomers, 2025'],
+  PETase_activity_pH_screen: [2, 'PETase oligomers, 2025'],
+};
+
+function addDays(iso, n) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+
+function sampleDatasets() {
+  return SAMPLE.map(([name, instrument, owner, date, status, tags, nVersions, sizeMB], i) => {
+    const notes = VERSION_NOTES[instrument];
+    const versions = [];
+    let day = date, size = sizeMB;
+    for (let v = 1; v <= nVersions; v++) {
+      versions.push({ v, date: day, by: v > 2 && i % 3 === 0 ? 'JT' : owner, note: notes[(v - 1) % notes.length], sizeMB: Math.round(size * 10) / 10 });
+      day = addDays(day, 3 + (i * 7 + v * 5) % 19);
+      size *= v % 2 ? 1.08 : 0.93;
+    }
+    const project = tags[0] === 'methods' ? 'methods' : tags[0];
+    const [paperVersion, paper] = PAPER_SEED[name] || [null, ''];
+    return { id: i + 1, name, instrument, owner, status, tags, versions, paperVersion, paper,
+      format: FORMATS[instrument], path: `/labshare/data/${project}/${name}/`, notes: '' };
+  });
+}
+
+// ===== Saved state (this browser) =====
+const STORE = 'lab-datasets/v1';
+function load() {
+  try { const saved = JSON.parse(localStorage.getItem(STORE)); if (Array.isArray(saved) && saved.length) return saved; } catch (e) { /* fall through */ }
+  return sampleDatasets();
+}
+function save() { localStorage.setItem(STORE, JSON.stringify(datasets)); }
+
+let datasets = load();
+const state = { q: '', status: '', tags: new Set(), paperOnly: false, sortKey: 'updated', sortDir: -1, checked: new Set(), open: null };
+
+const latest = d => d.versions[d.versions.length - 1];
+const sizeOf = d => latest(d).sizeMB;
+function fmtSize(mb) { return mb >= 1000 ? (mb / 1000).toFixed(1) + ' GB' : mb >= 1 ? Math.round(mb) + ' MB' : Math.round(mb * 1000) + ' kB'; }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+// ===== Search, filters and sorting =====
+function shown() {
+  const q = state.q.trim().toLowerCase();
+  const rows = datasets.filter(d => {
+    if (state.status && d.status !== state.status) return false;
+    if (state.paperOnly && !d.paperVersion) return false;
+    for (const t of state.tags) if (!d.tags.includes(t)) return false;
+    if (!q) return true;
+    return [d.name, d.instrument, d.owner, d.path, d.notes, d.paper, ...d.tags].join(' ').toLowerCase().includes(q);
+  });
+  const key = {
+    name: d => d.name.toLowerCase(), instrument: d => d.instrument, owner: d => d.owner,
+    updated: d => latest(d).date, size: d => sizeOf(d), version: d => d.versions.length, status: d => STATUSES.indexOf(d.status),
+  }[state.sortKey];
+  return rows.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0) * state.sortDir);
+}
+
+function buildTagChips() {
+  const box = document.getElementById('tagChips');
+  box.querySelectorAll('button').forEach(b => b.remove());
+  const all = [...new Set(datasets.flatMap(d => d.tags))].sort();
+  for (const t of all) {
+    const b = document.createElement('button');
+    b.className = 'chip' + (state.tags.has(t) ? ' on' : '');
+    b.textContent = t;
+    b.addEventListener('click', () => { state.tags.has(t) ? state.tags.delete(t) : state.tags.add(t); b.classList.toggle('on'); render(); });
+    box.appendChild(b);
+  }
+}
+
+// ===== Dataset table =====
+function render() {
+  const rows = shown();
+  document.getElementById('count').textContent = `Showing ${rows.length} of ${datasets.length} datasets`;
+  document.querySelectorAll('th.sortable').forEach(th => {
+    const label = th.textContent.replace(/ [▲▼]$/, '');
+    th.innerHTML = esc(label) + (th.dataset.key === state.sortKey ? ` <span class="dir">${state.sortDir > 0 ? '▲' : '▼'}</span>` : '');
+  });
+  const body = document.getElementById('rows');
+  body.innerHTML = rows.length ? rows.map(d => `
+    <tr data-id="${d.id}" class="${d.id === state.open ? 'open' : ''} ${state.checked.has(d.id) ? 'checked' : ''}">
+      <td><input type="checkbox" class="pick" ${state.checked.has(d.id) ? 'checked' : ''} aria-label="Select ${esc(d.name)}"></td>
+      <td>${esc(d.name)}</td><td>${esc(d.instrument)}</td><td>${esc(d.owner)}</td>
+      <td class="num">${latest(d).date}</td><td class="r num">${fmtSize(sizeOf(d))}</td>
+      <td class="num">v${d.versions.length}${d.paperVersion ? `<span class="paper">paper: v${d.paperVersion}</span>` : ''}</td>
+      <td><span class="status ${d.status}">${d.status}</span></td>
+      <td>${d.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</td>
+    </tr>`).join('')
+    : '<tr><td colspan="9" class="empty">No datasets match this search and these filters.</td></tr>';
+  const ids = rows.map(d => d.id);
+  const all = document.getElementById('checkAll');
+  all.checked = ids.length > 0 && ids.every(id => state.checked.has(id));
+  all.indeterminate = !all.checked && ids.some(id => state.checked.has(id));
+  renderBulk();
+}
+
+document.getElementById('rows').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-id]');
+  if (!tr) return;
+  const id = Number(tr.dataset.id);
+  if (e.target.classList.contains('pick')) {
+    e.target.checked ? state.checked.add(id) : state.checked.delete(id);
+    render();
+    return;
+  }
+  openDrawer(id);
+});
+
+document.querySelectorAll('th.sortable').forEach(th => th.addEventListener('click', () => {
+  if (state.sortKey === th.dataset.key) state.sortDir *= -1;
+  else { state.sortKey = th.dataset.key; state.sortDir = 1; }
+  render();
+}));
+
+// ===== Bulk status change =====
+function renderBulk() {
+  const n = state.checked.size;
+  document.getElementById('bulk').hidden = n === 0;
+  document.getElementById('bulkCount').textContent = `${n} dataset${n === 1 ? '' : 's'} selected`;
+}
+document.getElementById('checkAll').addEventListener('change', e => {
+  for (const d of shown()) e.target.checked ? state.checked.add(d.id) : state.checked.delete(d.id);
+  render();
+});
+document.getElementById('bulkApply').addEventListener('click', () => {
+  const status = document.getElementById('bulkStatus').value;
+  datasets.forEach(d => { if (state.checked.has(d.id)) d.status = status; });
+  state.checked.clear();
+  save(); render();
+  if (state.open) openDrawer(state.open);
+});
+document.getElementById('bulkClear').addEventListener('click', () => { state.checked.clear(); render(); });
+
+// ===== Detail drawer: metadata, version history, paper version, notes =====
+const drawer = document.getElementById('drawer');
+
+function openDrawer(id) {
+  const d = datasets.find(x => x.id === id);
+  if (!d) return;
+  state.open = id;
+  const versions = d.versions.slice().reverse();
+  drawer.innerHTML = `
+    <div class="drawer-head"><h2>${esc(d.name)}</h2><button id="dClose">Close</button></div>
+    <dl class="meta">
+      <dt>Status</dt><dd><select id="dStatus">${STATUSES.map(s => `<option ${s === d.status ? 'selected' : ''}>${s}</option>`).join('')}</select></dd>
+      <dt>Instrument</dt><dd>${esc(d.instrument)}</dd>
+      <dt>Owner</dt><dd>${esc(d.owner)}</dd>
+      <dt>Format</dt><dd>${esc(d.format)}</dd>
+      <dt>Location</dt><dd class="mono">${esc(d.path)}</dd>
+      <dt>First export</dt><dd class="num">${d.versions[0].date}</dd>
+      <dt>Latest</dt><dd class="num">v${d.versions.length}, ${latest(d).date}, ${fmtSize(sizeOf(d))}</dd>
+      <dt>Tags</dt><dd>${d.tags.map(esc).join(', ')}</dd>
+    </dl>
+    <h3>Versions (${d.versions.length})</h3>
+    <ul class="versions">${versions.map(v => `
+      <li class="${v.v === d.paperVersion ? 'is-paper' : ''}">
+        <div class="vhead"><b>v${v.v}</b><span class="muted num">${v.date}, ${esc(v.by)}, ${fmtSize(v.sizeMB)}</span></div>
+        <div class="note">${esc(v.note)}</div>
+        ${v.v === d.paperVersion
+          ? `<span class="paper" style="margin:0">Used in the paper</span> <button data-unmark="${v.v}">Unmark</button>`
+          : `<button data-mark="${v.v}">Mark as the version used in the paper</button>`}
+      </li>`).join('')}
+    </ul>
+    ${d.paperVersion ? `<div class="paper-name"><label for="dPaper">Paper</label><input id="dPaper" type="text" value="${esc(d.paper)}" placeholder="Which paper, e.g. short title and year"></div>` : ''}
+    <h3>Notes</h3>
+    <textarea id="dNotes" placeholder="What changed, what to watch out for, where the figure files are">${esc(d.notes)}</textarea>
+    <div id="saved" class="muted"></div>`;
+  drawer.hidden = false;
+  drawer.querySelector('#dClose').addEventListener('click', closeDrawer);
+  drawer.querySelector('#dStatus').addEventListener('change', e => { d.status = e.target.value; save(); render(); });
+  drawer.querySelectorAll('[data-mark]').forEach(b => b.addEventListener('click', () => markPaper(d, Number(b.dataset.mark))));
+  drawer.querySelectorAll('[data-unmark]').forEach(b => b.addEventListener('click', () => markPaper(d, null)));
+  const paper = drawer.querySelector('#dPaper');
+  if (paper) paper.addEventListener('input', () => { d.paper = paper.value; save(); flashSaved(); });
+  let timer = null;
+  drawer.querySelector('#dNotes').addEventListener('input', e => {
+    clearTimeout(timer);
+    document.getElementById('saved').textContent = 'Not saved yet';
+    timer = setTimeout(() => { d.notes = e.target.value; save(); flashSaved(); }, 400);
+  });
+  render();
+}
+
+// Only one version per dataset can be the paper version.
+function markPaper(d, v) {
+  d.paperVersion = v;
+  if (!v) d.paper = '';
+  save();
+  openDrawer(d.id);
+}
+
+function flashSaved() {
+  document.getElementById('saved').textContent = 'Saved in this browser at ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function closeDrawer() { drawer.hidden = true; state.open = null; render(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !drawer.hidden) closeDrawer(); });
+
+// ===== Export the table as CSV =====
+function csvCell(v) { const s = String(v ?? ''); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function exportCsv() {
+  const head = ['name', 'instrument', 'owner', 'updated', 'size_mb', 'current_version', 'paper_version', 'paper', 'status', 'tags', 'location', 'notes'];
+  const lines = [head.join(',')].concat(shown().map(d => [d.name, d.instrument, d.owner, latest(d).date, sizeOf(d), 'v' + d.versions.length,
+    d.paperVersion ? 'v' + d.paperVersion : '', d.paper, d.status, d.tags.join('; '), d.path, d.notes].map(csvCell).join(',')));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/csv' }));
+  a.download = 'lab-datasets-' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ===== Toolbar events =====
+document.getElementById('search').addEventListener('input', e => { state.q = e.target.value; render(); });
+document.getElementById('statusFilter').addEventListener('change', e => { state.status = e.target.value; render(); });
+document.getElementById('paperOnly').addEventListener('change', e => { state.paperOnly = e.target.checked; render(); });
+document.getElementById('exportCsv').addEventListener('click', exportCsv);
+document.getElementById('reset').addEventListener('click', () => {
+  if (!confirm('Replace every status, paper mark and note saved in this browser with the sample data?')) return;
+  localStorage.removeItem(STORE);
+  datasets = sampleDatasets();
+  state.checked.clear(); state.tags.clear();
+  closeDrawer(); buildTagChips(); render();
+});
+
+// ===== Start =====
+buildTagChips();
+render();
+</script>
+</body>
+</html>

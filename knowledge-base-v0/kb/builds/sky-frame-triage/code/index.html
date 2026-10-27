@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frame triage: NGC 7789 r band, night of 2026-09-13</title>
+<style>
+:root {
+  --bg: #f4f4f2;
+  --panel: #ffffff;
+  --line: #d8d8d3;
+  --text: #1c1c1a;
+  --muted: #6a6a64;
+  --accent: #2f6db5;
+  --keep: #2e7445;
+  --reject: #a2392e;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+button, select, input { font: inherit; color: inherit; }
+button { border: 1px solid var(--line); background: var(--panel); border-radius: 5px; padding: 4px 10px; cursor: pointer; }
+button:hover { border-color: #b2b2ab; }
+select, input[type=number] { border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; background: var(--panel); }
+input[type=number] { width: 4.5em; }
+kbd { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; background: #fafaf8; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---- Header: the night and the running tally ---- */
+header.summary { display: flex; flex-wrap: wrap; gap: 6px 24px; align-items: baseline; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header.summary h1 { font-size: 16px; font-weight: 600; margin: 0; }
+.tally { display: flex; flex-wrap: wrap; gap: 4px 18px; color: var(--muted); }
+.tally b { color: var(--text); font-weight: 600; }
+.tally .met { color: var(--keep); }
+.tally .short { color: var(--reject); }
+
+/* ---- Toolbar: sort, stretch, export ---- */
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+.toolbar label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+.toolbar .spacer { flex: 1; }
+
+main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 560px); gap: 16px; padding: 16px; align-items: start; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } .viewer { position: static !important; order: -1; } }
+
+/* ---- Thumbnail grid ---- */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.thumb { border: 1px solid var(--line); border-radius: 6px; background: var(--panel); padding: 4px; cursor: pointer; font-size: 12px; }
+.thumb canvas { display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: 3px; background: #000; }
+.thumb.current { outline: 2px solid var(--accent); outline-offset: 1px; }
+.thumb.rejected canvas { opacity: .45; }
+.thumb .row { display: flex; justify-content: space-between; gap: 6px; margin-top: 3px; }
+.thumb .stats { color: var(--muted); }
+.state-keep { color: var(--keep); font-weight: 600; }
+.state-reject { color: var(--reject); font-weight: 600; }
+.state-none { color: var(--muted); }
+
+/* ---- Large view of the current frame ---- */
+.viewer { position: sticky; top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+.viewer-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.viewer-head h2 { font-size: 15px; font-weight: 600; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+#big { display: block; width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: 3px; image-rendering: pixelated; }
+.facts { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 3px 12px; margin: 10px 0; font-size: 13px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+.actions, .reasons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.reasons span { color: var(--muted); margin-right: 4px; }
+.reasons.waiting span { color: var(--reject); font-weight: 600; }
+.reasons button.on { border-color: var(--reject); color: var(--reject); }
+.keys { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+</style>
+</head>
+<body>
+
+<header class="summary">
+  <h1>NGC 7789, r band, night of 2026-09-13 (0.6 m, 120 s frames)</h1>
+  <div class="tally num">
+    <span><b id="tKept">0</b> kept of <span id="tTotal">0</span></span>
+    <span><b id="tExp">0.0</b> min kept exposure, target <input id="target" type="number" min="0" step="5" value="45"> min <span id="tTarget"></span></span>
+    <span><b id="tRej">0</b> rejected <span id="tReasons"></span></span>
+    <span><b id="tUnd">0</b> not decided</span>
+  </div>
+</header>
+
+<div class="toolbar">
+  <label>Sort by
+    <select id="sort">
+      <option value="time">Time taken</option>
+      <option value="fwhm">FWHM, sharpest first</option>
+      <option value="bg">Background, darkest first</option>
+      <option value="stars">Stars detected, most first</option>
+    </select>
+  </label>
+  <label>Stretch
+    <select id="stretch">
+      <option value="asinh">asinh (shows faint stars)</option>
+      <option value="linear">linear</option>
+    </select>
+  </label>
+  <span class="spacer"></span>
+  <button id="exportKept">Download kept list (.txt)</button>
+  <button id="exportCsv">Download all decisions (.csv)</button>
+</div>
+
+<main>
+  <section class="grid" id="grid" aria-label="Frames"></section>
+
+  <section class="viewer" aria-label="Current frame">
+    <div class="viewer-head"><h2 id="vName"></h2><span id="vPos" class="num"></span></div>
+    <canvas id="big" width="720" height="540"></canvas>
+    <dl class="facts num">
+      <dt>UT start</dt><dd id="fTime"></dd>
+      <dt>Exposure</dt><dd id="fExp"></dd>
+      <dt>FWHM</dt><dd id="fFwhm"></dd>
+      <dt>Elongation</dt><dd id="fElong"></dd>
+      <dt>Background</dt><dd id="fBg"></dd>
+      <dt>Stars detected</dt><dd id="fStars"></dd>
+      <dt>Decision</dt><dd id="fDecision"></dd>
+    </dl>
+    <div class="actions">
+      <button id="bPrev">Previous</button>
+      <button id="bKeep">Keep <kbd>k</kbd></button>
+      <button id="bReject">Reject <kbd>r</kbd></button>
+      <button id="bNext">Next</button>
+    </div>
+    <div class="reasons" id="reasons">
+      <span id="reasonPrompt">Reason for rejecting:</span>
+    </div>
+    <p class="keys"><kbd>k</kbd> keep, <kbd>r</kbd> reject then <kbd>1</kbd>–<kbd>4</kbd> for the reason, <kbd>←</kbd> <kbd>→</kbd> previous / next, <kbd>↑</kbd> <kbd>↓</kbd> row above / below.</p>
+  </section>
+</main>
+
+<script>
+// ===== Settings for the night =====
+const W = 240, H = 180;      // frame image in binned pixels
+const PIXSCALE = 0.8;        // arcsec per binned pixel
+const EXPTIME = 120;         // seconds per frame
+const N_FRAMES = 48;
+const REASONS = ['trail', 'cloud', 'blur', 'other'];
+
+// ===== Seeded random numbers =====
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20260913);
+function gauss() {
+  let u = 0;
+  while (u === 0) u = rand();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand());
+}
+
+// ===== Synthetic star field and per-frame conditions =====
+// The same patch of sky in every frame; frames differ by dither, seeing, sky and what went wrong.
+function makeField() {
+  const stars = [];
+  for (let i = 0; i < 260; i++) {
+    const mag = 19 - 7 * Math.pow(rand(), 2);  // more faint stars than bright ones
+    stars.push({ x: -12 + rand() * (W + 24), y: -12 + rand() * (H + 24), flux: 60000 * Math.pow(10, -0.4 * (mag - 12)) });
+  }
+  return stars;
+}
+
+// Which frames had a problem (index from 0). Everything else is clean.
+const PROBLEMS = {
+  6: { kind: 'trail' }, 19: { kind: 'trail' },
+  11: { kind: 'blur', len: 7 }, 37: { kind: 'blur', len: 9 }, 38: { kind: 'blur', len: 5 },
+  23: { kind: 'cloud', t: 0.55 }, 24: { kind: 'cloud', t: 0.3 }, 25: { kind: 'cloud', t: 0.2 }, 26: { kind: 'cloud', t: 0.6 },
+  43: { kind: 'column' }, 44: { kind: 'column' },
+};
+
+function transAt(f, x, y) {
+  if (!f.cloud) return f.trans;
+  const patch = 0.5 + 0.5 * Math.sin(x / 37 + f.phase) * Math.cos(y / 29 - f.phase);
+  return Math.min(1, Math.max(0.05, f.trans * (0.6 + 0.8 * patch)));
+}
+
+function makeFrames(field) {
+  const frames = [];
+  const start = Date.UTC(2026, 8, 14, 3, 5, 0);
+  for (let i = 0; i < N_FRAMES; i++) {
+    const p = PROBLEMS[i] || {};
+    let seeing = 2.0 + 0.25 * Math.sin(i / 7) + 0.08 * gauss();
+    if (i >= 29 && i <= 35) seeing += 0.9 + 0.2 * (i - 29) / 6;  // wind picked up around 04:10 UT
+    const f = {
+      i, name: 'n7789_r_' + String(i + 1).padStart(4, '0') + '.fits',
+      ut: new Date(start + i * (EXPTIME + 15) * 1000),
+      cloud: p.kind === 'cloud', trail: p.kind === 'trail', column: p.kind === 'column',
+      trans: p.kind === 'cloud' ? p.t : 0.97 + 0.03 * rand(),
+      phase: rand() * 6.28,
+      bg: 620 + i * 9 + (p.kind === 'cloud' ? 900 * (1 - p.t) : 0) + 15 * gauss(),
+      dx: (rand() - 0.5) * 12, dy: (rand() - 0.5) * 12,
+      blurLen: p.kind === 'blur' ? p.len : 0.6 * rand(),
+      blurAng: 0.3 + 0.3 * rand(),
+      sigma: seeing / PIXSCALE / 2.355,
+      decision: null, reason: null,
+    };
+    f.noise = Math.sqrt(f.bg) * 0.9 + 4;
+    // Quality numbers: FWHM from the PSF moments, elongation from the trail length, stars above 5 sigma.
+    const major = Math.sqrt(f.sigma * f.sigma + f.blurLen * f.blurLen / 12);
+    f.elong = major / f.sigma;
+    f.fwhm = 2.355 * PIXSCALE * (major + f.sigma) / 2 * (1 + 0.02 * gauss());
+    f.stars = field.filter(s => {
+      const x = s.x + f.dx, y = s.y + f.dy;
+      if (x < 3 || y < 3 || x > W - 3 || y > H - 3) return false;
+      return s.flux * transAt(f, x, y) / (2 * Math.PI * f.sigma * major) > 5 * f.noise;
+    }).length;
+    frames.push(f);
+  }
+  return frames;
+}
+
+// ===== Rendering one frame's pixels =====
+function renderPixels(f, field) {
+  const img = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    img[y * W + x] = f.bg + f.noise * gauss() + (f.cloud ? 350 * (1 - transAt(f, x, y)) : 0);
+  }
+  const steps = f.blurLen > 1 ? 9 : 1;
+  const ux = Math.cos(f.blurAng), uy = Math.sin(f.blurAng);
+  const s2 = 2 * f.sigma * f.sigma;
+  const rad = Math.ceil(3 * f.sigma) + 1;
+  for (const s of field) {
+    const cx = s.x + f.dx, cy = s.y + f.dy;
+    if (cx < -rad - f.blurLen || cy < -rad - f.blurLen || cx > W + rad + f.blurLen || cy > H + rad + f.blurLen) continue;
+    const amp = s.flux * transAt(f, cx, cy) / steps / (Math.PI * s2);
+    for (let j = 0; j < steps; j++) {
+      const off = steps > 1 ? (j / (steps - 1) - 0.5) * f.blurLen : 0;
+      const px = cx + ux * off, py = cy + uy * off;
+      const x0 = Math.max(0, Math.floor(px - rad)), x1 = Math.min(W - 1, Math.ceil(px + rad));
+      const y0 = Math.max(0, Math.floor(py - rad)), y1 = Math.min(H - 1, Math.ceil(py + rad));
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+        const d2 = (x - px) * (x - px) + (y - py) * (y - py);
+        img[y * W + x] += amp * Math.exp(-d2 / s2);
+      }
+    }
+  }
+  if (f.trail) {  // satellite: a straight line right across the chip
+    const ax = rand() * W, ang = 0.2 + rand() * 1.2, sn = Math.sin(ang), cs = Math.cos(ang);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const d = Math.abs((x - ax) * sn - y * cs);
+      if (d < 4) img[y * W + x] += 1400 * Math.exp(-d * d / 1.6);
+    }
+  }
+  if (f.column) {  // hot column: the cooler lost temperature for the last frames
+    for (let y = 0; y < H; y++) { img[y * W + 171] += 2600 + 200 * gauss(); img[y * W + 172] += 450; }
+  }
+  for (let k = 0; k < img.length; k++) if (img[k] > 65535) img[k] = 65535;
+  return img;
+}
+
+// ===== Display stretch =====
+const state = { order: [], cur: 0, sort: 'time', stretch: 'asinh', waitingReason: false };
+
+function paintFrame(f) {
+  const ctx = f.canvas.getContext('2d');
+  const out = ctx.createImageData(W, H);
+  const black = f.bg - 2 * f.noise;
+  const span = (state.stretch === 'asinh' ? 20000 : 6000) - black;
+  const beta = 200, norm = Math.asinh(beta);
+  for (let k = 0; k < f.data.length; k++) {
+    let x = (f.data[k] - black) / span;
+    x = x < 0 ? 0 : x > 1 ? 1 : x;
+    const v = 255 * (state.stretch === 'asinh' ? Math.asinh(beta * x) / norm : x);
+    out.data[4 * k] = out.data[4 * k + 1] = out.data[4 * k + 2] = v;
+    out.data[4 * k + 3] = 255;
+  }
+  ctx.putImageData(out, 0, 0);
+}
+
+// ===== Thumbnail grid =====
+const grid = document.getElementById('grid');
+
+function buildGrid() {
+  for (const f of frames) {
+    const el = document.createElement('div');
+    el.className = 'thumb';
+    el.innerHTML = `<canvas width="${W}" height="${H}"></canvas>
+      <div class="row"><span class="num">${String(f.i + 1).padStart(4, '0')}</span><span class="state"></span></div>
+      <div class="row stats num"><span>${f.fwhm.toFixed(2)}″</span><span>bg ${Math.round(f.bg)}</span><span>${f.stars} stars</span></div>`;
+    el.addEventListener('click', () => { state.cur = f.i; state.waitingReason = false; showCurrent(); });
+    f.el = el;
+    f.canvas = el.querySelector('canvas');
+    paintFrame(f);
+  }
+  placeThumbs();
+}
+
+function placeThumbs() {
+  for (const i of state.order) grid.appendChild(frames[i].el);
+}
+
+function decisionText(f) {
+  if (f.decision === 'keep') return ['Kept', 'state-keep'];
+  if (f.decision === 'reject') return ['Rejected' + (f.reason ? ': ' + f.reason : ', no reason'), 'state-reject'];
+  return ['Not decided', 'state-none'];
+}
+
+function updateThumb(f) {
+  const [text, cls] = decisionText(f);
+  const s = f.el.querySelector('.state');
+  s.textContent = text; s.className = 'state ' + cls;
+  f.el.classList.toggle('rejected', f.decision === 'reject');
+  f.el.classList.toggle('current', f.i === state.cur);
+}
+
+// ===== Sorting =====
+function applySort() {
+  const key = {
+    time: f => f.i,
+    fwhm: f => f.fwhm,
+    bg: f => f.bg,
+    stars: f => -f.stars,
+  }[state.sort];
+  state.order = frames.map(f => f.i).sort((a, b) => key(frames[a]) - key(frames[b]));
+  placeThumbs();
+}
+
+// ===== Large view and facts for the current frame =====
+const big = document.getElementById('big');
+
+function showCurrent() {
+  const f = frames[state.cur];
+  const ctx = big.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(f.canvas, 0, 0, big.width, big.height);
+  document.getElementById('vName').textContent = f.name;
+  document.getElementById('vPos').textContent = (state.order.indexOf(f.i) + 1) + ' of ' + frames.length;
+  document.getElementById('fTime').textContent = f.ut.toISOString().slice(11, 19);
+  document.getElementById('fExp').textContent = EXPTIME + ' s';
+  document.getElementById('fFwhm').textContent = f.fwhm.toFixed(2) + '″';
+  document.getElementById('fElong').textContent = f.elong.toFixed(2);
+  document.getElementById('fBg').textContent = Math.round(f.bg) + ' ADU';
+  document.getElementById('fStars').textContent = f.stars;
+  const [text, cls] = decisionText(f);
+  const d = document.getElementById('fDecision');
+  d.textContent = text; d.className = cls;
+  const box = document.getElementById('reasons');
+  box.classList.toggle('waiting', state.waitingReason);
+  document.getElementById('reasonPrompt').textContent = state.waitingReason ? 'Why reject it? Press 1–4:' : 'Reason for rejecting:';
+  box.querySelectorAll('button').forEach(b => b.classList.toggle('on', f.decision === 'reject' && f.reason === b.dataset.reason));
+  frames.forEach(updateThumb);
+  f.el.scrollIntoView({ block: 'nearest' });
+}
+
+// ===== Decisions =====
+function decide(decision, reason) {
+  const f = frames[state.cur];
+  f.decision = decision;
+  f.reason = decision === 'reject' ? (reason || null) : null;
+  updateTally();
+  if (decision === 'reject' && !reason) { state.waitingReason = true; showCurrent(); return; }
+  state.waitingReason = false;
+  move(1);
+}
+
+function move(delta) {
+  const pos = state.order.indexOf(state.cur);
+  const next = Math.max(0, Math.min(state.order.length - 1, pos + delta));
+  state.cur = state.order[next];
+  state.waitingReason = false;
+  showCurrent();
+}
+
+function gridColumns() {
+  return getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+}
+
+// ===== Tally: kept count, exposure against target, reasons =====
+function updateTally() {
+  const kept = frames.filter(f => f.decision === 'keep');
+  const rej = frames.filter(f => f.decision === 'reject');
+  const minutes = kept.length * EXPTIME / 60;
+  const target = Number(document.getElementById('target').value) || 0;
+  document.getElementById('tKept').textContent = kept.length;
+  document.getElementById('tTotal').textContent = frames.length;
+  document.getElementById('tExp').textContent = minutes.toFixed(1);
+  const t = document.getElementById('tTarget');
+  if (minutes >= target) { t.textContent = '(target met)'; t.className = 'met'; }
+  else { t.textContent = `(${Math.ceil((target - minutes) * 60 / EXPTIME)} more frames needed)`; t.className = 'short'; }
+  document.getElementById('tRej').textContent = rej.length;
+  const parts = REASONS.map(r => [r, rej.filter(f => f.reason === r).length]).filter(([, n]) => n);
+  const none = rej.filter(f => !f.reason).length;
+  if (none) parts.push(['no reason', none]);
+  document.getElementById('tReasons').textContent = parts.length ? '(' + parts.map(([r, n]) => `${r} ${n}`).join(', ') + ')' : '';
+  document.getElementById('tUnd').textContent = frames.length - kept.length - rej.length;
+}
+
+// ===== Export =====
+function download(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function exportKept() {
+  const names = frames.filter(f => f.decision === 'keep').map(f => f.name);
+  if (!names.length) { alert('No frames are kept yet, so there is nothing to export.'); return; }
+  download('n7789_r_20260913_kept.txt', names.join('\n') + '\n', 'text/plain');
+}
+
+function exportCsv() {
+  const rows = [['file', 'ut_start', 'exptime_s', 'fwhm_arcsec', 'elongation', 'background_adu', 'stars', 'decision', 'reason']];
+  for (const f of frames) {
+    rows.push([f.name, f.ut.toISOString(), EXPTIME, f.fwhm.toFixed(2), f.elong.toFixed(2), Math.round(f.bg), f.stars, f.decision || 'undecided', f.reason || '']);
+  }
+  download('n7789_r_20260913_decisions.csv', rows.map(r => r.join(',')).join('\n') + '\n', 'text/csv');
+}
+
+// ===== Keyboard and buttons =====
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, select, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
+  const n = REASONS[Number(e.key) - 1];
+  if (e.key === 'k') decide('keep');
+  else if (e.key === 'r') decide('reject');
+  else if (n) decide('reject', n);
+  else if (e.key === 'ArrowRight') move(1);
+  else if (e.key === 'ArrowLeft') move(-1);
+  else if (e.key === 'ArrowDown') move(gridColumns());
+  else if (e.key === 'ArrowUp') move(-gridColumns());
+  else return;
+  e.preventDefault();
+});
+
+REASONS.forEach((r, k) => {
+  const b = document.createElement('button');
+  b.dataset.reason = r;
+  b.innerHTML = `<kbd>${k + 1}</kbd> ${r}`;
+  b.addEventListener('click', () => decide('reject', r));
+  document.getElementById('reasons').appendChild(b);
+});
+document.getElementById('bKeep').addEventListener('click', () => decide('keep'));
+document.getElementById('bReject').addEventListener('click', () => decide('reject'));
+document.getElementById('bPrev').addEventListener('click', () => move(-1));
+document.getElementById('bNext').addEventListener('click', () => move(1));
+document.getElementById('sort').addEventListener('change', e => { state.sort = e.target.value; applySort(); showCurrent(); });
+document.getElementById('stretch').addEventListener('change', e => { state.stretch = e.target.value; frames.forEach(paintFrame); showCurrent(); });
+document.getElementById('target').addEventListener('input', updateTally);
+document.getElementById('exportKept').addEventListener('click', exportKept);
+document.getElementById('exportCsv').addEventListener('click', exportCsv);
+
+// ===== Start =====
+const field = makeField();
+const frames = makeFrames(field);
+frames.forEach(f => { f.data = renderPixels(f, field); });
+state.order = frames.map(f => f.i);
+buildGrid();
+updateTally();
+showCurrent();
+</script>
+</body>
+</html>

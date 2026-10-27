@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transcript coder: courier interviews</title>
+<style>
+  /* ---------- Base ---------- */
+  :root {
+    --bg: #f5f5f3; --panel: #ffffff; --line: #d9d9d4; --soft-line: #ecece8;
+    --ink: #1f2328; --muted: #6b6f76; --accent: #2b5f8f; --accent-soft: #e7eef5;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { border: 1px solid var(--line); background: var(--panel); border-radius: 4px; padding: 3px 10px; cursor: pointer; }
+  button:hover { border-color: #b8b8b1; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+
+  /* ---------- Header and participant tabs ---------- */
+  header { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); height: 48px; }
+  header h1 { font-size: 15px; font-weight: 600; margin: 0 10px 0 0; }
+  .tabs { display: flex; gap: 4px; }
+  .tabs button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .spacer { flex: 1; }
+  #status { color: var(--muted); font-size: 13px; }
+
+  /* ---------- Layout ---------- */
+  main { display: grid; grid-template-columns: 1fr 330px; height: calc(100vh - 48px); }
+  #transcript { overflow-y: auto; padding: 14px 24px 60px; }
+  #codebook { overflow-y: auto; border-left: 1px solid var(--line); background: var(--panel); padding: 14px 16px 40px; }
+  #codebook section { margin-bottom: 20px; }
+
+  /* ---------- Transcript turns ---------- */
+  .meta { color: var(--muted); margin: 0 0 10px; display: flex; gap: 10px; align-items: center; }
+  .turn { display: grid; grid-template-columns: 96px 1fr 190px; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--soft-line); }
+  .turn.target { background: var(--accent-soft); }
+  .who { font-size: 12px; color: var(--muted); padding-top: 2px; }
+  .turn.participant .who b { color: var(--ink); }
+  .turn-text { margin: 0; white-space: pre-wrap; }
+  .turn.interviewer .turn-text { color: #50555c; }
+  .seg { border-radius: 2px; padding: 1px 0; }
+  .seg.multi { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+  .jump { padding: 0 6px; font-size: 12px; margin-bottom: 2px; }
+  .chips { display: flex; flex-direction: column; gap: 4px; }
+  .chip { display: flex; align-items: center; gap: 6px; font-size: 12px; border: 1px solid var(--line); border-radius: 4px; padding: 1px 2px 1px 6px; background: var(--panel); }
+  .chip .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip button { border: 0; padding: 0 6px; color: var(--muted); background: none; }
+  .chip button:hover { color: var(--ink); }
+  .sw { width: 10px; height: 10px; border-radius: 2px; flex: none; display: inline-block; }
+  .empty { color: var(--muted); padding: 24px 0; }
+
+  /* ---------- Codebook sidebar ---------- */
+  #selection { border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; background: #fafaf8; font-size: 13px; }
+  #selection.has { border-color: var(--accent); background: var(--accent-soft); }
+  #selection q { display: block; margin: 4px 0; }
+  #code-list { list-style: none; margin: 0; padding: 0; }
+  .code { border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; margin-bottom: 8px; }
+  .code.filtering { border-color: var(--accent); background: var(--accent-soft); }
+  .code-head { display: flex; align-items: center; gap: 8px; }
+  .code-head .apply { flex: 1; text-align: left; font-weight: 600; border: 0; padding: 0; background: none; }
+  .code-head .apply:hover { text-decoration: underline; }
+  .code-head .filter { font-size: 12px; padding: 1px 8px; }
+  .code-head .filter[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .def { margin: 4px 0; font-size: 13px; color: #3c4047; }
+  .count { margin: 0; font-size: 12px; color: var(--muted); }
+  .per { margin: 2px 0 0; font-size: 12px; color: var(--muted); display: flex; gap: 8px; }
+  .per .zero { opacity: .45; }
+  #add-code label { display: block; font-size: 12px; color: var(--muted); margin: 6px 0 2px; }
+  #add-code input, #add-code textarea { width: 100%; border: 1px solid var(--line); border-radius: 4px; padding: 5px 7px; background: #fff; }
+  #add-code textarea { height: 64px; resize: vertical; }
+  #add-code button { margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Courier interviews: coding</h1>
+  <div class="tabs" id="tabs"></div>
+  <div class="spacer"></div>
+  <span id="status"></span>
+  <button id="export" class="primary">Export segments (CSV)</button>
+</header>
+<main>
+  <div id="transcript"></div>
+  <aside id="codebook">
+    <section>
+      <h2>Selected passage</h2>
+      <div id="selection"></div>
+    </section>
+    <section>
+      <h2>Codebook</h2>
+      <ul id="code-list"></ul>
+    </section>
+    <section>
+      <h2>Add a code</h2>
+      <form id="add-code">
+        <label for="new-name">Name</label>
+        <input id="new-name" required maxlength="40" placeholder="e.g. Multi-apping">
+        <label for="new-def">Definition</label>
+        <textarea id="new-def" required placeholder="When to apply it, and when not to"></textarea>
+        <button type="submit">Add code</button>
+      </form>
+    </section>
+    <section>
+      <h2>Saved in this browser</h2>
+      <button id="clear-all">Clear all coding</button>
+    </section>
+  </aside>
+</main>
+
+<script>
+// ===================== Data: codebook and transcripts (synthetic) =====================
+const PALETTE = ['#4f6fa8', '#b5651d', '#3f7f5f', '#a0527a', '#8a7a2e', '#5f8a8b', '#9a5b4b', '#6f7d4a', '#7a6a58'];
+const DEFAULT_CODES = [
+  { id: 'FT', name: 'Folk theory', color: PALETTE[0], def: "The courier's own explanation of how the app decides who gets which order, pay or rating." },
+  { id: 'WA', name: 'Workaround', color: PALETTE[1], def: 'Something the courier does to get around or game the app (declining, logging off, ignoring the route, extra evidence).' },
+  { id: 'INC', name: 'Income uncertainty', color: PALETTE[2], def: 'Not knowing what a shift or order will pay, or pay changing with no explanation.' },
+  { id: 'PEER', name: 'Peer knowledge', color: PALETTE[3], def: 'Learning from other couriers: group chats, forums, videos, talk at pickup spots.' },
+  { id: 'SAFE', name: 'Safety', color: PALETTE[4], def: 'Physical risk on the road or at pickup and drop-off, and whether the app accounts for it.' },
+  { id: 'DIST', name: 'Distrust of platform', color: PALETTE[8], def: 'Doubt that the platform is honest or fair with couriers. Not for plain confusion; use Folk theory for that.' },
+  { id: 'SUPP', name: 'Support and deactivation', color: PALETTE[6], def: 'Dealing with platform support, disputes, flags or the threat of deactivation.' }
+];
+// Each turn is [speaker, text]; 'I' is the interviewer, 'P' the participant.
+const PARTICIPANTS = [
+  { id: 'P01', about: 'Bike, 3 years, full-time', turns: [
+    ['I', 'Can you walk me through how you decide which orders to take?'],
+    ['P', "Honestly it's mostly gut at this point. If it's a restaurant I know is slow, like the noodle place on Grand, I decline unless the pay is over eight bucks, because I'll sit there twenty minutes and the app doesn't pay you for waiting."],
+    ['I', "When you say the app doesn't pay for waiting, how do you know that?"],
+    ['P', "You just see it. The offer says six-fifty and it's six-fifty whether I wait two minutes or twenty-five. Some guys say there's a wait bonus if you message support, but I've never seen it."],
+    ['I', 'Do you have a sense of how the app picks who gets an order?'],
+    ['P', "My theory is it's your acceptance rate. When I was accepting everything I got the good downtown orders. Then I started declining the long ones and for like a week I only got junk. So I think it punishes you, but nobody can prove it."],
+    ['I', 'Where do you hear about things like that?'],
+    ['P', "There's a group chat, maybe forty of us, mostly bike people. Someone posts 'dead zone by the stadium, don't go' and everyone moves. That's more useful than anything in the app."],
+    ['I', 'Have you ever felt unsafe while delivering?'],
+    ['P', "The app routes bikes onto the highway frontage road, which is insane. I don't follow the route, I take the river path. It's longer but I'm not getting clipped by a truck. Then the app thinks I'm slow."]
+  ] },
+  { id: 'P02', about: 'Car, 8 months, evenings after a day job', turns: [
+    ['I', 'Tell me about a typical evening for you.'],
+    ['P', "I get off at five, eat, and I'm online by six. I try to hit dinner rush till nine. Some nights I make ninety bucks, some nights forty, and I can't tell you why. Same hours, same area."],
+    ['I', 'What do you think explains the difference?'],
+    ['P', "I really don't know. My friend says they flood the area with new drivers on weekends so there's less for everyone. That kind of makes sense, but it could just be the weather."],
+    ['I', 'Have you had to contact support?'],
+    ['P', "Once a customer said they never got the food, and I had a photo of it on their porch. Support took four days to answer and by then I'd been flagged. I sent the photo three times. It was all copy-paste answers."],
+    ['I', 'How did that change how you work?'],
+    ['P', "Now I take two photos for every drop, one wide with the house number. And I screenshot the order before I accept. It's extra work but I don't trust them to have my back."],
+    ['I', 'Anything else you do differently since you started?'],
+    ['P', 'I sit in the parking lot of the big shopping center because people on the forum say orders come from there first. Could be a myth. I still do it.']
+  ] },
+  { id: 'P03', about: 'Scooter, 18 months, runs two apps at once', turns: [
+    ['I', 'You mentioned you run two apps at once. How does that work?'],
+    ['P', "I keep both open on two phones on the handlebar. Whichever gives me a better offer first, I take, and I pause the other one. If I get a stacked order on one I log off the other so I don't get dinged for ignoring it."],
+    ['I', 'How do you judge a better offer?'],
+    ['P', "Dollars per mile, roughly. Anything under one-fifty a mile I skip. But one of them hides the drop-off until you accept, so half the time you're guessing."],
+    ['I', 'How do you feel about the guessing?'],
+    ['P', "It feels like they do it on purpose. If they showed you everything, nobody would take the far ones. So they make you gamble. They're not really on our side."],
+    ['I', 'What happens when something goes wrong on a delivery?'],
+    ['P', "Last month an apartment had no lights, no numbers, I went around three times at eleven at night. There's no button for 'this place is unsafe'. I just marked it delivered at the lobby and hoped."],
+    ['I', 'Do you talk to other couriers about these things?'],
+    ['P', "Not much. I'm a bit of a loner. Sometimes I watch YouTube guys who explain the algorithm, but half of them are selling a course."]
+  ] }
+];
+// A few passages already coded, so the counts are not empty on first open.
+const SEED = [
+  { pid: 'P01', turn: 5, quote: "My theory is it's your acceptance rate.", code: 'FT' },
+  { pid: 'P01', turn: 7, quote: "There's a group chat, maybe forty of us, mostly bike people.", code: 'PEER' },
+  { pid: 'P02', turn: 1, quote: "Some nights I make ninety bucks, some nights forty, and I can't tell you why.", code: 'INC' },
+  { pid: 'P03', turn: 5, quote: "It feels like they do it on purpose. If they showed you everything, nobody would take the far ones.", code: 'FT' },
+  { pid: 'P03', turn: 5, quote: "They're not really on our side.", code: 'DIST' }
+];
+
+// ===================== State and saving =====================
+const STORE_KEY = 'transcript-coder/courier-study/v1';
+let state = loadState();
+let current = 'P01';
+let filterCode = null;   // when set, the transcript pane shows only turns with this code
+let pending = null;      // the passage selected but not yet coded
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (saved && saved.codes && saved.segments) return saved;
+  } catch (e) { /* fall through to the seed */ }
+  const s = { codes: DEFAULT_CODES.map(c => ({ ...c })), segments: [], nextId: 1 };
+  SEED.forEach(x => {
+    const text = PARTICIPANTS.find(p => p.id === x.pid).turns[x.turn][1];
+    const start = text.indexOf(x.quote);
+    if (start >= 0) s.segments.push({ id: s.nextId++, pid: x.pid, turn: x.turn, start, end: start + x.quote.length, code: x.code, text: x.quote });
+  });
+  return s;
+}
+function saveState() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+// ===================== Helpers =====================
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const participant = id => PARTICIPANTS.find(p => p.id === id);
+const codeById = id => state.codes.find(c => c.id === id);
+const speakerOf = (pid, turn) => participant(pid).turns[turn][0] === 'I' ? 'Interviewer' : pid;
+function setStatus(msg) { $('status').textContent = msg; }
+
+// ===================== Participant tabs =====================
+function renderTabs() {
+  $('tabs').innerHTML = PARTICIPANTS.map(p => {
+    const n = state.segments.filter(s => s.pid === p.id).length;
+    return `<button data-pid="${p.id}" aria-pressed="${!filterCode && p.id === current}" title="${n} coded segments">${p.id}</button>`;
+  }).join('');
+}
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  current = b.dataset.pid; filterCode = null; pending = null; renderAll();
+  $('transcript').scrollTop = 0;
+});
+
+// ===================== Transcript view (one participant) =====================
+function renderTranscript() {
+  if (filterCode) return renderFilterView();
+  const p = participant(current);
+  const n = state.segments.filter(s => s.pid === p.id).length;
+  let html = `<p class="meta"><b>${p.id}</b><span>${esc(p.about)}</span><span>${n} coded segment${n === 1 ? '' : 's'}</span></p>`;
+  p.turns.forEach((t, i) => { html += turnRow(p, i, false); });
+  $('transcript').innerHTML = html;
+}
+
+// ===================== Filter view (one code, all participants) =====================
+function renderFilterView() {
+  const c = codeById(filterCode);
+  const segs = state.segments.filter(s => s.code === c.id);
+  const turns = [];
+  PARTICIPANTS.forEach(p => p.turns.forEach((t, i) => {
+    if (segs.some(s => s.pid === p.id && s.turn === i)) turns.push([p, i]);
+  }));
+  const people = new Set(segs.map(s => s.pid)).size;
+  let html = `<p class="meta"><span class="sw" style="background:${c.color}"></span><b>${esc(c.name)}</b>
+    <span>${segs.length} segments in ${turns.length} turns, ${people} of ${PARTICIPANTS.length} participants</span>
+    <button id="clear-filter">Show full transcript</button></p>`;
+  if (!turns.length) html += `<p class="empty">No passages are coded ${esc(c.name)} yet.</p>`;
+  turns.forEach(([p, i]) => { html += turnRow(p, i, true); });
+  $('transcript').innerHTML = html;
+  $('clear-filter').onclick = () => { filterCode = null; renderAll(); };
+}
+
+// ===================== Turn row: text with tinted segments, and code chips =====================
+function turnRow(p, i, withPid) {
+  const [who, text] = p.turns[i];
+  const segs = state.segments.filter(s => s.pid === p.id && s.turn === i).sort((a, b) => a.start - b.start);
+  const speaker = who === 'I' ? 'Interviewer' : `<b>${p.id}</b>`;
+  const label = withPid
+    ? `<button class="jump" data-pid="${p.id}" data-turn="${i}" title="Open this turn in ${p.id}'s transcript">${p.id}, turn ${i + 1}</button><br>${speaker}`
+    : `${speaker}<br>turn ${i + 1}`;
+  return `<div class="turn ${who === 'I' ? 'interviewer' : 'participant'}" id="t-${p.id}-${i}">
+    <div class="who">${label}</div>
+    <p class="turn-text" data-pid="${p.id}" data-turn="${i}">${markup(text, segs)}</p>
+    <div class="chips">${segs.map(chip).join('')}</div>
+  </div>`;
+}
+
+// Cut the text at every segment edge; each piece is tinted by the codes covering it.
+// One code: tinted background. Two or more: tint of the first, underline in the second.
+function markup(text, segs) {
+  if (!segs.length) return esc(text);
+  const cuts = [...new Set([0, text.length, ...segs.flatMap(s => [s.start, s.end])])].sort((a, b) => a - b);
+  let out = '';
+  for (let k = 0; k < cuts.length - 1; k++) {
+    const a = cuts[k], b = cuts[k + 1];
+    const piece = esc(text.slice(a, b));
+    const on = segs.filter(s => s.start <= a && s.end >= b).map(s => codeById(s.code)).filter(Boolean);
+    if (!on.length) { out += piece; continue; }
+    const style = `background:${on[0].color}38;` + (on[1] ? `text-decoration-color:${on[1].color};` : '');
+    out += `<span class="seg${on[1] ? ' multi' : ''}" style="${style}" title="${esc(on.map(c => c.name).join(' + '))}">${piece}</span>`;
+  }
+  return out;
+}
+
+function chip(s) {
+  const c = codeById(s.code); if (!c) return '';
+  return `<div class="chip" title="${esc('“' + s.text + '”')}"><span class="sw" style="background:${c.color}"></span>
+    <span class="name">${esc(c.name)}</span>
+    <button data-remove="${s.id}" aria-label="Remove ${esc(c.name)} from this passage" title="Remove code">×</button></div>`;
+}
+
+$('transcript').addEventListener('click', e => {
+  const rm = e.target.closest('[data-remove]');
+  if (rm) {
+    const s = state.segments.find(x => x.id === +rm.dataset.remove);
+    state.segments = state.segments.filter(x => x !== s);
+    saveState(); renderAll(); setStatus(`Removed ${codeById(s.code).name} from ${s.pid}, turn ${s.turn + 1}`);
+    return;
+  }
+  const jump = e.target.closest('.jump');
+  if (jump) jumpTo(jump.dataset.pid, +jump.dataset.turn);
+});
+
+function jumpTo(pid, turn) {
+  filterCode = null; current = pid; renderAll();
+  const row = $(`t-${pid}-${turn}`);
+  row.scrollIntoView({ block: 'center' });
+  row.classList.add('target');
+  setTimeout(() => row.classList.remove('target'), 1600);
+}
+
+// ===================== Selecting a passage =====================
+$('transcript').addEventListener('mouseup', () => {
+  const sel = window.getSelection();
+  if (!sel.rangeCount || sel.isCollapsed) return;
+  const r = sel.getRangeAt(0);
+  const host = textHost(r.startContainer);
+  if (!host || host !== textHost(r.endContainer)) {
+    pending = null; renderSelection('Select within one turn. A passage cannot cross speakers.');
+    return;
+  }
+  const pid = host.dataset.pid, turn = +host.dataset.turn;
+  const full = participant(pid).turns[turn][1];
+  let start = offsetIn(host, r.startContainer, r.startOffset), end = offsetIn(host, r.endContainer, r.endOffset);
+  while (start < end && /\s/.test(full[start])) start++;
+  while (end > start && /\s/.test(full[end - 1])) end--;
+  if (end <= start) return;
+  pending = { pid, turn, start, end, text: full.slice(start, end) };
+  renderSelection();
+});
+function textHost(node) { const el = node.nodeType === 1 ? node : node.parentElement; return el && el.closest('.turn-text'); }
+function offsetIn(host, node, off) {
+  const r = document.createRange(); r.setStart(host, 0); r.setEnd(node, off);
+  return r.toString().length;
+}
+
+function renderSelection(msg) {
+  const box = $('selection');
+  box.classList.toggle('has', !!pending);
+  if (pending) {
+    const t = pending.text.length > 160 ? pending.text.slice(0, 160) + '…' : pending.text;
+    box.innerHTML = `${pending.pid}, turn ${pending.turn + 1} (${speakerOf(pending.pid, pending.turn)})<q>${esc(t)}</q>Click a code name to apply it.`;
+  } else {
+    box.textContent = msg || 'Select text in the transcript, then click a code name below.';
+  }
+}
+
+// ===================== Codebook sidebar: apply, counts, filter =====================
+function renderCodebook() {
+  $('code-list').innerHTML = state.codes.map(c => {
+    const segs = state.segments.filter(s => s.code === c.id);
+    const people = new Set(segs.map(s => s.pid)).size;
+    const count = segs.length
+      ? `${segs.length} segment${segs.length === 1 ? '' : 's'}, ${people} of ${PARTICIPANTS.length} participants`
+      : 'Not applied yet';
+    const per = PARTICIPANTS.map(p => {
+      const n = segs.filter(s => s.pid === p.id).length;
+      return `<span class="${n ? '' : 'zero'}">${p.id} ${n}</span>`;
+    }).join('');
+    return `<li class="code${filterCode === c.id ? ' filtering' : ''}">
+      <div class="code-head"><span class="sw" style="background:${c.color}"></span>
+        <button class="apply" data-apply="${c.id}" title="Apply to the selected passage">${esc(c.name)}</button>
+        <button class="filter" data-filter="${c.id}" aria-pressed="${filterCode === c.id}">Show turns</button></div>
+      <p class="def">${esc(c.def)}</p>
+      <p class="count">${count}</p>
+      ${segs.length ? `<p class="per">${per}</p>` : ''}
+    </li>`;
+  }).join('');
+}
+
+$('code-list').addEventListener('click', e => {
+  const a = e.target.closest('[data-apply]');
+  if (a) return applyCode(a.dataset.apply);
+  const f = e.target.closest('[data-filter]');
+  if (f) { filterCode = filterCode === f.dataset.filter ? null : f.dataset.filter; renderAll(); $('transcript').scrollTop = 0; }
+});
+
+function applyCode(codeId) {
+  const c = codeById(codeId);
+  if (!pending) { renderSelection(`Select a passage first, then click ${c.name}.`); return; }
+  const same = state.segments.find(s => s.pid === pending.pid && s.turn === pending.turn &&
+    s.start === pending.start && s.end === pending.end && s.code === codeId);
+  if (same) { setStatus(`That passage is already coded ${c.name}`); return; }
+  state.segments.push({ id: state.nextId++, ...pending, code: codeId });
+  saveState();
+  setStatus(`Coded ${c.name}: ${pending.pid}, turn ${pending.turn + 1}`);
+  pending = null;
+  window.getSelection().removeAllRanges();
+  renderAll();
+}
+
+// ===================== Adding a code =====================
+$('add-code').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = $('new-name').value.trim(), def = $('new-def').value.trim();
+  if (!name || !def) return;
+  if (state.codes.some(c => c.name.toLowerCase() === name.toLowerCase())) { setStatus(`There is already a code called ${name}`); return; }
+  const used = new Set(state.codes.map(c => c.color));
+  const color = PALETTE.find(p => !used.has(p)) || PALETTE[state.codes.length % PALETTE.length];
+  let id = name.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 6) || 'CODE';
+  while (codeById(id)) id += '2';
+  state.codes.push({ id, name, color, def });
+  $('new-name').value = ''; $('new-def').value = '';
+  saveState(); renderAll(); setStatus(`Added code ${name}`);
+});
+
+// ===================== Export coded segments as CSV =====================
+function csvCell(v) { const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+$('export').addEventListener('click', () => {
+  const order = id => PARTICIPANTS.findIndex(p => p.id === id);
+  const segs = [...state.segments].sort((a, b) => order(a.pid) - order(b.pid) || a.turn - b.turn || a.start - b.start);
+  const rows = [['participant', 'turn', 'speaker', 'code', 'text']];
+  segs.forEach(s => rows.push([s.pid, s.turn + 1, speakerOf(s.pid, s.turn), codeById(s.code).name, s.text]));
+  const blob = new Blob([rows.map(r => r.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `coded-segments-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+  setStatus(`Exported ${segs.length} segments`);
+});
+
+$('clear-all').addEventListener('click', () => {
+  if (!confirm(`Remove all ${state.segments.length} coded segments? Added codes are kept.`)) return;
+  state.segments = []; saveState(); renderAll(); setStatus('Cleared all coding');
+});
+
+// ===================== Start =====================
+function renderAll() { renderTabs(); renderTranscript(); renderCodebook(); renderSelection(); }
+renderAll();
+</script>
+</body>
+</html>

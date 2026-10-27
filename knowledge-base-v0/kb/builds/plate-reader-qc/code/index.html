@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Growth curve QC, 96-well plate</title>
+<style>
+  :root {
+    --bg: #f5f5f3; --panel: #fff; --line: #d8d8d4; --text: #1d1d1f; --muted: #6a6a66;
+    --accent: #1f5f99; --flag: #b4532a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; padding: 12px 20px;
+    background: var(--panel); border-bottom: 1px solid var(--line); }
+  h1 { font-size: 17px; font-weight: 600; margin: 0; }
+  h2 { font-size: 14px; font-weight: 600; margin: 0; }
+  .muted { color: var(--muted); }
+  .layout { display: grid; grid-template-columns: auto minmax(360px, 1fr); gap: 16px; padding: 16px 20px; align-items: start; }
+  @media (max-width: 1250px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; overflow-x: auto; }
+  .boxhead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .btn { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--panel); border-radius: 6px;
+    padding: 5px 10px; cursor: pointer; color: var(--text); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  /* plate of small multiples */
+  .plate { display: grid; grid-template-columns: 70px repeat(12, 68px); gap: 2px; }
+  .colhead, .rowhead { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.2; }
+  .colhead { padding-bottom: 3px; } .colhead b, .rowhead b { color: var(--text); }
+  .rowhead { display: flex; flex-direction: column; justify-content: center; text-align: right; padding-right: 6px; }
+  .well { position: relative; width: 68px; height: 46px; padding: 1px; border: 1px solid var(--line); border-radius: 4px;
+    background: var(--panel); cursor: pointer; }
+  .well svg { display: block; }
+  .well .sm-data { fill: none; stroke: #55554f; stroke-width: 1; }
+  .well .sm-fit { fill: none; stroke: var(--accent); stroke-width: 1.2; }
+  .well.flagged { border-color: var(--flag); }
+  .well .mark { position: absolute; top: 1px; right: 3px; font-size: 9px; font-weight: 600; color: var(--flag); }
+  .well.excluded svg { opacity: .25; }
+  .well.excluded .mark { color: var(--muted); }
+  .well.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .plate-key { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .key-line { display: inline-block; width: 16px; height: 0; border-top: 1.5px solid; vertical-align: middle; margin-right: 4px; }
+
+  /* selected well */
+  .big svg { width: 100%; height: auto; display: block; }
+  .big .axis text { font-size: 12px; fill: var(--muted); }
+  .big .axis line, .big .axis path { stroke: #bdbdb8; }
+  .big .pt { fill: #55554f; }
+  .big .pt.dropped { fill: none; stroke: #a9a9a3; }
+  .big .fit { fill: none; stroke: var(--accent); stroke-width: 2; }
+  .big .tangent { stroke: var(--accent); stroke-dasharray: 4 3; stroke-width: 1; }
+  .params { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 16px; margin: 10px 0; }
+  .params div span { display: block; font-size: 12px; color: var(--muted); }
+  .params div b { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .flags { margin: 6px 0 10px; padding: 0; list-style: none; font-size: 13px; color: var(--flag); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .empty { color: var(--muted); margin: 0; }
+
+  /* summary */
+  table.summary { border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+  table.summary th { font-weight: 500; color: var(--muted); padding: 4px 6px; text-align: center; }
+  table.summary th.strain { text-align: right; color: var(--text); }
+  table.summary td { width: 56px; height: 34px; text-align: center; border: 1px solid #fff; }
+  table.summary td small { display: block; font-size: 10px; opacity: .8; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Growth curve QC</h1>
+  <span class="muted">OD600 every 15 min for 24 h · rows: strain in duplicate · columns: ciprofloxacin, µg/mL · column 12: media only</span>
+  <span id="plate-counts" class="muted"></span>
+</header>
+
+<main class="layout">
+  <!-- View: plate of small multiples -->
+  <section class="box" id="plate-view">
+    <div class="boxhead">
+      <h2>Plate</h2>
+      <div class="actions">
+        <button class="btn" id="next-flag">Next flagged well</button>
+        <button class="btn primary" id="export-csv">Download kept wells (CSV)</button>
+      </div>
+    </div>
+    <div class="plate" id="plate"></div>
+    <div class="plate-key">
+      <span><span class="key-line" style="color:#55554f"></span>OD600</span>
+      <span><span class="key-line" style="color:var(--accent)"></span>logistic fit</span>
+      <span id="y-scale"></span>
+      <span style="color:var(--flag)">flag: a QC rule fired, see the well</span>
+    </div>
+  </section>
+
+  <!-- View: selected well, large curve with fit -->
+  <section class="box big" id="detail-view">
+    <div id="detail"></div>
+  </section>
+</main>
+
+<!-- View: summary of growth rate by strain and concentration -->
+<section class="box" id="summary-view" style="margin: 0 20px 20px">
+  <div class="boxhead"><h2>Max growth rate by strain and ciprofloxacin (mean of kept replicate wells, OD/h)</h2></div>
+  <div id="summary"></div>
+</section>
+
+<script>
+// ===== Plate layout and synthetic data =====
+const ROWS = 'ABCDEFGH'.split('');
+const STRAINS = ['WT', 'ΔacrB', 'ΔtolC', 'marR*'];
+const CONCS = [0, 0.001, 0.002, 0.004, 0.008, 0.016, 0.031, 0.063, 0.125, 0.25, 0.5, null]; // null = media blank
+const TIMES = Array.from({ length: 97 }, (_, i) => i * 0.25);                                  // hours
+const IC50 = { 'WT': 0.012, 'ΔacrB': 0.004, 'ΔtolC': 0.002, 'marR*': 0.05 };
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20261001);
+function gauss() { let u = 0; while (!u) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); }
+const logistic = (t, p) => p[0] + p[1] / (1 + Math.exp(-p[2] * (t - p[3])));   // p = [baseline, K, r, t_mid]
+const concLabel = c => c === null ? 'blank' : c === 0 ? 'no drug' : String(c);
+
+function makeWell(r, c) {
+  const id = ROWS[r] + (c + 1), strain = STRAINS[r >> 1], conc = CONCS[c];
+  const y0 = 0.045 + 0.004 * gauss();
+  let p = [y0, 0, 1, 12];                                         // media only: flat
+  if (conc !== null) {
+    const f = 1 / (1 + Math.pow(conc / IC50[strain], 2));          // fraction of drug-free growth
+    if (f >= 0.06) p = [y0, (0.55 + 0.45 * f) * (0.95 + 0.04 * gauss()),
+      (0.25 + 0.7 * f) * (1 + 0.05 * gauss()), 4.5 + 4 * (1 - f) + 0.3 * gauss()];
+    else p = [y0, 0.01, 0.5, 12];
+  }
+  if (id === 'D1') p = [y0, 0, 1, 12];                            // missed with the multichannel
+  if (id === 'G12') p = [y0, 0.45, 0.6, 17];                      // contaminated blank
+  const od = TIMES.map(t => { const m = logistic(t, p); return m + 0.005 * gauss() + 0.01 * (m - y0) * gauss(); });
+  if (id === 'B3') [28, 29, 30, 31].forEach((i, k) => od[i] += 0.22 + 0.04 * k);   // bubble
+  if (id === 'B3') od[62] += 0.17;
+  if (id === 'E7') [44, 45, 46].forEach(i => od[i] += 0.15);
+  return { id, row: r, col: c, strain, rep: (r % 2) + 1, conc, od: od.map(v => +v.toFixed(4)),
+           dropped: new Set(), excluded: false, fit: null, flags: [] };
+}
+const WELLS = [];
+for (let r = 0; r < 8; r++) for (let c = 0; c < 12; c++) WELLS.push(makeWell(r, c));
+const byId = Object.fromEntries(WELLS.map(w => [w.id, w]));
+const state = { selected: null };
+
+// ===== Logistic fit (Levenberg-Marquardt least squares) =====
+const median = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const movingMedian = (ys, k) => ys.map((_, i) => median(ys.slice(Math.max(0, i - k), i + k + 1)));
+
+function solve(A, b) {                       // Gaussian elimination with partial pivoting
+  const n = b.length, M = A.map((row, i) => [...row, b[i]]);
+  for (let i = 0; i < n; i++) {
+    let piv = i;
+    for (let j = i + 1; j < n; j++) if (Math.abs(M[j][i]) > Math.abs(M[piv][i])) piv = j;
+    if (Math.abs(M[piv][i]) < 1e-14) return null;
+    [M[i], M[piv]] = [M[piv], M[i]];
+    for (let j = i + 1; j < n; j++) {
+      const f = M[j][i] / M[i][i];
+      for (let k = i; k <= n; k++) M[j][k] -= f * M[i][k];
+    }
+  }
+  const x = new Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    let s = M[i][n];
+    for (let k = i + 1; k < n; k++) s -= M[i][k] * x[k];
+    x[i] = s / M[i][i];
+  }
+  return x;
+}
+
+function fitLogistic(ts, ys) {
+  const smooth = movingMedian(ys, 4);
+  const y0 = median(ys.slice(0, 8));
+  const rise = Math.max(...smooth) - y0;
+  if (rise < 0.08) return { noGrowth: true, y0, rise };
+  let slope = 0;
+  for (let i = 2; i < ts.length - 2; i++) slope = Math.max(slope, (smooth[i + 2] - smooth[i - 2]) / (ts[i + 2] - ts[i - 2]));
+  const half = ts[smooth.findIndex(v => v >= y0 + rise / 2)];
+  let p = [y0, rise, Math.min(5, Math.max(0.05, 4 * slope / rise)), half];
+  const sse = q => ts.reduce((s, t, i) => s + (ys[i] - logistic(t, q)) ** 2, 0);
+  let err = sse(p), lambda = 1e-2;
+  for (let it = 0; it < 200; it++) {
+    const JTJ = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]], JTr = [0, 0, 0, 0];
+    ts.forEach((t, i) => {
+      const e = Math.exp(-p[2] * (t - p[3])), s = 1 / (1 + e);
+      const J = [1, s, p[1] * s * s * e * (t - p[3]), -p[1] * s * s * e * p[2]];
+      const res = ys[i] - logistic(t, p);
+      for (let a = 0; a < 4; a++) { JTr[a] += J[a] * res; for (let b = 0; b < 4; b++) JTJ[a][b] += J[a] * J[b]; }
+    });
+    const A = JTJ.map((row, a) => row.map((v, b) => a === b ? v * (1 + lambda) : v));
+    const d = solve(A, JTr);
+    if (!d) break;
+    const q = p.map((v, k) => v + d[k]);
+    const qErr = q[2] > 0 && q[1] > 0 ? sse(q) : Infinity;
+    if (qErr < err) {
+      const gain = (err - qErr) / err;
+      p = q; err = qErr; lambda = Math.max(lambda / 10, 1e-7);
+      if (gain < 1e-10) break;
+    } else if ((lambda *= 10) > 1e8) break;
+  }
+  const mean = ys.reduce((a, b) => a + b, 0) / ys.length;
+  const sst = ys.reduce((a, y) => a + (y - mean) ** 2, 0);
+  const [b, K, r, tm] = p;
+  return { noGrowth: false, p, y0: b, K, r, tm, lag: Math.max(0, tm - 2 / r), maxRate: K * r / 4, r2: 1 - err / sst };
+}
+
+// ===== QC flags =====
+function qcFlags(w, ts, ys, fit) {
+  const flags = [], med = movingMedian(ys, 4);
+  const spikes = ts.filter((t, i) => Math.abs(ys[i] - med[i]) > 0.06);
+  if (spikes.length) flags.push(`spike at ${spikes.join(', ')} h (bubble?)`);
+  if (w.conc === null && !fit.noGrowth) flags.push('media blank grew (contamination?)');
+  if (w.conc === 0 && fit.noGrowth) flags.push('no growth without drug (well missed?)');
+  if (!fit.noGrowth && fit.r2 < 0.98) flags.push(`poor fit, R² ${fit.r2.toFixed(3)}`);
+  return flags;
+}
+
+function analyse(w) {
+  const keep = TIMES.map((_, i) => i).filter(i => !w.dropped.has(i));
+  const ts = keep.map(i => TIMES[i]), ys = keep.map(i => w.od[i]);
+  w.fit = fitLogistic(ts, ys);
+  w.flags = qcFlags(w, ts, ys, w.fit);
+}
+
+// ===== View: plate of small multiples (one shared y axis) =====
+const SM = { w: 64, h: 42 };
+const Y_MAX = Math.ceil(Math.max(...WELLS.flatMap(w => w.od)) * 10) / 10;
+const wellEls = {};
+function buildPlate() {
+  const plate = document.getElementById('plate');
+  plate.appendChild(Object.assign(document.createElement('div'), { className: 'colhead' }));
+  CONCS.forEach((c, j) => plate.appendChild(Object.assign(document.createElement('div'),
+    { className: 'colhead', innerHTML: `<b>${j + 1}</b><br>${concLabel(c)}` })));
+  ROWS.forEach((R, r) => {
+    plate.appendChild(Object.assign(document.createElement('div'),
+      { className: 'rowhead', innerHTML: `<b>${R}</b>${STRAINS[r >> 1]}` }));
+    for (let c = 0; c < 12; c++) {
+      const w = WELLS[r * 12 + c], b = document.createElement('button');
+      b.className = 'well';
+      b.addEventListener('click', () => selectWell(w.id));
+      plate.appendChild(b);
+      wellEls[w.id] = b;
+    }
+  });
+  document.getElementById('y-scale').textContent = `every small plot: 0 to 24 h, OD 0 to ${Y_MAX}`;
+}
+
+function drawWell(w) {
+  const b = wellEls[w.id];
+  const x = t => 2 + (SM.w - 4) * t / 24, y = v => SM.h - 2 - (SM.h - 4) * Math.max(0, v) / Y_MAX;
+  const pts = TIMES.map((t, i) => w.dropped.has(i) ? null : `${x(t).toFixed(1)},${y(w.od[i]).toFixed(1)}`).filter(Boolean).join(' ');
+  const fit = w.fit.noGrowth ? '' : `<polyline class="sm-fit" points="${TIMES.filter((_, i) => i % 4 === 0)
+    .map(t => `${x(t).toFixed(1)},${y(logistic(t, w.fit.p)).toFixed(1)}`).join(' ')}"/>`;
+  const mark = w.excluded ? 'excluded' : w.flags.length ? 'flag' : '';
+  b.innerHTML = `<svg viewBox="0 0 ${SM.w} ${SM.h}" width="${SM.w}" height="${SM.h}" aria-hidden="true">` +
+    `<polyline class="sm-data" points="${pts}"/>${fit}</svg>${mark ? `<span class="mark">${mark}</span>` : ''}`;
+  b.classList.toggle('flagged', w.flags.length > 0 && !w.excluded);
+  b.classList.toggle('excluded', w.excluded);
+  b.classList.toggle('selected', w.id === state.selected);
+  b.title = `${w.id}, ${w.strain}, ${concLabel(w.conc)}` + (w.flags.length ? `\n${w.flags.join('\n')}` : '');
+  b.setAttribute('aria-label', b.title);
+}
+
+function drawCounts() {
+  const flagged = WELLS.filter(w => w.flags.length && !w.excluded).length;
+  const excluded = WELLS.filter(w => w.excluded).length;
+  const dropped = WELLS.reduce((s, w) => s + w.dropped.size, 0);
+  document.getElementById('plate-counts').textContent =
+    `${flagged} flagged · ${excluded} excluded · ${dropped} time points dropped`;
+}
+
+// ===== View: selected well, large curve with fit =====
+const BIG = { w: 440, h: 280, l: 46, r: 12, t: 12, b: 38 };
+function drawDetail() {
+  const box = document.getElementById('detail'), w = byId[state.selected];
+  if (!w) { box.innerHTML = '<p class="empty">Click a well on the plate to see its curve, the fit and its parameters.</p>'; return; }
+  const f = w.fit, ymax = Math.max(0.2, Math.ceil(Math.max(...w.od) * 11) / 10);
+  const X = t => BIG.l + (BIG.w - BIG.l - BIG.r) * t / 24;
+  const Y = v => BIG.h - BIG.b - (BIG.h - BIG.t - BIG.b) * Math.max(0, v) / ymax;
+  let s = `<svg viewBox="0 0 ${BIG.w} ${BIG.h}" id="big-plot" role="img" aria-label="OD600 over time for ${w.id}"><g class="axis">`;
+  for (let t = 0; t <= 24; t += 4) s += `<line x1="${X(t)}" x2="${X(t)}" y1="${Y(0)}" y2="${Y(0) + 4}"/><text x="${X(t)}" y="${Y(0) + 16}" text-anchor="middle">${t}</text>`;
+  const step = ymax > 0.6 ? 0.2 : 0.05;
+  for (let v = 0; v <= ymax + 1e-9; v += step) s += `<line x1="${BIG.l - 4}" x2="${BIG.l}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${BIG.l - 7}" y="${Y(v) + 4}" text-anchor="end">${v.toFixed(2)}</text>`;
+  s += `<path d="M${BIG.l},${BIG.t} V${Y(0)} H${BIG.w - BIG.r}" fill="none"/>`;
+  s += `<text x="${(BIG.l + BIG.w) / 2}" y="${BIG.h - 4}" text-anchor="middle">time (h)</text>`;
+  s += `<text transform="translate(12,${(BIG.t + BIG.h - BIG.b) / 2}) rotate(-90)" text-anchor="middle">OD600</text></g>`;
+  if (!f.noGrowth) {
+    s += `<polyline class="fit" points="${TIMES.map(t => `${X(t).toFixed(1)},${Y(logistic(t, f.p)).toFixed(1)}`).join(' ')}"/>`;
+    const tEnd = f.lag + f.K / f.maxRate;                       // tangent at the inflection: baseline to plateau
+    s += `<line class="tangent" x1="${X(f.lag)}" y1="${Y(f.y0)}" x2="${X(Math.min(24, tEnd))}" y2="${Y(f.y0 + f.maxRate * (Math.min(24, tEnd) - f.lag))}"/>`;
+  }
+  TIMES.forEach((t, i) => s += `<circle class="pt${w.dropped.has(i) ? ' dropped' : ''}" cx="${X(t).toFixed(1)}" cy="${Y(w.od[i]).toFixed(1)}" r="3"/>`);
+  s += '</svg>';
+  const fmt = (v, d) => v == null ? '–' : v.toFixed(d);
+  const params = f.noGrowth
+    ? [['Lag (h)', '–'], ['Max rate (OD/h)', '0'], ['Rise above baseline (OD)', fmt(f.rise, 3)], ['Fit', 'no growth, not fitted']]
+    : [['Lag (h)', fmt(f.lag, 2)], ['Max rate (OD/h)', fmt(f.maxRate, 3)], ['Carrying capacity K (OD)', fmt(f.K, 3)],
+       ['Baseline (OD)', fmt(f.y0, 3)], ['R²', fmt(f.r2, 4)]];
+  params.push(['Points used', `${TIMES.length - w.dropped.size} of ${TIMES.length}`]);
+  box.innerHTML = `<div class="boxhead"><h2>${w.id} · ${w.strain} rep ${w.rep} · ${w.conc === null ? 'media blank' : concLabel(w.conc) + (w.conc ? ' µg/mL cipro' : '')}</h2>` +
+    `<span class="muted">Click a point to drop it or put it back; the fit updates.</span></div>${s}` +
+    `<div class="params">${params.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>` +
+    (w.flags.length ? `<ul class="flags">${w.flags.map(x => `<li>${x}</li>`).join('')}</ul>` : '<p class="muted" style="margin:6px 0 10px">No QC rule fired for this well.</p>') +
+    `<div class="actions"><button class="btn" id="toggle-exclude">${w.excluded ? 'Include this well again' : 'Exclude this well'}</button>` +
+    `<button class="btn" id="restore-points" ${w.dropped.size ? '' : 'disabled'}>Put back ${w.dropped.size || ''} dropped point${w.dropped.size === 1 ? '' : 's'}</button></div>`;
+  document.getElementById('big-plot').addEventListener('click', ev => togglePoint(w, ev, X, Y));
+  document.getElementById('toggle-exclude').addEventListener('click', () => { w.excluded = !w.excluded; refresh(w); });
+  document.getElementById('restore-points').addEventListener('click', () => { w.dropped.clear(); analyse(w); refresh(w); });
+}
+
+function togglePoint(w, ev, X, Y) {
+  const svg = ev.currentTarget, pt = svg.createSVGPoint();
+  pt.x = ev.clientX; pt.y = ev.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+  let best = -1, bestD = 10;
+  TIMES.forEach((t, i) => { const d = Math.hypot(X(t) - p.x, Y(w.od[i]) - p.y); if (d < bestD) { bestD = d; best = i; } });
+  if (best < 0) return;
+  if (w.dropped.has(best)) w.dropped.delete(best); else w.dropped.add(best);
+  analyse(w);
+  refresh(w);
+}
+
+// ===== View: summary of growth rate by strain and concentration =====
+function drawSummary() {
+  const concs = CONCS.slice(0, 11);
+  const cells = STRAINS.map(strain => concs.map(conc => {
+    const kept = WELLS.filter(w => w.strain === strain && w.conc === conc && !w.excluded);
+    const rates = kept.map(w => w.fit.noGrowth ? 0 : w.fit.maxRate);
+    return { n: kept.length, mean: rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : null };
+  }));
+  const max = Math.max(...cells.flat().map(c => c.mean || 0)) || 1;
+  const shade = v => { const t = v / max, a = [243, 246, 250], b = [22, 70, 122];
+    return a.map((x, k) => Math.round(x + (b[k] - x) * t)); };
+  let h = `<table class="summary"><tr><th></th>${concs.map(c => `<th>${concLabel(c)}</th>`).join('')}</tr>`;
+  STRAINS.forEach((strain, i) => {
+    h += `<tr><th class="strain">${strain}</th>` + cells[i].map(c => {
+      if (c.mean === null) return `<td style="background:#fff;color:#6a6a66" title="both replicates excluded">–</td>`;
+      const rgb = shade(c.mean), dark = rgb[0] * 0.3 + rgb[1] * 0.59 + rgb[2] * 0.11 < 140;
+      return `<td style="background:rgb(${rgb});color:${dark ? '#fff' : '#1d1d1f'}">${c.mean.toFixed(3)}${c.n < 2 ? '<small>n=1</small>' : ''}</td>`;
+    }).join('') + '</tr>';
+  });
+  h += `</table><p class="muted" style="font-size:12px;margin:8px 0 0">Darker is faster growth. Wells with no growth count as 0. ` +
+       `n=1 means one replicate was excluded; – means both were. Media blanks are left out.</p>`;
+  document.getElementById('summary').innerHTML = h;
+}
+
+// ===== CSV export of kept wells =====
+function exportCsv() {
+  const head = ['well', 'strain', 'replicate', 'cipro_ug_per_ml', 'lag_h', 'max_rate_od_per_h', 'K_od', 'baseline_od', 'r2', 'points_used', 'dropped_times_h', 'flags'];
+  const n = (v, d) => v == null || Number.isNaN(v) ? '' : v.toFixed(d);
+  const q = s => `"${String(s).replace(/"/g, '""')}"`;
+  const rows = WELLS.filter(w => !w.excluded).map(w => {
+    const f = w.fit;
+    return [w.id, w.strain, w.rep, w.conc === null ? 'blank' : w.conc,
+      f.noGrowth ? '' : n(f.lag, 3), f.noGrowth ? '0' : n(f.maxRate, 4), f.noGrowth ? '' : n(f.K, 4), n(f.y0, 4),
+      f.noGrowth ? '' : n(f.r2, 4), TIMES.length - w.dropped.size,
+      q([...w.dropped].sort((a, b) => a - b).map(i => TIMES[i]).join(';')), q(w.flags.join('; '))].join(',');
+  });
+  const blob = new Blob([[head.join(','), ...rows].join('\n') + '\n'], { type: 'text/csv' });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'growth_params_kept_wells.csv' });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ===== Wiring =====
+function selectWell(id) {
+  const prev = state.selected;
+  state.selected = id;
+  if (prev) drawWell(byId[prev]);
+  drawWell(byId[id]);
+  drawDetail();
+}
+function refresh(w) { drawWell(w); drawDetail(); drawSummary(); drawCounts(); }
+
+document.getElementById('next-flag').addEventListener('click', () => {
+  const start = state.selected ? WELLS.indexOf(byId[state.selected]) : -1;
+  for (let k = 1; k <= WELLS.length; k++) {
+    const w = WELLS[(start + k) % WELLS.length];
+    if (w.flags.length && !w.excluded) return selectWell(w.id);
+  }
+});
+document.getElementById('export-csv').addEventListener('click', exportCsv);
+
+WELLS.forEach(analyse);
+buildPlate();
+WELLS.forEach(drawWell);
+drawCounts();
+drawDetail();
+drawSummary();
+</script>
+</body>
+</html>

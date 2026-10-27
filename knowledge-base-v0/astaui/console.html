@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AstaUI console</title>
+<style>
+  /* In Asta: asta.css (tokens, both fonts, the parts) is put in front of this
+     sheet when the page is served (__ASTA__ below). This only says how the page
+     wears it: light or dark by the system's setting, depth from tone and
+     strokes, never a shadow. */
+  __ASTA__
+  :root {
+    --page: var(--color-background);
+    --pane: var(--surface-pane);
+    --raised: var(--surface-raised);
+    --field: var(--surface-field);
+    --tint: var(--surface);
+    --hover: var(--surface-strong);
+    --text: var(--color-text);
+    --link: var(--color-link);
+    --green: var(--color-interactive-primary);
+    --picked: var(--color-interactive-default);
+    --picked-soft: color-mix(in srgb, var(--color-green) 14%, transparent);
+    --good: var(--success);
+    --c1: var(--data-1); --c2: var(--data-2); --c3: var(--data-3); --other: var(--data-other);
+    --r: var(--radius-xs); --r-sm: var(--radius-3xs); --r-text: var(--radius-3xs); --pill: 999px;
+    --ease: cubic-bezier(.22, .61, .36, 1); --t: 160ms;
+    --ui: var(--font-body-sm);
+    --mono: var(--font-mono);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); background: var(--page); color: var(--text); font: 14px/1.5 var(--ui); }
+  button, select, input, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  a { color: var(--link); }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; padding: .6rem 1rem; border-bottom: 1px solid var(--stroke); }
+  h1 { margin: 0; font: 700 1.05rem/1 var(--font-heading-sm); }
+  .muted { color: var(--text-muted); }
+  .faint { color: var(--text-faint); }
+  .small { font-size: .85rem; }
+  .spacer { flex: 1; }
+  .pill { display: inline-flex; align-items: center; gap: .35rem; padding: .1rem .6rem; border-radius: var(--r-sm); border: 0; background: var(--color-extra-subtle); font-size: .82rem; white-space: nowrap; }
+  .pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
+  .pill.ok i { background: var(--good); }
+  .pill.bad i { background: var(--danger); }
+  .pill.warn i { background: var(--caution); }
+  #embedder { max-width: 16rem; }
+  select { max-width: 100%; }
+  select, input[type=text], input[type=number], textarea { padding: .3rem .55rem; border: 1px solid var(--stroke); border-radius: var(--r-sm); background: var(--field); color: var(--text); }
+  textarea { width: 100%; resize: vertical; line-height: 1.45; }
+  /* Asta's buttons: teal by default, green for the one action a view is for, 32px, 4px. */
+  button.act { height: 32px; padding: 0 var(--spacing-xs); border: 0; border-radius: var(--r-sm); background: var(--color-interactive-default); color: var(--color-cream); font-weight: 600; cursor: pointer; transition: background var(--t) var(--ease); }
+  button.act:hover { background: var(--color-interactive-default-hover); }
+  button.act.primary { background: var(--color-interactive-primary); color: var(--color-extra-dark-teal); }
+  button.act.primary:hover { background: var(--color-interactive-primary-hover); }
+  button.act[disabled] { opacity: .55; cursor: progress; }
+  .shell { display: grid; grid-template-columns: 12.5rem minmax(0, 1fr); min-height: 0; }
+  nav { border-right: 1px solid var(--stroke); padding: .7rem .5rem; overflow: auto; background: var(--pane); }
+  nav a { display: flex; justify-content: space-between; gap: .5rem; padding: .4rem .65rem; border-radius: var(--r-sm); color: var(--text); text-decoration: none; }
+  nav a:hover { background: var(--hover); }
+  nav a[aria-current="page"] { background: var(--picked); color: var(--color-cream); font-weight: 600; }
+  nav a span { color: var(--text-faint); font-variant-numeric: tabular-nums; font-weight: 400; }
+  main { overflow: auto; padding: 1.2rem 1.4rem 3rem; }
+  .page { max-width: 72rem; }
+  h2 { margin: 0 0 .2rem; font-size: 1.25rem; font-weight: 600; }
+  h3 { margin: 1.6rem 0 .5rem; font-size: .95rem; font-weight: 600; }
+  h4 { margin: .9rem 0 .3rem; font-size: .88rem; font-weight: 600; color: var(--text-muted); }
+  p { margin: .35rem 0; }
+  .lede { color: var(--text-muted); max-width: 46rem; margin-bottom: 1rem; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: .6rem; }
+  .tile { background: var(--raised); border: 1px solid var(--stroke); border-radius: var(--r); padding: .7rem .85rem; }
+  .tile b { display: block; font-size: 1.45rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tile span { color: var(--text-muted); font-size: .85rem; }
+  .panel { background: var(--raised); border: 1px solid var(--stroke); border-radius: var(--r); padding: .85rem 1rem; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: .8rem; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; }
+  ul.plain { list-style: none; margin: 0; padding: 0; }
+  ul.plain li { padding: .35rem 0; border-bottom: 1px solid var(--stroke); }
+  ul.plain li:last-child { border-bottom: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th, td { text-align: left; vertical-align: top; padding: .45rem .55rem; border-bottom: 1px solid var(--stroke); }
+  th { font-weight: 600; color: var(--text-muted); font-size: .8rem; white-space: nowrap; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.link { cursor: pointer; }
+  tr.link:hover td { background: var(--tint); }
+  .tablewrap { overflow-x: auto; background: var(--raised); border: 1px solid var(--stroke); border-radius: var(--r); }
+  .chips { display: flex; flex-wrap: wrap; gap: .25rem; }
+  .chip { padding: .05rem .5rem; border: 0; border-radius: var(--r-sm); background: var(--color-extra-subtle); color: var(--color-on-extra-subtle); font-size: .78rem; }
+  button.chip { cursor: pointer; }
+  button.chip:hover { background: var(--color-cream-20); }
+  .facet { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: .6rem; padding: .4rem 0; border-bottom: 1px solid var(--stroke); }
+  .facet:last-child { border-bottom: 0; }
+  .facet > b { font-weight: 500; color: var(--text-muted); }
+  ol.steps { margin: .3rem 0; padding-left: 1.4rem; }
+  ol.steps li { margin: .45rem 0; }
+  .here { color: var(--text-muted); font-size: .88rem; }
+  .bar { display: inline-block; vertical-align: middle; width: 4.5rem; height: 6px; border-radius: 3px; background: var(--hover); overflow: hidden; margin: 0 .3rem 0 .2rem; }
+  .bar > i { display: block; height: 100%; background: var(--green); border-radius: 3px; }
+  .bars { display: flex; flex-wrap: wrap; gap: .2rem 1rem; font-size: .8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .result { background: var(--raised); border: 1px solid var(--stroke); border-radius: var(--r); padding: .9rem 1rem; margin: .7rem 0; }
+  .result h4 { margin: 0; color: var(--text); font-size: .98rem; }
+  .diff { display: grid; gap: .3rem; margin: .5rem 0; }
+  .same { padding: .45rem .6rem; border-radius: var(--r-sm); background: var(--tint); }
+  .same .who { color: var(--text-faint); font-size: .78rem; margin-right: .3rem; }
+  pre.code { margin: .3rem 0 .6rem; padding: .55rem .7rem; background: var(--tint); border-radius: var(--r-sm); overflow-x: auto; font: 12px/1.5 var(--mono); max-height: 26rem; }
+  pre.code .ln { color: var(--text-faint); user-select: none; display: inline-block; min-width: 2.6rem; }
+  .span-head { font: 12px var(--mono); color: var(--text-muted); margin-top: .5rem; }
+  .spanlist { font: 12px/1.6 var(--mono); color: var(--text-muted); }
+  details > summary { cursor: pointer; color: var(--link); font-size: .88rem; }
+  .err { color: var(--danger); }
+  .warn { color: var(--caution); }
+  .good { color: var(--good); }
+  .loading { color: var(--text-faint); padding: 1rem 0; }
+  iframe.map { width: 100%; height: calc(100vh - 9rem); border: 1px solid var(--stroke); border-radius: var(--r); background: var(--raised); }
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .8rem; }
+  @media (max-width: 760px) {
+    .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+    nav { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--stroke); padding: .4rem; }
+    nav a { flex: none; }
+    main { padding: 1rem; }
+    .two { grid-template-columns: minmax(0, 1fr); }
+    select, input, textarea { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>AstaUI console</h1>
+  <span class="muted small" id="kbname"></span>
+  <span class="spacer"></span>
+  <label class="small muted">Embedder <select id="embedder" aria-label="Embedder"></select></label>
+  <span class="pill" id="health"><i></i><span>Checking</span></span>
+</header>
+<div class="shell">
+  <nav id="nav" aria-label="Sections">
+    <a href="#overview">Overview</a>
+    <a href="#builds">Builds <span id="n-builds"></span></a>
+    <a href="#search">Search</a>
+    <a href="#workflows">Workflows</a>
+    <a href="#eval">Evaluation</a>
+    <a href="#activity">Activity <span id="n-activity"></span></a>
+    <a href="#ontology">Ontology</a>
+    <a href="#map">Map</a>
+  </nav>
+  <main id="main"><div class="page loading">Loading</div></main>
+</div>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const pct = (x) => x == null ? "–" : Math.round(x * 100) + "%";
+const num = (x, d = 2) => x == null ? "–" : Number(x).toFixed(d);
+const plural = (n, one, many) => `${n} ${n === 1 ? one : (many || one + "s")}`;
+// Times are stored in UTC; show them in the reader's own clock.
+const when = (iso) => { if (!iso) return ""; const d = new Date(iso.replace(/Z?$/, "Z").replace("+00:00Z", "Z")); return isNaN(d) ? iso : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); };
+// ?scheme=dark or ?scheme=light pins the colour scheme; otherwise it follows the system.
+const pinned = new URLSearchParams(location.search).get("scheme");
+if (pinned === "dark" || pinned === "light") document.documentElement.style.colorScheme = pinned;
+let embedder = "";
+let overview = null;
+
+async function api(path, body) {
+  const sep = path.includes("?") ? "&" : "?";
+  const url = path + (embedder ? `${sep}embedder=${encodeURIComponent(embedder)}` : "");
+  const res = await fetch(url, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, embedder }) } : {});
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+function page(html) { $("#main").innerHTML = `<div class="page">${html}</div>`; }
+function fail(e) { page(`<p class="err">${esc(e.message || e)}</p>`); }
+function bar(v) { const w = Math.max(0, Math.min(1, v)) * 100; return `<span class="bar"><i style="width:${w}%"></i></span>`; }
+
+// ---------------------------------------------------------------- header
+async function loadOverview() {
+  overview = await api("/api/overview");
+  $("#kbname").textContent = `${overview.name} · ontology ${overview.ontology}`;
+  const sel = $("#embedder");
+  if (!sel.options.length) {
+    sel.innerHTML = overview.embedders.map((e) => `<option value="${esc(e.name)}">${esc(e.name)}${e.default ? " (default)" : ""}</option>`).join("");
+    embedder = overview.embedders[0]?.name || "";
+    sel.value = embedder;
+  }
+  const n = overview.problems.length;
+  const h = $("#health");
+  h.className = "pill " + (n ? "bad" : overview.index.fresh ? "ok" : "warn");
+  h.querySelector("span").textContent = n ? `${n} problem${n === 1 ? "" : "s"}` : overview.index.fresh ? "All sound" : "Index out of date";
+  $("#n-builds").textContent = overview.counts.builds;
+  $("#n-activity").textContent = overview.activity.searches || "";
+}
+$("#embedder").onchange = async (e) => { embedder = e.target.value; await loadOverview().catch(() => {}); route(); };
+
+// ---------------------------------------------------------------- overview
+async function showOverview() {
+  await loadOverview();
+  const o = overview, c = o.counts;
+  const tiles = [["Builds", c.builds], ["With cards", c.cards], ["Parts", c.parts], ["Spans of code", c.spans],
+                 ["Workflow steps", c.steps], ["Test requests", c.queries], ["Judged pairs", c.pairs]];
+  const kinds = Object.entries(o.kinds).map(([k, n]) => `${n} ${k}`).join(", ");
+  const ev = o.eval;
+  const evHtml = ev ? `<table><tr><th>Representation</th><th class="num">First</th><th class="num">Top 3</th></tr>${
+      Object.entries(ev.modes || {}).map(([m, r]) => `<tr><td>${esc(m)}</td><td class="num">${pct(r.top1)}</td><td class="num">${pct(r.top3)}</td></tr>`).join("")}</table>
+      <p class="small muted">Run ${esc(when(ev.at))}. ${ev.far ? `Far match right on ${pct(ev.far.hit)} of ${ev.far.queries}.` : ""} ${ev.steps ? `${pct(ev.steps.with_code)} of steps got code; ${pct(ev.steps.from_wanted)} of it from a wanted build.` : ""}</p>`
+    : `<p class="muted">Not run yet with ${esc(o.embedder)}.</p>`;
+  page(`
+    <h2>Overview</h2>
+    <p class="lede">${esc(o.root)}${o.read_only ? " (read-only)" : ""}. ${esc(kinds)}.</p>
+    <div class="tiles">${tiles.map(([l, v]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join("")}</div>
+    <div class="grid2" style="margin-top:.8rem">
+      <div class="panel">
+        <h3 style="margin-top:0">Health</h3>
+        ${o.problems.length ? `<ul class="plain">${o.problems.map((p) => `<li class="err">${esc(p)}</li>`).join("")}</ul>`
+          : `<p class="good">Every build, card, request and judged pair passes the check.</p>`}
+        ${o.without_card.length ? `<p class="warn">Without a card: ${o.without_card.map(esc).join(", ")}</p>` : ""}
+        <p>Privacy: ${o.privacy.must_go ? `<span class="err">${o.privacy.must_go} must go</span>` : "nothing that must go"}${o.privacy.to_look_at ? `, ${o.privacy.to_look_at} to look at` : ""}.</p>
+        <p>Words the cards proposed for the ontology: ${o.proposals}. <a href="#ontology">See them</a></p>
+      </div>
+      <div class="panel">
+        <h3 style="margin-top:0">Vector index</h3>
+        <p>${esc(o.index.embedder)}: ${o.index.fresh ? `<span class="good">up to date</span>` : `<span class="warn">out of date</span>`}, ${esc(o.index.vectors || 0)} vectors, built ${esc(when(o.index.built))}.</p>
+        <p class="small muted">The vectors are a cache rebuilt from the cards. Search rebuilds what changed by itself.</p>
+        <button class="act" id="reindex">Rebuild now</button> <span id="reindex-out" class="small muted"></span>
+        ${o.families ? `<h4>Workflow families</h4><p>${o.families.families} families, ${o.families.alone} builds with no close relative. <a href="#workflows">See them</a></p>` : ""}
+      </div>
+      <div class="panel">
+        <h3 style="margin-top:0">Evaluation</h3>
+        ${evHtml}
+        <a href="#eval">Run it or see the detail</a>
+      </div>
+      <div class="panel">
+        <h3 style="margin-top:0">Activity</h3>
+        <p>${plural(o.activity.searches, "search", "searches")} logged${o.activity.last ? `, the last on ${esc(when(o.activity.last))}` : ""}.</p>
+        <p>Feedback: ${o.activity.helped} helped, ${o.activity.not_helped} did not, ${o.activity.feedback} in all.</p>
+        <a href="#activity">See what was searched</a>
+      </div>
+    </div>`);
+  $("#reindex").onclick = async (e) => {
+    e.target.disabled = true; $("#reindex-out").textContent = "Embedding";
+    try { const r = await api("/api/index", {}); $("#reindex-out").textContent = `Embedded ${r.embedded} new texts, reused ${r.reused}.`; await loadOverview(); }
+    catch (err) { $("#reindex-out").textContent = err.message; }
+    e.target.disabled = false;
+  };
+}
+
+// ---------------------------------------------------------------- builds
+async function showBuilds() {
+  const rows = await api("/api/builds");
+  const st = (r) => !r.card ? `<span class="warn">no card</span>` : r.problems ? `<span class="err">${r.problems} problem${r.problems > 1 ? "s" : ""}</span>` : `<span class="good">sound</span>`;
+  page(`
+    <h2>Builds</h2>
+    <p class="lede">Every interface in the knowledge base, with its card. A slice is the code for one part: its markup, styles, script and data, with the helpers it uses.</p>
+    <div class="tablewrap"><table>
+      <tr><th>Build</th><th>Field</th><th>Workflow</th><th class="num">Parts</th><th class="num">Spans</th><th class="num">Median slice</th><th class="num">Whole file</th><th>Card</th></tr>
+      ${rows.map((r) => `<tr class="link" data-id="${esc(r.id)}">
+        <td><b>${esc(r.title)}</b><br><span class="faint small">${esc(r.id)} · ${esc(r.kind)} · ${esc(r.author)}</span></td>
+        <td>${esc(r.discipline || "")}<br><span class="faint small">${esc(r.field || "")}</span></td>
+        <td>${esc(r.workflow || "")}${r.family ? `<br><span class="faint small">family: ${esc(r.family)}</span>` : ""}</td>
+        <td class="num">${r.parts ?? "–"}</td><td class="num">${r.spans ?? "–"}</td>
+        <td class="num">${r.slice_median ? r.slice_median + " lines" : "–"}</td><td class="num">${r.lines ? r.lines + " lines" : "–"}</td>
+        <td>${st(r)}</td></tr>`).join("")}
+    </table></div>`);
+  document.querySelectorAll("tr.link").forEach((tr) => tr.onclick = () => { location.hash = "build/" + tr.dataset.id; });
+}
+
+function facetRow(name, f) {
+  if (!f) return "";
+  const words = Object.entries(f).filter(([, v]) => Array.isArray(v)).flatMap(([, v]) => v);
+  return `<div class="facet"><b>${name}</b><div>${esc(f.text || "")}${f.item ? `<br><span class="muted small">One item: ${esc(f.item)}</span>` : ""}
+    ${words.length ? `<div class="chips" style="margin-top:.25rem">${words.map((w) => `<span class="chip">${esc(w)}</span>`).join("")}</div>` : ""}</div></div>`;
+}
+
+function spanLabel(sp) {
+  const sym = (sp.symbols && sp.symbols.length ? sp.symbols.join(", ") : sp.symbol) || "";
+  return `${esc(sp.path || sp.file)}:${sp.start}-${sp.shown_end || sp.end} · ${esc(sp.role)}${sym ? " · " + esc(sym) : ""}`;
+}
+
+function codeBlock(sp) {
+  const lines = (sp.text || "").split("\n");
+  return `<div class="span-head">${spanLabel(sp)}${sp.why ? " · " + esc(sp.why.join("; ")) : ""}</div><pre class="code">${
+    lines.map((l, i) => `<span class="ln">${sp.start + i}</span>${esc(l)}`).join("\n")}</pre>`;
+}
+
+async function showSliceInto(el, build, part) {
+  el.innerHTML = `<p class="loading">Slicing</p>`;
+  try {
+    const sl = await api(`/api/slice/${encodeURIComponent(build)}/${encodeURIComponent(part)}`);
+    el.innerHTML = `<p class="small muted">${sl.lines} lines: ${sl.spans.filter((s) => s.why.includes("the card")).length} span${sl.spans.length === 1 ? "" : "s"} the card names, and ${sl.spans.filter((s) => !s.why.includes("the card")).length} found by following the code.</p>`
+      + sl.spans.map(codeBlock).join("")
+      + (sl.needs.length ? `<p class="small muted">Also uses, not shown: ${sl.needs.map(esc).join("; ")}</p>` : "");
+  } catch (e) { el.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+}
+
+async function showBuild(id) {
+  const b = await api(`/api/build/${encodeURIComponent(id)}`);
+  const card = b.card, app = card?.app || {};
+  const wf = app.workflow || {};
+  page(`
+    <p><a href="#builds">All builds</a></p>
+    <h2>${esc(app.title || b.meta.title)}</h2>
+    <p class="lede">${esc(b.id)} · ${esc(b.meta.provenance?.kind || "")} build by ${esc(b.meta.author?.name || "")} · ${b.files.length} file${b.files.length === 1 ? "" : "s"} ·
+      <a href="/builds/${encodeURIComponent(b.id)}/${esc(b.meta.entry || "")}" target="_blank" rel="noopener">Open the interface</a></p>
+    ${(b.problems || []).map((p) => `<p class="err">${esc(p)}</p>`).join("")}
+    ${(b.notes || []).length ? `<details><summary>${b.notes.length} note${b.notes.length > 1 ? "s" : ""} from the check</summary><ul class="plain small">${b.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul></details>` : ""}
+    ${card ? `<p>${esc(app.summary)}</p>` : `<p class="warn">No card yet. Run <code>astaui extract ${esc(b.id)}</code>.</p>`}
+    ${wf.name ? `<h3>Workflow: ${esc(wf.name)}</h3>
+      <ol class="steps">${(wf.steps || []).map((s) => `<li>${esc(s.step)}<div class="here">${esc(s.here)}</div>
+        ${(s.parts || []).length ? `<div class="chips" style="margin-top:.2rem">${s.parts.map((p) => `<button class="chip" data-part="${esc(p)}">${esc(p)}</button>`).join("")}</div>` : ""}</li>`).join("")}</ol>
+      ${(wf.distinctive || []).length ? `<h4>Particular to this case</h4><ul>${wf.distinctive.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>` : ""}` : ""}
+    ${b.neighbours?.length ? `<h4>Closest workflows</h4><div class="chips">${b.neighbours.map((n) => `<a class="chip" href="#compare/${encodeURIComponent(b.id)}/${encodeURIComponent(n.id)}">${esc(n.title)} · ${num(n.overlap)}</a>`).join("")}</div>` : ""}
+    ${card ? `<h3>Card</h3><div class="panel">${["task", "data", "stage", "mechanism", "field"].map((f) => facetRow(f[0].toUpperCase() + f.slice(1), app[f])).join("")}</div>` : ""}
+    ${card ? `<h3>Parts and their code</h3>${card.parts.map((p) => `
+      <div class="result" id="part-${esc(p.id)}">
+        <h4>${esc(p.title)} <span class="faint small">${esc(p.level)} · ${esc(p.id)}${p.parent ? " in " + esc(p.parent) : ""}</span></h4>
+        <p class="muted">${esc(p.summary)}</p>
+        <div class="spanlist">${(p.spans || []).map((s) => `<div>${spanLabel(s)}</div>`).join("")}</div>
+        <p><button class="act" data-slice="${esc(p.id)}">Show the slice</button></p>
+        <div class="slice"></div>
+      </div>`).join("")}` : ""}
+    <h3>Prompts</h3><ol class="steps">${b.prompts.map((t) => `<li>${esc(t.text)}${t.at ? ` <span class="faint small">${esc(t.at)}</span>` : ""}</li>`).join("")}</ol>
+    ${b.privacy.length ? `<h3>Privacy check</h3><ul class="plain small">${b.privacy.map((f) => `<li class="${f.level === "block" ? "err" : "warn"}">${esc(f.what)} in ${esc(f.file)}:${f.line}</li>`).join("")}</ul>` : ""}
+  `);
+  document.querySelectorAll("[data-slice]").forEach((btn) => btn.onclick = () => showSliceInto(btn.closest(".result").querySelector(".slice"), b.id, btn.dataset.slice));
+  document.querySelectorAll("[data-part]").forEach((chip) => chip.onclick = () => {
+    const el = document.getElementById("part-" + chip.dataset.part);
+    if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); showSliceInto(el.querySelector(".slice"), b.id, chip.dataset.part); }
+  });
+}
+
+// ---------------------------------------------------------------- search
+let examples = null;
+async function showSearch(exampleId) {
+  examples = examples || await api("/api/examples");
+  page(`
+    <h2>Search</h2>
+    <p class="lede">Try a request the way the plugin runs it. Pick a test request to load its query card (written from the request alone), or type your own; without a card it searches on the words.</p>
+    <div class="panel">
+      <div class="row"><label class="small muted">Test request <select id="ex"><option value="">None</option>${examples.map((e) => `<option value="${esc(e.id)}">${esc(e.id)}: ${esc(e.request.slice(0, 70))}…</option>`).join("")}</select></label>
+        <label class="small muted">Results <input type="number" id="k" value="3" min="1" max="12" style="width:4.5rem"></label></div>
+      <p><textarea id="req" rows="3" placeholder="What do you want to build? Say it the way a scientist would."></textarea></p>
+      <details><summary>Query card (JSON, optional)</summary><textarea id="qcard" rows="10" style="font:12px/1.45 var(--mono)"></textarea></details>
+      <p class="row"><button class="act primary" id="go">Search</button><span id="wanted" class="small muted"></span></p>
+    </div>
+    <div id="out"></div>`);
+  $("#ex").onchange = (e) => {
+    if (e.target.value && location.hash !== "#search/" + e.target.value) history.replaceState(null, "", "#search/" + e.target.value);
+    const ex = examples.find((x) => x.id === e.target.value);
+    $("#req").value = ex ? ex.request : "";
+    $("#qcard").value = ex && ex.card ? JSON.stringify(ex.card, null, 2) : "";
+    $("#wanted").textContent = ex ? `Should find: ${ex.wanted.join(", ")}` : "";
+  };
+  $("#go").onclick = runSearch;
+  if (exampleId && examples.some((x) => x.id === exampleId)) {
+    $("#ex").value = exampleId;
+    $("#ex").onchange({ target: $("#ex") });
+    runSearch();
+  }
+}
+
+function diffHtml(m) {
+  if (!m) return "";
+  const def = m.shared.filter((s) => !s.common), common = m.shared.filter((s) => s.common);
+  return `<div class="diff">
+    ${def.length ? `<b class="small">Same steps</b>` + def.map((s) => `<div class="same">${esc(s.step)}
+      ${s.a ? `<div class="here"><span class="who">yours</span>${esc(s.a)}</div>` : ""}${s.b ? `<div class="here"><span class="who">theirs</span>${esc(s.b)}</div>` : ""}</div>`).join("") : `<p class="small muted">No defining steps in common.</p>`}
+    ${common.length ? `<p class="small muted">Also both, moves most builds have: ${common.map((s) => esc(s.step)).join("; ")}</p>` : ""}
+    ${m.only_b.length ? `<p class="small"><b>Only theirs:</b> ${m.only_b.map((s) => esc(s.step)).join("; ")}</p>` : ""}
+    ${m.only_a.length ? `<p class="small"><b>Only yours:</b> ${m.only_a.map((s) => esc(s.step)).join("; ")}</p>` : ""}
+    ${m.b_distinctive.length ? `<p class="small"><b>Particular to theirs:</b> ${m.b_distinctive.map(esc).join("; ")}</p>` : ""}
+    ${m.a_needs.length ? `<p class="small"><b>Your needs:</b> ${m.a_needs.map((n) => n.covered ? `<span class="good">${esc(n.need)} (likely met)</span>` : `${esc(n.need)} <span class="faint">(check; closest: ${esc((n.closest || "").slice(0, 80))})</span>`).join("; ")}</p>` : ""}
+  </div>`;
+}
+
+function resultHtml(h, label) {
+  return `<div class="result">
+    <h4>${label} ${esc(h.title)} <span class="faint small">${esc(h.id)} · score ${num(h.score)}</span></h4>
+    <p class="small muted">${esc(h.field)} · ${esc(h.kind)} build</p>
+    <div class="bars">${Object.entries(h.by || {}).map(([k, v]) => `<span>${esc(k)}${bar(v)}${num(v)}</span>`).join("")}</div>
+    <p>${esc(h.summary)}</p>
+    ${h.workflow ? `<p class="small"><b>Workflow:</b> ${esc(h.workflow.name)}</p>` : ""}
+    ${diffHtml(h.workflow_match)}
+    ${(h.parts || []).length ? `<details><summary>${h.parts.length} part${h.parts.length > 1 ? "s" : ""} that fit, with code</summary>${h.parts.map((p) => `<h4>${esc(p.title)} <span class="faint small">${esc(p.level)}</span></h4><p class="small muted">${esc(p.summary)}</p>${p.spans.map(codeBlock).join("")}`).join("")}</details>` : ""}
+    <p class="small"><a href="#build/${encodeURIComponent(h.id)}">Open the build</a></p>
+  </div>`;
+}
+
+async function runSearch() {
+  const btn = $("#go"); btn.disabled = true;
+  $("#out").innerHTML = `<p class="loading">Searching</p>`;
+  try {
+    let card = $("#qcard").value.trim();
+    if (card) card = JSON.parse(card);
+    const res = await api("/api/search", { request: $("#req").value, card: card || null, k: Number($("#k").value) || 3 });
+    const q = res.query;
+    const described = ["summary", "workflow", "task", "data", "stage", "mechanism", "field"].filter((f) => q[f]);
+    $("#out").innerHTML = `
+      <p class="small muted">Described as ${described.length ? described.join(", ") : "nothing (searching on the words)"} · ${esc(res.embedder)}</p>
+      ${res.results.map((h, i) => resultHtml(h, `${i + 1}.`)).join("") || `<p>Nothing matched.</p>`}
+      ${res.far ? `<h3>From another field, same structure</h3>${resultHtml(res.far, "")}` : ""}
+      ${res.steps_code?.length ? `<h3>Code for each of your steps</h3>${res.steps_code.map((st, i) => `
+        <div class="result"><h4>${i + 1}. ${esc(st.step)}</h4>${st.here ? `<p class="here">${esc(st.here)}</p>` : ""}
+          ${st.from.length ? st.from.map((src) => `<p class="small">From <a href="#build/${encodeURIComponent(src.build)}">${esc(src.title)}</a>${src.common ? " (a move most builds have)" : ""}: <span class="muted">${esc(src.their_here || src.their_step)}</span></p>
+            ${src.slices.map((sl) => `<details><summary>${esc(sl.title)}: ${sl.lines} lines</summary>${sl.spans.map(codeBlock).join("")}${sl.needs.length ? `<p class="small muted">Also uses: ${sl.needs.map(esc).join("; ")}</p>` : ""}</details>`).join("")}`).join("")
+            : `<p class="warn small">No build does this step yet.</p>`}
+        </div>`).join("")}` : ""}
+      ${res.pieces?.length ? `<h3>Pieces from elsewhere that fit</h3><ul class="plain">${res.pieces.map((p) => `<li>${esc(p.title)} in <a href="#build/${encodeURIComponent(p.build)}">${esc(p.build_title)}</a></li>`).join("")}</ul>` : ""}`;
+  } catch (e) { $("#out").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+  btn.disabled = false;
+}
+
+// ---------------------------------------------------------------- workflows
+async function showWorkflows() {
+  page(`<h2>Workflows</h2><p class="loading">Grouping</p>`);
+  const [res, rows] = await Promise.all([api("/api/workflows"), api("/api/builds")]);
+  const carded = rows.filter((r) => r.card);
+  const opts = carded.map((r) => `<option value="${esc(r.id)}">${esc(r.title)}</option>`).join("");
+  const groups = res.families.filter((f) => f.members.length > 1), alone = res.families.filter((f) => f.members.length === 1);
+  page(`
+    <h2>Workflows</h2>
+    <p class="lede">Builds that share a workflow form a family. Each member is listed with the steps that are its own and what is particular to its case. Two steps count as the same move when their similarity stands out against every step comparison in the knowledge base (above ${num(res.step_threshold)} here).</p>
+    <div class="panel"><div class="row">Compare <select id="ca">${opts}</select> with <select id="cb">${opts}</select> <button class="act" id="cgo">Compare</button></div></div>
+    ${res.common_moves.length ? `<p class="small muted" style="margin-top:.8rem">Moves most builds have, so they do not make a family: ${res.common_moves.map(esc).join("; ")}</p>` : ""}
+    ${groups.map((f) => `<div class="result">
+      <h4>${esc(f.name)} <span class="faint small">${f.members.length} builds</span></h4>
+      ${f.shared_steps.length ? `<p class="small"><b>Shared steps:</b> ${f.shared_steps.map(esc).join("; ")}</p>` : ""}
+      ${f.members.map((m) => `<div class="same" style="margin:.4rem 0"><a href="#build/${encodeURIComponent(m.id)}"><b>${esc(m.title)}</b></a> <span class="faint small">${esc(m.field)}</span>
+        ${m.own_steps.length ? `<div class="here"><b>Its own steps:</b> ${m.own_steps.map((s) => esc(s.step)).join("; ")}</div>` : ""}
+        ${m.distinctive.length ? `<div class="here"><b>Particular to it:</b> ${m.distinctive.map(esc).join("; ")}</div>` : ""}</div>`).join("")}
+      ${f.members.length > 1 ? `<p class="small"><a href="#compare/${encodeURIComponent(f.members[0].id)}/${encodeURIComponent(f.members[1].id)}">Compare the first two</a></p>` : ""}
+    </div>`).join("")}
+    ${alone.length ? `<h3>No close relative yet</h3><ul class="plain">${alone.map((f) => `<li><a href="#build/${encodeURIComponent(f.members[0].id)}">${esc(f.members[0].title)}</a> <span class="muted small">${esc(f.members[0].name)}</span></li>`).join("")}</ul>` : ""}`);
+  if (carded.length > 1) $("#cb").selectedIndex = 1;
+  $("#cgo").onclick = () => { location.hash = `compare/${encodeURIComponent($("#ca").value)}/${encodeURIComponent($("#cb").value)}`; };
+}
+
+async function showCompare(a, b) {
+  const d = await api(`/api/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
+  const def = d.shared.filter((s) => !s.common), common = d.shared.filter((s) => s.common);
+  const needs = (list, other) => list.length ? `<ul class="plain small">${list.map((n) => `<li>${esc(n.need)}<br>${n.covered ? `<span class="good">likely met by ${esc(other)}</span>` : `<span class="faint">check: closest in ${esc(other)} is ${esc((n.closest || "nothing").slice(0, 110))}</span>`}</li>`).join("")}</ul>` : `<p class="small muted">None listed.</p>`;
+  page(`
+    <p><a href="#workflows">All workflows</a></p>
+    <h2>${esc(d.a_title)} and ${esc(d.b_title)}</h2>
+    <p class="lede">Shared workflow ${num(d.overlap)} (0 is no steps in common, 1 is the same steps; rare steps count more).</p>
+    <div class="two">
+      <div class="panel"><b>${esc(d.a_title)}</b><p class="muted small">${esc(d.a_name)}</p></div>
+      <div class="panel"><b>${esc(d.b_title)}</b><p class="muted small">${esc(d.b_name)}</p></div>
+    </div>
+    <h3>Same steps, done each way</h3>
+    ${def.length ? def.map((s) => `<div class="result"><b>${esc(s.step)}</b><div class="two" style="margin-top:.4rem"><div class="here">${esc(s.a)}</div><div class="here">${esc(s.b)}</div></div></div>`).join("") : `<p class="muted">No defining steps in common.</p>`}
+    ${common.length ? `<p class="small muted">Also both, moves most builds have: ${common.map((s) => esc(s.step)).join("; ")}</p>` : ""}
+    <div class="two">
+      <div><h3>Only ${esc(d.a_title)}</h3><ul>${d.only_a.map((s) => `<li>${esc(s.step)}<div class="here">${esc(s.here)}</div></li>`).join("") || "<li class='muted'>Nothing</li>"}</ul>
+        <h4>Its particular needs</h4>${needs(d.a_needs, d.b_title)}</div>
+      <div><h3>Only ${esc(d.b_title)}</h3><ul>${d.only_b.map((s) => `<li>${esc(s.step)}<div class="here">${esc(s.here)}</div></li>`).join("") || "<li class='muted'>Nothing</li>"}</ul>
+        <h4>Its particular needs</h4>${needs(d.b_needs, d.a_title)}</div>
+    </div>`);
+}
+
+// ---------------------------------------------------------------- evaluation
+async function showEval(run) {
+  page(`<h2>Evaluation</h2><p class="loading">${run ? "Running every test request and judged pair" : "Loading"}</p>`);
+  const ev = run ? await api("/api/eval", {}) : await api("/api/eval");
+  if (ev.never) {
+    page(`<h2>Evaluation</h2><p class="lede">Not run yet with this embedder.</p><button class="act primary" id="run">Run the evaluation</button>`);
+    $("#run").onclick = () => showEval(true);
+    return;
+  }
+  const q = ev.queries || {}, p = ev.pairs || {};
+  const modes = Object.keys(q.modes || {});
+  page(`
+    <h2>Evaluation</h2>
+    <p class="lede">Run ${esc(when(ev.at))} with ${esc(ev.embedder)}. Each test request lists the builds it should find; each representation is scored on how high it puts them.</p>
+    <p><button class="act" id="run">Run again</button></p>
+    <div class="tablewrap"><table><tr><th>Representation</th><th class="num">Requests</th><th class="num">First</th><th class="num">Top 3</th><th class="num">Mean reciprocal rank</th></tr>
+      ${modes.map((m) => { const r = q.modes[m]; return `<tr><td><b>${esc(m)}</b><br><span class="faint small">${esc(ev.modes[m] || "")}</span></td><td class="num">${r.queries}</td><td class="num">${pct(r.top1)}</td><td class="num">${pct(r.top3)}</td><td class="num">${num(r.mrr)}</td></tr>`; }).join("")}
+    </table></div>
+    <p>${q.far ? `The far match was a listed one for ${pct(q.far.hit)} of the ${q.far.queries} requests that list one. ` : ""}${q.steps ? `${pct(q.steps.with_code)} of the ${q.steps.steps} steps got code, and ${pct(q.steps.from_wanted)} of it came from a build the request wanted.` : ""}</p>
+    ${p.channels ? `<h3>Pairs judged by eye</h3><p class="small muted">How well each representation's similarity follows the judgements (same > related > different).</p>
+      <div class="tablewrap"><table><tr><th>Representation</th><th class="num">Spearman</th><th class="num">Separation</th><th class="num">Same</th><th class="num">Related</th><th class="num">Different</th></tr>
+      ${Object.entries(p.channels).map(([c, m]) => `<tr><td>${esc(c)}</td><td class="num">${num(m.spearman)}</td><td class="num">${pct(m.auc)}</td><td class="num">${num(m.mean.same)}</td><td class="num">${num(m.mean.related)}</td><td class="num">${num(m.mean.different)}</td></tr>`).join("")}
+      </table></div>` : ""}
+    <h3>Request by request</h3>
+    <div class="tablewrap"><table><tr><th>Request</th><th>Should find</th>${modes.map((m) => `<th class="num">${esc(m)}</th>`).join("")}<th class="num">Steps with code</th></tr>
+      ${(q.queries || []).map((r) => `<tr><td><b>${esc(r.id)}</b> <span class="small">${esc(r.request.slice(0, 110))}…</span></td><td class="small">${r.wanted.map(esc).join(", ")}</td>
+        ${modes.map((m) => { const v = r.ranks[m]; return `<td class="num ${v === 1 ? "good" : v == null ? "faint" : v > 3 ? "err" : ""}">${v == null ? "–" : v}</td>`; }).join("")}
+        <td class="num">${r.steps ? `${r.steps_with_code}/${r.steps}` : "–"}</td></tr>`).join("")}
+    </table></div>`);
+  $("#run").onclick = () => showEval(true);
+}
+
+// ---------------------------------------------------------------- activity
+async function showActivity() {
+  const rows = await api("/api/activity");
+  page(`
+    <h2>Activity</h2>
+    <p class="lede">Every search the plugin ran on this machine, newest first, with whether the scientist used a match and whether it helped. The log stays on this machine (<code>kb/.usage/</code>).</p>
+    ${rows.length ? `<div class="tablewrap"><table><tr><th>When</th><th>Request</th><th>Came back</th><th>Feedback</th></tr>
+      ${rows.map((r) => r.event === "search" ? `<tr><td class="small">${esc(when(r.at))}</td><td>${esc(r.request || "(query card only)")}<br><span class="faint small">described: ${esc((r.described || []).join(", ") || "nothing")}</span></td>
+        <td class="small">${(r.results || []).map(([id, s]) => `<a href="#build/${encodeURIComponent(id)}">${esc(id)}</a> ${num(s)}`).join("<br>")}${r.far ? `<br><span class="faint">far: ${esc(r.far)}</span>` : ""}</td>
+        <td class="small">${r.feedback.map((f) => `${esc(f.build)}: ${f.helped === true ? `<span class="good">helped</span>` : f.helped === false ? `<span class="err">did not help</span>` : "no answer"}${f.used ? ", used" : ""}${f.note ? `<br><span class="muted">${esc(f.note)}</span>` : ""}`).join("<br>") || `<span class="faint">none yet</span>`}</td></tr>`
+        : `<tr><td class="small">${esc(r.at)}</td><td colspan="2" class="faint">feedback for a search not in the log</td><td class="small">${esc(r.build)}</td></tr>`).join("")}
+    </table></div>` : `<p class="muted">No searches logged yet. Searches run through the plugin or <code>astaui search</code> appear here; the console's own searches do not.</p>`}`);
+}
+
+// ---------------------------------------------------------------- ontology
+async function showOntology() {
+  const o = await api("/api/ontology");
+  page(`
+    <h2>Ontology, version ${esc(o.version)}</h2>
+    <p class="lede">The words cards are described with. A word a card needed and the ontology lacks is kept and proposed; add the ones that recur, and log why.</p>
+    <h3>Proposed words</h3>
+    ${o.proposals.length ? `<div class="tablewrap"><table><tr><th>Word</th><th>Where</th><th>Cards</th></tr>${o.proposals.map((p) => `<tr><td><b>${esc(p.term)}</b></td><td>${esc(p.facet)}.${esc(p.list)}</td><td class="small">${p.cards.map((c) => `<a href="#build/${encodeURIComponent(c)}">${esc(c)}</a>`).join(", ")}</td></tr>`).join("")}</table></div>` : `<p class="muted">None: every word on every card is in the ontology.</p>`}
+    <h3>How much of each list the cards use</h3>
+    <div class="tablewrap"><table><tr><th>List</th><th class="num">Words</th><th class="num">Used</th><th>Most used</th><th>Never used yet</th></tr>
+      ${o.lists.map((l) => `<tr><td>${esc(l.facet)}.${esc(l.list)}${l.open ? ` <span class="faint small">open</span>` : ""}</td><td class="num">${l.terms || "–"}</td><td class="num">${l.used}</td>
+        <td class="small">${l.top.map(([w, n]) => `${esc(w)} (${n})`).join(", ")}</td><td class="small faint">${l.unused.map(esc).join(", ")}</td></tr>`).join("")}
+    </table></div>
+    <p class="small muted">${o.moves} general workflow moves are listed for steps to share.</p>
+    <h3>Changes</h3>
+    <ul class="plain">${o.changes.slice().reverse().map((c) => `<li><b>Version ${esc(c.version)}</b> <span class="faint small">${esc(c.date)}</span><br>${esc(c.change)}<br><span class="muted small">Because: ${esc(c.because)}</span></li>`).join("")}</ul>`);
+}
+
+// ---------------------------------------------------------------- map
+function showMap() {
+  page(`<h2>Map</h2><p class="lede">Every build placed so that similar builds sit together. The buttons inside switch what "similar" means.</p>
+    <iframe class="map" src="/map${embedder ? "?embedder=" + encodeURIComponent(embedder) : ""}" title="Map of the builds"></iframe>`);
+}
+
+// ---------------------------------------------------------------- routing
+async function route() {
+  const [name, ...rest] = (location.hash.slice(1) || "overview").split("/").map(decodeURIComponent);
+  const navName = { build: "builds", compare: "workflows" }[name] || name;
+  document.querySelectorAll("nav a").forEach((a) => a.setAttribute("aria-current", a.getAttribute("href") === "#" + navName ? "page" : "false"));
+  page(`<p class="loading">Loading</p>`);
+  try {
+    if (name === "overview") await showOverview();
+    else if (name === "builds") await showBuilds();
+    else if (name === "build") await showBuild(rest[0]);
+    else if (name === "search") await showSearch(rest[0]);
+    else if (name === "workflows") await showWorkflows();
+    else if (name === "compare") await showCompare(rest[0], rest[1]);
+    else if (name === "eval") await showEval(false);
+    else if (name === "activity") await showActivity();
+    else if (name === "ontology") await showOntology();
+    else if (name === "map") showMap();
+    else await showOverview();
+  } catch (e) { fail(e); }
+  $("#main").scrollTop = 0;
+}
+addEventListener("hashchange", route);
+loadOverview().catch(fail).then(route);
+</script>
+</body>
+</html>

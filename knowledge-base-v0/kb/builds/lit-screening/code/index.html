@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Title and abstract screening</title>
+<style>
+  :root {
+    --bg: #f5f5f2; --panel: #ffffff; --line: #d9d9d3; --ink: #1d1d1b; --muted: #6a6a64;
+    --accent: #2f6a3a; --accent-soft: #e2efe3; --flag: #efeee9;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: var(--ink); background: var(--bg); }
+  button, input, select { font: inherit; color: inherit; }
+  button { border: 1px solid var(--line); background: var(--panel); border-radius: 5px; padding: 5px 11px; cursor: pointer; }
+  button:hover { border-color: #b3b3ac; }
+  button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.on kbd { background: transparent; color: #fff; border-color: rgba(255,255,255,.55); }
+  input[type=text], select { border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; background: #fff; }
+  kbd { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; background: #fafaf8; }
+
+  /* ---------- top bar with progress ---------- */
+  .topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .topbar h1 { font-size: 15px; margin: 0; }
+  .topbar .question { color: var(--muted); }
+  .topbar .spacer { flex: 1; }
+  .progress { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .bar { width: 180px; height: 6px; background: #e9e9e4; border-radius: 3px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--accent); width: 0; }
+
+  /* ---------- layout ---------- */
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; padding: 16px 18px 40px; max-width: 1200px; margin: 0 auto; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+  .block { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; margin-bottom: 12px; }
+  .block h2 { font-size: 13px; margin: 0 0 8px; }
+  .muted { color: var(--muted); font-size: 12px; }
+
+  /* ---------- record card ---------- */
+  .queue-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 13px; }
+  .queue-bar .spacer { flex: 1; }
+  .record-meta { color: var(--muted); font-size: 13px; }
+  .block .record-title { font-size: 18px; line-height: 1.35; margin: 4px 0 4px; }
+  .record-authors { margin: 0 0 12px; font-size: 13px; }
+  .abstract { max-width: 75ch; margin: 0 0 10px; }
+  mark.inc { background: var(--accent-soft); color: inherit; border-radius: 2px; padding: 0 1px; }
+  span.exc { background: var(--flag); border-bottom: 1px dashed #85857e; }
+  .found { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .note-row { display: flex; gap: 8px; align-items: center; }
+  .note-row input { flex: 1; }
+  .dup-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  /* ---------- decision bar and reasons ---------- */
+  .decide { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .decide .spacer { flex: 1; }
+  #current { font-size: 13px; margin-top: 8px; }
+  #reasons { display: none; margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+  #reasons.open { display: block; }
+  #reasons button { display: block; width: 100%; text-align: left; margin-bottom: 4px; }
+  .keys { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+  /* ---------- PRISMA counts ---------- */
+  table.prisma { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.prisma td { padding: 3px 0; border-bottom: 1px solid #efefea; }
+  table.prisma td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  table.prisma tr.sub td:first-child { padding-left: 14px; color: var(--muted); }
+  table.prisma tr.sub2 td:first-child { padding-left: 28px; color: var(--muted); }
+  .side label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+  .side input[type=text] { width: 100%; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Title and abstract screening</h1>
+  <span class="question">Digital peer support for family caregivers of people with dementia</span>
+  <span class="spacer"></span>
+  <div class="progress"><span id="progressText"></span><div class="bar"><div id="progressFill"></div></div></div>
+</header>
+
+<div class="layout">
+  <main>
+    <!-- ===================== VIEW: one record at a time ===================== -->
+    <section class="block" aria-label="Current record">
+      <div class="queue-bar">
+        <label>Queue
+          <select id="queueFilter">
+            <option value="all">All records</option>
+            <option value="open">Not screened</option>
+            <option value="maybe">Maybe</option>
+            <option value="include">Included</option>
+            <option value="exclude">Excluded</option>
+          </select>
+        </label>
+        <span id="position" class="muted"></span>
+        <span class="spacer"></span>
+        <button id="prevBtn" type="button">Previous</button>
+        <button id="nextBtn" type="button">Next</button>
+        <button id="nextOpenBtn" type="button">Next not screened</button>
+      </div>
+      <div id="record"></div>
+    </section>
+
+    <!-- ===================== COMPONENT: decision bar and exclusion reasons ===================== -->
+    <section class="block" aria-label="Decision" id="decisionBlock">
+      <div class="decide">
+        <button id="incBtn" type="button">Include <kbd>i</kbd></button>
+        <button id="excBtn" type="button">Exclude <kbd>e</kbd></button>
+        <button id="maybeBtn" type="button">Maybe <kbd>m</kbd></button>
+        <span class="spacer"></span>
+        <button id="clearBtn" type="button">Clear decision</button>
+      </div>
+      <div id="current"></div>
+      <div id="reasons" aria-label="Exclusion reason">
+        <div class="muted" style="margin-bottom:6px">Why exclude? Press a number, or <kbd>Esc</kbd> to go back.</div>
+        <div id="reasonList"></div>
+      </div>
+      <div class="keys"><kbd>i</kbd> include · <kbd>e</kbd> then <kbd>1</kbd>–<kbd>6</kbd> exclude with reason · <kbd>m</kbd> maybe · <kbd>←</kbd> <kbd>→</kbd> previous and next · <kbd>n</kbd> next not screened · <kbd>/</kbd> write a note</div>
+    </section>
+  </main>
+
+  <aside class="side">
+    <!-- ===================== VIEW: PRISMA counts ===================== -->
+    <section class="block" aria-label="PRISMA counts">
+      <h2>Counts for the PRISMA flow diagram</h2>
+      <table class="prisma" id="prisma"></table>
+    </section>
+
+    <!-- ===================== COMPONENT: keyword lists ===================== -->
+    <section class="block" aria-label="Highlighted terms">
+      <h2>Highlighted terms</h2>
+      <label for="incTerms">Inclusion terms (shaded), comma separated</label>
+      <input type="text" id="incTerms">
+      <label for="excTerms">Exclusion flags (dashed underline)</label>
+      <input type="text" id="excTerms">
+      <p class="muted" style="margin:6px 0 0">Plurals match on their own. End a term with * to match any ending: caregiv* finds caregiver and caregiving.</p>
+    </section>
+
+    <!-- ===================== COMPONENT: CSV export ===================== -->
+    <section class="block" aria-label="Export">
+      <h2>Export decisions</h2>
+      <label for="screener">Your initials (go in the file and its name)</label>
+      <input type="text" id="screener" maxlength="6" placeholder="e.g. AB">
+      <p class="muted">One row per record, duplicates included and marked, so both screeners' files line up for kappa.</p>
+      <button id="exportBtn" type="button">Download CSV</button>
+      <div class="muted" id="exportStatus" style="margin-top:6px"></div>
+    </section>
+  </aside>
+</div>
+
+<script>
+// ===================== DATA: records from the database exports (paste the real export here) =====================
+const RECORDS = [
+  { id: "S-001", source: "Scopus", year: 2023, venue: "Journal of Ageing and Digital Care", authors: "Hallberg T, Mensah A, Ruiz C",
+    title: "Online peer support groups for family caregivers of people with dementia: a mixed-methods evaluation",
+    abstract: "Family caregivers of people with dementia often report isolation. We evaluated a 12-week moderated online peer support group delivered through a closed forum and weekly video meetings. Forty-two caregivers took part. Caregiver burden decreased and participants valued exchanging practical advice with peers, although uptake of the video meetings was lower than of the forum. We discuss implications for scaling digital peer support in community dementia services." },
+  { id: "W-001", source: "Web of Science", year: 2024, venue: "Dementia Care Research", authors: "Pearce J, Lindqvist E, Adeyemi O",
+    title: "A smartphone app to reduce burden in spousal carers of people living with Alzheimer's disease: randomised feasibility trial",
+    abstract: "Spousal carers of people with Alzheimer's disease carry most of the daily care at home. We tested the feasibility of a smartphone app combining care planning tools with a moderated chat in which carers could message other carers. Sixty carers in two UK regions were randomised to the app or usual support. Recruitment and retention targets were met, and carers used the peer chat more than any other feature. A full trial is warranted." },
+  { id: "P-001", source: "PubMed", year: 2022, venue: "Age and Community Health", authors: "Okonkwo D, Sato M, Varga P",
+    title: "Telephone befriending for older adults living alone: a cluster randomised trial",
+    abstract: "Loneliness is common among older adults who live alone. In this cluster randomised trial, 18 community centres were allocated to a volunteer telephone befriending service or a waiting list. Older adults (n = 311) received weekly calls for six months. Loneliness scores improved modestly in the intervention arm. The service did not target caregivers, and participants with cognitive impairment were excluded." },
+  { id: "S-002", source: "Scopus", year: 2023, venue: "Proceedings of the Conference on Health and Interaction", authors: "Brennan K, Huang L",
+    title: "Peer mentoring for parents of children with autism delivered via video calls",
+    abstract: "Parents of autistic children frequently seek advice from other parents. We designed and deployed a peer mentoring programme in which experienced parents met newer parents over video calls for eight weeks. Interviews with 16 parent pairs showed that mentors provided emotional support and practical knowledge about services. We reflect on matching mentors and mentees online." },
+  { id: "W-002", source: "Web of Science", year: 2023, venue: "Journal of Ageing and Digital Care", authors: "Hallberg T, Mensah A, Ruiz C",
+    title: "Online Peer Support Groups for Family Caregivers of People with Dementia: A Mixed-Methods Evaluation",
+    abstract: "Family caregivers of people with dementia often report isolation. We evaluated a 12-week moderated online peer support group delivered through a closed forum and weekly video meetings. Forty-two caregivers took part. Caregiver burden decreased and participants valued exchanging practical advice with peers, although uptake of the video meetings was lower than of the forum. We discuss implications for scaling digital peer support in community dementia services." },
+  { id: "P-002", source: "PubMed", year: 2025, venue: "Trials in Ageing", authors: "Marquez R, Holm S, Qureshi N",
+    title: "Protocol for a randomised controlled trial of a web-based peer support programme for dementia caregivers",
+    abstract: "This protocol describes a two-arm randomised controlled trial of a web-based peer support programme for family caregivers of people with dementia. Caregivers will be randomised to the programme or to an information website. The primary outcome is caregiver depressive symptoms at six months. Recruitment will begin across four memory clinics, and results will be reported separately." },
+  { id: "S-003", source: "Scopus", year: 2022, venue: "International Journal of Caregiving Studies", authors: "Whitfield A, Nkemelu B",
+    title: "Experiences of carers using an online dementia forum: a qualitative analysis of posts",
+    abstract: "Online forums are a common source of support for carers of people with dementia. We analysed 1,200 publicly available posts from a UK dementia forum using thematic analysis. Carers used the forum to seek reassurance, compare experiences of services and share coping strategies with other carers. The study did not evaluate a specific intervention, but describes how informal peer support unfolds online." },
+  { id: "W-003", source: "Web of Science", year: 2021, venue: "Dementia Care Research", authors: "Laurent C, Dube T, Park H",
+    title: "Professional-led psychoeducation for caregivers of people with dementia: an in-person group intervention",
+    abstract: "We evaluated an eight-session psychoeducation group led by nurses for family caregivers of people with dementia. Sessions were held in person at a memory clinic and covered disease progression, behaviour changes and self-care. Caregiver knowledge and confidence improved at three months. Sessions were led by professionals and did not include structured peer exchange." },
+  { id: "P-003", source: "PubMed", year: 2024, venue: "Health Informatics Letters", authors: "Fontaine G, Abebe M, Rossi L",
+    title: "Digital interventions for informal caregivers: an umbrella review",
+    abstract: "We conducted an umbrella review of systematic reviews of digital interventions for informal caregivers across conditions, including dementia, cancer and stroke. Twenty-three reviews were included. Evidence for reductions in caregiver burden was mixed, with stronger effects for interventions that combined education with peer support. We highlight gaps in evidence on long-term outcomes." },
+  { id: "S-004", source: "Scopus", year: 2023, venue: "Proceedings of the Conference on Health and Interaction", authors: "Iversen M, Castillo J",
+    title: "Designing a voice assistant to support caregivers of people with Parkinson's disease",
+    abstract: "Caregivers of people with Parkinson's disease manage complex medication schedules. Through co-design workshops with 11 caregivers we developed a voice assistant prototype for reminders and symptom logging. Caregivers valued hands-free use but worried about privacy. The prototype did not include contact with other caregivers." },
+  { id: "W-004", source: "Web of Science", year: 2024, venue: "Journal of Ageing and Digital Care", authors: "Souza F, Almeida R, Tanaka Y",
+    title: "Moderated WhatsApp groups for caregivers of people with young-onset dementia in Brazil",
+    abstract: "Caregivers of people with young-onset dementia face distinct challenges, including employment and childcare. We evaluated moderated WhatsApp groups that connected 74 caregivers in three cities over six months. Message analysis and interviews showed that peer support centred on navigating benefits and managing behaviour changes. Caregiver burden decreased from baseline to six months." },
+  { id: "P-004", source: "PubMed", year: 2023, venue: "Age and Community Health", authors: "Nilsen H, Barros T",
+    title: "Loneliness among caregivers of stroke survivors: a cross-sectional survey",
+    abstract: "We surveyed 402 caregivers of stroke survivors about loneliness, social support and use of online communities. One third reported frequent loneliness. Caregivers who used online communities reported higher perceived social support. The study was cross-sectional and did not include caregivers of people with dementia." },
+  { id: "S-005", source: "Scopus", year: 2025, venue: "Proceedings of the Conference on Health and Interaction", authors: "Kowalczyk E, Mbeki S, Doyle R",
+    title: "Peer support, online: a co-design study with family members of people with frontotemporal dementia",
+    abstract: "Family members of people with frontotemporal dementia are a small and dispersed group. We co-designed an online peer support space with 14 family members over five workshops. The resulting app pairs new members with a peer who has cared for someone at a similar stage. We report design requirements and early feedback from a two-month pilot with 20 users." },
+  { id: "W-005", source: "Web of Science", year: 2021, venue: "International Journal of Caregiving Studies", authors: "Ahmed S, Grunwald L",
+    title: "Video-call support groups for caregivers during the COVID-19 pandemic: a pre-post study",
+    abstract: "During the COVID-19 pandemic, in-person caregiver groups moved online. We evaluated weekly video-call support groups for caregivers of older adults, of whom 38% cared for a person with dementia. Groups were co-facilitated by a social worker and a peer volunteer. Depressive symptoms decreased over 10 weeks. Results were not reported separately for dementia caregivers." },
+  { id: "P-005", source: "PubMed", year: 2022, venue: "International Journal of Caregiving Studies", authors: "Whitfield A, Nkemelu B",
+    title: "Experiences of carers using an online dementia forum: A qualitative analysis of posts.",
+    abstract: "Online forums are a common source of support for carers of people with dementia. We analysed 1,200 publicly available posts from a UK dementia forum using thematic analysis. Carers used the forum to seek reassurance, compare experiences of services and share coping strategies with other carers. The study did not evaluate a specific intervention, but describes how informal peer support unfolds online." },
+  { id: "S-006", source: "Scopus", year: 2024, venue: "Health Informatics Letters", authors: "Duarte P, Lehmann K",
+    title: "A chatbot companion for people living with mild cognitive impairment",
+    abstract: "We designed a chatbot companion for people living with mild cognitive impairment to support daily routines and conversation. In a four-week field study, 12 older adults used the chatbot at home. Participants valued reminders and found the conversation engaging, though some found it repetitive. Family members were interviewed but did not use the system." }
+];
+
+// Exclusion reasons from the review protocol, in the order of the number keys.
+const REASONS = [
+  "Wrong population (not family caregivers)",
+  "Not dementia",
+  "No peer support component",
+  "Not digital or online",
+  "Wrong publication type (protocol, review, editorial)",
+  "Conference abstract only"
+];
+const DEFAULT_INC = "caregiver, carer, dementia, alzheimer, peer, online, digital, app, web-based, forum";
+const DEFAULT_EXC = "protocol, review, children, stroke, parkinson, cross-sectional";
+
+// ===================== DEDUPLICATION: same title ignoring case and punctuation =====================
+const normTitle = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const DUP_OF = new Map();   // duplicate id -> id of the record kept
+const SCREEN = [];          // records that go into the queue
+{
+  const kept = new Map();
+  for (const r of RECORDS) {
+    const k = normTitle(r.title);
+    if (kept.has(k)) DUP_OF.set(r.id, kept.get(k).id);
+    else { kept.set(k, r); SCREEN.push(r); }
+  }
+}
+
+// ===================== STATE and saving =====================
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const KEY = "screening-dementia-peer-support";
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+const state = {
+  decisions: saved.decisions || {},   // id -> { decision, reason, at }
+  notes: saved.notes || {},
+  incTerms: saved.incTerms ?? DEFAULT_INC,
+  excTerms: saved.excTerms ?? DEFAULT_EXC,
+  screener: saved.screener || "",
+  filter: saved.filter || "all",
+  currentId: saved.currentId || SCREEN[0].id,
+  pickingReason: false
+};
+function save() {
+  const { decisions, notes, incTerms, excTerms, screener, filter, currentId } = state;
+  localStorage.setItem(KEY, JSON.stringify({ decisions, notes, incTerms, excTerms, screener, filter, currentId }));
+}
+
+// ===================== QUEUE and navigation =====================
+function statusOf(id) { return state.decisions[id] ? state.decisions[id].decision : "open"; }
+function queue() { return state.filter === "all" ? SCREEN : SCREEN.filter((r) => statusOf(r.id) === state.filter); }
+function current() { return SCREEN.find((r) => r.id === state.currentId); }
+
+function move(step) {
+  const list = queue();
+  if (!list.length) return;
+  const i = list.findIndex((r) => r.id === state.currentId);
+  const j = i === -1 ? 0 : Math.max(0, Math.min(list.length - 1, i + step));
+  state.currentId = list[j].id;
+  closeReasons(); save(); render();
+}
+
+function nextNotScreened() {
+  const pos = SCREEN.findIndex((r) => r.id === state.currentId);
+  const open = SCREEN.filter((r) => statusOf(r.id) === "open");
+  const next = open.find((r) => SCREEN.indexOf(r) > pos) || open[0];
+  if (!next) { $("#current").textContent = "Every record has a decision."; return; }
+  if (state.filter !== "all" && state.filter !== "open") { state.filter = "all"; $("#queueFilter").value = "all"; }
+  state.currentId = next.id; closeReasons(); save(); render();
+}
+
+// After a decision, go to the next record in the queue. In a filtered queue the record
+// just decided may have left it, so wrap to the first one still there.
+function advance() {
+  const list = queue();
+  const pos = SCREEN.findIndex((r) => r.id === state.currentId);
+  const later = list.find((r) => SCREEN.indexOf(r) > pos);
+  if (later) state.currentId = later.id;
+  else if (!list.length) state.lastMessage = "No records left in this queue.";
+  else if (!list.some((r) => r.id === state.currentId)) state.currentId = list[0].id;
+  else state.lastMessage = "That was the last record in this queue.";
+}
+
+// ===================== DECISIONS =====================
+function decide(decision, reason) {
+  const r = current();
+  if (!r || !queue().some((x) => x.id === r.id)) return;
+  state.decisions[r.id] = { decision, reason: reason || "", at: new Date().toISOString() };
+  closeReasons();
+  advance();
+  save(); render();
+}
+function clearDecision() {
+  const r = current();
+  if (!r) return;
+  delete state.decisions[r.id];
+  save(); render();
+}
+function openReasons() { if (!current() || !queue().length) return; state.pickingReason = true; $("#reasons").classList.add("open"); }
+function closeReasons() { state.pickingReason = false; $("#reasons").classList.remove("open"); }
+
+// ===================== COMPONENT: term highlighting =====================
+function termRegex(list) {
+  const terms = list.split(",").map((t) => t.trim()).filter(Boolean);
+  if (!terms.length) return null;
+  const parts = terms.map((t) => t.endsWith("*")
+    ? t.slice(0, -1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\w-]*"
+    : t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?:s|es)?");
+  return new RegExp("\\b(?:" + parts.join("|") + ")\\b", "gi");
+}
+
+function highlightTerms(text, found) {
+  const ranges = [];
+  for (const [cls, re] of [["inc", termRegex(state.incTerms)], ["exc", termRegex(state.excTerms)]]) {
+    if (!re) continue;
+    for (const m of text.matchAll(re)) {
+      ranges.push({ s: m.index, e: m.index + m[0].length, cls });
+      if (found) { const k = cls + ":" + m[0].toLowerCase(); found[k] = (found[k] || 0) + 1; }
+    }
+  }
+  ranges.sort((a, b) => a.s - b.s);
+  let out = "", pos = 0;
+  for (const r of ranges) {
+    if (r.s < pos) continue;
+    const tag = r.cls === "inc" ? "mark" : "span";
+    out += esc(text.slice(pos, r.s)) + `<${tag} class="${r.cls}">${esc(text.slice(r.s, r.e))}</${tag}>`;
+    pos = r.e;
+  }
+  return out + esc(text.slice(pos));
+}
+
+// ===================== VIEW: the current record =====================
+function renderRecord() {
+  const list = queue();
+  const r = current();
+  const inList = r && list.some((x) => x.id === r.id);
+  if (!inList) {
+    $("#record").innerHTML = `<p class="muted">No records in this queue. Pick another queue above.</p>`;
+    $("#position").textContent = "";
+    return;
+  }
+  const found = {};
+  const title = highlightTerms(r.title, found);
+  const abstract = highlightTerms(r.abstract, found);
+  const summary = (cls) => Object.entries(found).filter(([k]) => k.startsWith(cls + ":"))
+    .map(([k, n]) => k.slice(cls.length + 1) + (n > 1 ? " ×" + n : "")).join(", ") || "none";
+  const dups = [...DUP_OF].filter(([, keep]) => keep === r.id).map(([d]) => RECORDS.find((x) => x.id === d).source);
+  $("#position").textContent = `Record ${list.indexOf(r) + 1} of ${list.length} in this queue`;
+  $("#record").innerHTML = `
+    <div class="record-meta">${esc(r.id)} · ${esc(r.source)} · ${r.year} · ${esc(r.venue)}</div>
+    <h2 class="record-title">${title}</h2>
+    <p class="record-authors">${esc(r.authors)}</p>
+    <p class="abstract">${abstract}</p>
+    <div class="found">Inclusion terms: ${esc(summary("inc"))}. Exclusion flags: ${esc(summary("exc"))}.</div>
+    <div class="note-row"><label for="note" class="muted">Note</label><input type="text" id="note" value="${esc(state.notes[r.id] || "")}" placeholder="Why, if it is not obvious from the reason"></div>
+    ${dups.length ? `<div class="dup-note">Also exported from ${esc(dups.join(", "))}; that copy was removed as a duplicate.</div>` : ""}`;
+  $("#note").addEventListener("input", (e) => { state.notes[r.id] = e.target.value; save(); });
+}
+
+function renderDecision() {
+  const r = current();
+  const inList = r && queue().some((x) => x.id === r.id);
+  const d = inList && state.decisions[r.id];
+  $("#incBtn").classList.toggle("on", !!d && d.decision === "include");
+  $("#excBtn").classList.toggle("on", !!d && d.decision === "exclude");
+  $("#maybeBtn").classList.toggle("on", !!d && d.decision === "maybe");
+  const label = { include: "Included for full-text review", exclude: "Excluded", maybe: "Maybe, to discuss" };
+  let text = !inList ? "" : d ? label[d.decision] + (d.reason ? ": " + d.reason : "") : "Not screened yet.";
+  if (state.lastMessage) { text = state.lastMessage + " " + text; state.lastMessage = ""; }
+  $("#current").textContent = text;
+}
+
+// ===================== VIEW: progress and PRISMA counts =====================
+function renderCounts() {
+  const n = SCREEN.length;
+  const by = { include: 0, exclude: 0, maybe: 0 };
+  const reasons = Object.fromEntries(REASONS.map((x) => [x, 0]));
+  for (const r of SCREEN) {
+    const d = state.decisions[r.id];
+    if (!d) continue;
+    by[d.decision]++;
+    if (d.decision === "exclude") reasons[d.reason] = (reasons[d.reason] || 0) + 1;
+  }
+  const done = by.include + by.exclude + by.maybe;
+  $("#progressText").textContent = `${done} of ${n} screened (${Math.round((done / n) * 100)}%)`;
+  $("#progressFill").style.width = (done / n) * 100 + "%";
+  const sources = {};
+  for (const r of RECORDS) sources[r.source] = (sources[r.source] || 0) + 1;
+  const row = (label, v, cls = "") => `<tr class="${cls}"><td>${esc(label)}</td><td class="n">${v}</td></tr>`;
+  $("#prisma").innerHTML =
+    row("Records identified", RECORDS.length) +
+    Object.entries(sources).map(([s, v]) => row(s, v, "sub")).join("") +
+    row("Duplicates removed", DUP_OF.size) +
+    row("Records screened (title and abstract)", n) +
+    row("Excluded", by.exclude, "sub") +
+    REASONS.map((x) => row(x, reasons[x], "sub2")).join("") +
+    row("Included for full-text review", by.include, "sub") +
+    row("Maybe, to discuss", by.maybe, "sub") +
+    row("Not screened yet", n - done, "sub");
+}
+
+function render() { renderRecord(); renderDecision(); renderCounts(); }
+
+// ===================== EXPORT: CSV, one row per record =====================
+function toCSV() {
+  const cols = ["record_id", "source", "year", "title", "authors", "venue", "decision", "exclusion_reason", "note", "decided_at", "screener", "duplicate_of"];
+  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [cols.join(",")];
+  for (const r of RECORDS) {
+    const d = state.decisions[r.id] || {};
+    const dup = DUP_OF.get(r.id) || "";
+    lines.push([r.id, r.source, r.year, r.title, r.authors, r.venue,
+      dup ? "duplicate_removed" : (d.decision || "not_screened"), d.reason || "", state.notes[r.id] || "",
+      d.at || "", state.screener, dup].map(q).join(","));
+  }
+  return lines.join("\r\n");
+}
+function exportCSV() {
+  const who = state.screener.trim() || "screener";
+  const d = new Date(), pad = (n) => String(n).padStart(2, "0");
+  const name = `screening_${who}_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.csv`;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([toCSV()], { type: "text/csv" }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  $("#exportStatus").textContent = `Saved ${name} with ${RECORDS.length} rows.`;
+}
+
+// ===================== WIRING: buttons and keyboard =====================
+$("#reasonList").innerHTML = REASONS.map((x, i) => `<button type="button" data-reason="${i}"><kbd>${i + 1}</kbd> ${esc(x)}</button>`).join("");
+$("#reasonList").addEventListener("click", (e) => { const b = e.target.closest("[data-reason]"); if (b) decide("exclude", REASONS[b.dataset.reason]); });
+$("#incBtn").onclick = () => decide("include");
+$("#excBtn").onclick = openReasons;
+$("#maybeBtn").onclick = () => decide("maybe");
+$("#clearBtn").onclick = clearDecision;
+$("#prevBtn").onclick = () => move(-1);
+$("#nextBtn").onclick = () => move(1);
+$("#nextOpenBtn").onclick = nextNotScreened;
+$("#queueFilter").onchange = (e) => {
+  state.filter = e.target.value;
+  const list = queue();
+  if (list.length && !list.some((r) => r.id === state.currentId)) state.currentId = list[0].id;
+  closeReasons(); save(); render();
+};
+$("#incTerms").addEventListener("input", (e) => { state.incTerms = e.target.value; save(); renderRecord(); });
+$("#excTerms").addEventListener("input", (e) => { state.excTerms = e.target.value; save(); renderRecord(); });
+$("#screener").addEventListener("input", (e) => { state.screener = e.target.value.trim(); save(); });
+$("#exportBtn").onclick = exportCSV;
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.matches("input, select, textarea")) { if (e.key === "Escape") e.target.blur(); return; }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (state.pickingReason) {
+    const n = Number(e.key);
+    if (n >= 1 && n <= REASONS.length) decide("exclude", REASONS[n - 1]);
+    else if (e.key === "Escape") closeReasons();
+    e.preventDefault();
+    return;
+  }
+  const k = e.key.toLowerCase();
+  if (k === "i") decide("include");
+  else if (k === "e") openReasons();
+  else if (k === "m") decide("maybe");
+  else if (k === "n") nextNotScreened();
+  else if (e.key === "ArrowRight") move(1);
+  else if (e.key === "ArrowLeft") move(-1);
+  else if (k === "/") { const n = $("#note"); if (n) n.focus(); }
+  else return;
+  e.preventDefault();
+});
+
+// ===================== START =====================
+if (!current()) state.currentId = SCREEN[0].id;
+$("#queueFilter").value = state.filter;
+$("#incTerms").value = state.incTerms;
+$("#excTerms").value = state.excTerms;
+$("#screener").value = state.screener;
+render();
+</script>
+</body>
+</html>

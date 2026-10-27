@@ -1,0 +1,1041 @@
+{
+  "schema": "astaui.card/1",
+  "id": "plate-reader-qc",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/3",
+    "at": "2026-10-24T04:04:44Z"
+  },
+  "app": {
+    "title": "Plate reader growth curve QC",
+    "summary": "A person scans a whole multi-well plate laid out as tiny growth curves on one shared axis, where wells that trip quality-control rules are flagged, and can step from one flagged well to the next. Clicking a well opens its curve large with a fitted growth model and its parameters; they click points to drop or restore them and the fit updates, or exclude the whole well. A shaded table under the plate averages a growth parameter over the kept replicate wells for each condition, and the kept wells' parameters download as a CSV.",
+    "task": {
+      "text": "Find and remove bad wells and time points from a plate of growth curves before fitting growth parameters and comparing conditions.",
+      "verbs": [
+        "clean",
+        "triage",
+        "derive",
+        "summarize",
+        "compare",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Optical density readings over time for every well of a multi-well plate, with rows and columns standing for strains, replicates and drug concentrations, plus the person's exclusions and the fitted parameters.",
+      "item": "a well on a 96-well plate with its growth curve",
+      "shapes": [
+        "grid of series",
+        "time series",
+        "judgements",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "quality control of plate reader runs before analysis",
+      "terms": [
+        "clean",
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A plate-shaped grid of small curves on a common scale gives the overview, with rule-based flags marking suspect wells, and selecting a well opens a large plot where clicking points drops them and refits. Every exclusion recomputes the well's parameters, its flags, the condition summary heatmap and the counts, and the kept wells export to a file.",
+      "views": [
+        "fixed-layout grid",
+        "small multiples",
+        "line chart",
+        "detail panel",
+        "summary stats",
+        "heatmap"
+      ],
+      "interactions": [
+        "select",
+        "exclude and refit",
+        "accept or reject",
+        "export"
+      ],
+      "patterns": [
+        "small multiples",
+        "overview and detail",
+        "master-detail",
+        "review queue",
+        "automatic flags"
+      ]
+    },
+    "field": {
+      "text": "microbiology, antibiotic susceptibility of bacterial efflux mutants",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "microbiology",
+        "antibiotic susceptibility",
+        "growth curves"
+      ]
+    },
+    "workflow": {
+      "name": "quality-check a grid of curves, then fit and summarise them by condition",
+      "steps": [
+        {
+          "step": "look over every item at a glance",
+          "here": "All 96 wells sit in plate layout, rows labelled by strain and columns by drug concentration, each drawn as a small curve of its readings with its logistic fit on one shared y axis; the header counts flagged and excluded wells and dropped points.",
+          "parts": [
+            "plate-grid"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "Wells that trip a QC rule get a coloured border and a flag mark, and Next flagged well jumps to the next flagged well that is not excluded, in plate order.",
+          "parts": [
+            "next-flagged",
+            "qc-flags"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Clicking a well shows its readings large with the fitted curve and the tangent at the inflection, its fitted parameters and points used, and the rules that fired for it.",
+          "parts": [
+            "well-detail"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Each well's kept points get a four-parameter logistic fit by least squares, giving lag, maximum growth rate, carrying capacity, baseline and R squared; a well that barely rises is called no growth, is not fitted, and has its lag left blank.",
+          "parts": [
+            "growth-fit"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Clicking a point on the large plot drops it or puts it back and the well refits at once, and a button excludes the whole well; the flags, the small curve, the summary and the counts all update.",
+          "parts": [
+            "point-dropping",
+            "well-detail"
+          ]
+        },
+        {
+          "step": "summarise the kept items by condition",
+          "here": "A shaded table gives the maximum growth rate for each strain and concentration, averaged over the kept replicate wells, with no-growth wells counted as zero, blanks left out, and n=1 or a dash where replicates were excluded.",
+          "parts": [
+            "condition-summary"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download kept wells writes a CSV with one row per kept well: its strain, replicate and concentration, lag, maximum rate, K, baseline, R squared, points used, the dropped time points and its flags.",
+          "parts": [
+            "csv-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every small curve shares one y axis, so a flat well cannot look as if it grows while the plate is scanned.",
+        "Four rules flag wells: spikes off a moving median, growth in a media-only blank, no growth without drug, and a poor fit.",
+        "Single time points are dropped by clicking them, separately from excluding a whole well, and the dropped times go into the export.",
+        "Lag is read from the tangent at the inflection, drawn on the plot, and left blank when the well does not grow.",
+        "The summary averages the two replicate rows per strain and concentration and shades them, so the concentration where each strain stops growing shows."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "plate-grid",
+      "level": "view",
+      "parent": null,
+      "title": "Plate of small curves",
+      "summary": "Draws every well in its plate position as a small curve with its fit on one shared y axis, marking flagged, excluded and selected wells, and opens a well when clicked.",
+      "views": [
+        "fixed-layout grid",
+        "small multiples"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "small multiples",
+        "overview and detail",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 80,
+          "end": 95,
+          "role": "markup",
+          "symbol": "#plate-view",
+          "anchor": "0d31854c88e3",
+          "first": "<section class=\"box\" id=\"plate-view\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 75,
+          "end": 75,
+          "role": "markup",
+          "symbol": "#plate-counts",
+          "anchor": "873db08bf421",
+          "first": "<span id=\"plate-counts\" class=\"muted\"></span>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 30,
+          "end": 30,
+          "role": "style",
+          "symbol": ".plate",
+          "anchor": "47b2710e9fd4",
+          "first": ".plate { display: grid; grid-template-columns: 70px repeat(12, 68px); gap: 2px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 31,
+          "end": 31,
+          "role": "style",
+          "symbol": ".colhead, .rowhead",
+          "anchor": "35a27a9b8a7c",
+          "first": ".colhead, .rowhead { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.2; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 32,
+          "end": 32,
+          "role": "style",
+          "symbol": ".colhead",
+          "anchor": "cf26e0271a3c",
+          "first": ".colhead { padding-bottom: 3px; } .colhead b, .rowhead b { color: var(--text); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 33,
+          "end": 33,
+          "role": "style",
+          "symbol": ".rowhead",
+          "anchor": "b4a55096607a",
+          "first": ".rowhead { display: flex; flex-direction: column; justify-content: center; text-align: right; padding-right: 6px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 34,
+          "end": 35,
+          "role": "style",
+          "symbol": ".well",
+          "anchor": "fc85647d3523",
+          "first": ".well { position: relative; width: 68px; height: 46px; padding: 1px; border: 1px solid var(--line); border-radius: 4px;"
+        },
+        {
+          "file": "code/index.html",
+          "start": 36,
+          "end": 36,
+          "role": "style",
+          "symbol": ".well svg",
+          "anchor": "cad4d3104b72",
+          "first": ".well svg { display: block; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 37,
+          "end": 37,
+          "role": "style",
+          "symbol": ".well .sm-data",
+          "anchor": "f29351744b20",
+          "first": ".well .sm-data { fill: none; stroke: #55554f; stroke-width: 1; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 38,
+          "end": 38,
+          "role": "style",
+          "symbol": ".well .sm-fit",
+          "anchor": "1b8c13ed8532",
+          "first": ".well .sm-fit { fill: none; stroke: var(--accent); stroke-width: 1.2; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 41,
+          "end": 41,
+          "role": "style",
+          "symbol": ".well.excluded svg",
+          "anchor": "7eedfed3f65a",
+          "first": ".well.excluded svg { opacity: .25; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 42,
+          "end": 42,
+          "role": "style",
+          "symbol": ".well.excluded .mark",
+          "anchor": "ea2d22ca1197",
+          "first": ".well.excluded .mark { color: var(--muted); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 43,
+          "end": 43,
+          "role": "style",
+          "symbol": ".well.selected",
+          "anchor": "29ac058da663",
+          "first": ".well.selected { outline: 2px solid var(--accent); outline-offset: 1px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 44,
+          "end": 44,
+          "role": "style",
+          "symbol": ".plate-key",
+          "anchor": "ed881ef7bd85",
+          "first": ".plate-key { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; font-size: 12px; color: var(--muted); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 45,
+          "end": 45,
+          "role": "style",
+          "symbol": ".key-line",
+          "anchor": "c8a384c63e02",
+          "first": ".key-line { display: inline-block; width: 16px; height: 0; border-top: 1.5px solid; vertical-align: middle; margin-right"
+        },
+        {
+          "file": "code/index.html",
+          "start": 234,
+          "end": 234,
+          "role": "data",
+          "symbol": "SM",
+          "anchor": "166eb33381e7",
+          "first": "const SM = { w: 64, h: 42 };"
+        },
+        {
+          "file": "code/index.html",
+          "start": 235,
+          "end": 235,
+          "role": "data",
+          "anchor": "37d59b7b4827",
+          "first": "const Y_MAX = Math.ceil(Math.max(...WELLS.flatMap(w => w.od)) * 10) / 10;"
+        },
+        {
+          "file": "code/index.html",
+          "start": 236,
+          "end": 236,
+          "role": "data",
+          "symbol": "wellEls",
+          "anchor": "d32ec1128c0f",
+          "first": "const wellEls = {};"
+        },
+        {
+          "file": "code/index.html",
+          "start": 237,
+          "end": 254,
+          "role": "logic",
+          "symbol": "buildPlate",
+          "anchor": "bb6923d34970",
+          "first": "function buildPlate() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 256,
+          "end": 270,
+          "role": "logic",
+          "symbol": "drawWell",
+          "anchor": "ccf2647d506c",
+          "first": "function drawWell(w) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 272,
+          "end": 278,
+          "role": "logic",
+          "symbol": "drawCounts",
+          "anchor": "26191b39a224",
+          "first": "function drawCounts() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 393,
+          "end": 395,
+          "role": "logic",
+          "anchor": "ccc2c927a66d",
+          "first": "buildPlate();"
+        },
+        {
+          "file": "code/index.html",
+          "start": 111,
+          "end": 115,
+          "role": "data",
+          "anchor": "a05e0d606498",
+          "first": "const ROWS = 'ABCDEFGH'.split('');"
+        },
+        {
+          "file": "code/index.html",
+          "start": 117,
+          "end": 124,
+          "role": "data",
+          "symbol": "mulberry32",
+          "anchor": "d001a3ab18bd",
+          "first": "function mulberry32(a) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 125,
+          "end": 125,
+          "role": "data",
+          "anchor": "e11c30fb9dc8",
+          "first": "const rand = mulberry32(20261001);"
+        },
+        {
+          "file": "code/index.html",
+          "start": 130,
+          "end": 148,
+          "role": "data",
+          "symbol": "makeWell",
+          "anchor": "c7d41985f41d",
+          "first": "function makeWell(r, c) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 149,
+          "end": 149,
+          "role": "data",
+          "symbol": "WELLS",
+          "anchor": "0ede01ca5f1a",
+          "first": "const WELLS = [];"
+        },
+        {
+          "file": "code/index.html",
+          "start": 150,
+          "end": 151,
+          "role": "data",
+          "anchor": "dcf48ef2105c",
+          "first": "for (let r = 0; r < 8; r++) for (let c = 0; c < 12; c++) WELLS.push(makeWell(r, c));"
+        }
+      ]
+    },
+    {
+      "id": "qc-flags",
+      "level": "component",
+      "parent": "plate-grid",
+      "title": "QC flag rules",
+      "summary": "Checks each well against simple rules (spikes off a moving median, growth in a blank, no growth without drug, poor fit) and lists the reasons that fired.",
+      "views": [],
+      "interactions": [],
+      "patterns": [
+        "automatic flags"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 93,
+          "end": 93,
+          "role": "markup",
+          "anchor": "18ba06c79364",
+          "first": "<span style=\"color:var(--flag)\">flag: a QC rule fired, see the well</span>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 262,
+          "end": 264,
+          "role": "markup",
+          "anchor": "eaf5fafd28c9",
+          "first": "const mark = w.excluded ? 'excluded' : w.flags.length ? 'flag' : '';"
+        },
+        {
+          "file": "code/index.html",
+          "start": 311,
+          "end": 311,
+          "role": "markup",
+          "anchor": "99a8e9dc073c",
+          "first": "(w.flags.length ? `<ul class=\"flags\">${w.flags.map(x => `<li>${x}</li>`).join('')}</ul>` : '<p class=\"muted\" style=\"marg"
+        },
+        {
+          "file": "code/index.html",
+          "start": 39,
+          "end": 39,
+          "role": "style",
+          "symbol": ".well.flagged",
+          "anchor": "ad7e0e408e3f",
+          "first": ".well.flagged { border-color: var(--flag); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 40,
+          "end": 40,
+          "role": "style",
+          "symbol": ".well .mark",
+          "anchor": "995258b8c465",
+          "first": ".well .mark { position: absolute; top: 1px; right: 3px; font-size: 9px; font-weight: 600; color: var(--flag); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 58,
+          "end": 58,
+          "role": "style",
+          "symbol": ".flags",
+          "anchor": "80e2559c88f9",
+          "first": ".flags { margin: 6px 0 10px; padding: 0; list-style: none; font-size: 13px; color: var(--flag); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 216,
+          "end": 224,
+          "role": "logic",
+          "symbol": "qcFlags",
+          "anchor": "6d714ea73b80",
+          "first": "function qcFlags(w, ts, ys, fit) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 155,
+          "end": 155,
+          "role": "logic",
+          "symbol": "median",
+          "anchor": "4a8a44f918de",
+          "first": "const median = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] "
+        },
+        {
+          "file": "code/index.html",
+          "start": 230,
+          "end": 230,
+          "role": "logic",
+          "anchor": "3d3a6c447080",
+          "first": "w.flags = qcFlags(w, ts, ys, w.fit);"
+        },
+        {
+          "file": "code/index.html",
+          "start": 265,
+          "end": 265,
+          "role": "logic",
+          "anchor": "5ddd3d41eafc",
+          "first": "b.classList.toggle('flagged', w.flags.length > 0 && !w.excluded);"
+        }
+      ]
+    },
+    {
+      "id": "next-flagged",
+      "level": "component",
+      "parent": "plate-grid",
+      "title": "Next flagged well button",
+      "summary": "Jumps the selection to the next flagged well that is not yet excluded, so suspect wells can be worked through in order.",
+      "views": [],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "review queue",
+        "automatic flags"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 84,
+          "end": 84,
+          "role": "markup",
+          "symbol": "#next-flag",
+          "anchor": "d0340621c397",
+          "first": "<button class=\"btn\" id=\"next-flag\">Next flagged well</button>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 383,
+          "end": 389,
+          "role": "logic",
+          "anchor": "d6d5f55e54d2",
+          "first": "document.getElementById('next-flag').addEventListener('click', () => {"
+        }
+      ]
+    },
+    {
+      "id": "well-detail",
+      "level": "view",
+      "parent": null,
+      "title": "Selected well",
+      "summary": "Shows the selected well's readings large with the fitted curve and tangent, its fitted parameters, the flags that fired, and buttons to exclude the well or put back dropped points.",
+      "views": [
+        "line chart",
+        "detail panel",
+        "summary stats"
+      ],
+      "interactions": [
+        "accept or reject",
+        "exclude and refit"
+      ],
+      "patterns": [
+        "master-detail",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 98,
+          "end": 100,
+          "role": "markup",
+          "symbol": "#detail-view",
+          "anchor": "4785ca4305eb",
+          "first": "<section class=\"box big\" id=\"detail-view\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 48,
+          "end": 48,
+          "role": "style",
+          "symbol": ".big svg",
+          "anchor": "330f798de8ad",
+          "first": ".big svg { width: 100%; height: auto; display: block; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 49,
+          "end": 49,
+          "role": "style",
+          "symbol": ".big .axis text",
+          "anchor": "81fc4caca482",
+          "first": ".big .axis text { font-size: 12px; fill: var(--muted); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 50,
+          "end": 50,
+          "role": "style",
+          "symbol": ".big .axis line, .big .axis path",
+          "anchor": "c4379381a3c7",
+          "first": ".big .axis line, .big .axis path { stroke: #bdbdb8; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 51,
+          "end": 51,
+          "role": "style",
+          "symbol": ".big .pt",
+          "anchor": "ed5e97e588b0",
+          "first": ".big .pt { fill: #55554f; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 53,
+          "end": 53,
+          "role": "style",
+          "symbol": ".big .fit",
+          "anchor": "bbe5e7907356",
+          "first": ".big .fit { fill: none; stroke: var(--accent); stroke-width: 2; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 54,
+          "end": 54,
+          "role": "style",
+          "symbol": ".big .tangent",
+          "anchor": "fc86cb0b1555",
+          "first": ".big .tangent { stroke: var(--accent); stroke-dasharray: 4 3; stroke-width: 1; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 55,
+          "end": 55,
+          "role": "style",
+          "symbol": ".params",
+          "anchor": "24ef65ba6044",
+          "first": ".params { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 16px; margin: 10px 0; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 56,
+          "end": 56,
+          "role": "style",
+          "symbol": ".params div span",
+          "anchor": "dc55425809fc",
+          "first": ".params div span { display: block; font-size: 12px; color: var(--muted); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 57,
+          "end": 57,
+          "role": "style",
+          "symbol": ".params div b",
+          "anchor": "9a6c4a8653df",
+          "first": ".params div b { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 59,
+          "end": 59,
+          "role": "style",
+          "symbol": ".actions",
+          "anchor": "2a01751f0f7f",
+          "first": ".actions { display: flex; flex-wrap: wrap; gap: 8px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 60,
+          "end": 60,
+          "role": "style",
+          "symbol": ".empty",
+          "anchor": "c22edfc5aee2",
+          "first": ".empty { color: var(--muted); margin: 0; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 281,
+          "end": 281,
+          "role": "data",
+          "symbol": "BIG",
+          "anchor": "18a5130e83b1",
+          "first": "const BIG = { w: 440, h: 280, l: 46, r: 12, t: 12, b: 38 };"
+        },
+        {
+          "file": "code/index.html",
+          "start": 282,
+          "end": 317,
+          "role": "logic",
+          "symbol": "drawDetail",
+          "anchor": "208eea109306",
+          "first": "function drawDetail() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 114,
+          "end": 114,
+          "role": "data",
+          "anchor": "d8721358595c",
+          "first": "const TIMES = Array.from({ length: 97 }, (_, i) => i * 0.25);                                  // hours"
+        },
+        {
+          "file": "code/index.html",
+          "start": 151,
+          "end": 151,
+          "role": "data",
+          "anchor": "d55c5b311289",
+          "first": "const byId = Object.fromEntries(WELLS.map(w => [w.id, w]));"
+        },
+        {
+          "file": "code/index.html",
+          "start": 152,
+          "end": 152,
+          "role": "data",
+          "symbol": "state",
+          "anchor": "2ccfb1e4e6a7",
+          "first": "const state = { selected: null };"
+        }
+      ]
+    },
+    {
+      "id": "point-dropping",
+      "level": "component",
+      "parent": "well-detail",
+      "title": "Click to drop a point",
+      "summary": "Finds the time point nearest the click, drops it or puts it back, and refits the well and redraws everything that depends on it.",
+      "views": [],
+      "interactions": [
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 300,
+          "end": 300,
+          "role": "markup",
+          "anchor": "1c4064bd510d",
+          "first": "TIMES.forEach((t, i) => s += `<circle class=\"pt${w.dropped.has(i) ? ' dropped' : ''}\" cx=\"${X(t).toFixed(1)}\" cy=\"${Y(w."
+        },
+        {
+          "file": "code/index.html",
+          "start": 313,
+          "end": 313,
+          "role": "markup",
+          "anchor": "174dec799fd8",
+          "first": "`<button class=\"btn\" id=\"restore-points\" ${w.dropped.size ? '' : 'disabled'}>Put back ${w.dropped.size || ''} dropped po"
+        },
+        {
+          "file": "code/index.html",
+          "start": 52,
+          "end": 52,
+          "role": "style",
+          "symbol": ".big .pt.dropped",
+          "anchor": "207e82e29f8d",
+          "first": ".big .pt.dropped { fill: none; stroke: #a9a9a3; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 314,
+          "end": 314,
+          "role": "logic",
+          "anchor": "2c1642f50d47",
+          "first": "document.getElementById('big-plot').addEventListener('click', ev => togglePoint(w, ev, X, Y));"
+        },
+        {
+          "file": "code/index.html",
+          "start": 319,
+          "end": 329,
+          "role": "logic",
+          "symbol": "togglePoint",
+          "anchor": "605c0dce57c8",
+          "first": "function togglePoint(w, ev, X, Y) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 316,
+          "end": 316,
+          "role": "logic",
+          "anchor": "fa5b01f5fe8f",
+          "first": "document.getElementById('restore-points').addEventListener('click', () => { w.dropped.clear(); analyse(w); refresh(w); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 114,
+          "end": 114,
+          "role": "data",
+          "anchor": "d8721358595c",
+          "first": "const TIMES = Array.from({ length: 97 }, (_, i) => i * 0.25);                                  // hours"
+        }
+      ]
+    },
+    {
+      "id": "growth-fit",
+      "level": "component",
+      "parent": "well-detail",
+      "title": "Logistic growth fit",
+      "summary": "Fits a four-parameter logistic to the kept points, or reports no growth, and derives lag, maximum rate, carrying capacity and R squared.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 295,
+          "end": 299,
+          "role": "markup",
+          "anchor": "b4c7724ebab0",
+          "first": "if (!f.noGrowth) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 226,
+          "end": 231,
+          "role": "logic",
+          "symbol": "analyse",
+          "anchor": "6806cb9eddfc",
+          "first": "function analyse(w) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 179,
+          "end": 213,
+          "role": "logic",
+          "symbol": "fitLogistic",
+          "anchor": "397e97eb5a9f",
+          "first": "function fitLogistic(ts, ys) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 158,
+          "end": 177,
+          "role": "logic",
+          "symbol": "solve",
+          "anchor": "8c525cf63c94",
+          "first": "function solve(A, b) {                       // Gaussian elimination with partial pivoting"
+        },
+        {
+          "file": "code/index.html",
+          "start": 155,
+          "end": 155,
+          "role": "logic",
+          "symbol": "median",
+          "anchor": "4a8a44f918de",
+          "first": "const median = a => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] "
+        },
+        {
+          "file": "code/index.html",
+          "start": 156,
+          "end": 156,
+          "role": "logic",
+          "symbol": "movingMedian",
+          "anchor": "e3bda4eb3427",
+          "first": "const movingMedian = (ys, k) => ys.map((_, i) => median(ys.slice(Math.max(0, i - k), i + k + 1)));"
+        },
+        {
+          "file": "code/index.html",
+          "start": 127,
+          "end": 128,
+          "role": "logic",
+          "symbol": "logistic",
+          "anchor": "076259116ce3",
+          "first": "const logistic = (t, p) => p[0] + p[1] / (1 + Math.exp(-p[2] * (t - p[3])));   // p = [baseline, K, r, t_mid]"
+        },
+        {
+          "file": "code/index.html",
+          "start": 392,
+          "end": 392,
+          "role": "logic",
+          "anchor": "f7f411078575",
+          "first": "WELLS.forEach(analyse);"
+        },
+        {
+          "file": "code/index.html",
+          "start": 114,
+          "end": 114,
+          "role": "data",
+          "anchor": "d8721358595c",
+          "first": "const TIMES = Array.from({ length: 97 }, (_, i) => i * 0.25);                                  // hours"
+        }
+      ]
+    },
+    {
+      "id": "condition-summary",
+      "level": "view",
+      "parent": null,
+      "title": "Growth rate by strain and concentration",
+      "summary": "Averages the maximum growth rate over kept replicate wells for each strain and drug concentration, shades the cells, marks where a replicate or both were excluded, and recomputes whenever a well or point is dropped.",
+      "views": [
+        "heatmap",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 104,
+          "end": 107,
+          "role": "markup",
+          "symbol": "#summary-view",
+          "anchor": "2fb8cdab57f0",
+          "first": "<section class=\"box\" id=\"summary-view\" style=\"margin: 0 20px 20px\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 63,
+          "end": 63,
+          "role": "style",
+          "symbol": "table.summary",
+          "anchor": "6ff5834a70f0",
+          "first": "table.summary { border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 64,
+          "end": 64,
+          "role": "style",
+          "symbol": "table.summary th",
+          "anchor": "76387dc5e47d",
+          "first": "table.summary th { font-weight: 500; color: var(--muted); padding: 4px 6px; text-align: center; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 65,
+          "end": 65,
+          "role": "style",
+          "symbol": "table.summary th.strain",
+          "anchor": "827c9b39ed64",
+          "first": "table.summary th.strain { text-align: right; color: var(--text); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 66,
+          "end": 66,
+          "role": "style",
+          "symbol": "table.summary td",
+          "anchor": "7d3a93f134cd",
+          "first": "table.summary td { width: 56px; height: 34px; text-align: center; border: 1px solid #fff; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 67,
+          "end": 67,
+          "role": "style",
+          "symbol": "table.summary td small",
+          "anchor": "0772a652940e",
+          "first": "table.summary td small { display: block; font-size: 10px; opacity: .8; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 332,
+          "end": 353,
+          "role": "logic",
+          "symbol": "drawSummary",
+          "anchor": "44aa57c2e5c3",
+          "first": "function drawSummary() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 112,
+          "end": 112,
+          "role": "data",
+          "symbol": "STRAINS",
+          "anchor": "aa131fd3a869",
+          "first": "const STRAINS = ['WT', 'ΔacrB', 'ΔtolC', 'marR*'];"
+        },
+        {
+          "file": "code/index.html",
+          "start": 113,
+          "end": 113,
+          "role": "data",
+          "symbol": "CONCS",
+          "anchor": "d15c37b8ef74",
+          "first": "const CONCS = [0, 0.001, 0.002, 0.004, 0.008, 0.016, 0.031, 0.063, 0.125, 0.25, 0.5, null]; // null = media blank"
+        }
+      ]
+    },
+    {
+      "id": "csv-export",
+      "level": "component",
+      "parent": "plate-grid",
+      "title": "Download kept wells",
+      "summary": "Writes one CSV row per kept well with its condition, fitted parameters, the time points dropped and its flags.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 85,
+          "end": 85,
+          "role": "markup",
+          "symbol": "#export-csv",
+          "anchor": "67f261b281c3",
+          "first": "<button class=\"btn primary\" id=\"export-csv\">Download kept wells (CSV)</button>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 26,
+          "end": 26,
+          "role": "style",
+          "symbol": ".btn.primary",
+          "anchor": "8d9fa6c72a39",
+          "first": ".btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 356,
+          "end": 371,
+          "role": "logic",
+          "symbol": "exportCsv",
+          "anchor": "d638d2e4017d",
+          "first": "function exportCsv() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 390,
+          "end": 390,
+          "role": "logic",
+          "anchor": "255d147607ad",
+          "first": "document.getElementById('export-csv').addEventListener('click', exportCsv);"
+        },
+        {
+          "file": "code/index.html",
+          "start": 114,
+          "end": 114,
+          "role": "data",
+          "anchor": "d8721358595c",
+          "first": "const TIMES = Array.from({ length: 97 }, (_, i) => i * 0.25);                                  // hours"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "patterns",
+      "term": "automatic flags"
+    }
+  ]
+}

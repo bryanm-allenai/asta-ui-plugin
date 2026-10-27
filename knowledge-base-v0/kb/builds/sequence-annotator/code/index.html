@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Construct annotator</title>
+<style>
+  :root {
+    --bg: #f5f5f3; --panel: #fff; --line: #d8d8d4; --text: #1d1d1f; --muted: #6a6a66;
+    --accent: #1f5f99; --hit: #f0e3b0;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; padding: 12px 20px;
+    background: var(--panel); border-bottom: 1px solid var(--line); }
+  h1 { font-size: 17px; font-weight: 600; margin: 0; }
+  h2 { font-size: 13px; font-weight: 600; margin: 0 0 8px; }
+  .muted { color: var(--muted); }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; padding: 16px 20px; align-items: start; }
+  @media (max-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr); } .side { position: static; max-height: none; } }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; margin-bottom: 16px; }
+  .side { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
+  .btn { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--panel); border-radius: 6px;
+    padding: 5px 10px; cursor: pointer; color: var(--text); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  input[type=text], input[type=number], select, textarea { font: inherit; font-size: 13px; border: 1px solid var(--line);
+    border-radius: 4px; padding: 4px 6px; background: #fff; color: var(--text); }
+  textarea { width: 100%; font-family: var(--mono); font-size: 12px; }
+
+  /* sequence view */
+  .seq { font: 13px/1.5 var(--mono); user-select: none; overflow-x: auto; }
+  .srow { display: grid; grid-template-columns: 6ch auto; column-gap: 1ch; margin-bottom: 6px; }
+  .pos { grid-column: 1; grid-row: 2; text-align: right; color: var(--muted); }
+  .track { grid-column: 2; grid-row: 1; position: relative; }
+  .bases { grid-column: 2; grid-row: 2; white-space: nowrap; cursor: text; }
+  .bases span.g { margin-right: 1ch; }
+  .bases span.sel { background: var(--accent); color: #fff; }
+  .bases span.hit { background: var(--hit); }
+  .bases span.hit.sel { background: var(--accent); }
+  .bar { position: absolute; height: 12px; font: 13px/12px var(--mono); border-radius: 2px; overflow: hidden;
+    cursor: pointer; color: #1d1d1f; }
+  .bar span { font: 10px/12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding-left: 3px; white-space: nowrap; }
+  .bar.arrow-r { clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%); }
+  .bar.arrow-l { clip-path: polygon(6px 0, 100% 0, 100% 100%, 6px 100%, 0 50%); }
+  .bar.arrow-l span { padding-left: 8px; }
+  .bar.current { box-shadow: inset 0 0 0 1px #1d1d1f; }
+
+  /* palette and side panels */
+  .palette { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .palette button { display: flex; align-items: center; gap: 6px; text-align: left; }
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; flex: none; }
+  .strand { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
+  .strand button { font: inherit; font-size: 13px; border: 0; background: #fff; padding: 4px 10px; cursor: pointer; }
+  .strand button + button { border-left: 1px solid var(--line); }
+  .strand button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .oligo { font: 12px/1.4 var(--mono); word-break: break-all; margin-top: 6px; }
+  .hits { list-style: none; padding: 0; margin: 6px 0 0; font-size: 13px; max-height: 140px; overflow-y: auto; }
+  .hits button { font: inherit; border: 0; background: none; color: var(--accent); cursor: pointer; padding: 1px 0; }
+
+  /* feature table */
+  table.features { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.features th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  table.features td { padding: 3px 6px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  table.features tr.current td { background: #eef3f9; }
+  table.features input[type=number] { width: 72px; }
+  table.features input[type=text] { width: 100%; min-width: 110px; }
+  .linkbtn { font: inherit; font-size: 13px; border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; }
+  .empty { color: var(--muted); margin: 0; font-size: 13px; }
+  details summary { cursor: pointer; font-size: 13px; color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Construct annotator</h1>
+  <span id="seq-title" class="muted"></span>
+</header>
+
+<div class="layout">
+  <main>
+    <!-- View: sequence with feature track -->
+    <section class="box">
+      <h2>Sequence <span class="muted" style="font-weight:400">· drag across bases to select, shift-click to extend, Esc to clear</span></h2>
+      <div class="seq" id="seq"></div>
+    </section>
+
+    <!-- View: feature list -->
+    <section class="box">
+      <h2>Features <span class="muted" style="font-weight:400">· 1-based, inclusive</span></h2>
+      <div id="feature-table"></div>
+    </section>
+  </main>
+
+  <aside class="side">
+    <!-- Component: mark selection as a feature (palette) -->
+    <section class="box">
+      <h2>Mark the selection as</h2>
+      <div class="strand" id="strand-switch" role="group" aria-label="Strand of the new feature">
+        <button data-strand="+" aria-pressed="true">+ strand</button>
+        <button data-strand="-" aria-pressed="false">− strand</button>
+      </div>
+      <div class="palette" id="palette"></div>
+      <p class="empty" id="palette-hint" style="margin-top:8px"></p>
+    </section>
+
+    <!-- Component: selection readout (GC, Tm) -->
+    <section class="box">
+      <h2>Selection</h2>
+      <div id="sel-info"></div>
+    </section>
+
+    <!-- Component: motif search on both strands -->
+    <section class="box">
+      <h2>Find a motif (exact, both strands)</h2>
+      <input type="text" id="motif" placeholder="e.g. GAATTC" style="width:100%" autocomplete="off" spellcheck="false">
+      <div id="motif-result" class="muted" style="font-size:13px;margin-top:6px"></div>
+      <ul class="hits" id="hit-list"></ul>
+    </section>
+
+    <!-- Component: export and load -->
+    <section class="box">
+      <h2>Export and load</h2>
+      <button class="btn primary" id="export-show">Show features as GFF table</button>
+      <div id="export-wrap" hidden style="margin-top:8px">
+        <textarea id="export-text" rows="7" wrap="off" readonly></textarea>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="btn" id="export-copy">Copy</button>
+          <button class="btn" id="export-download">Download .gff</button>
+          <span class="muted" id="export-status" style="font-size:12px;align-self:center"></span>
+        </div>
+      </div>
+      <details style="margin-top:10px">
+        <summary>Paste a different sequence</summary>
+        <input type="text" id="load-name" placeholder="Name" style="width:100%;margin:8px 0 6px">
+        <textarea id="load-text" rows="6" placeholder="Raw sequence or a GenBank ORIGIN block; numbers and spaces are removed"></textarea>
+        <button class="btn" id="load-go" style="margin-top:6px">Replace sequence</button>
+        <p class="empty" id="load-status" style="margin-top:6px"></p>
+      </details>
+    </section>
+  </aside>
+</div>
+
+<script>
+// ===== Placeholder sequence (synthetic; lac promoter, ORF, rrnB T1-like terminator, M13 sites) =====
+const PLACEHOLDER = [
+  'CGACAGATTGGATAATTTGGATGGAGAGGTACGAGGACAGAATCGCGCGCGCGAGCTCCG', 'GAGCGTAAAACGACGGCCAGTGTCATAGTATTGGGGACTCTATAGAATTCTGACCAACCA',
+  'ATGGTTTACACTTTATGCTTCCGGCTCGTATGTTGTGTGGAATTGTGAGCGGATAACAAT', 'TTCACACAGGAAACAGCTATGACCATGATTACGGATCCAGCTGCCTACAAGGAGGTAAAC',
+  'CATGCTCCCAAAAAAGAATCGACAGCATGAATGCAGCGACGTAGAAGTCTGTGTTCAGGT', 'TTTTCGTAGACGACCGCAGTTCGAGTTCGATAGCACAGAACGCATTTCGGGCGTCCCAGA',
+  'GTTAGGCTTCCGCGAGGACATCGCCTCCGTGAGTTTCACAGGCTCAGCCAACGGCGGTAA', 'TCTTAGCCCTCTATCGTTCATGGGGACACACGGCACTGGGGCACCAACAGTGGAGTTCAC',
+  'CTGCGTACGGTGGTTAAGCTGGTCAAGTTATGCTCACGAAACTATGCAGCTCCGTGTGTA', 'TAATGATCCTTTAAGTAGCGAGTGGCCGGGTAGGAGGATTAGTCTGTTACCAAAAGATGA',
+  'TCCAGAACGGGCCCTCTGTCTAGGCCATCTTAATTGCCGCGAAAAGTGCTATGGCGAGCG', 'CCCACATCTGTATCGACCTGAGAGAACTCGGCCGACACATATAACGGTTCCAAACGATCG',
+  'GAGGCAAGACGAGCCAATAGACCCTTGTTCCTGTATCCTCTATGCGCAGAGGAGTTCTCG', 'TGGCCAAAGATTGAGCAGTCAGTACATAGCATCTCAGTTGGATGTAGCCATGTTCGTCGA',
+  'GATGGTCTCGTGGCAAATGCACCGCGACGACAACCTCAGACTCCGGGAAGGAAAACGCAT', 'GTATCCGAAAAAAGAGAAACATCGACACCCTAACTGTAAGAAAAGGTCTAAATCATAAGG',
+  'AAAGCTTTAGATCAAATAAAACGAAAGGCTCAGTCGAAAGACTGGGCCTTTCGTTTTATC', 'TGTTGTTTGTCGGTGAACGCTCTCCTGAGTAGGACAAATCTACCAAGGTTGAAGCGGCCT',
+  'TATACGACAGTGTGAACGAGTCATAGCTGTTTCCTGCATATCCACCCTATCATCTAGGGC', 'GGTCACTTTGTTGGTCCCTAGACCACTCAGGATTTTGCACACGGTGATACGATCAGCCGA',
+  'GGGTGTAGAACGTGAATGTGTTTGCCATCGCATGGTTTATGATGCCAAACCATCGATCGC', 'ACACGCAACAAAACTTCATACGACATAGGAAACGTCGCTTGTCATTGTTTAGATTTATCA',
+  'AAAGCTGTCTAAAAACCGGATGATCGTTCATCCCAGTACCGATTCGACTTTTGATCAAGT', 'GTTGCCATTGATGTCGTCGGTACTGTCTATGTAACTATCACACAAGTAGTAATTTTTGGC',
+  'AACTTGACGGCGGTTCCTCTCCCGAACCTGTTGGCGTCGAGGAAAATATTGACGACTGTT',
+].join('');
+
+// Feature types: muted colours, GFF type for export
+const TYPES = {
+  promoter:   { label: 'Promoter',    name: 'promoter',    colour: '#a9c2a3', gff: 'promoter' },
+  CDS:        { label: 'CDS',         name: 'CDS',         colour: '#a7bcd3', gff: 'CDS' },
+  terminator: { label: 'Terminator',  name: 'terminator',  colour: '#d2b3a8', gff: 'terminator' },
+  primer:     { label: 'Primer site', name: 'primer site', colour: '#d8c79c', gff: 'primer_binding_site' },
+  other:      { label: 'Other',       name: 'feature',     colour: '#c4c1bb', gff: 'misc_feature' },
+};
+const ROW = 60;
+
+// ===== State (kept in localStorage) =====
+const STORE = 'construct-annotator-v1';
+const state = { name: 'pRep-lacGFP placeholder', seq: PLACEHOLDER, features: [], sel: null, strand: '+', hits: [], current: null };
+try {
+  const saved = JSON.parse(localStorage.getItem(STORE));
+  if (saved && saved.seq) Object.assign(state, { name: saved.name, seq: saved.seq, features: saved.features || [] });
+} catch (err) { /* first visit */ }
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify({ name: state.name, seq: state.seq, features: state.features })); } catch (err) {}
+}
+let nextId = 1 + state.features.reduce((m, f) => Math.max(m, +String(f.id).slice(1) || 0), 0);
+
+// ===== Sequence helpers =====
+const COMP = { A: 'T', T: 'A', G: 'C', C: 'G', N: 'N' };
+const revcomp = s => s.split('').reverse().map(b => COMP[b] || 'N').join('');
+const gcFraction = s => s.length ? (s.match(/[GC]/g) || []).length / s.length : 0;
+function tm(s) {                       // rough: Wallace rule under 14 nt, basic GC formula above
+  const gc = (s.match(/[GC]/g) || []).length, at = (s.match(/[AT]/g) || []).length;
+  return s.length < 14 ? 2 * at + 4 * gc : 64.9 + 41 * (gc - 16.4) / s.length;
+}
+const xch = off => off + Math.floor(off / 10);        // column in ch, with a 1ch gap after every 10 bases
+
+// ===== View: sequence rows with position numbers =====
+let spans = [], trackEls = [];
+function renderSequence() {
+  const host = document.getElementById('seq');
+  host.innerHTML = '';
+  spans = []; trackEls = [];
+  for (let r = 0; r * ROW < state.seq.length; r++) {
+    const row = document.createElement('div');
+    row.className = 'srow';
+    const track = document.createElement('div');
+    track.className = 'track';
+    const pos = document.createElement('div');
+    pos.className = 'pos';
+    pos.textContent = r * ROW + 1;
+    const bases = document.createElement('div');
+    bases.className = 'bases';
+    const chunk = state.seq.slice(r * ROW, (r + 1) * ROW);
+    for (let k = 0; k < chunk.length; k++) {
+      const s = document.createElement('span');
+      s.textContent = chunk[k];
+      s.dataset.i = r * ROW + k;
+      if (k % 10 === 9 && k < ROW - 1) s.className = 'g';
+      bases.appendChild(s);
+      spans.push(s);
+    }
+    row.append(track, pos, bases);
+    host.appendChild(row);
+    trackEls.push(track);
+  }
+  document.getElementById('seq-title').textContent = `${state.name} · ${state.seq.length} bp · GC ${(100 * gcFraction(state.seq)).toFixed(1)}%`;
+}
+
+// ===== Component: feature track (bars stacked in lanes, arrow shows strand) =====
+function assignLanes() {
+  const ends = [];
+  const sorted = [...state.features].sort((a, b) => a.start - b.start || b.end - a.end);
+  for (const f of sorted) {
+    let lane = ends.findIndex(e => e < f.start);
+    if (lane < 0) { lane = ends.length; ends.push(0); }
+    ends[lane] = f.end;
+    f.lane = lane;
+  }
+}
+function renderTracks() {
+  assignLanes();
+  trackEls.forEach((track, r) => {
+    const rs = r * ROW + 1, re = Math.min(state.seq.length, (r + 1) * ROW);
+    const here = state.features.filter(f => f.start <= re && f.end >= rs);
+    const lanes = here.reduce((m, f) => Math.max(m, f.lane + 1), 0);
+    track.style.height = lanes ? (lanes * 14 + 2) + 'px' : '0';
+    track.innerHTML = here.map(f => {
+      const a = Math.max(f.start, rs) - rs, b = Math.min(f.end, re) - rs;     // 0-based offsets in this row
+      const arrow = f.strand === '+' && f.end <= re ? ' arrow-r' : f.strand === '-' && f.start >= rs ? ' arrow-l' : '';
+      const label = f.start >= rs ? `<span>${escapeHtml(f.name)}</span>` : '';
+      return `<div class="bar${arrow}${f.id === state.current ? ' current' : ''}" data-id="${f.id}" title="${escapeHtml(f.name)} ${f.start}–${f.end} (${f.strand})" ` +
+        `style="left:${xch(a)}ch;width:${xch(b) + 1 - xch(a)}ch;top:${f.lane * 14}px;background:${TYPES[f.type].colour}">${label}</div>`;
+    }).join('');
+  });
+}
+const escapeHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ===== Mouse selection on the bases =====
+let drag = null, shown = null;
+function setSel(a, b) {
+  if (shown) for (let i = shown[0]; i <= shown[1]; i++) spans[i] && spans[i].classList.remove('sel');
+  state.sel = a == null ? null : [Math.min(a, b), Math.max(a, b)];
+  if (state.sel) for (let i = state.sel[0]; i <= state.sel[1]; i++) spans[i].classList.add('sel');
+  shown = state.sel;
+  renderSelection();
+}
+const seqHost = document.getElementById('seq');
+seqHost.addEventListener('mousedown', ev => {
+  const bar = ev.target.closest('.bar');
+  if (bar) { selectFeature(bar.dataset.id); return; }
+  if (!ev.target.dataset || ev.target.dataset.i == null) return;
+  ev.preventDefault();
+  const i = +ev.target.dataset.i;
+  if (ev.shiftKey && state.sel) { setSel(i < state.sel[0] ? state.sel[1] : state.sel[0], i); return; }
+  drag = { anchor: i };
+  setSel(i, i);
+});
+seqHost.addEventListener('mouseover', ev => {
+  if (drag && ev.target.dataset && ev.target.dataset.i != null) setSel(drag.anchor, +ev.target.dataset.i);
+});
+document.addEventListener('mouseup', () => { drag = null; });
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !ev.target.closest('input, textarea')) setSel(null); });
+
+// ===== Component: selection readout (length, GC, Tm, strands) =====
+function renderSelection() {
+  const box = document.getElementById('sel-info');
+  const hint = document.getElementById('palette-hint');
+  document.querySelectorAll('#palette button').forEach(b => b.disabled = !state.sel);
+  if (!state.sel) {
+    box.innerHTML = '<p class="empty">Nothing selected. Drag across bases in the sequence.</p>';
+    hint.textContent = 'Select bases in the sequence first.';
+    return;
+  }
+  const [a, b] = state.sel, s = state.seq.slice(a, b + 1);
+  hint.textContent = `Will mark ${a + 1}–${b + 1} on the ${state.strand} strand.`;
+  let html = `<dl class="kv"><dt>Range</dt><dd>${a + 1}–${b + 1}</dd><dt>Length</dt><dd>${s.length} bp</dd>` +
+    `<dt>GC</dt><dd>${(100 * gcFraction(s)).toFixed(1)}%</dd>`;
+  if (s.length >= 8 && s.length <= 60) html += `<dt>Tm, rough</dt><dd>${tm(s).toFixed(1)} °C</dd>`;
+  html += '</dl>';
+  if (s.length <= 120) html += `<div class="oligo"><span class="muted">5′→3′ top</span><br>${s}<br><span class="muted">5′→3′ bottom</span><br>${revcomp(s)}</div>`;
+  box.innerHTML = html;
+}
+
+// ===== Component: palette (mark selection as a feature) =====
+function buildPalette() {
+  document.getElementById('palette').innerHTML = Object.entries(TYPES).map(([k, t]) =>
+    `<button class="btn" data-type="${k}"><span class="swatch" style="background:${t.colour}"></span>${t.label}</button>`).join('');
+}
+document.getElementById('palette').addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-type]');
+  if (!b || !state.sel) return;
+  const type = b.dataset.type;
+  const n = state.features.filter(f => f.type === type).length + 1;
+  const f = { id: 'f' + nextId++, name: `${TYPES[type].name} ${n}`, type,
+              start: state.sel[0] + 1, end: state.sel[1] + 1, strand: state.strand };
+  state.features.push(f);
+  state.current = f.id;
+  save(); renderTracks(); renderFeatureTable();
+});
+document.getElementById('strand-switch').addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-strand]');
+  if (!b) return;
+  state.strand = b.dataset.strand;
+  document.querySelectorAll('#strand-switch button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  renderSelection();
+});
+
+// ===== View: feature list (editable, deletable) =====
+function renderFeatureTable() {
+  const host = document.getElementById('feature-table');
+  if (!state.features.length) {
+    host.innerHTML = '<p class="empty">No features yet. Select bases in the sequence, pick a strand, then a type on the right.</p>';
+    return;
+  }
+  const rows = [...state.features].sort((a, b) => a.start - b.start).map(f => `
+    <tr data-id="${f.id}" class="${f.id === state.current ? 'current' : ''}">
+      <td><input type="text" data-k="name" value="${escapeHtml(f.name)}" aria-label="Name"></td>
+      <td><select data-k="type" aria-label="Type">${Object.entries(TYPES).map(([k, t]) =>
+        `<option value="${k}"${k === f.type ? ' selected' : ''}>${t.label}</option>`).join('')}</select></td>
+      <td><input type="number" data-k="start" value="${f.start}" min="1" max="${state.seq.length}" aria-label="Start"></td>
+      <td><input type="number" data-k="end" value="${f.end}" min="1" max="${state.seq.length}" aria-label="End"></td>
+      <td>${f.end - f.start + 1}</td>
+      <td><select data-k="strand" aria-label="Strand"><option value="+"${f.strand === '+' ? ' selected' : ''}>+</option>` +
+        `<option value="-"${f.strand === '-' ? ' selected' : ''}>−</option></select></td>
+      <td><button class="linkbtn" data-act="show">Show</button> · <button class="linkbtn" data-act="delete">Delete</button></td>
+    </tr>`).join('');
+  host.innerHTML = `<table class="features"><thead><tr><th>Name</th><th>Type</th><th>Start</th><th>End</th>` +
+    `<th>Length</th><th>Strand</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+const tableHost = document.getElementById('feature-table');
+tableHost.addEventListener('change', ev => {
+  const tr = ev.target.closest('tr[data-id]'), k = ev.target.dataset.k;
+  const f = tr && state.features.find(x => x.id === tr.dataset.id);
+  if (!f || !k) return;
+  if (k === 'start' || k === 'end') {
+    const v = Math.round(+ev.target.value);
+    f[k] = Math.min(state.seq.length, Math.max(1, Number.isFinite(v) ? v : f[k]));
+    if (f.start > f.end) [f.start, f.end] = [f.end, f.start];
+  } else f[k] = ev.target.value;
+  state.current = f.id;
+  save(); renderTracks(); renderFeatureTable();
+});
+tableHost.addEventListener('click', ev => {
+  const btn = ev.target.closest('button[data-act]'), tr = ev.target.closest('tr[data-id]');
+  if (!btn || !tr) return;
+  if (btn.dataset.act === 'delete') {
+    state.features = state.features.filter(f => f.id !== tr.dataset.id);
+    if (state.current === tr.dataset.id) state.current = null;
+    save(); renderTracks(); renderFeatureTable();
+  } else selectFeature(tr.dataset.id);
+});
+function selectFeature(id) {
+  const f = state.features.find(x => x.id === id);
+  if (!f) return;
+  state.current = id;
+  setSel(f.start - 1, f.end - 1);
+  renderTracks(); renderFeatureTable();
+  spans[f.start - 1].scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+// ===== Component: motif search on both strands =====
+function findMotif() {
+  const raw = document.getElementById('motif').value.toUpperCase().replace(/[^ACGT]/g, '');
+  for (const h of state.hits) for (let i = h.start; i <= h.end; i++) spans[i] && spans[i].classList.remove('hit');
+  state.hits = [];
+  const out = document.getElementById('motif-result'), list = document.getElementById('hit-list');
+  list.innerHTML = '';
+  if (!raw) { out.textContent = ''; return; }
+  if (raw.length < 4) { out.textContent = 'Type at least 4 bases.'; return; }
+  const rc = revcomp(raw), found = new Map();
+  for (let i = state.seq.indexOf(raw); i >= 0; i = state.seq.indexOf(raw, i + 1)) found.set(i, '+');
+  for (let i = state.seq.indexOf(rc); i >= 0; i = state.seq.indexOf(rc, i + 1)) found.set(i, found.has(i) ? 'both' : '−');
+  state.hits = [...found].sort((a, b) => a[0] - b[0]).map(([i, strand]) => ({ start: i, end: i + raw.length - 1, strand }));
+  for (const h of state.hits) for (let i = h.start; i <= h.end; i++) spans[i].classList.add('hit');
+  const plus = state.hits.filter(h => h.strand !== '−').length, minus = state.hits.filter(h => h.strand !== '+').length;
+  out.textContent = state.hits.length
+    ? `${state.hits.length} hit${state.hits.length > 1 ? 's' : ''}: ${plus} on +, ${minus} on −` + (raw === rc ? ' (palindrome, both strands at once)' : '')
+    : `No match for ${raw} or its reverse complement ${rc}.`;
+  list.innerHTML = state.hits.slice(0, 100).map((h, k) =>
+    `<li><button data-hit="${k}">${h.start + 1}–${h.end + 1}</button> <span class="muted">${h.strand} strand</span></li>`).join('');
+}
+document.getElementById('motif').addEventListener('input', findMotif);
+document.getElementById('hit-list').addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-hit]');
+  if (!b) return;
+  const h = state.hits[+b.dataset.hit];
+  setSel(h.start, h.end);
+  spans[h.start].scrollIntoView({ block: 'center', behavior: 'smooth' });
+});
+
+// ===== Export: GFF-like, tab separated =====
+function gffText() {
+  const seqid = state.name.replace(/\s+/g, '_');
+  const lines = ['##gff-version 3', `##sequence-region ${seqid} 1 ${state.seq.length}`,
+    ['#seqid', 'source', 'type', 'start', 'end', 'score', 'strand', 'phase', 'attributes'].join('\t')];
+  for (const f of [...state.features].sort((a, b) => a.start - b.start)) {
+    const attrs = `ID=${f.id};Name=${f.name.replace(/[;=&,\t]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'))};length=${f.end - f.start + 1}`;
+    lines.push([seqid, 'annotator', TYPES[f.type].gff, f.start, f.end, '.', f.strand, f.type === 'CDS' ? '0' : '.', attrs].join('\t'));
+  }
+  return lines.join('\n') + '\n';
+}
+document.getElementById('export-show').addEventListener('click', () => {
+  const wrap = document.getElementById('export-wrap'), ta = document.getElementById('export-text');
+  ta.value = gffText();
+  wrap.hidden = false;
+  document.getElementById('export-status').textContent = `${state.features.length} feature${state.features.length === 1 ? '' : 's'}`;
+  ta.select();
+});
+document.getElementById('export-copy').addEventListener('click', async () => {
+  const ta = document.getElementById('export-text'), status = document.getElementById('export-status');
+  ta.value = gffText();
+  try { await navigator.clipboard.writeText(ta.value); status.textContent = 'Copied, paste into the sheet.'; }
+  catch (err) { ta.select(); status.textContent = 'Copy blocked here; the text is selected, press Ctrl+C.'; }
+});
+document.getElementById('export-download').addEventListener('click', () => {
+  const blob = new Blob([gffText()], { type: 'text/plain' });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: state.name.replace(/\W+/g, '_') + '.gff' });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+// ===== Load: paste a sequence (GenBank ORIGIN numbers and spaces stripped) =====
+document.getElementById('load-go').addEventListener('click', () => {
+  const raw = document.getElementById('load-text').value;
+  const body = raw.toUpperCase().replace(/^[\s\S]*?ORIGIN/, '').replace(/\/\/[\s\S]*$/, '');
+  const seq = body.replace(/[\s\d]/g, '');
+  const odd = seq.replace(/[ACGTN]/g, '').length;
+  const status = document.getElementById('load-status');
+  if (seq.length < 20) { status.textContent = 'That is under 20 bases; nothing was replaced.'; return; }
+  const clean = seq.replace(/[^ACGTN]/g, 'N');
+  const before = state.features.length;
+  state.features = state.features.filter(f => f.end <= clean.length);
+  state.seq = clean;
+  state.name = document.getElementById('load-name').value.trim() || 'pasted sequence';
+  state.hits = []; state.current = null; shown = null; state.sel = null;
+  save(); renderSequence(); renderTracks(); renderFeatureTable(); renderSelection(); findMotif();
+  const dropped = before - state.features.length;
+  status.textContent = `Loaded ${clean.length} bp.` + (odd ? ` ${odd} unexpected characters became N.` : '') +
+    (dropped ? ` ${dropped} feature${dropped > 1 ? 's' : ''} ran past the end and were removed.` : '');
+});
+
+// ===== Start =====
+buildPalette();
+renderSequence();
+renderTracks();
+renderFeatureTable();
+renderSelection();
+</script>
+</body>
+</html>

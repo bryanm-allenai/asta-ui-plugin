@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hollin Marsh bird transects, 2025</title>
+<style>
+:root {
+  --bg: #f5f5f2;
+  --panel: #ffffff;
+  --line: #d9d9d3;
+  --text: #1d1d1b;
+  --muted: #6b6b65;
+  --accent: #2f6db5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+button { border: 1px solid var(--line); background: var(--panel); border-radius: 5px; padding: 3px 9px; cursor: pointer; }
+button:hover { border-color: #b3b3ac; }
+button.on { border-color: var(--accent); color: var(--accent); }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+
+/* ---- Header: what is showing, load a file ---- */
+header { display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: baseline; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header h1 { font-size: 16px; font-weight: 600; margin: 0; }
+header .spacer { flex: 1; }
+.file-btn { border: 1px solid var(--line); border-radius: 5px; padding: 3px 9px; cursor: pointer; background: var(--panel); }
+.file-btn input { display: none; }
+#loadMsg.error { color: #a2392e; }
+
+.layout { display: grid; grid-template-columns: 240px minmax(0, 1fr) 300px; gap: 12px; padding: 12px; align-items: start; }
+.pane { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+.pane h2 { font-size: 13px; font-weight: 600; margin: 0 0 8px; }
+.filters { grid-row: span 2; }
+.table-pane { grid-column: 2 / 4; }
+@media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); } .filters { grid-row: auto; } .table-pane { grid-column: auto; } }
+
+/* ---- Filters ---- */
+.filters section + section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.seasons { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.range-row { display: grid; grid-template-columns: 34px 1fr; gap: 6px; align-items: center; font-size: 13px; }
+.range-row input { width: 100%; accent-color: var(--accent); }
+.range-label { font-size: 13px; margin: 2px 0 6px 40px; }
+.checks label { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 1px 0; cursor: pointer; }
+.checks label .n { margin-left: auto; color: var(--muted); }
+.swatch { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.species-list { max-height: 260px; overflow: auto; }
+.row-btns { display: flex; gap: 4px; margin-bottom: 6px; }
+
+/* ---- Map ---- */
+#map { display: block; width: 100%; height: auto; background: #fbfbf9; border: 1px solid var(--line); border-radius: 4px; }
+#map .pt { cursor: pointer; }
+#map text { font: 40px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--muted); }
+
+/* ---- Species totals chart ---- */
+#chart text { font: 12px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--text); }
+#chart .bar { fill: var(--accent); cursor: pointer; }
+#chart .bar:hover { fill: #24589a; }
+#chart .val { fill: var(--muted); }
+
+/* ---- Observation table ---- */
+.table-wrap { max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #ecece8; white-space: nowrap; }
+th { position: sticky; top: 0; background: #f7f7f4; font-weight: 600; }
+td.n { text-align: right; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: #f3f6fb; }
+tbody tr.sel { background: #e3ecf8; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hollin Marsh bird transects, 2025</h1>
+  <span id="summary" class="num muted"></span>
+  <span class="spacer"></span>
+  <span id="loadMsg" class="muted"></span>
+  <label class="file-btn">Load observations CSV<input id="file" type="file" accept=".csv,text/csv"></label>
+</header>
+
+<div class="layout">
+  <aside class="pane filters">
+    <section>
+      <h2>Dates</h2>
+      <div class="seasons" id="seasons"></div>
+      <div class="range-row"><span>From</span><input id="from" type="range" step="1"></div>
+      <div class="range-label num" id="fromLabel"></div>
+      <div class="range-row"><span>To</span><input id="to" type="range" step="1"></div>
+      <div class="range-label num" id="toLabel"></div>
+    </section>
+    <section>
+      <h2>Habitat</h2>
+      <div class="checks" id="habitats"></div>
+    </section>
+    <section>
+      <h2>Species</h2>
+      <div class="row-btns"><button id="spAll">All</button><button id="spNone">None</button></div>
+      <div class="checks species-list" id="species"></div>
+    </section>
+  </aside>
+
+  <section class="pane map-pane">
+    <h2>Map (local grid, metres; circle size is the count)</h2>
+    <svg id="map" role="img" aria-label="Map of observations"></svg>
+  </section>
+
+  <section class="pane chart-pane">
+    <h2>Birds counted per species</h2>
+    <button id="chartReset" hidden>Show all species</button>
+    <svg id="chart" width="100%"></svg>
+  </section>
+
+  <section class="pane table-pane">
+    <h2 id="tableTitle">Observations</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Transect</th><th>Species</th><th>Count</th><th>Habitat</th><th>Observer</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+// ===== Study area: boundary and transect lines (local grid, metres) =====
+const OUTLINE = [[120,180],[700,60],[1350,120],[1900,40],[2320,260],[2380,820],[2200,1350],[1650,1540],[1050,1480],[520,1560],[150,1300],[60,760]];
+const TRANSECTS = [
+  { id: 'T1', a: [260, 330], b: [2150, 430] },
+  { id: 'T2', a: [180, 650], b: [2300, 720] },
+  { id: 'T3', a: [200, 1000], b: [2220, 1060] },
+  { id: 'T4', a: [380, 1380], b: [1900, 1420] },
+  { id: 'T5', a: [820, 160], b: [870, 1450] },
+  { id: 'T6', a: [1520, 140], b: [1460, 1480] },
+];
+const HABITAT_COLORS = { wetland: '#5b87b0', grassland: '#9aa65a', scrub: '#c09553', woodland: '#4d7a5b' };
+const OTHER_COLOR = '#9a9a94';
+const SEASONS = [
+  { name: 'Spring', from: '2025-03-01', to: '2025-05-31' },
+  { name: 'Summer', from: '2025-06-01', to: '2025-08-31' },
+  { name: 'Autumn', from: '2025-09-01', to: '2025-11-30' },
+];
+
+// ===== Synthetic observations (seeded) =====
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(2025);
+
+// habitat weights; seasonal factor for spring, summer, autumn; typical group size
+const SPECIES = [
+  { name: 'Reed warbler',  hab: { wetland: 6, scrub: 0.5 }, season: [1.0, 1.4, 0.1], flock: 1 },
+  { name: 'Sedge warbler', hab: { wetland: 4, scrub: 1 }, season: [1.2, 1.0, 0.1], flock: 1 },
+  { name: 'Reed bunting',  hab: { wetland: 3, grassland: 1, scrub: 1 }, season: [1, 1, 1], flock: 3 },
+  { name: 'Grey heron',    hab: { wetland: 1.5 }, season: [1, 1, 1.2], flock: 1 },
+  { name: 'Skylark',       hab: { grassland: 4 }, season: [1.3, 1, 0.6], flock: 3 },
+  { name: 'Meadow pipit',  hab: { grassland: 3, scrub: 1 }, season: [1, 0.8, 1.6], flock: 8 },
+  { name: 'Lapwing',       hab: { grassland: 2, wetland: 1 }, season: [0.8, 0.4, 1.5], flock: 26 },
+  { name: 'Whitethroat',   hab: { scrub: 4, grassland: 0.5 }, season: [1, 1.2, 0.2], flock: 1 },
+  { name: 'Yellowhammer',  hab: { scrub: 3, grassland: 1 }, season: [1, 1, 0.8], flock: 3 },
+  { name: 'Chiffchaff',    hab: { woodland: 3, scrub: 1 }, season: [1.2, 1, 0.7], flock: 1 },
+  { name: 'Blackcap',      hab: { woodland: 3, scrub: 1.5 }, season: [1, 1.1, 0.4], flock: 1 },
+  { name: 'Wren',          hab: { woodland: 2, scrub: 2, wetland: 1 }, season: [1, 1, 1], flock: 1 },
+];
+const OBSERVERS = ['JM', 'AK', 'RT', 'LS'];
+
+function habitatAt(x, y) {
+  if (((x - 1100) / 560) ** 2 + ((y - 740) / 320) ** 2 < 1) return 'wetland';
+  if (x > 1750 && y > 650) return 'woodland';
+  if ((x < 650 && y > 950) || (x > 1300 && y < 330)) return 'scrub';
+  return 'grassland';
+}
+
+function seasonOf(iso) {
+  const s = SEASONS.findIndex(s => iso.slice(5) >= s.from.slice(5) && iso.slice(5) <= s.to.slice(5));
+  return s < 0 ? '' : SEASONS[s].name;
+}
+
+function makeObservations() {
+  const out = [];
+  const starts = ['2025-04-07', '2025-06-02', '2025-09-01'];
+  starts.forEach((start, s) => {
+    TRANSECTS.forEach((tr, ti) => {
+      for (let visit = 0; visit < 2; visit++) {
+        const d = new Date(start + 'T00:00:00Z');
+        d.setUTCDate(d.getUTCDate() + visit * 26 + ti * 2 + Math.floor(rand() * 3));
+        const date = d.toISOString().slice(0, 10);
+        const observer = OBSERVERS[(ti + visit + s + (rand() < 0.3 ? 1 : 0)) % OBSERVERS.length];
+        const n = 7 + Math.floor(rand() * 4);
+        for (let k = 0; k < n; k++) {
+          const t = rand(), off = (rand() - 0.5) * 90;
+          const dx = tr.b[0] - tr.a[0], dy = tr.b[1] - tr.a[1], len = Math.hypot(dx, dy);
+          const x = Math.round(tr.a[0] + dx * t - dy / len * off), y = Math.round(tr.a[1] + dy * t + dx / len * off);
+          const habitat = habitatAt(x, y);
+          const weights = SPECIES.map(sp => (sp.hab[habitat] || 0) * sp.season[s]);
+          let pick = rand() * weights.reduce((a, b) => a + b, 0), i = 0;
+          while (pick > weights[i]) { pick -= weights[i]; i++; }
+          const sp = SPECIES[i];
+          const count = sp.flock === 1 ? 1 + (rand() < 0.3 ? 1 : 0) : Math.max(1, Math.round(rand() * sp.flock * sp.season[s]));
+          out.push({ id: out.length + 1, date, season: SEASONS[s].name, transect: tr.id, observer, species: sp.name, count, habitat, x, y });
+        }
+      }
+    });
+  });
+  return out;
+}
+
+// ===== State =====
+let DATA = makeObservations();
+const state = { species: new Set(), habitats: new Set(), from: 0, to: 0, sel: null };
+const DAY = 86400000;
+const dayOf = iso => Math.round(Date.parse(iso + 'T00:00:00Z') / DAY);
+const isoOf = day => new Date(day * DAY).toISOString().slice(0, 10);
+const fmtDate = iso => new Date(iso + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const colorOf = h => HABITAT_COLORS[h] || OTHER_COLOR;
+const svgEl = (tag, attrs) => { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+
+function filtered() {
+  return DATA.filter(o => state.species.has(o.species) && state.habitats.has(o.habitat) && o.day >= state.from && o.day <= state.to);
+}
+
+// ===== Filters panel =====
+function buildFilters() {
+  DATA.forEach(o => { o.day = dayOf(o.date); });
+  const days = DATA.map(o => o.day);
+  const lo = Math.min(...days), hi = Math.max(...days);
+  for (const id of ['from', 'to']) { const el = document.getElementById(id); el.min = lo; el.max = hi; }
+  state.from = lo; state.to = hi;
+  document.getElementById('from').value = lo; document.getElementById('to').value = hi;
+
+  const seasons = document.getElementById('seasons');
+  seasons.innerHTML = '';
+  const year = isoOf(lo).slice(0, 4);
+  [...SEASONS, { name: 'Whole period' }].forEach(s => {
+    const b = document.createElement('button');
+    b.textContent = s.name;
+    b.dataset.from = s.from ? Math.max(lo, dayOf(year + s.from.slice(4))) : lo;
+    b.dataset.to = s.to ? Math.min(hi, dayOf(year + s.to.slice(4))) : hi;
+    b.addEventListener('click', () => {
+      state.from = +b.dataset.from; state.to = +b.dataset.to;
+      document.getElementById('from').value = state.from; document.getElementById('to').value = state.to;
+      render();
+    });
+    seasons.appendChild(b);
+  });
+
+  const habitats = [...new Set(DATA.map(o => o.habitat))].sort();
+  state.habitats = new Set(habitats);
+  document.getElementById('habitats').innerHTML = habitats.map(h =>
+    `<label><input type="checkbox" value="${h}" checked><span class="swatch" style="background:${colorOf(h)}"></span>${h}<span class="n num">${DATA.filter(o => o.habitat === h).length}</span></label>`).join('');
+
+  const species = [...new Set(DATA.map(o => o.species))].sort();
+  state.species = new Set(species);
+  document.getElementById('species').innerHTML = species.map(s =>
+    `<label><input type="checkbox" value="${s}" checked>${s}<span class="n num">${DATA.filter(o => o.species === s).length}</span></label>`).join('');
+}
+
+function syncSpeciesChecks() {
+  document.querySelectorAll('#species input').forEach(c => { c.checked = state.species.has(c.value); });
+}
+
+function updateDateLabels() {
+  document.getElementById('fromLabel').textContent = fmtDate(isoOf(state.from));
+  document.getElementById('toLabel').textContent = fmtDate(isoOf(state.to));
+  document.querySelectorAll('#seasons button').forEach(b => {
+    b.classList.toggle('on', +b.dataset.from === state.from && +b.dataset.to === state.to);
+  });
+}
+
+// ===== Map =====
+const map = document.getElementById('map');
+let proj = null;
+
+function fitMap() {
+  const xs = OUTLINE.map(p => p[0]).concat(DATA.map(o => o.x));
+  const ys = OUTLINE.map(p => p[1]).concat(DATA.map(o => o.y));
+  const pad = 80, minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  proj = { x: x => x - minX + pad, y: y => maxY - y + pad, w: maxX - minX + 2 * pad, h: maxY - minY + 2 * pad + 100 };
+  map.setAttribute('viewBox', `0 0 ${proj.w} ${proj.h}`);
+}
+
+function drawBase() {
+  map.innerHTML = '';
+  const d = OUTLINE.map((p, i) => (i ? 'L' : 'M') + proj.x(p[0]) + ' ' + proj.y(p[1])).join(' ') + ' Z';
+  map.appendChild(svgEl('path', { d, fill: '#ffffff', stroke: '#8c8c86', 'stroke-width': 1.5, 'vector-effect': 'non-scaling-stroke' }));
+  for (const t of TRANSECTS) {
+    map.appendChild(svgEl('line', { x1: proj.x(t.a[0]), y1: proj.y(t.a[1]), x2: proj.x(t.b[0]), y2: proj.y(t.b[1]), stroke: '#b9b9b2', 'stroke-dasharray': '4 4', 'vector-effect': 'non-scaling-stroke' }));
+    const ux = proj.x(t.b[0]) - proj.x(t.a[0]), uy = proj.y(t.b[1]) - proj.y(t.a[1]), ul = Math.hypot(ux, uy);
+    const lab = svgEl('text', { x: proj.x(t.a[0]) - ux / ul * 55, y: proj.y(t.a[1]) - uy / ul * 55 + 14, 'text-anchor': 'middle' });
+    lab.textContent = t.id;
+    map.appendChild(lab);
+  }
+  // scale bar (500 m) and north mark
+  const sx = proj.x(OUTLINE[0][0]), sy = proj.h - 30;
+  map.appendChild(svgEl('path', { d: `M${sx} ${sy - 8} V${sy} H${sx + 500} V${sy - 8}`, fill: 'none', stroke: '#6b6b65', 'vector-effect': 'non-scaling-stroke' }));
+  const st = svgEl('text', { x: sx + 515, y: sy + 4 }); st.textContent = '500 m'; map.appendChild(st);
+  const nx = proj.w - 60;
+  map.appendChild(svgEl('path', { d: `M${nx} 150 V40 M${nx - 18} 66 L${nx} 40 L${nx + 18} 66`, fill: 'none', stroke: '#6b6b65', 'vector-effect': 'non-scaling-stroke' }));
+  const nt = svgEl('text', { x: nx, y: 195, 'text-anchor': 'middle' }); nt.textContent = 'N'; map.appendChild(nt);
+  // size key
+  [1, 5, 20].forEach((c, i) => {
+    const cx = proj.w - 470 + i * 150;
+    map.appendChild(svgEl('circle', { cx, cy: sy - 45, r: radius(c), fill: 'none', stroke: '#8c8c86', 'vector-effect': 'non-scaling-stroke' }));
+    const t = svgEl('text', { x: cx + radius(c) + 8, y: sy - 32 }); t.textContent = c; map.appendChild(t);
+  });
+  map.appendChild(svgEl('g', { id: 'points' }));
+}
+
+function radius(count) { return 8 + 9 * Math.sqrt(count); }
+
+function drawPoints(rows) {
+  const g = document.getElementById('points');
+  g.innerHTML = '';
+  // biggest first so small counts sit on top of the big flocks; the selected one goes last
+  const order = rows.slice().sort((a, b) => b.count - a.count);
+  const sel = order.findIndex(o => o.id === state.sel);
+  if (sel >= 0) order.push(order.splice(sel, 1)[0]);
+  for (const o of order) {
+    const isSel = o.id === state.sel;
+    const c = svgEl('circle', {
+      class: 'pt', cx: proj.x(o.x), cy: proj.y(o.y), r: radius(o.count), fill: colorOf(o.habitat), 'fill-opacity': isSel ? 0.95 : 0.7,
+      stroke: isSel ? '#111' : '#fff', 'stroke-width': isSel ? 2.5 : 1, 'vector-effect': 'non-scaling-stroke',
+    });
+    const tip = svgEl('title', {});
+    tip.textContent = `${o.species} × ${o.count}, ${fmtDate(o.date)}, ${o.transect}, ${o.habitat}, ${o.observer}`;
+    c.appendChild(tip);
+    c.addEventListener('click', () => select(o.id, 'map'));
+    g.appendChild(c);
+  }
+  if (!rows.length) {
+    const t = svgEl('text', { x: proj.w / 2, y: proj.h / 2, 'text-anchor': 'middle' });
+    t.textContent = 'No observations match these filters.';
+    g.appendChild(t);
+  }
+}
+
+// ===== Species totals chart =====
+function drawChart(rows) {
+  const chart = document.getElementById('chart');
+  const totals = {};
+  rows.forEach(o => { totals[o.species] = (totals[o.species] || 0) + o.count; });
+  const list = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...list.map(d => d[1]));
+  const rowH = 20, labelW = 108, barW = 130;
+  chart.setAttribute('viewBox', `0 0 280 ${Math.max(40, list.length * rowH + 6)}`);
+  chart.setAttribute('height', Math.max(40, list.length * rowH + 6));
+  chart.innerHTML = '';
+  if (!list.length) {
+    const t = svgEl('text', { x: 0, y: 20 }); t.textContent = 'No birds in the current filters.'; chart.appendChild(t);
+  }
+  list.forEach(([name, n], i) => {
+    const y = i * rowH + 3;
+    const lab = svgEl('text', { x: labelW - 6, y: y + 13, 'text-anchor': 'end' }); lab.textContent = name; chart.appendChild(lab);
+    const bar = svgEl('rect', { class: 'bar', x: labelW, y, width: Math.max(1, n / max * barW), height: rowH - 6, rx: 2 });
+    const tip = svgEl('title', {}); tip.textContent = `${name}: ${n} birds. Click to show only this species.`; bar.appendChild(tip);
+    bar.addEventListener('click', () => { state.species = new Set([name]); syncSpeciesChecks(); render(); });
+    chart.appendChild(bar);
+    const val = svgEl('text', { class: 'val', x: labelW + n / max * barW + 5, y: y + 13 }); val.textContent = n; chart.appendChild(val);
+  });
+  const all = document.querySelectorAll('#species input').length;
+  document.getElementById('chartReset').hidden = state.species.size === all;
+}
+
+// ===== Observation table =====
+function drawTable(rows) {
+  const body = document.getElementById('rows');
+  const sorted = rows.slice().sort((a, b) => a.date.localeCompare(b.date) || a.transect.localeCompare(b.transect));
+  body.innerHTML = sorted.length ? sorted.map(o =>
+    `<tr data-id="${o.id}" class="${o.id === state.sel ? 'sel' : ''}"><td class="num">${o.date}</td><td>${o.transect}</td><td>${o.species}</td><td class="n num">${o.count}</td>` +
+    `<td><span class="swatch" style="background:${colorOf(o.habitat)}"></span> ${o.habitat}</td><td>${o.observer}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="muted">No observations match these filters.</td></tr>';
+  document.getElementById('tableTitle').textContent = `Observations (${rows.length} of ${DATA.length})`;
+}
+
+document.getElementById('rows').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-id]');
+  if (tr) select(Number(tr.dataset.id), 'table');
+});
+
+// ===== Linked selection: table row <-> map point =====
+function select(id, from) {
+  state.sel = state.sel === id ? null : id;
+  const rows = filtered();
+  drawPoints(rows);
+  document.querySelectorAll('#rows tr').forEach(tr => tr.classList.toggle('sel', Number(tr.dataset.id) === state.sel));
+  if (from === 'map' && state.sel) {
+    const tr = document.querySelector(`#rows tr[data-id="${state.sel}"]`);
+    const wrap = document.querySelector('.table-wrap');
+    const r = tr.getBoundingClientRect(), w = wrap.getBoundingClientRect();
+    if (r.top < w.top + 30 || r.bottom > w.bottom) wrap.scrollTop += r.top - w.top - wrap.clientHeight / 2;
+  }
+}
+
+// ===== Summary and render =====
+function render() {
+  const rows = filtered();
+  if (state.sel && !rows.some(o => o.id === state.sel)) state.sel = null;
+  const birds = rows.reduce((a, o) => a + o.count, 0);
+  document.getElementById('summary').textContent =
+    `Showing ${rows.length} of ${DATA.length} observations, ${birds.toLocaleString()} birds, ${fmtDate(isoOf(state.from))} to ${fmtDate(isoOf(state.to))}`;
+  updateDateLabels();
+  drawPoints(rows);
+  drawChart(rows);
+  drawTable(rows);
+}
+
+// ===== Loading a real CSV =====
+function parseCsv(text) {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(v => v.trim() !== ''));
+}
+
+function recordsFromCsv(text) {
+  const rows = parseCsv(text);
+  if (rows.length < 2) throw new Error('the file has no data rows');
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  const need = ['date', 'transect', 'observer', 'species', 'count', 'habitat', 'x', 'y'];
+  const missing = need.filter(k => !head.includes(k));
+  if (missing.length) throw new Error('missing columns ' + missing.join(', '));
+  const col = k => head.indexOf(k);
+  return rows.slice(1).map((r, i) => {
+    const date = r[col('date')].trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`row ${i + 2}: date "${date}" is not YYYY-MM-DD`);
+    const count = Number(r[col('count')]), x = Number(r[col('x')]), y = Number(r[col('y')]);
+    if (![count, x, y].every(Number.isFinite)) throw new Error(`row ${i + 2}: count, x and y must be numbers`);
+    return { id: i + 1, date, season: seasonOf(date), transect: r[col('transect')].trim(), observer: r[col('observer')].trim(),
+      species: r[col('species')].trim(), count, habitat: r[col('habitat')].trim().toLowerCase(), x, y };
+  });
+}
+
+document.getElementById('file').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const msg = document.getElementById('loadMsg');
+  try {
+    DATA = recordsFromCsv(await file.text());
+    state.sel = null;
+    start();
+    msg.textContent = `Loaded ${DATA.length} observations from ${file.name}`; msg.className = 'muted';
+  } catch (err) {
+    msg.textContent = `Could not read ${file.name}: ${err.message}`; msg.className = 'error';
+  }
+  e.target.value = '';
+});
+
+// ===== Filter events =====
+document.getElementById('from').addEventListener('input', e => { state.from = Math.min(+e.target.value, state.to); e.target.value = state.from; render(); });
+document.getElementById('to').addEventListener('input', e => { state.to = Math.max(+e.target.value, state.from); e.target.value = state.to; render(); });
+document.getElementById('habitats').addEventListener('change', e => { e.target.checked ? state.habitats.add(e.target.value) : state.habitats.delete(e.target.value); render(); });
+document.getElementById('species').addEventListener('change', e => { e.target.checked ? state.species.add(e.target.value) : state.species.delete(e.target.value); render(); });
+document.getElementById('spAll').addEventListener('click', () => { document.querySelectorAll('#species input').forEach(c => state.species.add(c.value)); syncSpeciesChecks(); render(); });
+document.getElementById('spNone').addEventListener('click', () => { state.species.clear(); syncSpeciesChecks(); render(); });
+document.getElementById('chartReset').addEventListener('click', () => document.getElementById('spAll').click());
+
+// ===== Start =====
+function start() {
+  buildFilters();
+  fitMap();
+  drawBase();
+  render();
+}
+start();
+</script>
+</body>
+</html>

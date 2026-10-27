@@ -1,0 +1,965 @@
+{
+  "schema": "astaui.card/1",
+  "id": "sequence-annotator",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/3",
+    "at": "2026-10-24T04:04:28Z"
+  },
+  "app": {
+    "title": "Plasmid sequence annotator",
+    "summary": "A person reads a DNA sequence laid out in numbered rows, drags across bases to select a stretch, picks a strand and a feature type from a palette, and the stretch becomes a coloured, strand-arrowed bar on a track above the sequence, stacked in lanes where features overlap. The features are listed in a table where names, types, coordinates and strands can be corrected by typing or deleted. A side panel reports the length, GC content, a rough melting temperature and the reverse complement of the current selection, searches a short motif on both strands and jumps to each hit, and exports the features as a tab-separated table; a new sequence can be pasted in, and the sequence and features are kept between visits.",
+    "task": {
+      "text": "Mark and keep track of the features along a DNA construct, and check where a short motif such as a primer binds on either strand.",
+      "verbs": [
+        "annotate",
+        "locate",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "One nucleotide sequence of a construct, with labelled, stranded features marked along it from a small set of feature types.",
+      "item": "a feature marked as a stretch of bases on one strand of a plasmid sequence",
+      "shapes": [
+        "sequence",
+        "spans",
+        "categories",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "designing and checking a DNA construct while assembling it",
+      "terms": [
+        "annotate",
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "Dragging across bases in the sequence view makes a selection that a palette of feature types turns into a span, drawn as a bar on the track above the bases and listed as an editable row in the feature table. Clicking a bar, a table row's Show button or a motif hit selects that stretch back in the sequence and scrolls to it, and the selection readout updates with its properties.",
+      "views": [
+        "sequence track",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "select text span",
+        "apply label",
+        "inline edit",
+        "search",
+        "select",
+        "export",
+        "import"
+      ],
+      "patterns": [
+        "category palette",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "synthetic biology, reporter plasmid construction",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "synthetic biology",
+        "molecular cloning",
+        "plasmid design"
+      ]
+    },
+    "workflow": {
+      "name": "mark labelled stretches along one sequence and keep them in an editable list",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A sequence is pasted raw or as a GenBank ORIGIN block; numbers and spaces are stripped, other characters become N, and features that run past the new end are dropped. A synthetic placeholder is shown until then.",
+          "parts": [
+            "export-load"
+          ]
+        },
+        {
+          "step": "read the whole sequence with its labels drawn along it",
+          "here": "The sequence runs in rows of 60 bases with a gap every 10 and the start position at the left of each row, and each feature is a bar above the bases it covers.",
+          "parts": [
+            "sequence-view",
+            "feature-track"
+          ]
+        },
+        {
+          "step": "select a stretch and label it with a category",
+          "here": "Dragging or shift-clicking across bases selects a stretch; the person picks the plus or minus strand, then a type from the palette (promoter, CDS, terminator, primer site, other), and the stretch becomes a muted coloured bar pointed by strand, stacked in lanes where features overlap.",
+          "parts": [
+            "sequence-view",
+            "feature-palette",
+            "feature-track"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The selection readout gives the range, length and GC percentage, a rough melting temperature for 8 to 60 bases, and the top and bottom strand sequences up to 120 bases.",
+          "parts": [
+            "selection-readout"
+          ]
+        },
+        {
+          "step": "find every place a pattern occurs",
+          "here": "Typing a motif of at least four bases highlights exact matches of it and of its reverse complement, counts the hits on each strand, and lists them; clicking a hit selects it and scrolls to it.",
+          "parts": [
+            "motif-search"
+          ]
+        },
+        {
+          "step": "correct or delete labels in a list",
+          "here": "The feature table, in order of start, lets name, type, start, end and strand be edited in place, shows the length, and has Show, which selects the feature and scrolls to it, and Delete; clicking a bar also brings a feature up. Features are kept between visits.",
+          "parts": [
+            "feature-table",
+            "feature-track"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The features are written as a tab-separated GFF3-style table, with each type mapped to a GFF type, to copy into a sheet or download as a .gff file.",
+          "parts": [
+            "export-load"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every label has a strand, shown as the direction of its bar's point and carried into the export.",
+        "Coordinates are 1-based and inclusive, as in GenBank, and can be fixed by typing.",
+        "The motif search looks on both strands at once by also matching the reverse complement, and says which strand each hit is on.",
+        "The selection readout gives GC content, a rough melting temperature at primer length, and the reverse complement for minus-strand primers.",
+        "Overlapping features are stacked in lanes so the lower one can still be clicked."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sequence-view",
+      "level": "view",
+      "parent": null,
+      "title": "Sequence with feature track",
+      "summary": "Shows the sequence in rows of sixty bases with the start position of each row, and lets the person drag or shift-click across bases to select a stretch and press Esc to clear it.",
+      "views": [
+        "sequence track"
+      ],
+      "interactions": [
+        "select text span"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 87,
+          "end": 90,
+          "role": "markup",
+          "symbol": "section.box:1",
+          "anchor": "2c798af10b55",
+          "first": "<section class=\"box\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 81,
+          "end": 81,
+          "role": "markup",
+          "symbol": "#seq-title",
+          "anchor": "ceefc430c013",
+          "first": "<span id=\"seq-title\" class=\"muted\"></span>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 34,
+          "end": 34,
+          "role": "style",
+          "symbol": ".seq",
+          "anchor": "7928f4a9b348",
+          "first": ".seq { font: 13px/1.5 var(--mono); user-select: none; overflow-x: auto; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 35,
+          "end": 35,
+          "role": "style",
+          "symbol": ".srow",
+          "anchor": "699f05cd1f97",
+          "first": ".srow { display: grid; grid-template-columns: 6ch auto; column-gap: 1ch; margin-bottom: 6px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 36,
+          "end": 36,
+          "role": "style",
+          "symbol": ".pos",
+          "anchor": "77ffbb01d1f1",
+          "first": ".pos { grid-column: 1; grid-row: 2; text-align: right; color: var(--muted); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 38,
+          "end": 38,
+          "role": "style",
+          "symbol": ".bases",
+          "anchor": "0055b7552156",
+          "first": ".bases { grid-column: 2; grid-row: 2; white-space: nowrap; cursor: text; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 39,
+          "end": 39,
+          "role": "style",
+          "symbol": ".bases span.g",
+          "anchor": "f2143e706e8c",
+          "first": ".bases span.g { margin-right: 1ch; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 40,
+          "end": 40,
+          "role": "style",
+          "symbol": ".bases span.sel",
+          "anchor": "e6a5bf05c00d",
+          "first": ".bases span.sel { background: var(--accent); color: #fff; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 150,
+          "end": 164,
+          "role": "data",
+          "symbol": "PLACEHOLDER",
+          "anchor": "b6989d13fe93",
+          "first": "const PLACEHOLDER = ["
+        },
+        {
+          "file": "code/index.html",
+          "start": 174,
+          "end": 174,
+          "role": "data",
+          "anchor": "6005bc14bb1e",
+          "first": "const ROW = 60;"
+        },
+        {
+          "file": "code/index.html",
+          "start": 178,
+          "end": 178,
+          "role": "data",
+          "symbol": "state",
+          "anchor": "1690f53eaa4c",
+          "first": "const state = { name: 'pRep-lacGFP placeholder', seq: PLACEHOLDER, features: [], sel: null, strand: '+', hits: [], curre"
+        },
+        {
+          "file": "code/index.html",
+          "start": 199,
+          "end": 199,
+          "role": "data",
+          "symbol": "spans",
+          "anchor": "5f8e6cf54b65",
+          "first": "let spans = [], trackEls = [];"
+        },
+        {
+          "file": "code/index.html",
+          "start": 200,
+          "end": 228,
+          "role": "logic",
+          "symbol": "renderSequence",
+          "anchor": "caedf2f13362",
+          "first": "function renderSequence() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 260,
+          "end": 260,
+          "role": "logic",
+          "anchor": "578fa500cf61",
+          "first": "let drag = null, shown = null;"
+        },
+        {
+          "file": "code/index.html",
+          "start": 261,
+          "end": 267,
+          "role": "logic",
+          "symbol": "setSel",
+          "anchor": "9b7fe7177061",
+          "first": "function setSel(a, b) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 268,
+          "end": 283,
+          "role": "logic",
+          "anchor": "6533d3f8280c",
+          "first": "const seqHost = document.getElementById('seq');"
+        }
+      ]
+    },
+    {
+      "id": "feature-track",
+      "level": "component",
+      "parent": "sequence-view",
+      "title": "Feature bars",
+      "summary": "Draws each feature as a bar coloured by type above the bases it covers, pointed to show its strand and stacked in lanes when features overlap; clicking a bar selects that feature.",
+      "views": [
+        "sequence track"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 207,
+          "end": 208,
+          "role": "markup",
+          "anchor": "44b3dd342903",
+          "first": "const track = document.createElement('div');"
+        },
+        {
+          "file": "code/index.html",
+          "start": 37,
+          "end": 37,
+          "role": "style",
+          "symbol": ".track",
+          "anchor": "f8fdc7a26164",
+          "first": ".track { grid-column: 2; grid-row: 1; position: relative; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 43,
+          "end": 44,
+          "role": "style",
+          "symbol": ".bar",
+          "anchor": "90d381e69363",
+          "first": ".bar { position: absolute; height: 12px; font: 13px/12px var(--mono); border-radius: 2px; overflow: hidden;"
+        },
+        {
+          "file": "code/index.html",
+          "start": 45,
+          "end": 45,
+          "role": "style",
+          "symbol": ".bar span",
+          "anchor": "af4562292e84",
+          "first": ".bar span { font: 10px/12px -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; padding-left: 3px; white-"
+        },
+        {
+          "file": "code/index.html",
+          "start": 46,
+          "end": 46,
+          "role": "style",
+          "symbol": ".bar.arrow-r",
+          "anchor": "6df12fd4f21e",
+          "first": ".bar.arrow-r { clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 47,
+          "end": 47,
+          "role": "style",
+          "symbol": ".bar.arrow-l",
+          "anchor": "43e062dfd827",
+          "first": ".bar.arrow-l { clip-path: polygon(6px 0, 100% 0, 100% 100%, 6px 100%, 0 50%); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 48,
+          "end": 48,
+          "role": "style",
+          "symbol": ".bar.arrow-l span",
+          "anchor": "71553d9dc094",
+          "first": ".bar.arrow-l span { padding-left: 8px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 49,
+          "end": 49,
+          "role": "style",
+          "symbol": ".bar.current",
+          "anchor": "8df194920068",
+          "first": ".bar.current { box-shadow: inset 0 0 0 1px #1d1d1f; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 231,
+          "end": 240,
+          "role": "logic",
+          "symbol": "assignLanes",
+          "anchor": "6b4b04a99ae6",
+          "first": "function assignLanes() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 241,
+          "end": 256,
+          "role": "logic",
+          "symbol": "renderTracks",
+          "anchor": "2fc3cc8abeb7",
+          "first": "function renderTracks() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 196,
+          "end": 199,
+          "role": "logic",
+          "symbol": "xch",
+          "anchor": "bfe331f0107a",
+          "first": "const xch = off => off + Math.floor(off / 10);        // column in ch, with a 1ch gap after every 10 bases"
+        },
+        {
+          "file": "code/index.html",
+          "start": 270,
+          "end": 271,
+          "role": "logic",
+          "anchor": "11a928311244",
+          "first": "const bar = ev.target.closest('.bar');"
+        }
+      ]
+    },
+    {
+      "id": "feature-table",
+      "level": "view",
+      "parent": null,
+      "title": "Feature list",
+      "summary": "Lists the features in order of position with name, type, start, end, length and strand, all editable in place, with buttons to show a feature in the sequence or delete it.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 93,
+          "end": 96,
+          "role": "markup",
+          "anchor": "f04e2c4890e4",
+          "first": "<section class=\"box\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 66,
+          "end": 66,
+          "role": "style",
+          "symbol": "table.features",
+          "anchor": "443b6bc96d26",
+          "first": "table.features { width: 100%; border-collapse: collapse; font-size: 13px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 67,
+          "end": 67,
+          "role": "style",
+          "symbol": "table.features th",
+          "anchor": "3ea8270f41ea",
+          "first": "table.features th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 4px 6px; border-b"
+        },
+        {
+          "file": "code/index.html",
+          "start": 68,
+          "end": 68,
+          "role": "style",
+          "symbol": "table.features td",
+          "anchor": "dbb03ad178e9",
+          "first": "table.features td { padding: 3px 6px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 69,
+          "end": 69,
+          "role": "style",
+          "symbol": "table.features tr.current td",
+          "anchor": "5be74949a863",
+          "first": "table.features tr.current td { background: #eef3f9; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 70,
+          "end": 70,
+          "role": "style",
+          "symbol": "table.features input[type=number]",
+          "anchor": "35b0b8f02d1d",
+          "first": "table.features input[type=number] { width: 72px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 71,
+          "end": 71,
+          "role": "style",
+          "symbol": "table.features input[type=text]",
+          "anchor": "95b4732f12fe",
+          "first": "table.features input[type=text] { width: 100%; min-width: 110px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 72,
+          "end": 72,
+          "role": "style",
+          "symbol": ".linkbtn",
+          "anchor": "22cfc757c6d1",
+          "first": ".linkbtn { font: inherit; font-size: 13px; border: 0; background: none; color: var(--accent); cursor: pointer; padding: "
+        },
+        {
+          "file": "code/index.html",
+          "start": 330,
+          "end": 350,
+          "role": "logic",
+          "symbol": "renderFeatureTable",
+          "anchor": "fed962270967",
+          "first": "function renderFeatureTable() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 351,
+          "end": 372,
+          "role": "logic",
+          "anchor": "70543aeecfbb",
+          "first": "const tableHost = document.getElementById('feature-table');"
+        },
+        {
+          "file": "code/index.html",
+          "start": 373,
+          "end": 380,
+          "role": "logic",
+          "symbol": "selectFeature",
+          "anchor": "ed85c818bfb6",
+          "first": "function selectFeature(id) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 177,
+          "end": 182,
+          "role": "data",
+          "anchor": "605cd66db1c1",
+          "first": "const STORE = 'construct-annotator-v1';"
+        },
+        {
+          "file": "code/index.html",
+          "start": 183,
+          "end": 185,
+          "role": "logic",
+          "symbol": "save",
+          "anchor": "c055c1618e9a",
+          "first": "function save() {"
+        }
+      ]
+    },
+    {
+      "id": "tools-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Side panel",
+      "summary": "Holds the tools for the current selection beside the sequence: marking it as a feature, reading its properties, searching a motif, and exporting or loading.",
+      "views": [],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 99,
+          "end": 145,
+          "role": "markup",
+          "symbol": "aside.side",
+          "anchor": "90e27c971c3a",
+          "first": "<aside class=\"side\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 21,
+          "end": 21,
+          "role": "style",
+          "symbol": ".layout",
+          "anchor": "e2df7562c268",
+          "first": ".layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; padding: 16px 20px; align-items: start;"
+        },
+        {
+          "file": "code/index.html",
+          "start": 22,
+          "end": 22,
+          "role": "style",
+          "symbol": "@media (max-width: 960px)",
+          "anchor": "bed4ab174268",
+          "first": "@media (max-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr); } .side { position: static; max-height: non"
+        },
+        {
+          "file": "code/index.html",
+          "start": 24,
+          "end": 24,
+          "role": "style",
+          "symbol": ".side",
+          "anchor": "fa791abea7b8",
+          "first": ".side { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 23,
+          "end": 23,
+          "role": "style",
+          "symbol": ".box",
+          "anchor": "667ca66a83d3",
+          "first": ".box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; margin-bottom: 16px; "
+        }
+      ]
+    },
+    {
+      "id": "feature-palette",
+      "level": "component",
+      "parent": "tools-panel",
+      "title": "Mark the selection as a feature",
+      "summary": "Turns the selected stretch into a feature of the chosen type on the chosen strand, from a palette of colour-coded types and a strand switch.",
+      "views": [],
+      "interactions": [
+        "apply label"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 101,
+          "end": 109,
+          "role": "markup",
+          "anchor": "54165e1750dc",
+          "first": "<section class=\"box\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 52,
+          "end": 52,
+          "role": "style",
+          "symbol": ".palette",
+          "anchor": "e8ac827919a6",
+          "first": ".palette { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 53,
+          "end": 53,
+          "role": "style",
+          "symbol": ".palette button",
+          "anchor": "b22e4122995a",
+          "first": ".palette button { display: flex; align-items: center; gap: 6px; text-align: left; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 54,
+          "end": 54,
+          "role": "style",
+          "symbol": ".swatch",
+          "anchor": "75ab06d734f8",
+          "first": ".swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; flex: none; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 55,
+          "end": 55,
+          "role": "style",
+          "symbol": ".strand",
+          "anchor": "dc210c50b0b5",
+          "first": ".strand { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-bottom: 8px;"
+        },
+        {
+          "file": "code/index.html",
+          "start": 56,
+          "end": 56,
+          "role": "style",
+          "symbol": ".strand button",
+          "anchor": "c54348187ec1",
+          "first": ".strand button { font: inherit; font-size: 13px; border: 0; background: #fff; padding: 4px 10px; cursor: pointer; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 57,
+          "end": 57,
+          "role": "style",
+          "symbol": ".strand button + button",
+          "anchor": "93e1d3493c3d",
+          "first": ".strand button + button { border-left: 1px solid var(--line); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 58,
+          "end": 58,
+          "role": "style",
+          "symbol": ".strand button[aria-pressed=\"true\"]",
+          "anchor": "6d826232f50d",
+          "first": ".strand button[aria-pressed=\"true\"] { background: var(--accent); color: #fff; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 167,
+          "end": 173,
+          "role": "data",
+          "symbol": "TYPES",
+          "anchor": "f0113c8437ac",
+          "first": "const TYPES = {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 186,
+          "end": 186,
+          "role": "data",
+          "anchor": "78d97d9e12c6",
+          "first": "let nextId = 1 + state.features.reduce((m, f) => Math.max(m, +String(f.id).slice(1) || 0), 0);"
+        },
+        {
+          "file": "code/index.html",
+          "start": 306,
+          "end": 309,
+          "role": "logic",
+          "symbol": "buildPalette",
+          "anchor": "d828b9b99205",
+          "first": "function buildPalette() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 310,
+          "end": 327,
+          "role": "logic",
+          "anchor": "864cbcbbf948",
+          "first": "document.getElementById('palette').addEventListener('click', ev => {"
+        }
+      ]
+    },
+    {
+      "id": "selection-readout",
+      "level": "component",
+      "parent": "tools-panel",
+      "title": "Selection readout",
+      "summary": "Gives the selected range's coordinates, length, GC percentage, a rough melting temperature at primer length, and its top and bottom strand sequences.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 112,
+          "end": 115,
+          "role": "markup",
+          "anchor": "244c230c5874",
+          "first": "<section class=\"box\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 59,
+          "end": 59,
+          "role": "style",
+          "symbol": ".kv",
+          "anchor": "ed1b4bf95c7c",
+          "first": ".kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 60,
+          "end": 60,
+          "role": "style",
+          "symbol": ".kv dt",
+          "anchor": "231a823540ba",
+          "first": ".kv dt { color: var(--muted); } .kv dd { margin: 0; font-variant-numeric: tabular-nums; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 61,
+          "end": 61,
+          "role": "style",
+          "symbol": ".oligo",
+          "anchor": "4eabd67cd250",
+          "first": ".oligo { font: 12px/1.4 var(--mono); word-break: break-all; margin-top: 6px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 286,
+          "end": 303,
+          "role": "logic",
+          "symbol": "renderSelection",
+          "anchor": "a53a55515e59",
+          "first": "function renderSelection() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 192,
+          "end": 195,
+          "role": "logic",
+          "symbol": "tm",
+          "anchor": "b4021e876845",
+          "first": "function tm(s) {                       // rough: Wallace rule under 14 nt, basic GC formula above"
+        },
+        {
+          "file": "code/index.html",
+          "start": 189,
+          "end": 189,
+          "role": "data",
+          "symbol": "COMP",
+          "anchor": "7401495f0f14",
+          "first": "const COMP = { A: 'T', T: 'A', G: 'C', C: 'G', N: 'N' };"
+        }
+      ]
+    },
+    {
+      "id": "motif-search",
+      "level": "component",
+      "parent": "tools-panel",
+      "title": "Motif search on both strands",
+      "summary": "Finds exact matches of a typed motif and of its reverse complement, highlights them in the sequence, says which strand each is on, and jumps to a hit when clicked.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "search",
+        "select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 118,
+          "end": 123,
+          "role": "markup",
+          "anchor": "2ae7e4310c56",
+          "first": "<section class=\"box\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 62,
+          "end": 62,
+          "role": "style",
+          "symbol": ".hits",
+          "anchor": "94cbff9995e0",
+          "first": ".hits { list-style: none; padding: 0; margin: 6px 0 0; font-size: 13px; max-height: 140px; overflow-y: auto; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 63,
+          "end": 63,
+          "role": "style",
+          "symbol": ".hits button",
+          "anchor": "41c2284e973d",
+          "first": ".hits button { font: inherit; border: 0; background: none; color: var(--accent); cursor: pointer; padding: 1px 0; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 41,
+          "end": 41,
+          "role": "style",
+          "symbol": ".bases span.hit",
+          "anchor": "9a7e09d71b0a",
+          "first": ".bases span.hit { background: var(--hit); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 42,
+          "end": 42,
+          "role": "style",
+          "symbol": ".bases span.hit.sel",
+          "anchor": "e5e25d1971d5",
+          "first": ".bases span.hit.sel { background: var(--accent); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 383,
+          "end": 402,
+          "role": "logic",
+          "symbol": "findMotif",
+          "anchor": "b1a6c13d2b0f",
+          "first": "function findMotif() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 403,
+          "end": 410,
+          "role": "logic",
+          "anchor": "3812ae826af7",
+          "first": "document.getElementById('motif').addEventListener('input', findMotif);"
+        },
+        {
+          "file": "code/index.html",
+          "start": 189,
+          "end": 189,
+          "role": "data",
+          "symbol": "COMP",
+          "anchor": "7401495f0f14",
+          "first": "const COMP = { A: 'T', T: 'A', G: 'C', C: 'G', N: 'N' };"
+        }
+      ]
+    },
+    {
+      "id": "export-load",
+      "level": "component",
+      "parent": "tools-panel",
+      "title": "Export and load",
+      "summary": "Writes the features as a tab-separated GFF-style table to copy or download, and replaces the sequence with a pasted one after stripping numbers and spaces, dropping features that run past its end.",
+      "views": [],
+      "interactions": [
+        "export",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 126,
+          "end": 144,
+          "role": "markup",
+          "anchor": "5beae2d66cd4",
+          "first": "<section class=\"box\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 31,
+          "end": 31,
+          "role": "style",
+          "symbol": "textarea",
+          "anchor": "acd20a7ed03f",
+          "first": "textarea { width: 100%; font-family: var(--mono); font-size: 12px; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 74,
+          "end": 74,
+          "role": "style",
+          "symbol": "details summary",
+          "anchor": "1051cf03bb09",
+          "first": "details summary { cursor: pointer; font-size: 13px; color: var(--accent); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 413,
+          "end": 422,
+          "role": "logic",
+          "symbol": "gffText",
+          "anchor": "631ecc90444d",
+          "first": "function gffText() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 423,
+          "end": 441,
+          "role": "logic",
+          "anchor": "6fc419c75a72",
+          "first": "document.getElementById('export-show').addEventListener('click', () => {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 443,
+          "end": 461,
+          "role": "logic",
+          "anchor": "5fa8110c3d45",
+          "first": "// ===== Load: paste a sequence (GenBank ORIGIN numbers and spaces stripped) ====="
+        }
+      ]
+    }
+  ]
+}

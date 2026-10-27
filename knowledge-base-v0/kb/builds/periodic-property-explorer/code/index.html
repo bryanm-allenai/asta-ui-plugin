@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Element properties, H to Xe</title>
+<style>
+  :root {
+    --bg: #f5f5f3; --panel: #fff; --line: #d8d8d4; --text: #1d1d1f; --muted: #6a6a66;
+    --accent: #1f5f99;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px;
+    padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  h1 { font-size: 17px; font-weight: 600; margin: 0; }
+  h2 { font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+  .muted { color: var(--muted); }
+
+  /* property switch */
+  .switch { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .switch button { font: inherit; border: 0; border-right: 1px solid var(--line); background: var(--panel);
+    padding: 6px 12px; cursor: pointer; color: var(--text); }
+  .switch button:last-child { border-right: 0; }
+  .switch button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; padding: 16px 20px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; }
+
+  /* periodic table grid */
+  .table-scroll { overflow-x: auto; }
+  .ptable { display: grid; grid-template-columns: 18px repeat(18, minmax(40px, 1fr)); gap: 3px; min-width: 790px; }
+  .glabel, .plabel { font-size: 11px; color: var(--muted); display: flex; align-items: flex-end; justify-content: center; }
+  .plabel { align-items: center; }
+  .cell { position: relative; aspect-ratio: 1 / 1.1; padding: 3px 4px; text-align: left; cursor: pointer;
+    font: inherit; border: 1px solid rgba(0,0,0,.10); border-radius: 4px; background: #eee; color: var(--text); }
+  .cell .z { position: absolute; top: 2px; left: 4px; font-size: 9px; opacity: .8; }
+  .cell .sym { position: absolute; top: 30%; left: 4px; font-size: 15px; font-weight: 600; }
+  .cell .val { position: absolute; bottom: 2px; left: 4px; font-size: 9px; font-variant-numeric: tabular-nums; }
+  .cell .bar { position: absolute; right: 4px; top: 5px; bottom: 5px; width: 4px; background: rgba(0,0,0,.10); border-radius: 1px; }
+  .cell .fill { position: absolute; left: 0; right: 0; bottom: 0; background: currentColor; border-radius: 1px; }
+  .cell.novalue { background: var(--panel); border: 1px dashed #b9b9b4; color: var(--muted); }
+  .cell.pinned { outline: 2px solid var(--text); outline-offset: 1px; }
+  .cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* legend */
+  .legend { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px 24px; align-items: flex-start; }
+  .legend-scale { flex: 1 1 280px; max-width: 380px; }
+  .legend-scale svg { width: 100%; height: auto; display: block; }
+  .legend-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .legend svg text { font: 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; fill: var(--muted); }
+  .legend .note { font-size: 12px; color: var(--muted); max-width: 300px; }
+  .swatch-none { display: inline-block; width: 14px; height: 14px; border: 1px dashed #b9b9b4; border-radius: 3px; vertical-align: -3px; margin-right: 4px; background: #fff; }
+
+  /* tooltip */
+  .tooltip { position: fixed; pointer-events: none; background: var(--text); color: #fff; font-size: 12px;
+    padding: 5px 8px; border-radius: 4px; white-space: nowrap; z-index: 10; }
+
+  /* detail panel */
+  .big { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+  .bigsym { font-size: 30px; font-weight: 600; width: 56px; height: 56px; border: 1px solid var(--line);
+    border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+  .name { font-size: 16px; text-transform: capitalize; }
+  dl.props { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; }
+  dl.props dt { color: var(--muted); }
+  dl.props dd { margin: 0; }
+  .empty { color: var(--muted); margin: 0; }
+  table.compare { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  table.compare th, table.compare td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: right; }
+  table.compare th:first-child, table.compare td:first-child { text-align: left; }
+  table.compare th { font-weight: 500; color: var(--muted); font-size: 12px; }
+  table.compare th.sel { color: var(--text); font-weight: 600; }
+  table.compare td.sel { font-weight: 600; }
+  .linkbtn { font: inherit; border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; }
+  .btn { font: inherit; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .row-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  .diff { font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Element properties, H to Xe</h1>
+  <div class="switch" id="prop-switch" role="group" aria-label="Property shown in the table">
+    <button data-prop="en">Electronegativity</button>
+    <button data-prop="rad">Atomic radius</button>
+    <button data-prop="ie">First ionization energy</button>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- View: periodic table with legend -->
+  <section class="box" id="table-view">
+    <div class="table-scroll"><div class="ptable" id="ptable"></div></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <!-- View: pinned elements panel -->
+  <aside class="box" id="pin-panel">
+    <h2>Pinned</h2>
+    <div id="detail"></div>
+    <div id="compare-wrap"></div>
+    <div class="row-actions">
+      <span class="muted" id="pin-count"></span>
+      <button class="btn" id="clear-pins">Unpin all</button>
+    </div>
+  </aside>
+</main>
+
+<div class="tooltip" id="tooltip" hidden></div>
+
+<script>
+// ===== Data: elements 1-54 =====
+// [Z, symbol, name, electronegativity (Pauling), atomic radius (pm, calculated), first ionization energy (kJ/mol)]
+const RAW = [
+  [1,'H','hydrogen',2.20,53,1312], [2,'He','helium',null,31,2372],
+  [3,'Li','lithium',0.98,167,520], [4,'Be','beryllium',1.57,112,900], [5,'B','boron',2.04,87,801],
+  [6,'C','carbon',2.55,67,1086], [7,'N','nitrogen',3.04,56,1402], [8,'O','oxygen',3.44,48,1314],
+  [9,'F','fluorine',3.98,42,1681], [10,'Ne','neon',null,38,2081],
+  [11,'Na','sodium',0.93,190,496], [12,'Mg','magnesium',1.31,145,738], [13,'Al','aluminium',1.61,118,578],
+  [14,'Si','silicon',1.90,111,787], [15,'P','phosphorus',2.19,98,1012], [16,'S','sulfur',2.58,88,1000],
+  [17,'Cl','chlorine',3.16,79,1251], [18,'Ar','argon',null,71,1521],
+  [19,'K','potassium',0.82,243,419], [20,'Ca','calcium',1.00,194,590], [21,'Sc','scandium',1.36,184,633],
+  [22,'Ti','titanium',1.54,176,659], [23,'V','vanadium',1.63,171,651], [24,'Cr','chromium',1.66,166,653],
+  [25,'Mn','manganese',1.55,161,717], [26,'Fe','iron',1.83,156,763], [27,'Co','cobalt',1.88,152,760],
+  [28,'Ni','nickel',1.91,149,737], [29,'Cu','copper',1.90,145,745], [30,'Zn','zinc',1.65,142,906],
+  [31,'Ga','gallium',1.81,136,579], [32,'Ge','germanium',2.01,125,762], [33,'As','arsenic',2.18,114,947],
+  [34,'Se','selenium',2.55,103,941], [35,'Br','bromine',2.96,94,1140], [36,'Kr','krypton',3.00,88,1351],
+  [37,'Rb','rubidium',0.82,265,403], [38,'Sr','strontium',0.95,219,549], [39,'Y','yttrium',1.22,212,600],
+  [40,'Zr','zirconium',1.33,206,640], [41,'Nb','niobium',1.60,198,652], [42,'Mo','molybdenum',2.16,190,684],
+  [43,'Tc','technetium',1.90,183,702], [44,'Ru','ruthenium',2.20,178,710], [45,'Rh','rhodium',2.28,173,720],
+  [46,'Pd','palladium',2.20,169,804], [47,'Ag','silver',1.93,165,731], [48,'Cd','cadmium',1.69,161,868],
+  [49,'In','indium',1.78,156,558], [50,'Sn','tin',1.96,145,709], [51,'Sb','antimony',2.05,133,834],
+  [52,'Te','tellurium',2.10,123,869], [53,'I','iodine',2.66,115,1008], [54,'Xe','xenon',2.60,108,1170],
+];
+
+// Period and group from Z (valid up to Xe, no lanthanides needed)
+function place(z) {
+  if (z <= 2) return { period: 1, group: z === 1 ? 1 : 18 };
+  const period = z <= 10 ? 2 : z <= 18 ? 3 : z <= 36 ? 4 : 5;
+  const start = { 2: 3, 3: 11, 4: 19, 5: 37 }[period];
+  const k = z - start;
+  if (period <= 3) return { period, group: k < 2 ? k + 1 : k + 11 };
+  return { period, group: k + 1 };
+}
+
+const ELEMENTS = RAW.map(([z, sym, name, en, rad, ie]) => ({ z, sym, name, en, rad, ie, ...place(z) }));
+const byZ = Object.fromEntries(ELEMENTS.map(e => [e.z, e]));
+
+const PROPS = {
+  en:  { label: 'Electronegativity', unit: 'Pauling', short: 'EN', fmt: v => v.toFixed(2) },
+  rad: { label: 'Atomic radius', unit: 'pm', short: 'Radius (pm)', fmt: v => String(v) },
+  ie:  { label: 'First ionization energy', unit: 'kJ/mol', short: 'IE (kJ/mol)', fmt: v => String(v) },
+};
+
+// ===== Colour scale (one sequential blue, light = low, dark = high) =====
+const STOPS = ['#eef3f9', '#c7daee', '#8fb7dc', '#5089c3', '#245a9b', '#0f3466'];
+const hexToRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+function colourFor(t) {
+  t = Math.max(0, Math.min(1, t));
+  const x = t * (STOPS.length - 1), i = Math.min(Math.floor(x), STOPS.length - 2), f = x - i;
+  const a = hexToRgb(STOPS[i]), b = hexToRgb(STOPS[i + 1]);
+  return a.map((c, k) => Math.round(c + (b[k] - c) * f));
+}
+const rgbCss = c => `rgb(${c.join(',')})`;
+const textOn = c => (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) < 145 ? '#fff' : '#1d1d1f';
+
+function range(prop) {
+  const vs = ELEMENTS.map(e => e[prop]).filter(v => v != null);
+  return { min: Math.min(...vs), max: Math.max(...vs), n: vs.length };
+}
+function rank(e, prop) {
+  const vs = ELEMENTS.map(x => x[prop]).filter(v => v != null).sort((a, b) => b - a);
+  return { rank: vs.indexOf(e[prop]) + 1, n: vs.length };
+}
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// ===== State (pins and chosen property are kept between visits) =====
+const STORE = 'element-properties-v1';
+const state = loadState();
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE));
+    if (s && PROPS[s.prop]) return { prop: s.prop, pins: (s.pins || []).filter(z => byZ[z]), hover: null };
+  } catch (err) { /* nothing saved yet */ }
+  return { prop: 'en', pins: [], hover: null };
+}
+function saveState() {
+  try { localStorage.setItem(STORE, JSON.stringify({ prop: state.prop, pins: state.pins })); } catch (err) {}
+}
+
+// ===== View: periodic table grid =====
+const cells = {};
+function buildTable() {
+  const grid = document.getElementById('ptable');
+  for (let g = 1; g <= 18; g++) {
+    const d = document.createElement('div');
+    d.className = 'glabel'; d.textContent = g;
+    d.style.gridColumn = g + 1; d.style.gridRow = 1;
+    grid.appendChild(d);
+  }
+  for (let p = 1; p <= 5; p++) {
+    const d = document.createElement('div');
+    d.className = 'plabel'; d.textContent = p;
+    d.style.gridColumn = 1; d.style.gridRow = p + 1;
+    grid.appendChild(d);
+  }
+  for (const e of ELEMENTS) {
+    const b = document.createElement('button');
+    b.className = 'cell';
+    b.style.gridColumn = e.group + 1; b.style.gridRow = e.period + 1;
+    b.innerHTML = `<span class="z">${e.z}</span><span class="sym">${e.sym}</span>` +
+      `<span class="val"></span><span class="bar"><span class="fill"></span></span>`;
+    b.addEventListener('mouseenter', ev => { state.hover = e.z; showTip(e, ev); drawLegendMarker(); });
+    b.addEventListener('mousemove', moveTip);
+    b.addEventListener('mouseleave', () => { state.hover = null; hideTip(); drawLegendMarker(); });
+    b.addEventListener('focus', () => { state.hover = e.z; drawLegendMarker(); });
+    b.addEventListener('blur', () => { state.hover = null; drawLegendMarker(); });
+    b.addEventListener('click', () => togglePin(e.z));
+    grid.appendChild(b);
+    cells[e.z] = b;
+  }
+}
+
+function paintTable() {
+  const P = PROPS[state.prop];
+  const { min, max } = range(state.prop);
+  for (const e of ELEMENTS) {
+    const b = cells[e.z], v = e[state.prop];
+    const val = b.querySelector('.val'), fill = b.querySelector('.fill');
+    if (v == null) {
+      b.classList.add('novalue');
+      b.style.background = ''; b.style.color = '';
+      val.textContent = ''; fill.style.height = '0';
+      b.setAttribute('aria-label', `${e.name}, no ${P.label.toLowerCase()} value`);
+    } else {
+      const c = colourFor((v - min) / (max - min));
+      b.classList.remove('novalue');
+      b.style.background = rgbCss(c); b.style.color = textOn(c);
+      val.textContent = P.fmt(v);
+      fill.style.height = (100 * v / max).toFixed(1) + '%';   // bar starts at zero
+      b.setAttribute('aria-label', `${e.name}, ${P.label.toLowerCase()} ${P.fmt(v)} ${P.unit}`);
+    }
+    b.classList.toggle('pinned', state.pins.includes(e.z));
+    b.setAttribute('aria-pressed', state.pins.includes(e.z));
+  }
+}
+
+// ===== Component: legend with scale =====
+const LEG = { W: 380, x0: 12, x1: 368, y: 18, h: 14, steps: 40 };
+function drawLegend() {
+  const P = PROPS[state.prop];
+  const { min, max } = range(state.prop);
+  const missing = ELEMENTS.filter(e => e[state.prop] == null).map(e => e.sym);
+  const w = (LEG.x1 - LEG.x0) / LEG.steps;
+  let svg = `<svg viewBox="0 0 ${LEG.W} 58" role="img" aria-label="Colour scale from ${P.fmt(min)} to ${P.fmt(max)} ${P.unit}">`;
+  for (let i = 0; i < LEG.steps; i++) {
+    svg += `<rect x="${(LEG.x0 + i * w).toFixed(2)}" y="${LEG.y}" width="${(w + 0.5).toFixed(2)}" height="${LEG.h}" fill="${rgbCss(colourFor((i + 0.5) / LEG.steps))}"/>`;
+  }
+  svg += `<rect x="${LEG.x0}" y="${LEG.y}" width="${LEG.x1 - LEG.x0}" height="${LEG.h}" fill="none" stroke="#bdbdb8"/>`;
+  svg += `<text x="${LEG.x0}" y="48">${P.fmt(min)}</text>`;
+  svg += `<text x="${LEG.x1}" y="48" text-anchor="end">${P.fmt(max)} ${P.unit}</text>`;
+  svg += `<g id="legend-marker" visibility="hidden"><path d="M0,0 L-5,-7 L5,-7 Z" fill="#1d1d1f"/>` +
+         `<text id="legend-marker-label" y="-9" text-anchor="middle" style="fill:#1d1d1f;font-weight:600"></text></g>`;
+  svg += '</svg>';
+  const miss = missing.length
+    ? `<div class="note"><span class="swatch-none"></span>No value for ${missing.join(', ')}.</div>` : '';
+  document.getElementById('legend').innerHTML =
+    `<div class="legend-scale"><div class="legend-title">${P.label} (${P.unit})</div>${svg}</div>` +
+    `<div><div class="note">Colour runs from the lowest to the highest value shown. ` +
+    `The bar in each cell is the value as a share of the highest, starting at zero.</div>${miss}</div>`;
+  drawLegendMarker();
+}
+function drawLegendMarker() {
+  const g = document.getElementById('legend-marker');
+  if (!g) return;
+  const e = byZ[state.hover];
+  const v = e ? e[state.prop] : null;
+  if (v == null) { g.setAttribute('visibility', 'hidden'); return; }
+  const { min, max } = range(state.prop);
+  const x = LEG.x0 + (LEG.x1 - LEG.x0) * (v - min) / (max - min);
+  g.setAttribute('transform', `translate(${x.toFixed(1)},${LEG.y})`);
+  const label = document.getElementById('legend-marker-label');
+  label.textContent = `${e.sym} ${PROPS[state.prop].fmt(v)}`;
+  label.setAttribute('text-anchor', x < 40 ? 'start' : x > LEG.W - 40 ? 'end' : 'middle');
+  g.setAttribute('visibility', 'visible');
+}
+
+// ===== Component: hover tooltip =====
+const tip = document.getElementById('tooltip');
+function showTip(e, ev) {
+  const P = PROPS[state.prop], v = e[state.prop];
+  tip.textContent = `${e.z} ${e.sym} ${e.name}: ` + (v == null ? `no ${P.label.toLowerCase()} value` : `${P.fmt(v)} ${P.unit}`);
+  tip.hidden = false;
+  moveTip(ev);
+}
+function moveTip(ev) {
+  const pad = 14, r = tip.getBoundingClientRect();
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  if (x + r.width > innerWidth - 4) x = ev.clientX - r.width - pad;
+  if (y + r.height > innerHeight - 4) y = ev.clientY - r.height - pad;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function hideTip() { tip.hidden = true; }
+
+// ===== View: pinned panel (detail card + compare table) =====
+function togglePin(z) {
+  const i = state.pins.indexOf(z);
+  if (i >= 0) state.pins.splice(i, 1); else state.pins.push(z);
+  saveState(); paintTable(); renderPanel();
+}
+function showFirst(z) {   // move a pinned element to the detail card
+  state.pins = state.pins.filter(p => p !== z).concat(z);
+  saveState(); renderPanel();
+}
+
+function renderDetail() {
+  const box = document.getElementById('detail');
+  if (!state.pins.length) {
+    box.innerHTML = '<p class="empty">Nothing pinned yet. Click an element in the table to keep its values here; pin two or more to compare them.</p>';
+    return;
+  }
+  const e = byZ[state.pins[state.pins.length - 1]];
+  const rows = Object.keys(PROPS).map(k => {
+    const P = PROPS[k], v = e[k];
+    if (v == null) return `<dt>${P.label}</dt><dd class="muted">no value</dd>`;
+    const r = rank(e, k);
+    const where = r.rank <= r.n / 2 ? `${ordinal(r.rank)} highest` : `${ordinal(r.n - r.rank + 1)} lowest`;
+    return `<dt>${P.label}</dt><dd><b>${P.fmt(v)}</b> ${P.unit}<br><span class="muted">${where} of ${r.n}</span></dd>`;
+  }).join('');
+  box.innerHTML = `<div class="big"><span class="bigsym">${e.sym}</span><div><div class="name">${e.name}</div>` +
+    `<div class="muted">Z ${e.z} · group ${e.group} · period ${e.period}</div></div></div><dl class="props">${rows}</dl>`;
+}
+
+function renderCompare() {
+  const wrap = document.getElementById('compare-wrap');
+  if (state.pins.length < 2) { wrap.innerHTML = ''; return; }
+  const p = state.prop;
+  const sorted = state.pins.map(z => byZ[z]).sort((a, b) => {
+    if (a[p] == null) return 1; if (b[p] == null) return -1;
+    return b[p] - a[p];
+  });
+  const head = `<tr><th>Element</th>` + Object.keys(PROPS).map(k =>
+    `<th class="${k === p ? 'sel' : ''}">${PROPS[k].short}</th>`).join('') + `<th></th></tr>`;
+  const body = sorted.map(e => `<tr><td><button class="linkbtn" data-show="${e.z}" title="Show ${e.name} above">${e.sym}</button></td>` +
+    Object.keys(PROPS).map(k => `<td class="${k === p ? 'sel' : ''}">${e[k] == null ? '–' : PROPS[k].fmt(e[k])}</td>`).join('') +
+    `<td><button class="linkbtn" data-unpin="${e.z}" aria-label="Unpin ${e.name}">Unpin</button></td></tr>`).join('');
+  const [a, b] = state.pins.slice(-2).map(z => byZ[z]);
+  const diff = (a.en != null && b.en != null)
+    ? `<div class="diff">${a.sym} and ${b.sym} differ by <b>${Math.abs(a.en - b.en).toFixed(2)}</b> in electronegativity (the last two pinned).</div>`
+    : `<div class="diff muted">No electronegativity difference: ${a.en == null ? a.sym : b.sym} has no Pauling value.</div>`;
+  wrap.innerHTML = `<h2 style="margin-top:16px">Compare, highest ${PROPS[p].label.toLowerCase()} first</h2>` +
+    `<table class="compare">${head}${body}</table>${diff}`;
+}
+
+function renderPanel() {
+  renderDetail();
+  renderCompare();
+  const n = state.pins.length;
+  document.getElementById('pin-count').textContent = n ? `${n} pinned` : '';
+  document.getElementById('clear-pins').disabled = !n;
+}
+
+// ===== Wiring =====
+function setProp(prop) {
+  state.prop = prop;
+  for (const b of document.querySelectorAll('#prop-switch button')) b.setAttribute('aria-pressed', b.dataset.prop === prop);
+  saveState(); paintTable(); drawLegend(); renderPanel();
+}
+document.getElementById('prop-switch').addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-prop]');
+  if (b) setProp(b.dataset.prop);
+});
+document.getElementById('compare-wrap').addEventListener('click', ev => {
+  const un = ev.target.closest('[data-unpin]'), sh = ev.target.closest('[data-show]');
+  if (un) togglePin(+un.dataset.unpin);
+  else if (sh) showFirst(+sh.dataset.show);
+});
+document.getElementById('clear-pins').addEventListener('click', () => {
+  state.pins = []; saveState(); paintTable(); renderPanel();
+});
+
+buildTable();
+setProp(state.prop);
+</script>
+</body>
+</html>

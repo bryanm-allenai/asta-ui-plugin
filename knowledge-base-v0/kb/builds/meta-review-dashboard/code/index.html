@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meta-review: submission 0412</title>
+<style>
+  :root {
+    --bg: #f4f4f1; --panel: #ffffff; --line: #d9d9d3; --ink: #1e1e1c; --muted: #6b6b65;
+    --accent: #1f6b6f; --accent-soft: #e3f0f0; --tag: #f1efe6;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: var(--ink); background: var(--bg); }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { border: 1px solid var(--line); background: var(--panel); border-radius: 5px; padding: 3px 9px; cursor: pointer; }
+  button:hover { border-color: #b4b4ad; }
+  button:disabled { color: var(--muted); cursor: default; border-color: var(--line); }
+  button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  select, input[type=text] { border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; background: #fff; }
+
+  /* ---------- layout ---------- */
+  .topbar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .topbar h1 { font-size: 15px; margin: 0; }
+  .topbar .sub { color: var(--muted); }
+  .topbar .spacer { flex: 1; }
+  #saveStatus { color: var(--muted); font-size: 13px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 430px; height: calc(100% - 44px); }
+  .main { overflow: auto; padding: 14px 16px 40px; }
+  .side { overflow: auto; padding: 14px 16px 40px; border-left: 1px solid var(--line); background: #fafaf8; }
+  .overview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 12px; margin-bottom: 12px; }
+  @media (max-width: 1000px) {
+    .layout { grid-template-columns: minmax(0, 1fr); height: auto; }
+    .main, .side { overflow: visible; }
+    .side { border-left: 0; border-top: 1px solid var(--line); }
+    .overview { grid-template-columns: minmax(0, 1fr); }
+    .agree-wrap { overflow-x: auto; }
+  }
+  .block { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; margin-bottom: 12px; }
+  .block h2 { font-size: 13px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+  .block h2 .spacer { flex: 1; }
+  .muted { color: var(--muted); font-size: 12px; }
+
+  /* ---------- score spread chart ---------- */
+  .chart text { font-size: 11px; fill: var(--muted); }
+  .chart text.who { fill: var(--ink); font-weight: 600; }
+  .chart text.mean-label { fill: var(--ink); }
+
+  /* ---------- agreement table ---------- */
+  table.agree { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.agree th, table.agree td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #ecece7; }
+  table.agree th { color: var(--muted); font-weight: 500; }
+  table.agree td.cell { text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); }
+  table.agree tr.topic-row { cursor: pointer; }
+  table.agree tr.topic-row:hover td { background: #f7f7f4; }
+  table.agree tr.selected td { background: var(--accent-soft); }
+  .status-disagree { color: var(--accent); font-weight: 600; }
+
+  /* ---------- reviews ---------- */
+  .seg button { border-radius: 0; margin-left: -1px; }
+  .seg button:first-child { border-radius: 5px 0 0 5px; }
+  .seg button:last-child { border-radius: 0 5px 5px 0; }
+  .reviews.side-by-side { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 10px; overflow-x: auto; }
+  .reviews.stacked { display: flex; flex-direction: column; gap: 10px; }
+  .review { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; background: #fff; }
+  .review header { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; border-bottom: 1px solid #ecece7; padding-bottom: 6px; margin-bottom: 8px; }
+  .review header b { font-size: 14px; }
+  .review p { margin: 0 0 8px; }
+  .reviews.stacked .review p { max-width: 80ch; }
+  .tagged { background: var(--tag); border-bottom: 1px solid #c9c4ad; }
+  .tagged.flash { background: var(--accent-soft); outline: 1px solid var(--accent); }
+  .tagname { font-size: 11px; color: var(--muted); margin-left: 3px; }
+  #tagPopover { position: absolute; display: none; z-index: 5; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 8px; box-shadow: 0 4px 12px rgba(0,0,0,.12); width: 290px; }
+  #tagPopover .row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+  /* ---------- tagged points ---------- */
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; font-size: 13px; }
+  .point { border-top: 1px solid #ecece7; padding: 7px 0; }
+  .point .meta { font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .point .meta .type { color: var(--ink); font-weight: 600; }
+  .point .text { margin: 2px 0 4px; cursor: pointer; }
+  .point .text:hover { text-decoration: underline; text-decoration-color: #bbb; }
+  .point.used .text { color: var(--muted); }
+  .point .acts { display: flex; gap: 6px; }
+
+  /* ---------- meta-review draft ---------- */
+  #draft { width: 100%; min-height: 260px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; resize: vertical; line-height: 1.5; }
+  .draft-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .draft-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1 id="pageTitle">Meta-review</h1>
+  <span class="sub" id="paperTitle"></span>
+  <span class="spacer"></span>
+  <span id="saveStatus"></span>
+</header>
+
+<div class="layout">
+  <div class="main">
+    <div class="overview">
+      <!-- ===================== VIEW: score spread ===================== -->
+      <section class="block" aria-label="Scores">
+        <h2>Scores</h2>
+        <div class="chart" id="scoreChart"></div>
+        <div class="muted" id="scoreSummary"></div>
+      </section>
+
+      <!-- ===================== VIEW: agreement by topic ===================== -->
+      <section class="block" aria-label="Agreement by topic">
+        <h2>Where reviewers agree and disagree <span class="spacer"></span><span class="muted">S strength · W weakness · Q question</span></h2>
+        <div id="agreement" class="agree-wrap"></div>
+        <p class="muted" style="margin:6px 0 0">Click a topic to show only its points on the right.</p>
+      </section>
+    </div>
+
+    <!-- ===================== VIEW: the four reviews ===================== -->
+    <section class="block" aria-label="Reviews">
+      <h2>Reviews
+        <span class="spacer"></span>
+        <span class="seg" role="group" aria-label="Layout">
+          <button id="layoutSide" type="button">Side by side</button><button id="layoutStack" type="button">Stacked</button>
+        </span>
+      </h2>
+      <p class="muted" style="margin:-2px 0 8px">Select a sentence in a review to tag it yourself.</p>
+      <div id="reviews" class="reviews"></div>
+    </section>
+  </div>
+
+  <aside class="side">
+    <!-- ===================== VIEW: meta-review draft ===================== -->
+    <section class="block" aria-label="Meta-review draft">
+      <h2>Meta-review</h2>
+      <div class="draft-bar">
+        <label>Recommendation
+          <select id="recommendation">
+            <option value="">Not decided</option>
+            <option>Accept</option><option>Minor revisions</option><option>Major revisions</option><option>Reject</option>
+          </select>
+        </label>
+        <button id="headingsBtn" type="button">Add section headings</button>
+      </div>
+      <textarea id="draft" placeholder="Write the meta-review here. With the section headings in place, an added point goes under Strengths, Weaknesses or Questions."></textarea>
+      <div class="draft-foot">
+        <span id="draftCount"></span>
+        <span class="spacer" style="flex:1"></span>
+        <button class="primary" id="copyBtn" type="button">Copy meta-review</button>
+      </div>
+      <div class="muted" id="draftStatus"></div>
+    </section>
+
+    <!-- ===================== VIEW: tagged points ===================== -->
+    <section class="block" aria-label="Tagged points">
+      <h2>Tagged points</h2>
+      <div class="filters">
+        <select id="typeFilter">
+          <option value="">All types</option><option value="strength">Strengths</option>
+          <option value="weakness">Weaknesses</option><option value="question">Questions</option>
+        </select>
+        <select id="reviewerFilter"><option value="">All reviewers</option></select>
+        <span id="topicFilter"></span>
+      </div>
+      <div id="points"></div>
+    </section>
+  </aside>
+</div>
+
+<!-- ===================== COMPONENT: tag a selection ===================== -->
+<div id="tagPopover" role="dialog" aria-label="Tag selected text">
+  <label class="muted" for="tagTopic">Topic</label>
+  <input type="text" id="tagTopic" list="topicList" style="width:100%">
+  <datalist id="topicList"></datalist>
+  <div class="row">
+    <button type="button" data-type="strength">Strength</button>
+    <button type="button" data-type="weakness">Weakness</button>
+    <button type="button" data-type="question">Question</button>
+    <button type="button" id="tagCancel">Cancel</button>
+  </div>
+</div>
+
+<script>
+// ===================== DATA: the submission and its reviews =====================
+const SUBMISSION = { id: "0412", title: "Shared Ledgers: A Year-Long Deployment of a Collective Budgeting Tool with Three Tenant Associations" };
+const EXPERTISE = { 1: "No knowledge", 2: "Passing knowledge", 3: "Knowledgeable", 4: "Expert" };
+const REVIEWS = [
+  { id: "R1", role: "2AC", score: 4.0, expertise: 3, paras: [
+    "This paper reports a twelve-month deployment of Ledger, a shared budgeting tool, with three tenant associations, and an analysis of how members negotiated what counted as a shared expense.",
+    "The field deployment is the paper's main strength: the authors stayed with the associations through two rent disputes and describe breakdowns honestly. The design implications in Section 6 are generic; 'support transparency' could follow from almost any study of shared money.",
+    "How were the three associations chosen? All three had a treasurer with a bookkeeping background, which may explain why the ledger format was accepted.",
+    "Overall a solid contribution that needs a sharper discussion."
+  ]},
+  { id: "R2", role: "External", score: 2.0, expertise: 4, paras: [
+    "The paper describes a deployment of a collective budgeting tool in tenant associations.",
+    "Although the deployment is described as a year long, the usage logs in Figure 4 show active use for only about five months. After that, entries drop to near zero in two of the three sites.",
+    "The analysis method is underspecified: there is no codebook, and it appears one author coded all interviews. The contribution overlaps heavily with prior work on community finance tools, and the related work does not say what is new beyond the setting.",
+    "Were tenants who did not use the tool asked for consent, given that their rent payments appeared in the shared ledger?",
+    "I cannot recommend acceptance in the current form."
+  ]},
+  { id: "R3", role: "External", score: 4.5, expertise: 2, paras: [
+    "I enjoyed reading this paper. The writing is clear and the vignettes in Section 5 bring the associations to life.",
+    "A year-long deployment is rare in this area and gives the findings a weight that short studies do not have. Tenant organising is an important and understudied setting for collaborative tools.",
+    "Figures 3 and 4 are hard to read; the axis labels are very small and the lines cannot be told apart in greyscale. I was not sure whether tenants who never joined the tool knew that their payments would be visible to other members.",
+    "I am not an expert in this area, but I would like to see it accepted."
+  ]},
+  { id: "R4", role: "External", score: 3.0, expertise: 3, paras: [
+    "The tool's design is described well and the screenshots make the interaction clear.",
+    "The analysis feels thin for a year of data: Section 5 reports three themes in four pages, with few quotes from members other than the treasurers. The length of the deployment is not used: there is little about how practices changed over the year.",
+    "Is the tool still in use at any of the sites?",
+    "Borderline. A revision that deepens the analysis could make this a strong paper."
+  ]}
+];
+
+// Points pulled from the reviews when they were pasted in. Each text is copied from its review.
+const PULLED_POINTS = [
+  { id: "p1", reviewer: "R1", type: "strength", topic: "Deployment", text: "The field deployment is the paper's main strength: the authors stayed with the associations through two rent disputes and describe breakdowns honestly." },
+  { id: "p2", reviewer: "R1", type: "weakness", topic: "Design implications", text: "The design implications in Section 6 are generic; 'support transparency' could follow from almost any study of shared money." },
+  { id: "p3", reviewer: "R1", type: "question", topic: "Site selection", text: "How were the three associations chosen?" },
+  { id: "p4", reviewer: "R2", type: "weakness", topic: "Deployment", text: "Although the deployment is described as a year long, the usage logs in Figure 4 show active use for only about five months." },
+  { id: "p5", reviewer: "R2", type: "weakness", topic: "Analysis method", text: "The analysis method is underspecified: there is no codebook, and it appears one author coded all interviews." },
+  { id: "p6", reviewer: "R2", type: "weakness", topic: "Contribution", text: "The contribution overlaps heavily with prior work on community finance tools, and the related work does not say what is new beyond the setting." },
+  { id: "p7", reviewer: "R2", type: "question", topic: "Consent and privacy", text: "Were tenants who did not use the tool asked for consent, given that their rent payments appeared in the shared ledger?" },
+  { id: "p8", reviewer: "R3", type: "strength", topic: "Writing", text: "The writing is clear and the vignettes in Section 5 bring the associations to life." },
+  { id: "p9", reviewer: "R3", type: "strength", topic: "Deployment", text: "A year-long deployment is rare in this area and gives the findings a weight that short studies do not have." },
+  { id: "p10", reviewer: "R3", type: "strength", topic: "Contribution", text: "Tenant organising is an important and understudied setting for collaborative tools." },
+  { id: "p11", reviewer: "R3", type: "weakness", topic: "Figures", text: "Figures 3 and 4 are hard to read; the axis labels are very small and the lines cannot be told apart in greyscale." },
+  { id: "p12", reviewer: "R4", type: "strength", topic: "Writing", text: "The tool's design is described well and the screenshots make the interaction clear." },
+  { id: "p13", reviewer: "R4", type: "weakness", topic: "Analysis method", text: "The analysis feels thin for a year of data: Section 5 reports three themes in four pages, with few quotes from members other than the treasurers." },
+  { id: "p14", reviewer: "R4", type: "weakness", topic: "Deployment", text: "The length of the deployment is not used: there is little about how practices changed over the year." },
+  { id: "p15", reviewer: "R4", type: "question", topic: "Deployment", text: "Is the tool still in use at any of the sites?" }
+];
+
+const TYPE_LABEL = { strength: "Strength", weakness: "Weakness", question: "Question" };
+const TYPE_LETTER = { strength: "S", weakness: "W", question: "Q" };
+const HEADING_FOR = { strength: "Strengths", weakness: "Weaknesses", question: "Questions for the authors" };
+const HEADINGS = ["Summary", "Strengths", "Weaknesses", "Points of disagreement", "Questions for the authors", "Recommendation"];
+
+// ===================== STATE and saving =====================
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const KEY = "meta-review-" + SUBMISSION.id;
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { saved = {}; }
+const state = {
+  layout: saved.layout || "side-by-side",
+  myPoints: saved.myPoints || [],          // points I tagged myself
+  draft: saved.draft || "",
+  recommendation: saved.recommendation || "",
+  typeFilter: "", reviewerFilter: "", topicFilter: ""
+};
+function save() {
+  const { layout, myPoints, draft, recommendation } = state;
+  localStorage.setItem(KEY, JSON.stringify({ layout, myPoints, draft, recommendation }));
+  $("#saveStatus").textContent = "Saved in this browser at " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+const allPoints = () => PULLED_POINTS.concat(state.myPoints);
+const reviewById = (id) => REVIEWS.find((r) => r.id === id);
+const inDraft = (p) => state.draft.includes(p.text);
+
+// ===================== VIEW: score spread =====================
+function scoreStats() {
+  const scores = REVIEWS.map((r) => r.score);
+  const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const wsum = REVIEWS.reduce((a, r) => a + r.expertise, 0);
+  const wmean = REVIEWS.reduce((a, r) => a + r.score * r.expertise, 0) / wsum;
+  return { mean, wmean, min: Math.min(...scores), max: Math.max(...scores) };
+}
+
+function renderScoreChart() {
+  const W = 360, H = 104, x0 = 20, x1 = W - 20, y = 62;
+  const sx = (v) => x0 + ((v - 1) / 4) * (x1 - x0);
+  const { mean, wmean, min, max } = scoreStats();
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Scores from 1 to 5 for each reviewer">`;
+  s += `<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="#c4c4bd"/>`;
+  for (let v = 1; v <= 5; v++) {
+    s += `<line x1="${sx(v)}" y1="${y - 3}" x2="${sx(v)}" y2="${y + 3}" stroke="#c4c4bd"/><text x="${sx(v)}" y="${y + 18}" text-anchor="middle">${v}</text>`;
+  }
+  s += `<line x1="${sx(min)}" y1="${y + 26}" x2="${sx(max)}" y2="${y + 26}" stroke="#9a9a93"/>`;
+  s += `<text x="${(sx(min) + sx(max)) / 2}" y="${y + 38}" text-anchor="middle">spread ${(max - min).toFixed(1)}</text>`;
+  const meanRight = mean >= wmean;
+  s += `<line x1="${sx(mean)}" y1="14" x2="${sx(mean)}" y2="${y}" stroke="#9a9a93" stroke-dasharray="3 3"/>`;
+  s += `<text class="mean-label" x="${sx(mean) + (meanRight ? 4 : -4)}" y="12" text-anchor="${meanRight ? "start" : "end"}">mean ${mean.toFixed(2)}</text>`;
+  s += `<line x1="${sx(wmean)}" y1="14" x2="${sx(wmean)}" y2="${y}" stroke="var(--accent)"/>`;
+  s += `<text class="mean-label" x="${sx(wmean) + (meanRight ? -4 : 4)}" y="12" text-anchor="${meanRight ? "end" : "start"}">weighted ${wmean.toFixed(2)}</text>`;
+  const seen = {};
+  for (const r of REVIEWS) {
+    const stackUp = (seen[r.score] = (seen[r.score] || 0) + 1) - 1;
+    const rad = 3 + r.expertise * 1.5, cy = y - stackUp * 16;
+    s += `<circle cx="${sx(r.score)}" cy="${cy}" r="${rad}" fill="var(--accent)" stroke="#fff"><title>${r.id}: ${r.score.toFixed(1)}, ${EXPERTISE[r.expertise]}</title></circle>`;
+    s += `<text class="who" x="${sx(r.score)}" y="${cy - rad - 4}" text-anchor="middle">${r.id}</text>`;
+  }
+  $("#scoreChart").innerHTML = s + "</svg>";
+  $("#scoreSummary").textContent = `Mean ${mean.toFixed(2)}; weighted by self-rated expertise ${wmean.toFixed(2)}. ` +
+    `Range ${min.toFixed(1)} to ${max.toFixed(1)}. A bigger dot means higher expertise (1 to 4).`;
+}
+
+// ===================== VIEW: agreement by topic =====================
+function topicSummary() {
+  const byTopic = new Map();
+  for (const p of allPoints()) {
+    if (!byTopic.has(p.topic)) byTopic.set(p.topic, []);
+    byTopic.get(p.topic).push(p);
+  }
+  return [...byTopic].map(([topic, pts]) => {
+    const types = new Set(pts.map((p) => p.type));
+    const who = [...new Set(pts.map((p) => p.reviewer))].sort();
+    let status, rank;
+    if (types.has("strength") && types.has("weakness")) { status = "Reviewers disagree"; rank = 0; }
+    else if (who.length > 1) {
+      const only = types.size === 1;
+      status = types.has("weakness") ? (only ? "Agree: weakness" : "Agree: a concern")
+        : types.has("strength") ? (only ? "Agree: strength" : "Agree: strength, with questions") : "Same question";
+      rank = 1;
+    }
+    else { status = "Raised by " + who[0] + " only"; rank = 2; }
+    return { topic, pts, who, status, rank };
+  }).sort((a, b) => a.rank - b.rank || b.who.length - a.who.length || a.topic.localeCompare(b.topic));
+}
+
+function renderAgreement() {
+  const rows = topicSummary();
+  let h = `<table class="agree"><thead><tr><th>Topic</th>${REVIEWS.map((r) => `<th class="cell">${r.id}</th>`).join("")}<th>What it means</th><th></th></tr></thead><tbody>`;
+  for (const t of rows) {
+    const cells = REVIEWS.map((r) => {
+      const letters = [...new Set(t.pts.filter((p) => p.reviewer === r.id).map((p) => TYPE_LETTER[p.type]))].join(" ");
+      return `<td class="cell">${letters || "·"}</td>`;
+    }).join("");
+    const btn = t.rank === 0 ? `<button type="button" data-disagree="${esc(t.topic)}">Add to draft</button>` : "";
+    h += `<tr class="topic-row ${state.topicFilter === t.topic ? "selected" : ""}" data-topic="${esc(t.topic)}"><td>${esc(t.topic)}</td>${cells}` +
+      `<td class="${t.rank === 0 ? "status-disagree" : ""}">${esc(t.status)}</td><td>${btn}</td></tr>`;
+  }
+  $("#agreement").innerHTML = h + "</tbody></table>";
+  $("#topicList").innerHTML = rows.map((t) => `<option value="${esc(t.topic)}">`).join("");
+}
+
+function disagreementLine(topic) {
+  const t = topicSummary().find((x) => x.topic === topic);
+  const by = (type) => [...new Set(t.pts.filter((p) => p.type === type).map((p) => p.reviewer))].sort().join(", ");
+  return `- ${topic}: ${by("strength")} see it as a strength; ${by("weakness")} see it as a weakness.`;
+}
+
+// ===================== VIEW: the four reviews =====================
+function highlight(text, reviewer) {
+  const ranges = allPoints().filter((p) => p.reviewer === reviewer)
+    .map((p) => ({ p, at: text.indexOf(p.text) })).filter((x) => x.at >= 0).sort((a, b) => a.at - b.at);
+  let out = "", pos = 0;
+  for (const { p, at } of ranges) {
+    if (at < pos) continue;
+    out += esc(text.slice(pos, at)) + `<span class="tagged" data-point="${p.id}" title="${TYPE_LABEL[p.type]}: ${esc(p.topic)}">${esc(p.text)}</span><span class="tagname">${TYPE_LETTER[p.type]}</span>`;
+    pos = at + p.text.length;
+  }
+  return out + esc(text.slice(pos));
+}
+
+function renderReviews() {
+  const box = $("#reviews");
+  box.className = "reviews " + state.layout;
+  $("#layoutSide").classList.toggle("on", state.layout === "side-by-side");
+  $("#layoutStack").classList.toggle("on", state.layout === "stacked");
+  box.innerHTML = REVIEWS.map((r) => `<article class="review">
+      <header><b>${r.id}</b><span class="muted">${r.role}</span><span>Score ${r.score.toFixed(1)}</span><span class="muted">${EXPERTISE[r.expertise]} (${r.expertise})</span></header>
+      <div class="review-body" data-reviewer="${r.id}">${r.paras.map((p) => `<p>${highlight(p, r.id)}</p>`).join("")}</div>
+    </article>`).join("");
+}
+
+function showInReview(id) {
+  const el = document.querySelector(`.tagged[data-point="${id}"]`);
+  if (!el) return;
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+  el.classList.add("flash");
+  setTimeout(() => el.classList.remove("flash"), 1500);
+}
+
+// ===================== COMPONENT: tag a selection =====================
+let pendingTag = null;
+function onReviewSelection() {
+  const sel = window.getSelection();
+  const text = sel ? sel.toString().replace(/\s+/g, " ").trim() : "";
+  const node = sel && sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+  const body = node && node.closest(".review-body");
+  if (!text || !body) return;
+  pendingTag = { reviewer: body.dataset.reviewer, text };
+  const r = sel.getRangeAt(0).getBoundingClientRect();
+  const pop = $("#tagPopover");
+  pop.style.top = (r.bottom + window.scrollY + 6) + "px";
+  pop.style.left = Math.min(window.innerWidth - 300, Math.max(8, r.left + window.scrollX)) + "px";
+  pop.style.display = "block";
+  $("#tagTopic").focus();
+}
+function closeTagPopover() { $("#tagPopover").style.display = "none"; pendingTag = null; }
+function addMyPoint(type) {
+  if (!pendingTag) return;
+  const topic = $("#tagTopic").value.trim() || "Other";
+  state.myPoints.push({ id: "m" + Date.now(), reviewer: pendingTag.reviewer, type, topic, text: pendingTag.text, mine: true });
+  closeTagPopover();
+  save(); renderAll();
+}
+
+// ===================== VIEW: tagged points =====================
+function renderPoints() {
+  const pts = allPoints().filter((p) =>
+    (!state.typeFilter || p.type === state.typeFilter) &&
+    (!state.reviewerFilter || p.reviewer === state.reviewerFilter) &&
+    (!state.topicFilter || p.topic === state.topicFilter));
+  $("#topicFilter").innerHTML = state.topicFilter
+    ? `Topic: <b>${esc(state.topicFilter)}</b> <button type="button" id="clearTopic">Show all topics</button>` : "";
+  $("#points").innerHTML = pts.length ? pts.map((p) => `<div class="point ${inDraft(p) ? "used" : ""}" data-id="${p.id}">
+      <div class="meta"><span class="type">${TYPE_LABEL[p.type]}</span><span>${esc(p.topic)}</span><span>${p.reviewer}</span>${p.mine ? "<span>tagged by you</span>" : ""}</div>
+      <div class="text" data-show="${p.id}" title="Show in the review">${esc(p.text)}</div>
+      <div class="acts">
+        <button type="button" data-add="${p.id}" ${inDraft(p) ? "disabled" : ""}>${inDraft(p) ? "In the draft" : "Add to draft"}</button>
+        ${p.mine ? `<button type="button" data-remove="${p.id}">Remove tag</button>` : ""}
+      </div>
+    </div>`).join("") : `<p class="muted">No points match these filters.</p>`;
+}
+
+// ===================== COMPONENT: meta-review draft =====================
+// With the headings in place, a point goes at the end of its section; without them, at the cursor.
+function insertUnderHeading(heading, line) {
+  const ta = $("#draft");
+  const lines = ta.value.split("\n");
+  const h = lines.findIndex((l) => l.trim() === heading);
+  if (h === -1) {
+    const at = ta.selectionStart ?? ta.value.length;
+    const before = ta.value.slice(0, at), lead = before && !before.endsWith("\n") ? "\n" : "";
+    ta.value = before + lead + line + "\n" + ta.value.slice(at);
+    return "at the cursor";
+  }
+  let end = lines.length;
+  for (let i = h + 1; i < lines.length; i++) if (HEADINGS.includes(lines[i].trim())) { end = i; break; }
+  let at = end;
+  while (at > h + 1 && lines[at - 1].trim() === "") at--;
+  lines.splice(at, 0, line);
+  if (at + 1 < lines.length && lines[at + 1].trim() !== "" && HEADINGS.includes(lines[at + 1].trim())) lines.splice(at + 1, 0, "");
+  ta.value = lines.join("\n");
+  return "under " + heading;
+}
+
+function addPointToDraft(id) {
+  const p = allPoints().find((x) => x.id === id);
+  if (!p || inDraft(p)) return;
+  const where = insertUnderHeading(HEADING_FOR[p.type], `- ${p.text} (${p.reviewer})`);
+  draftChanged(`Added ${p.reviewer}'s ${p.type} ${where}.`);
+}
+
+function addHeadings() {
+  const ta = $("#draft");
+  const missing = HEADINGS.filter((h) => !ta.value.split("\n").some((l) => l.trim() === h));
+  if (!missing.length) { $("#draftStatus").textContent = "All section headings are already in the draft."; return; }
+  ta.value = (ta.value.trim() ? ta.value.replace(/\s*$/, "\n\n") : "") + missing.join("\n\n") + "\n";
+  draftChanged(`Added headings: ${missing.join(", ")}.`);
+}
+
+function draftChanged(msg) {
+  state.draft = $("#draft").value;
+  const words = (state.draft.match(/\S+/g) || []).length;
+  $("#draftCount").textContent = `${words} words`;
+  if (msg !== undefined) $("#draftStatus").textContent = msg;
+  save();
+  renderPoints();
+}
+
+async function copyDraft() {
+  const text = (state.recommendation ? `Recommendation: ${state.recommendation}\n\n` : "") + state.draft.trim();
+  try { await navigator.clipboard.writeText(text); $("#draftStatus").textContent = "Copied the meta-review to the clipboard."; }
+  catch (e) { $("#draft").select(); document.execCommand("copy"); $("#draftStatus").textContent = "Copied the draft text (without the recommendation line)."; }
+}
+
+// ===================== WIRING =====================
+function renderAll() { renderScoreChart(); renderAgreement(); renderReviews(); renderPoints(); }
+
+$("#layoutSide").onclick = () => { state.layout = "side-by-side"; save(); renderReviews(); };
+$("#layoutStack").onclick = () => { state.layout = "stacked"; save(); renderReviews(); };
+
+$("#agreement").addEventListener("click", (e) => {
+  const d = e.target.closest("[data-disagree]");
+  if (d) {
+    const topic = d.dataset.disagree;
+    if (state.draft.includes(`- ${topic}:`)) { $("#draftStatus").textContent = `${topic} is already under Points of disagreement.`; return; }
+    draftChanged(`Added the ${topic} disagreement ${insertUnderHeading("Points of disagreement", disagreementLine(topic))}.`);
+    return;
+  }
+  const row = e.target.closest(".topic-row");
+  if (!row) return;
+  state.topicFilter = state.topicFilter === row.dataset.topic ? "" : row.dataset.topic;
+  renderAgreement(); renderPoints();
+});
+
+$("#points").addEventListener("click", (e) => {
+  const t = e.target;
+  if (t.dataset.add) addPointToDraft(t.dataset.add);
+  else if (t.dataset.show) showInReview(t.dataset.show);
+  else if (t.dataset.remove) { state.myPoints = state.myPoints.filter((p) => p.id !== t.dataset.remove); save(); renderAll(); }
+});
+$("#topicFilter").addEventListener("click", (e) => { if (e.target.id === "clearTopic") { state.topicFilter = ""; renderAgreement(); renderPoints(); } });
+$("#typeFilter").onchange = (e) => { state.typeFilter = e.target.value; renderPoints(); };
+$("#reviewerFilter").innerHTML += REVIEWS.map((r) => `<option value="${r.id}">${r.id}</option>`).join("");
+$("#reviewerFilter").onchange = (e) => { state.reviewerFilter = e.target.value; renderPoints(); };
+
+$("#reviews").addEventListener("mouseup", () => setTimeout(onReviewSelection, 0));
+$("#tagPopover").addEventListener("click", (e) => { if (e.target.dataset.type) addMyPoint(e.target.dataset.type); });
+$("#tagCancel").onclick = closeTagPopover;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeTagPopover(); });
+document.addEventListener("mousedown", (e) => { if (!e.target.closest("#tagPopover")) closeTagPopover(); });
+
+$("#draft").addEventListener("input", () => draftChanged());
+$("#headingsBtn").onclick = addHeadings;
+$("#recommendation").onchange = (e) => { state.recommendation = e.target.value; save(); };
+$("#copyBtn").onclick = copyDraft;
+
+// ===================== START =====================
+$("#pageTitle").textContent = "Meta-review: submission " + SUBMISSION.id;
+$("#paperTitle").textContent = SUBMISSION.title;
+$("#draft").value = state.draft;
+$("#recommendation").value = state.recommendation;
+$("#draftCount").textContent = `${(state.draft.match(/\S+/g) || []).length} words`;
+$("#saveStatus").textContent = saved.draft !== undefined ? "Draft restored from this browser" : "Not saved yet";
+renderAll();
+</script>
+</body>
+</html>
