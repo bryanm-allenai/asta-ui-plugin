@@ -60,7 +60,7 @@ MODE_WORD = {"card": "Card", "workflow": "Workflow", "structure": "Structure", "
              "prompt": "Prompts", "raw": "Prompts and code"}
 
 
-# Where a build came from, as the Collection lens says it: how it came (its kind),
+# Where a build came from, as the Sharing lens says it: how it came (its kind),
 # who may see it (its consent) and what it was filed from (its sources).
 KIND_WORD = {"study": "From the study's participants", "contributed": "Filed by the people who built them",
              "seed": "Written for the prototype"}
@@ -949,13 +949,18 @@ class Views:
         if share["line"]:
             copy = btn(tx("span", "Copy", "c0") + tx("span", "Copied", "c1") + tx("span", "Selected", "c2"), "run primary",
                        data_copy=True, aria_live="polite")
-            line += [blk("kb-so-where", "p", esc("They paste it once into a terminal, in the folder of an app they built with Claude Code."), "small muted"),
+            where = ("They paste it once into the coding agent they use (Claude Code, Codex, Cursor, Gemini CLI or another), "
+                     "in the folder of an app they built." if share.get("any_agent") else
+                     "They paste it once into a terminal, in the folder of an app they built with Claude Code.")
+            line += [blk("kb-so-where", "p", esc(where), "small muted"),
                      blk("kb-so-cmd", "div", el("code", esc(share["line"])) + copy, "socmd")]
             if share["link"]:
-                steps = ["Files their app under the name git has for them, for the project team, takes out keys, emails and "
+                agent = "their agent" if share.get("any_agent") else "Claude Code"
+                steps = ("Installs the AstaUI skills for " + ("the agents on their computer" if share.get("any_agent") else "Claude Code")
+                         + ", files their app under the name git has for them, for the project team, takes out keys, emails and "
                          "home paths, and sends it here. It asks them nothing.",
-                         "From then on, what they ask Claude Code to build for their research comes here too, and an app "
-                         "filed again replaces its earlier copy."]
+                         f"From then on, what they ask {agent} to build for their research comes here too, and an app "
+                         "filed again replaces its earlier copy.")
                 line.append(blk("kb-so-steps", "ol", "".join(tx("li", s) for s in steps), "sosteps"))
                 if share["access"]:
                     line.append(blk("kb-so-access", "p", esc("They need read access to the repository to install it. ") + hub, "small muted"))

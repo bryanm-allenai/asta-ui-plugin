@@ -51,6 +51,10 @@ from .kb import ID_RE, KB, KBError, check_id, read_json, set_user_config, user_c
 BRANCH_PREFIX = "add-"
 SKILL = "ui-to-workflow"
 ASK = "File the app I built in this folder into AstaUI with the {plugin}:{skill} skill."
+# The line for any coding agent: a request the person pastes into the agent
+# they use, which runs the installer (it needs only Python) and then files.
+ANY_AGENT = ("Set up AstaUI by running `curl -fsSL {raw}/install.py | python3 - --link {link}`, then follow its "
+             "ui-to-workflow skill (~/.agents/skills/ui-to-workflow/SKILL.md) to file the app I built in this folder.")
 SEND = " Send it to {link}"
 # The page in the owner's drive that builds are sent to, and the list on it a
 # row is added to. An Add only link may add only to the end of a list the page
@@ -165,6 +169,11 @@ def share_line(kb: KB) -> Dict[str, Any]:
     link = inbox_link(kb)
     if not slug:
         return {"line": None, "repo": None, "branch": None, "url": None, "access": None, "link": link}
+    if public.get("repo") and link:
+        # Any agent: the person pastes the request into the agent they use.
+        raw = f"https://raw.githubusercontent.com/{slug}/{branch or 'main'}"
+        return {"line": ANY_AGENT.format(raw=raw, link=link), "any_agent": True, "repo": slug, "branch": branch,
+                "url": f"https://github.com/{slug}", "access": None, "link": link}
     ask = ASK.format(plugin=plugin_name, skill=SKILL) + (SEND.format(link=link) if link else "")
     # Adding and installing again are harmless; the two updates bring a copy
     # installed before up to the one on GitHub. The prompt goes before
@@ -173,7 +182,7 @@ def share_line(kb: KB) -> Dict[str, Any]:
     line = (f"claude plugin marketplace add {slug}{'#' + branch if branch else ''} && "
             f"claude plugin marketplace update {market_name} && claude plugin install {plugin_id} && "
             f"claude plugin update {plugin_id} && claude \"{ask}\" --allowedTools \"{ALLOW}\"")
-    return {"line": line, "repo": slug, "branch": branch, "url": f"https://github.com/{slug}",
+    return {"line": line, "any_agent": False, "repo": slug, "branch": branch, "url": f"https://github.com/{slug}",
             "access": None if public.get("repo") else f"https://github.com/{slug}/settings/access", "link": link}
 
 

@@ -141,6 +141,32 @@ def cmd_filed(args) -> int:
     return 0
 
 
+def cmd_setup(args) -> int:
+    """Install the skills for the coding agents on this computer, and keep the
+    link the line gave, so a build filed later goes there too."""
+    from .install import install_skills
+    from .sources import open_link, set_user_config
+    if args.link:
+        open_link(args.link)  # it has to open something before it is kept
+        set_user_config("inbox-link", args.link.strip())
+    res = {"skills": install_skills(), "link": bool(args.link)}
+    if args.json:
+        _print_json(res)
+        return 0
+    s = res["skills"]
+    _say(f"Installed the AstaUI skills ({len(s['installed'])} folders) where coding agents look for them: ~/.agents/skills"
+         + ("" if s["claude_plugin"] else ", and Claude Code's ~/.claude/skills") + ".")
+    if s["claude_plugin"]:
+        _say("Claude Code already has them as the asta-ui plugin, so its folder was left as it is.")
+    for p in s["skipped"]:
+        _say(f"Left {p} alone: a skill of that name that astaui did not install is there.")
+    if args.link:
+        _say("Builds filed on this computer are sent to the link the line gave.")
+    _say(f"The tool: {s['command']}. An agent already running loads the skills next time it starts; "
+         "until then, read a skill's SKILL.md and follow it.")
+    return 0
+
+
 def cmd_intake(args) -> int:
     from .sources import intake
     kb = _kb(args)
@@ -198,12 +224,13 @@ def _gather_prompts(args) -> List[Dict[str, Any]]:
         if args.session == "latest":
             found = list_sessions(Path.cwd(), limit=1)
             if not found:
-                raise KBError("No Claude Code session found for this folder; pass the session file with --session PATH")
+                raise KBError("No conversation with Claude Code, Codex, Gemini CLI or Cursor found for this folder; "
+                              "pass one with --session PATH, or the prompts as a file with --prompts")
             path = Path(found[0]["path"])
         elif args.session == "this":
             path = this_session()
             if path is None:
-                raise KBError("This is not running in a Claude Code session whose log can be found; pass the session file with --session PATH")
+                raise KBError("No conversation for this folder can be found; pass one with --session PATH, or the prompts as a file with --prompts")
         else:
             path = Path(args.session).expanduser()
         prompts += session_prompts(path)
@@ -245,10 +272,11 @@ def cmd_sessions(args) -> int:
         _print_json(rows)
         return 0
     if not rows:
-        _say("No Claude Code sessions found" + ("" if args.all else " for this folder (try --all)") + ".")
+        _say("No conversations with Claude Code, Codex, Gemini CLI or Cursor found" + ("" if args.all else " for this folder (try --all)")
+             + ". Another agent's prompts can be passed as a file with --prompts.")
         return 0
     for r in rows:
-        _say(f"{r['modified']}  {r['prompts']:>3} prompts  {r['path']}")
+        _say(f"{r['modified']}  {r['agent']:<6} {r['prompts']:>3} prompts  {r['path']}")
         _say(f"            {r['first']}")
     return 0
 
@@ -970,7 +998,7 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--title", required=True)
     sp.add_argument("--prompts", action="append", help="a file of prompts: .jsonl, or text with a blank line between prompts (repeatable)")
     sp.add_argument("--prompt", action="append", help="one prompt (repeatable)")
-    sp.add_argument("--session", help="a Claude Code session log, `latest` for this folder's newest before this one, or `this` for the one running this command")
+    sp.add_argument("--session", help="a conversation log (Claude Code, Codex, Gemini CLI or Cursor), `latest` for this folder's newest before this one, or `this` for the one running this command")
     sp.add_argument("--code", action="append", required=True, help="a file or folder of the interface's code (repeatable)")
     sp.add_argument("--screenshot")
     sp.add_argument("--entry", help="the file that opens the interface (default: the first .html)")
@@ -1128,6 +1156,9 @@ def parser() -> argparse.ArgumentParser:
 
     sp = cmd("filed", "the build this folder was filed as before, if it was", cmd_filed)
     sp.add_argument("folder", nargs="?", help="the app's folder (default: this one)")
+
+    sp = cmd("setup", "install the skills for the coding agents on this computer, and keep the link builds are sent to", cmd_setup)
+    sp.add_argument("--link", help="the link from the line: https://<a drive>/s/<code>")
 
     sp = cmd("intake", "on the owner's computer: take in every build sent to the drive that passes the checks, and index it", cmd_intake)
     sp.add_argument("--no-index", action="store_true", help="leave the index as it is")

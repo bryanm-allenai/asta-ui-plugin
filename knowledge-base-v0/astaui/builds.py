@@ -81,59 +81,218 @@ def _user_text(entry: Dict[str, Any]) -> Optional[str]:
     return text
 
 
-def session_prompts(path: Path) -> List[Dict[str, Any]]:
-    """The prompts a person typed in one Claude Code session, in order."""
-    turns: List[Dict[str, Any]] = []
-    with path.open(encoding="utf-8", errors="replace") as f:
-        for line in f:
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            text = _user_text(entry)
-            if text:
-                at = (entry.get("timestamp") or "")[:10] or None
-                turns.append({"text": text, **({"at": at} if at else {})})
+# Where each coding agent keeps what a person typed. Claude Code, Codex, Gemini
+# CLI and Cursor are read; another agent's conversation can be passed as a file
+# of prompts. The formats are the agents' own and change between versions, so
+# every reader takes what it recognises and skips the rest.
+
+def _codex_home() -> Path:
+    return Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+
+
+def _gemini_tmp() -> Path:
+    return Path(os.environ.get("GEMINI_CLI_HOME", Path.home())) / ".gemini" / "tmp"
+
+
+def _cursor_user() -> Path:
+    if os.sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Cursor" / "User"
+    if os.name == "nt":
+        return Path(os.environ.get("APPDATA", Path.home())) / "Cursor" / "User"
+    return Path.home() / ".config" / "Cursor" / "User"
+
+
+def agent_of(path: Path) -> str:
+    """Which agent wrote a conversation file, by where and how it is kept."""
+    if path.name == "state.vscdb":
+        return "cursor"
+    if path.suffix == ".json":
+        return "gemini"
+    if path.name.startswith("rollout-"):
+        return "codex"
+    return "claude"
+
+
+def _jsonl(path: Path) -> Iterable[Dict[str, Any]]:
+    try:
+        with path.open(encoding="utf-8", errors="replace") as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(entry, dict):
+                    yield entry
+    except OSError:
+        return
+
+
+def _parts_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(b.get("text", "") for b in content
+                         if isinstance(b, dict) and b.get("type") in (None, "text", "input_text") and isinstance(b.get("text"), str))
+    return ""
+
+
+# What an agent puts in a person's turn that the person did not type.
+INJECTED = re.compile(r"^\s*<(environment_context|user_instructions|user_shell_command|turn_aborted)\b")
+
+
+def _codex_prompts(path: Path) -> List[Dict[str, Any]]:
+    typed, items = [], []
+    for e in _jsonl(path):
+        pl = e.get("payload") if isinstance(e.get("payload"), dict) else {}
+        at = (e.get("timestamp") or "")[:10] or None
+        if e.get("type") == "event_msg" and pl.get("type") == "user_message" and isinstance(pl.get("message"), str):
+            typed.append((pl["message"], at))
+        elif e.get("type") == "response_item" and pl.get("type") == "message" and pl.get("role") == "user":
+            items.append((_parts_text(pl.get("content")), at))
+    turns = typed or [(t, at) for t, at in items if not INJECTED.match(t)]
+    return [{"text": t.strip(), **({"at": at} if at else {})} for t, at in turns if t.strip()]
+
+
+def _gemini_prompts(path: Path) -> List[Dict[str, Any]]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except (OSError, ValueError):
+        return []
+    rows = data.get("messages") if isinstance(data, dict) else data
+    turns = []
+    for m in rows if isinstance(rows, list) else []:
+        if not isinstance(m, dict) or m.get("type") != "user":
+            continue
+        text = m.get("content") if "content" in m else m.get("message")
+        if not isinstance(text, str):
+            text = _parts_text(text)
+        at = str(m.get("timestamp") or "")[:10] or None
+        if text and text.strip():
+            turns.append({"text": text.strip(), **({"at": at} if at else {})})
     return turns
 
 
-def this_session(cwd: Optional[Path] = None) -> Optional[Path]:
-    """The log of the Claude Code session running this command, for when the
-    interface was built in the same conversation that files it."""
-    running = os.environ.get("CLAUDE_CODE_SESSION_ID")
-    root = _claude_projects()
-    if not running or not root.is_dir():
-        return None
-    here = root / _project_slug(cwd or Path.cwd()) / f"{running}.jsonl"
-    if here.is_file():
-        return here
-    return next(iter(root.glob(f"*/{running}.jsonl")), None)
-
-
-def list_sessions(cwd: Optional[Path] = None, limit: int = 15) -> List[Dict[str, Any]]:
-    """Recent Claude Code sessions, for the project folder ``cwd`` if given. The
-    session running this command is left out: when an agent files a build from
-    the folder it was built in, the newest session there is the filing itself."""
-    root = _claude_projects()
-    if not root.is_dir():
+def _cursor_prompts(path: Path) -> List[Dict[str, Any]]:
+    import sqlite3
+    try:
+        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except sqlite3.Error:
         return []
-    dirs = [root / _project_slug(cwd)] if cwd else [d for d in root.iterdir() if d.is_dir()]
-    running = os.environ.get("CLAUDE_CODE_SESSION_ID")
-    found = []
-    for d in dirs:
-        if not d.is_dir():
+    turns: List[Dict[str, Any]] = []
+    try:
+        for (value,) in con.execute("SELECT value FROM ItemTable WHERE key = 'aiService.prompts'"):
+            for p in json.loads(value) or []:
+                if isinstance(p, dict) and isinstance(p.get("text"), str) and p["text"].strip():
+                    turns.append({"text": p["text"].strip()})
+    except (sqlite3.Error, ValueError, TypeError):
+        pass
+    finally:
+        con.close()
+    return turns
+
+
+def session_prompts(path: Path) -> List[Dict[str, Any]]:
+    """The prompts a person typed in one conversation with a coding agent, in order."""
+    agent = agent_of(path)
+    if agent == "codex":
+        return _codex_prompts(path)
+    if agent == "gemini":
+        return _gemini_prompts(path)
+    if agent == "cursor":
+        return _cursor_prompts(path)
+    turns: List[Dict[str, Any]] = []
+    for entry in _jsonl(path):
+        text = _user_text(entry)
+        if text:
+            at = (entry.get("timestamp") or "")[:10] or None
+            turns.append({"text": text, **({"at": at} if at else {})})
+    return turns
+
+
+def _conversations(cwd: Optional[Path]) -> List[Path]:
+    """Every conversation file the agents on this computer kept for a folder
+    (or for any folder, without one)."""
+    found: List[Path] = []
+    claude = _claude_projects()
+    if claude.is_dir():
+        found += list((claude / _project_slug(cwd)).glob("*.jsonl")) if cwd else list(claude.glob("*/*.jsonl"))
+    rollouts = sorted((_codex_home() / "sessions").glob("**/rollout-*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)[:600]
+    for r in rollouts:
+        if cwd is None:
+            found.append(r)
             continue
-        for p in d.glob("*.jsonl"):
-            if p.stem != running:
-                found.append(p)
-    found.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        for e in _jsonl(r):
+            pl = e.get("payload") if isinstance(e.get("payload"), dict) else {}
+            if e.get("type") == "session_meta":
+                if pl.get("cwd") and Path(pl["cwd"]).resolve() == cwd.resolve():
+                    found.append(r)
+                break
+    tmp = _gemini_tmp()
+    if tmp.is_dir():
+        if cwd is None:
+            found += list(tmp.glob("*/chats/*.json"))
+        else:
+            want = hashlib.sha256(str(cwd.resolve()).encode()).hexdigest()
+            for d in tmp.iterdir():
+                root = d / ".project_root"
+                named = root.is_file() and Path(root.read_text(encoding="utf-8").strip()).resolve() == cwd.resolve()
+                if d.name == want or named:
+                    found += list(d.glob("chats/*.json"))
+    if cwd is not None:
+        for ws in (_cursor_user() / "workspaceStorage").glob("*/workspace.json"):
+            try:
+                folder = json.loads(ws.read_text(encoding="utf-8")).get("folder") or ""
+            except (OSError, ValueError):
+                continue
+            from urllib.parse import unquote, urlparse
+            if folder.startswith("file://") and Path(unquote(urlparse(folder).path)).resolve() == cwd.resolve():
+                db = ws.parent / "state.vscdb"
+                if db.is_file():
+                    found.append(db)
+    return found
+
+
+# The first prompt of a conversation that files a build rather than makes one.
+FILING = re.compile(r"(into AstaUI|AstaUI with|install AstaUI|set up AstaUI|ui-to-workflow)", re.I)
+
+
+def this_session(cwd: Optional[Path] = None) -> Optional[Path]:
+    """The conversation running this command, for when the interface was built
+    in the same conversation that files it. Claude Code says which one it is;
+    for another agent it is the folder's newest."""
+    running = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    root = _claude_projects()
+    if running and root.is_dir():
+        here = root / _project_slug(cwd or Path.cwd()) / f"{running}.jsonl"
+        if here.is_file():
+            return here
+        found = next(iter(root.glob(f"*/{running}.jsonl")), None)
+        if found:
+            return found
+    newest = list_sessions(cwd or Path.cwd(), limit=1, filing=True)
+    return Path(newest[0]["path"]) if newest else None
+
+
+def list_sessions(cwd: Optional[Path] = None, limit: int = 15, filing: bool = False) -> List[Dict[str, Any]]:
+    """Recent conversations with any coding agent this reads, for the project
+    folder ``cwd`` if given, newest first. The conversation filing a build is
+    left out (Claude Code's by its id, any agent's by a first prompt that asks
+    to file into AstaUI) unless ``filing``: when an agent files a build from the
+    folder it was built in, the newest conversation there is the filing itself."""
+    running = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    found = sorted(_conversations(cwd), key=lambda p: p.stat().st_mtime, reverse=True)
     out = []
-    for p in found[:limit]:
+    for p in found:
+        if len(out) >= limit:
+            break
+        if p.stem == running and not filing:
+            continue
         turns = session_prompts(p)
-        if not turns:
+        if not turns or (not filing and FILING.search(turns[0]["text"][:400])):
             continue
         out.append({
             "path": str(p),
+            "agent": agent_of(p),
             "project": p.parent.name,
             "prompts": len(turns),
             "first": turns[0]["text"][:140],

@@ -147,6 +147,8 @@ def _installed(root: Path) -> bool:
     """Whether this is the copy a plugin manager installed, which nothing should write to."""
     parts = root.resolve().parts
     managed = any(a == "plugins" and b in ("cache", "marketplaces") for a, b in zip(parts, parts[1:]))
+    # The copy the installer downloads, which the next install replaces.
+    managed = managed or WORKING.parent.joinpath("plugin").resolve() in root.resolve().parents
     return managed or (".claude" in parts and "plugins" in parts) or not os.access(root, os.W_OK)
 
 

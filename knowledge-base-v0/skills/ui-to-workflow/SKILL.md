@@ -13,7 +13,7 @@ The command is `astaui`: on the PATH if it was installed with pip, otherwise `py
 
 The status line says where the knowledge base is. When the plugin installed it, astaui files into the person's own copy (`~/.astaui/kb`), which it keeps up to date with the plugin by itself; there is nothing to set up.
 
-Someone may have started you with the line from the console's Collection lens, in the folder of the app they built. Then the build is the app in the current folder, and its prompts are in the Claude Code sessions for that folder. If the line ends with "Send it to" and an address ending in `/s/` and a code, step 6 sends the build there, and astaui remembers the address, so builds filed later go there without it.
+Someone may have started you with the line from the console's Sharing lens, in the folder of the app they built, in whichever coding agent they use. Then the build is the app in the current folder, and its prompts are in their conversations with their agent in that folder. If the line ran `install.py … --link` or ends with "Send it to" and an address ending in `/s/` and a code, step 6 sends the build there, and astaui remembers the address, so builds filed later go there without it.
 
 `astaui filed` says whether this folder was filed before. If it was, file it again under the same id with `--replace` and send it: the newer copy replaces the one sent before.
 
@@ -27,7 +27,7 @@ A participant's build from the formative study, filed by the owner, is `--kind s
 
 ## 2. Gather the build
 
-- **Prompts.** If the interface was built in Claude Code in this folder, `astaui sessions` lists the sessions with their first prompt, leaving out the one you are running in; `--session latest` takes the newest of the rest. If it was built in this same conversation, `--session this` takes this one. Several sessions can be combined by passing `--prompts` files. Otherwise collect the prompts into a text file with a blank line between them, typed as the person wrote them.
+- **Prompts.** If the interface was built with a coding agent in this folder, `astaui sessions` lists the conversations it finds (Claude Code, Codex, Gemini CLI and Cursor), with their first prompt, leaving out the one filing it; `--session latest` takes the newest of the rest. If it was built in this same conversation, `--session this` takes this one. If your agent keeps its conversations somewhere astaui does not read, write the person's prompts from this conversation, or from where your agent saved them, into a file and pass it with `--prompts`. Several sessions can be combined by passing `--prompts` files. Otherwise collect the prompts into a text file with a blank line between them, typed as the person wrote them.
 - **Code.** The interface's own files: the HTML, scripts and styles, a notebook, the app folder. `astaui add` skips dependencies, build output, lockfiles and large or binary files on its own.
 - **A screenshot** of the interface running, if you can take one.
 
@@ -79,7 +79,7 @@ astaui send <id>
 
 Then tell the person, in two or three sentences: what was sent and its id, the name it carries and that the project team may see it, and what was taken out as private. If they want it named differently or not shared, file it again as they say and send it, or tell the owner.
 
-If `send` says there is no link yet, nobody has given this computer the line: tell the person the build is filed here and that the knowledge base's owner can send them the line that sends it. If the knowledge base is a git clone they can push to, put the build and card on a branch named `add-<id>` and push it instead. The knowledge base's owner sees every `add-*` branch in their console (the Collection lens) as waiting, and checks it with the `review-publish` skill before it joins; open a pull request as well if `gh` is set up. If the push is refused, they have no write access yet: say so, and that the owner can add them on GitHub.
+If `send` says there is no link yet, nobody has given this computer the line: tell the person the build is filed here and that the knowledge base's owner can send them the line that sends it. If the knowledge base is a git clone they can push to, put the build and card on a branch named `add-<id>` and push it instead. The knowledge base's owner sees every `add-*` branch in their console (the Sharing lens) as waiting, and checks it with the `review-publish` skill before it joins; open a pull request as well if `gh` is set up. If the push is refused, they have no write access yet: say so, and that the owner can add them on GitHub.
 
 ```sh
 git checkout -b add-<id>

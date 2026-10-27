@@ -53,7 +53,7 @@ HERE = Path(__file__).parent
 # The lenses, in the order of the view switch: (key, its name, its heading, what to know to read it)
 LENSES: List[Tuple[str, str, str, str]] = [
     ("home", "Home", "What needs a decision", ""),
-    ("sources", "Collection", "Where the builds come from",
+    ("sources", "Sharing", "Where the builds come from",
      "Once a scientist has run the line below, what they build with Claude Code comes here by itself."),
     ("map", "Map", "The embedding space",
      "Near means alike. Place the builds by what they share, and pick one to see its true nearest neighbours, which a flat map only approximates."),
@@ -71,7 +71,7 @@ LENSES: List[Tuple[str, str, str, str]] = [
 # Each lens's button keeps the number it was given when it joined, wherever it sits.
 LENS_NUM = {"home": 0, "map": 1, "similar": 2, "coverage": 3, "workflows": 4, "eval": 5, "search": 6, "sources": 7}
 # Lenses that joined after pages were written keep the rules for showing them in
-# their own kept block (Collection: marble_sources.css), so a refresh brings them.
+# their own kept block (Sharing: marble_sources.css), so a refresh brings them.
 OWN_RULES = ("sources",)
 CATALOGS: List[Tuple[str, str]] = [("builds", "Builds"), ("words", "Words"), ("reqs", "Requests"), ("pairs", "Pairs")]
 LISTS = [(f"{f}-{l}", label) for f, l, label, _ in TERM_LISTS]
@@ -308,7 +308,7 @@ def skeleton(slots: Dict[str, List[Block]], stamp: str) -> str:
     # leads Colour by; the facets keep their places and ids after it.
     map_css = (HERE / "marble_map.css").read_text(encoding="utf-8")
     add_css = (HERE / "marble_add.css").read_text(encoding="utf-8")
-    # Collection: its layout and the rules that show it, and the Copy button's script.
+    # Sharing: its layout and the rules that show it, and the Copy button's script.
     sources_css = (HERE / "marble_sources.css").read_text(encoding="utf-8")
     copy_js = (HERE / "marble_copy.js").read_text(encoding="utf-8")
     place = (f'<button type="button" data-marble-id="kb-map-colour-{COLOUR_DEFAULT}" data-set="colour" '
