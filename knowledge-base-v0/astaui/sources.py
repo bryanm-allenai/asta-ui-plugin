@@ -169,8 +169,10 @@ def share_line(kb: KB) -> Dict[str, Any]:
     link = inbox_link(kb)
     if not slug:
         return {"line": None, "repo": None, "branch": None, "url": None, "access": None, "link": link}
-    if public.get("repo") and link:
+    if public.get("repo") and public.get("installer") and link:
         # Any agent: the person pastes the request into the agent they use.
+        # Only once the public copy has the installer (kb.json's plugin.installer),
+        # so the line never names a file nobody can fetch.
         raw = f"https://raw.githubusercontent.com/{slug}/{branch or 'main'}"
         return {"line": ANY_AGENT.format(raw=raw, link=link), "any_agent": True, "repo": slug, "branch": branch,
                 "url": f"https://github.com/{slug}", "access": None, "link": link}

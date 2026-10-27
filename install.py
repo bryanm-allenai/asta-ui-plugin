@@ -54,7 +54,7 @@ def main() -> int:
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     cli = dest / "knowledge-base-v0" / "astaui_cli.py"
-    print(f"Downloaded AstaUI into {dest}.")
+    print(f"Downloaded AstaUI into {dest}.", flush=True)
     return subprocess.call([sys.executable, str(cli), "setup", *sys.argv[1:]])
 
 
