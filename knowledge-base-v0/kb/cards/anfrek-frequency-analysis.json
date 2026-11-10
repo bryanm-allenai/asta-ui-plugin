@@ -1,0 +1,536 @@
+{
+  "schema": "astaui.card/1",
+  "id": "anfrek-frequency-analysis",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T19:25:05Z"
+  },
+  "app": {
+    "title": "Frequency Analysis in Hydrology (fiako-anfrek)",
+    "summary": "The person loads a CSV of one value per year, or uses the bundled example. They look over the series in an editable, filterable table, and a bar-and-bubble chart redraws as they change it. In later tabs they compute descriptive statistics, outlier bounds and the skewness and kurtosis checks for each candidate distribution. They then compute the magnitude at each return period they typed for four distributions, and test each distribution's fit with Kolmogorov-Smirnov and Chi-Square at a chosen significance level. Each stage downloads its results as a CSV or a text report.",
+    "task": {
+      "text": "Fit candidate probability distributions to an annual maximum series, estimate design magnitudes for chosen return periods, and test which distributions fit.",
+      "verbs": [
+        "derive",
+        "compare",
+        "identify",
+        "summarize",
+        "clean"
+      ]
+    },
+    "data": {
+      "text": "A single annual series: one dated row per year with one numeric value, such as the maximum daily rainfall of that year.",
+      "item": "one year's maximum value in an annual series",
+      "shapes": [
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "frequency analysis of an annual maximum series, checking the fit before the design values are used",
+      "terms": [
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "An upload enables four tabs that all read the same editable table. Filtering, sorting or editing the table changes what every later calculation uses. Each tab has an options column with a Calculate button that draws small-multiple charts, one per distribution, and turns on that tab's download button.",
+      "views": [
+        "table view",
+        "bar chart",
+        "line chart",
+        "scatter plot",
+        "strip plot",
+        "small multiples",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "filter",
+        "sort",
+        "exclude and refit",
+        "hover for detail",
+        "zoom and pan",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "small multiples",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "hydrological frequency analysis of extreme values for design floods",
+      "disciplines": [
+        "earth science",
+        "engineering"
+      ],
+      "terms": [
+        "hydrology",
+        "frequency analysis",
+        "goodness of fit"
+      ]
+    },
+    "workflow": {
+      "name": "fit candidate distributions to a series and test which one fits",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a CSV with a DATE index and one value column, or click the example-data button. Loading it unlocks the three analysis tabs and the table download.",
+          "parts": [
+            "data-sidebar"
+          ]
+        },
+        {
+          "step": "look over the series and fix or leave out values",
+          "here": "An editable value column with native filter and sort. The bar, line and bubble chart redraws from whatever rows remain, and every later calculation uses the same filtered rows.",
+          "parts": [
+            "table-view"
+          ]
+        },
+        {
+          "step": "compute summary statistics and flag outliers",
+          "here": "Calculate draws the series with mean, ±1 standard deviation and the upper and lower outlier bounds, plus a box plot. Cv, Cs and Ck are plotted against each distribution's criteria (Normal, Log Normal, Gumbel; Log Pearson III has none).",
+          "parts": [
+            "stat-view"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Type the return periods separated by spaces and pick a parameter source for each of four distributions. Calculate draws the magnitudes as grouped lines and bars by return period.",
+          "parts": [
+            "freq-view"
+          ]
+        },
+        {
+          "step": "test each candidate against a critical value",
+          "here": "Set alpha and pick the critical-value source for Kolmogorov-Smirnov and Chi-Square. Calculate draws the ranked values, the empirical (Weibull) and fitted CDFs and the Chi-Square class splits per distribution, then sets each computed statistic against its critical value.",
+          "parts": [
+            "fit-view"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Each stage has its own download: TABLE.csv, STATOUT.TXT, FREQUENCY.csv, and KS.csv, CHI.csv and FIT.TXT together.",
+          "parts": [
+            "data-sidebar",
+            "stat-view",
+            "freq-view",
+            "fit-view"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The same series is fitted with four distributions (Normal, Log Normal, Gumbel, Log Pearson III), each set side by side as small multiples.",
+        "Each distribution and each test has a selectable source, either a library or a named textbook method, so results can be matched to a given reference.",
+        "Outlier bounds come from a hydrology outlier test using a Kn factor on log values. Zero values are dropped before fitting.",
+        "Skewness and kurtosis are checked against each distribution's textbook criteria before fitting, as guidance on which distribution to pick.",
+        "The fit is judged at a user-set significance level, with the critical value and the computed statistic shown together for each distribution."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Upload and data buttons",
+      "summary": "Loads a CSV or the example series, unlocks the analysis tabs, and downloads the current table.",
+      "views": [],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pylayout.py",
+          "start": 29,
+          "end": 67,
+          "role": "markup",
+          "anchor": "eabe18261d0b",
+          "first": "HTML_ROW_BUTTON_UPLOAD = html.Div("
+        },
+        {
+          "file": "code/pylayout.py",
+          "start": 450,
+          "end": 482,
+          "role": "markup",
+          "anchor": "383517497dd2",
+          "first": "HTML_CARDS = dbc.Tabs("
+        },
+        {
+          "file": "code/app.py",
+          "start": 90,
+          "end": 131,
+          "role": "logic",
+          "symbol": "callback_upload",
+          "anchor": "ef107c7c0f30",
+          "first": "def callback_upload(content, filename, filedate, _):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 79,
+          "end": 89,
+          "role": "logic",
+          "anchor": "57de8b2e2944",
+          "first": "@app.callback("
+        },
+        {
+          "file": "code/pyfunc.py",
+          "start": 15,
+          "end": 72,
+          "role": "logic",
+          "symbol": "parse_upload_data",
+          "anchor": "44bd3c1ad5e1",
+          "first": "def parse_upload_data(content: str, filename: str):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 373,
+          "end": 377,
+          "role": "logic",
+          "symbol": "callback_download_table",
+          "anchor": "c6e8b6d47b5e",
+          "first": "def callback_download_table(_, table_data, table_columns):"
+        },
+        {
+          "file": "code/example_data.csv",
+          "start": 1,
+          "end": 33,
+          "role": "data",
+          "anchor": "23ce4c5a618a",
+          "first": "﻿DATE,R24"
+        }
+      ]
+    },
+    {
+      "id": "table-view",
+      "level": "view",
+      "parent": null,
+      "title": "Table / data",
+      "summary": "Shows the series as an editable, filterable, sortable table beside a bar, line and bubble chart that redraws from the visible rows.",
+      "views": [
+        "table view",
+        "bar chart",
+        "line chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "inline edit",
+        "filter",
+        "sort",
+        "exclude and refit",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/pylayout.py",
+          "start": 109,
+          "end": 153,
+          "role": "markup",
+          "anchor": "334bf8c73920",
+          "first": "TAB_DATA = dbc.Row("
+        },
+        {
+          "file": "code/pylayoutfunc.py",
+          "start": 24,
+          "end": 31,
+          "role": "logic",
+          "symbol": "create_table_layout",
+          "anchor": "118afc921753",
+          "first": "def create_table_layout("
+        },
+        {
+          "file": "code/app.py",
+          "start": 139,
+          "end": 146,
+          "role": "logic",
+          "symbol": "callback_table_visualize",
+          "anchor": "e59894362147",
+          "first": "def callback_table_visualize(table_data, table_columns):"
+        },
+        {
+          "file": "code/pyfunc.py",
+          "start": 75,
+          "end": 80,
+          "role": "logic",
+          "symbol": "transform_to_dataframe",
+          "anchor": "2e3c7c85ee38",
+          "first": "def transform_to_dataframe("
+        },
+        {
+          "file": "code/pyfigure.py",
+          "start": 79,
+          "end": 157,
+          "role": "logic",
+          "symbol": "generate_data_viz",
+          "anchor": "8cad683c1cee",
+          "first": "def generate_data_viz(dataframe):"
+        }
+      ]
+    },
+    {
+      "id": "stat-view",
+      "level": "view",
+      "parent": null,
+      "title": "Statistics & outlier",
+      "summary": "Plots the series with its mean, standard deviation and outlier bounds next to a box plot, sets the skew and kurtosis coefficients against each distribution's criteria, and exports a statistics report.",
+      "views": [
+        "line chart",
+        "strip plot",
+        "bar chart",
+        "summary stats",
+        "small multiples"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/pylayout.py",
+          "start": 155,
+          "end": 217,
+          "role": "markup",
+          "anchor": "c9e70ccd5e7e",
+          "first": "TAB_STAT = dbc.Row("
+        },
+        {
+          "file": "code/app.py",
+          "start": 158,
+          "end": 172,
+          "role": "logic",
+          "symbol": "callback_calc_statout",
+          "anchor": "978eb65e3941",
+          "first": "def callback_calc_statout(_, table_data, table_columns):"
+        },
+        {
+          "file": "code/pyfigure.py",
+          "start": 160,
+          "end": 287,
+          "role": "logic",
+          "symbol": "generate_statistic_outlier",
+          "anchor": "9f4f4ac9bd70",
+          "first": "def generate_statistic_outlier(dataframe: pd.DataFrame) -> go.Figure:"
+        },
+        {
+          "file": "code/pyfigure.py",
+          "start": 290,
+          "end": 569,
+          "role": "logic",
+          "symbol": "generate_distribution_check",
+          "anchor": "211017fba8f2",
+          "first": "def generate_distribution_check(dataframe: pd.DataFrame) -> go.Figure:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 181,
+          "end": 185,
+          "role": "logic",
+          "symbol": "callback_download_stat",
+          "anchor": "a757aff55014",
+          "first": "def callback_download_stat(_, table_data, table_columns):"
+        },
+        {
+          "file": "code/pyfunc.py",
+          "start": 141,
+          "end": 188,
+          "role": "logic",
+          "symbol": "generate_report_statout",
+          "anchor": "2b3841e5cdf3",
+          "first": "def generate_report_statout(dataframe: pd.DataFrame) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "freq-view",
+      "level": "view",
+      "parent": null,
+      "title": "Frequency analysis",
+      "summary": "Takes the return periods and a parameter source for each distribution, draws the magnitude at each return period for four distributions, and exports them as a CSV.",
+      "views": [
+        "form",
+        "line chart",
+        "bar chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/pylayout.py",
+          "start": 219,
+          "end": 328,
+          "role": "markup",
+          "anchor": "d9b8394a4c8f",
+          "first": "TAB_FREQ = dbc.Row("
+        },
+        {
+          "file": "code/app.py",
+          "start": 201,
+          "end": 209,
+          "role": "logic",
+          "symbol": "callback_calc_freq",
+          "anchor": "ddbe7c40ce3e",
+          "first": "def callback_calc_freq("
+        },
+        {
+          "file": "code/pyfunc.py",
+          "start": 191,
+          "end": 203,
+          "role": "logic",
+          "symbol": "transform_return_period",
+          "anchor": "4b0dfdddab97",
+          "first": "def transform_return_period(return_period):"
+        },
+        {
+          "file": "code/pyfigure.py",
+          "start": 572,
+          "end": 578,
+          "role": "logic",
+          "symbol": "generate_frequency_analysis",
+          "anchor": "e9e855c45946",
+          "first": "def generate_frequency_analysis("
+        },
+        {
+          "file": "code/app.py",
+          "start": 233,
+          "end": 241,
+          "role": "logic",
+          "symbol": "callback_down_freq",
+          "anchor": "71fca9585e50",
+          "first": "def callback_down_freq("
+        },
+        {
+          "file": "code/pyfunc.py",
+          "start": 206,
+          "end": 212,
+          "role": "logic",
+          "symbol": "generate_dataframe_freq",
+          "anchor": "5bf7746db6b3",
+          "first": "def generate_dataframe_freq("
+        }
+      ]
+    },
+    {
+      "id": "fit-options",
+      "level": "component",
+      "parent": "fit-view",
+      "title": "Goodness-of-fit options",
+      "summary": "Sets the significance level and the critical-value source for each test, then runs or downloads the tests.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pylayout.py",
+          "start": 332,
+          "end": 404,
+          "role": "markup",
+          "anchor": "7df0040aed20",
+          "first": "dbc.Col("
+        },
+        {
+          "file": "code/app.py",
+          "start": 332,
+          "end": 342,
+          "role": "logic",
+          "symbol": "callback_download_fit",
+          "anchor": "e61237edcfb4",
+          "first": "def callback_download_fit("
+        },
+        {
+          "file": "code/pyfunc.py",
+          "start": 251,
+          "end": 259,
+          "role": "logic",
+          "symbol": "generate_report_fit",
+          "anchor": "90e9ced4a4c2",
+          "first": "def generate_report_fit("
+        }
+      ]
+    },
+    {
+      "id": "fit-view",
+      "level": "view",
+      "parent": null,
+      "title": "Goodness of fit",
+      "summary": "For each distribution, shows the ranked values, the empirical and fitted CDFs for Kolmogorov-Smirnov and the class splits for Chi-Square, then sets each computed statistic against its critical value.",
+      "views": [
+        "bar chart",
+        "line chart",
+        "strip plot",
+        "small multiples"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "small multiples",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/pylayout.py",
+          "start": 405,
+          "end": 448,
+          "role": "markup",
+          "anchor": "98827e6d0daa",
+          "first": "dbc.Col("
+        },
+        {
+          "file": "code/app.py",
+          "start": 271,
+          "end": 281,
+          "role": "logic",
+          "symbol": "callback_calc_fit",
+          "anchor": "d456382a7e2f",
+          "first": "def callback_calc_fit("
+        },
+        {
+          "file": "code/pyfigure.py",
+          "start": 694,
+          "end": 702,
+          "role": "logic",
+          "symbol": "generate_goodness_fit_viz",
+          "anchor": "105ab3405a5f",
+          "first": "def generate_goodness_fit_viz("
+        },
+        {
+          "file": "code/pyfigure.py",
+          "start": 1069,
+          "end": 1077,
+          "role": "logic",
+          "symbol": "generate_goodness_fit_critical",
+          "anchor": "072eae5e9a3c",
+          "first": "def generate_goodness_fit_critical("
+        }
+      ]
+    }
+  ]
+}

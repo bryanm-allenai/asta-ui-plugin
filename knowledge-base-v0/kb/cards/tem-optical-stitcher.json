@@ -1,0 +1,386 @@
+{
+  "schema": "astaui.card/1",
+  "id": "tem-optical-stitcher",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T16:31:01Z"
+  },
+  "app": {
+    "title": "Optical Microscopy Stitcher",
+    "summary": "A person uploads a numbered series of overlapping microscope frames, either as several files or as a ZIP archive. The app orders them by the index at the end of each filename and lets the person preview the tiles. The person can adjust the settings for feature matching, contrast enhancement, blending and fallback alignment methods, then runs the stitch. The app aligns each adjacent pair, chains those shifts into absolute tile positions and blends the frames into one panorama. It then shows a diagnostics table for each pair, the panorama, a tile position map, and downloads for the panorama image and a CSV of tile positions.",
+    "task": {
+      "text": "Assemble a row of overlapping optical microscope frames into a single panorama and record where each frame sits in it.",
+      "verbs": [
+        "derive",
+        "locate"
+      ]
+    },
+    "data": {
+      "text": "An ordered series of overlapping microscope images taken along one row, plus a table of per-pair alignment diagnostics and tile offsets computed from them.",
+      "item": "one microscope frame in a numbered row of overlapping frames",
+      "shapes": [
+        "image collection",
+        "image",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "assembling overview images right after capture during TEM cross-section preparation",
+      "terms": [
+        "collect"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar settings and an upload control feed a single stitch run that reports its progress. After the run, the main column stacks a per-pair diagnostics table and warnings, a preview of the blended panorama, a text map of tile positions and download buttons, and a separate Help tab explains every setting.",
+      "views": [
+        "form",
+        "thumbnail grid",
+        "table view",
+        "image viewer"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "export"
+      ],
+      "patterns": []
+    },
+    "field": {
+      "text": "image stitching of optical microscopy frames for TEM specimen preparation in materials science",
+      "disciplines": [
+        "materials science"
+      ],
+      "terms": [
+        "image stitching",
+        "optical microscopy",
+        "tem specimen preparation"
+      ]
+    },
+    "workflow": {
+      "name": "assemble an ordered series of overlapping images into one mosaic",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload several image files or one ZIP archive. Tiles are sorted by the _N index in each filename, and the stitching order is shown.",
+          "parts": [
+            "upload"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A collapsible preview shows the loaded tiles in columns, each captioned with its index and name.",
+          "parts": [
+            "tile-preview"
+          ]
+        },
+        {
+          "step": "set the parameters of the computation",
+          "here": "Sliders and checkboxes set the SIFT feature count, Lowe ratio, RANSAC threshold, minimum inliers, CLAHE, pyramid levels, feather width, focus weighting, gain compensation, the fallback methods and the output format.",
+          "parts": [
+            "method-settings"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Stitch panorama aligns each adjacent pair (SIFT and RANSAC first, then phase correlation, then an NCC scan), chains the shifts into absolute positions and blends the tiles with multi-band blending while a progress bar runs.",
+          "parts": [
+            "stitch-results"
+          ]
+        },
+        {
+          "step": "check the quality of each computed step",
+          "here": "A diagnostics table lists, for each pair, the method used, whether it succeeded, dx, dy, rotation, scale, matches and inliers. Warnings flag pairs that failed or fell back.",
+          "parts": [
+            "diagnostics"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The panorama preview and the tile position map are shown, with downloads for the panorama (PNG, LZW TIFF or JPEG) and a tile_positions CSV.",
+          "parts": [
+            "panorama-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each pair falls back from feature matching to phase correlation to a brute-force NCC scan, and the diagnostics record which method aligned it.",
+        "Microscope TIFFs do not carry scale metadata, so the guide says to burn the scale bar into a corner of the first or last frame that no other tile overlaps.",
+        "CLAHE contrast enhancement is applied before matching so that dark microscope frames yield enough keypoints.",
+        "Gain compensation evens out brightness between shots before the multi-band blend.",
+        "Only a single row of tiles is supported, not a 2D grid."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Method settings sidebar",
+      "summary": "Holds the upload control and every stitching, preprocessing, blending, fallback and output setting.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 309,
+          "end": 368,
+          "role": "logic",
+          "anchor": "320d3e3521c3",
+          "first": "# === Sidebar: settings ==="
+        }
+      ]
+    },
+    {
+      "id": "upload",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Upload",
+      "summary": "Takes several image files or a ZIP archive, then loads the tiles and sorts them by the index in each filename.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 312,
+          "end": 330,
+          "role": "logic",
+          "anchor": "b5bd7c52bf16",
+          "first": "with st.sidebar.expander(\"Upload\", expanded=True):"
+        },
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 370,
+          "end": 428,
+          "role": "logic",
+          "anchor": "1bf71f157e26",
+          "first": "# === Main content ==="
+        },
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 396,
+          "end": 401,
+          "role": "logic",
+          "symbol": "save_uploaded_to_temp",
+          "anchor": "82a39a1ddf75",
+          "first": "def save_uploaded_to_temp(files, source_name: str) -> Path:"
+        },
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 403,
+          "end": 407,
+          "role": "logic",
+          "symbol": "extract_zip_to_temp",
+          "anchor": "43eef8190f61",
+          "first": "def extract_zip_to_temp(zip_file) -> Path:"
+        },
+        {
+          "file": "code/apps/01_optical_stitcher/src/io_utils.py",
+          "start": 111,
+          "end": 140,
+          "role": "logic",
+          "symbol": "load_tiles",
+          "anchor": "8f1d13480328",
+          "first": "def load_tiles(folder: Path) -> List[TileInfo]:"
+        }
+      ]
+    },
+    {
+      "id": "method-settings",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Method settings",
+      "summary": "Sliders and checkboxes for feature detection, CLAHE, blending, fallback methods and output format.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 332,
+          "end": 368,
+          "role": "logic",
+          "anchor": "c017b74f2c16",
+          "first": "with st.sidebar.expander(\"Feature Detection\", expanded=True):"
+        }
+      ]
+    },
+    {
+      "id": "stitch-results",
+      "level": "view",
+      "parent": null,
+      "title": "Stitcher results",
+      "summary": "Runs the stitch with a progress bar and stacks the diagnostics, panorama and downloads in the main column.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 444,
+          "end": 480,
+          "role": "logic",
+          "anchor": "3a00a924243f",
+          "first": "# Run button"
+        },
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 451,
+          "end": 452,
+          "role": "logic",
+          "symbol": "update_progress",
+          "anchor": "e46919483d0a",
+          "first": "def update_progress(msg, p):"
+        },
+        {
+          "file": "code/apps/01_optical_stitcher/src/pipeline.py",
+          "start": 49,
+          "end": 65,
+          "role": "logic",
+          "symbol": "stitch_row",
+          "anchor": "ba81ef340217",
+          "first": "def stitch_row("
+        },
+        {
+          "file": "code/apps/01_optical_stitcher/src/stitching.py",
+          "start": 242,
+          "end": 252,
+          "role": "logic",
+          "symbol": "stitch_pair",
+          "anchor": "10ca6ceb808e",
+          "first": "def stitch_pair("
+        },
+        {
+          "file": "code/apps/01_optical_stitcher/src/blending.py",
+          "start": 146,
+          "end": 156,
+          "role": "logic",
+          "symbol": "blend_tiles",
+          "anchor": "f75d7f79bacd",
+          "first": "def blend_tiles("
+        }
+      ]
+    },
+    {
+      "id": "tile-preview",
+      "level": "component",
+      "parent": "stitch-results",
+      "title": "Preview uploaded tiles",
+      "summary": "Shows downscaled loaded tiles in columns, each captioned with its index and name.",
+      "views": [
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 430,
+          "end": 442,
+          "role": "logic",
+          "anchor": "1a0d2915f86e",
+          "first": "# Preview uploaded tiles"
+        }
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "level": "component",
+      "parent": "stitch-results",
+      "title": "Stitching diagnostics",
+      "summary": "Lists each adjacent pair's alignment method, success, shift, rotation, scale, matches and inliers, with warnings for failed or fallback pairs.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 482,
+          "end": 503,
+          "role": "logic",
+          "anchor": "103888dad591",
+          "first": "# Pairwise diagnostics"
+        }
+      ]
+    },
+    {
+      "id": "panorama-export",
+      "level": "component",
+      "parent": "stitch-results",
+      "title": "Result, tile positions and download",
+      "summary": "Shows the blended panorama and each tile's canvas offset, and downloads the panorama image and a CSV of tile positions.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 505,
+          "end": 568,
+          "role": "logic",
+          "anchor": "489dc332b4b5",
+          "first": "# Panorama preview"
+        }
+      ]
+    },
+    {
+      "id": "help",
+      "level": "view",
+      "parent": null,
+      "title": "Help & Usage Guide",
+      "summary": "Explains image capture practice, every setting, the fallback methods, troubleshooting and limitations.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 35,
+          "end": 298,
+          "role": "logic",
+          "symbol": "render_help_tab",
+          "anchor": "4eea15fa622b",
+          "first": "def render_help_tab():"
+        },
+        {
+          "file": "code/apps/01_optical_stitcher/app.py",
+          "start": 571,
+          "end": 578,
+          "role": "logic",
+          "anchor": "165b246d59b7",
+          "first": "# === Render the two tabs ==="
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,576 @@
+{
+ "interface": {
+  "title": "SLEAP analysis pipeline (Streamlit UI for Barnes maze and Novel Object Recognition)",
+  "field": "Behavioural neuroscience: rodent pose tracking and analysis of behavioural assays",
+  "stage_of_work": "Post-tracking analysis: calibrate the arena, annotate trials, clean and validate the trajectories, compute behavioural metrics",
+  "what_it_is_for": "Turning SLEAP pose predictions from a cohort's Barnes-maze and NOR videos into cleaned trajectories, data-quality flags and per-video behavioural metrics, after clicking arena reference points and marking the novel-object side."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "The bundled 'cohort_demo' cohort (the only one in the Cohort dropdown). It has BARNES_DAY2_COHORT_DEMO/101_Trial_1.mp4, NOR_cohort_demo/101_familiar.mp4 and 101_novel.mp4, and 3 .predictions.slp files. The frames are synthetic: a grey circular arena, a red animal dot, and green and blue object dots. Calibration and annotations were saved to configs/*.json and to NOR_cohort_demo/101_novel.scene.json on the server. Every pipeline run failed at filter_and_interpolate with \"AttributeError: 'numpy.void' object has no attribute 'visible'\" (it looks like the installed sleap-io version doesn't match the code), so no results were produced."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Turn tracked-pose files for a cohort of behaviour videos into trustworthy per-animal behavioural measurements",
+  "specific": "Calibrate the Barnes and NOR arenas for cohort_demo, annotate the novel side, then run cleaning, validation and Barnes/NOR metrics",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Set up the dataset and analysis settings",
+    "specific": "Pick the cohort in the sidebar and set the pipeline parameters",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Choose which dataset to work on",
+      "specific": "Pick 'cohort_demo' from the sidebar Cohort dropdown",
+      "screens": [
+       "screens/004.webp",
+       "screens/003.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Cohort dropdown",
+        "screens": [
+         "screens/004.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose cohort_demo",
+        "screens": [
+         "screens/005.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Set the analysis parameters: recording frame rate and trajectory-cleaning thresholds",
+      "specific": "Tick 'Set the frame rate by hand' to enable the FPS field (30.00) when ffprobe cannot read the frame rate, and step 'Max gap (frames) for interpolation' from 30 to 35; the Run pipeline command then carries --fps 30.0 and --max-gap 35",
+      "screens": [
+       "screens/005.webp",
+       "screens/047.webp",
+       "check/screens/027.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "ticked Set the frame rate by hand (when the frame rate can't be read from the video)",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed + on Max gap (frames) for interpolation until it read 35",
+        "screens": [
+         "screens/047.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Calibrate arena geometry on a reference video frame",
+    "specific": "Barnes geometry tab and NOR scenes Step 1",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Mark the arena centre and the goal location on a reference frame and save them for the whole cohort",
+      "specific": "Click the Barnes maze centre and the target hole on 101_Trial_1.mp4, check the derived angle and distance, then Save geometry",
+      "screens": [
+       "screens/011.webp",
+       "screens/012.webp",
+       "screens/013.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose 101_Trial_1.mp4 in Calibration video (the only option)",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Pick centre",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the arena centre on the frame, giving (160,120)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Pick target hole",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the right-hand hole, giving (240,120): 90.0°, 80 px",
+        "screens": [
+         "screens/011.webp",
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Save geometry",
+        "screens": [
+         "screens/013.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Re-pick or clear the reference points",
+      "specific": "Re-pick the target hole at the top of the table (angle becomes 0.0°), then Reset all",
+      "screens": [
+       "screens/050.webp",
+       "screens/051.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Pick centre and clicked the centre again",
+        "screens": [
+         "screens/049.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Pick target hole and clicked the top hole, giving (160,40)",
+        "screens": [
+         "screens/050.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Reset all",
+        "screens": [
+         "screens/051.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Mark the two object positions once for the cohort",
+      "specific": "NOR Step 1: Pick left object and Pick right object on 101_familiar.mp4, then Save cohort calibration",
+      "screens": [
+       "screens/022.webp",
+       "screens/024.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Pick left object",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the green object, giving (90,120)",
+        "screens": [
+         "screens/019.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Pick right object",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the blue object, giving (230,120)",
+        "screens": [
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Save cohort calibration",
+        "screens": [
+         "screens/024.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Reopen a saved calibration to redo it",
+      "specific": "Expand 'Calibrate cohort (calibration found — expand to re-do)' and press Reset",
+      "screens": [
+       "screens/052.webp",
+       "screens/055.webp",
+       "screens/056.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded the re-do expander (saved points preloaded)",
+        "screens": [
+         "screens/055.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Reset",
+        "screens": [
+         "screens/056.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Annotate the experimental condition of each test trial",
+    "specific": "NOR Step 2: test-phase video annotation (locked until the NOR calibration is saved)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Record which side held the novel item for each test video",
+      "specific": "Pick 101_novel.mp4, choose left/right for the novel object, Save side; the status table and the sidebar count (1 / 1) update after the next rerun",
+      "screens": [
+       "screens/028.webp",
+       "screens/059.webp",
+       "screens/052.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose right",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Save side",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose left and pressed Save side again",
+        "screens": [
+         "screens/058.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "triggered a rerun (+ on Frame to display) so the status table shows left / yes",
+        "screens": [
+         "screens/059.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Run the processing pipeline and follow its log",
+    "specific": "Run pipeline tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Run the whole processing chain and watch the step-by-step log",
+      "specific": "Check the copyable run_pipeline.py command preview (it reflects the sidebar parameters and saved geometry paths), click Run full pipeline, and expand the status panel to read the step-numbered log (Step 0/3 inference, Step 1/3 filter_and_interpolate, …)",
+      "screens": [
+       "screens/039.webp",
+       "screens/040.webp",
+       "check/screens/027.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "copied the command preview with its Copy button (clipboard held the full command with --fps 30.0, --max-gap 35 and both geometry config paths)",
+        "screens": [
+         "check/screens/027.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run full pipeline",
+        "screens": [
+         "screens/038.webp",
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "expanded the status panel and read the step log",
+        "screens": [
+         "screens/040.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Run without the model step, using only the existing predictions",
+      "specific": "Untick 'Run inference on videos missing predictions' (this hides Force re-inference and drops --videos-root from the command), then re-run; the log starts at Step 1/3",
+      "screens": [
+       "screens/043.webp",
+       "screens/044.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "unticked Run inference on videos missing predictions",
+        "screens": [
+         "screens/043.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run full pipeline",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Run a single processing stage on its own",
+      "specific": "Press Filter + interpolate only or Validate trajectories only; each streams its own log into a 'failed — expand for the log' panel",
+      "screens": [
+       "screens/033.webp",
+       "screens/035.webp",
+       "screens/037.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Filter + interpolate only",
+        "screens": [
+         "screens/032.webp",
+         "screens/035.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Validate trajectories only",
+        "screens": [
+         "screens/036.webp",
+         "screens/037.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Review results",
+    "specific": "Results tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Filter results by data version (original or hand-corrected tracking)",
+      "specific": "Show: All / Original only / Corrected only. In this run every section showed only its empty-state message, because the pipeline produced no output",
+      "screens": [
+       "screens/045.webp",
+       "screens/046.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose Corrected only",
+        "screens": [
+         "screens/046.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Click-to-place landmark picker on a video frame",
+   "general": "Show a chosen frame from a reference video. Arm a named landmark with a button, click it on the image, see it drawn as a labelled marker, and save the points as a reusable config for the whole dataset. Points can be re-picked or cleared. Two variants: one derives geometry between the points (angle and distance); the other collapses into a 'found — expand to re-do' panel once saved and unlocks the next annotation step.",
+   "specific": "Barnes geometry tab: Pick centre and Pick target hole, showing the derived target angle (clockwise from vertical) and centre-to-target distance in px; Save geometry writes configs/cohort_<id>_barnes_geometry.json; Reset all clears. NOR scenes Step 1: Pick left object and Pick right object on a familiar video; Save cohort calibration writes configs/cohort_<id>_nor_geometry.json, collapses the picker into 'Calibrate cohort (calibration found — expand to re-do)' with the saved points preloaded, and unlocks Step 2. The overlay can lag one rerun, and the image shifts when the pick-mode info box appears.",
+   "steps": [
+    "choose a reference video and step to a frame",
+    "press a Pick button, then click that landmark on the image; repeat for the second landmark",
+    "check the labelled markers (Barnes: the derived angle and distance)",
+    "save the calibration for the cohort",
+    "later, re-pick or Reset (NOR: from the collapsed 're-do' expander)"
+   ],
+   "serves_tasks": [
+    "Mark the arena centre and the goal location on a reference frame and save them for the whole cohort",
+    "Re-pick or clear the reference points",
+    "Mark the two object positions once for the cohort",
+    "Reopen a saved calibration to redo it"
+   ],
+   "screens": [
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/011.webp",
+    "screens/012.webp",
+    "screens/013.webp",
+    "screens/050.webp",
+    "screens/051.webp",
+    "screens/016.webp",
+    "screens/019.webp",
+    "screens/023.webp",
+    "screens/024.webp",
+    "screens/052.webp",
+    "screens/055.webp",
+    "screens/056.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Per-trial condition labelling with a status table",
+   "general": "For each trial in a list, view a frame with the calibrated positions overlaid, choose the condition from a two-way radio, and save. A status table shows which trials are labelled, and a sidebar counter tracks progress (n / N).",
+   "specific": "NOR Step 2: pick a *_novel.mp4 from Test-phase video, view the frame with LEFT/RIGHT rings, choose which side holds the novel object ('Familiar will be the other side'), Save side (writes <video>.scene.json). The video / novel_side / annotated table (after the next rerun) and 'NOR test-phase sides annotated: 1 / 1' update. Locked until the NOR calibration is saved.",
+   "steps": [
+    "select a test-phase video",
+    "step to a frame to inspect",
+    "choose left or right for the novel object",
+    "Save side",
+    "check the status table and the sidebar counter"
+   ],
+   "serves_tasks": [
+    "Record which side held the novel item for each test video"
+   ],
+   "screens": [
+    "screens/025.webp",
+    "screens/028.webp",
+    "screens/029.webp",
+    "screens/058.webp",
+    "screens/059.webp"
+   ],
+   "id": "f3",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Pipeline runner with live command preview and step log",
+   "general": "Sidebar parameters and option checkboxes build a visible, copyable command line. One button runs the full multi-step chain and streams a step-numbered log into a status box that turns into an expandable 'failed — expand for the log' panel. Separate buttons run single stages.",
+   "specific": "Run pipeline tab: the 'Run inference on videos missing predictions' checkbox (its dependent 'Force re-inference' option shows only while it is ticked) and the sidebar fps / max-gap / collapse / max-speed / missing-gap values feed the run_pipeline.py command. Run full pipeline runs Step 0/3 inference, 1/3 filter_and_interpolate, and so on. Filter + interpolate only and Validate trajectories only run single stages.",
+   "steps": [
+    "set the parameters in the sidebar",
+    "tick or untick the inference options",
+    "check or copy the command preview",
+    "press Run full pipeline or a single-step button",
+    "expand the status panel to read the step log or traceback"
+   ],
+   "serves_tasks": [
+    "Set the analysis parameters: recording frame rate and trajectory-cleaning thresholds",
+    "Run the whole processing chain and watch the step-by-step log",
+    "Run without the model step, using only the existing predictions",
+    "Run a single processing stage on its own"
+   ],
+   "screens": [
+    "screens/031.webp",
+    "screens/038.webp",
+    "screens/039.webp",
+    "screens/040.webp",
+    "screens/043.webp",
+    "screens/044.webp",
+    "screens/047.webp",
+    "screens/037.webp",
+    "check/screens/027.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Results tab filter summary and validation summary tables: the pipeline never produced output, so the tab only shows 'No filter summary yet. Run the pipeline first.'",
+  "Data-quality banner for videos with long nose/tail tracking blackouts: needs validation output",
+  "Barnes metrics table and bar charts (latency to target, time at target, target-quadrant occupancy) and NOR metrics (discrimination index, exploration time): 'No per-video metrics yet'",
+  "Trajectory viewer (cleaned nose trajectory coloured by frame number): 'No trajectory CSVs match version filter'",
+  "'Download all metrics as CSV' and the per-table CSV download buttons on the Results tab",
+  "A second cohort, or a second Barnes or NOR test video: the demo has only one of each"
+ ],
+ "not_done": [
+  "Run the pipeline to completion. Every run (full pipeline with and without inference, and Filter + interpolate only) crashed in scripts/filter_and_interpolate.py line 71 with \"AttributeError: 'numpy.void' object has no attribute 'visible'\". It looks like the installed sleap-io version doesn't match the code. Inference also logged 'Model folder missing: /work/app/model/pretrained_unified_v2' and continued.",
+  "Validate trajectories only failed too. Its message depends on what ran before: 'results root does not exist' in the first run, 'No trajectory CSVs found under /work/app/results/cohort_demo' in the replay, after earlier runs had created the folder.",
+  "Inspect the data-quality banner, read Barnes and NOR metrics, export metric CSVs, and plot the cleaned trajectory: all depend on pipeline output that was never produced.",
+  "Compare original and hand-corrected results: the version filter (t13) works, but there was no output and no _corrected predictions file to compare.",
+  "Download the NOR annotation status table as CSV: pressing the table toolbar's 'Download as CSV' button twice recorded no download.",
+  "The Barnes geometry picker does not load the saved geometry back after a page reload (it shows 'not set' while the sidebar says 'Barnes geometry: set'). I reset it without re-saving, so the file on disk still holds the first save (centre 160,120; target 240,120).",
+  "The NOR novel side was left saved as 'left' after testing the second option; the first save was 'right'."
+ ],
+ "applied": [
+  "Removed the repeated 'SLEAP pipeline:' prefix from the title",
+  "Merged t3 (max-gap step) into t2 as one 'set analysis parameters' task",
+  "Folded t12 (copy command) into t9 as an action",
+  "Re-cited the --max-gap 35 command and the clipboard copy with check/screens/027.webp, which shows the full command",
+  "Re-cited t8 with screens/059.webp in place of screens/029.webp, which shows only the enlarged frame",
+  "Dropped incidental actions: help-icon hovers, the gated-message view, the Frame + step in t4, and the stale NOR warning read",
+  "Relabelled the t8 Frame + action as the rerun that refreshes the status table",
+  "Rewrote t9's specific label to describe the run and log, not the crash",
+  "Removed the order-dependent 'results root does not exist' quote from t11 and moved both validation messages into not_done",
+  "Noted in t13 that its sections were empty, and added the original-vs-corrected comparison to not_done",
+  "Merged f1 and f2 into one landmark-picker feature with Barnes and NOR variants",
+  "Updated f4's serves_tasks to match the merged tasks"
+ ],
+ "open_fixes": [
+  "Fix the environment and re-run: pin a sleap-io release whose points have `.visible` (plan.json installs it unpinned) and confirm the demo .slp files load. Every run crashed at filter_and_interpolate.py:71, so no outputs exist.",
+  "After a successful run, add review tasks: read the cleaning and validation summaries, act on the data-quality warning, read the Barnes metrics and charts and the NOR discrimination index, novel-object time and familiar-phase side bias, plot the nose trajectory, and download metrics as CSV. None of these screens were reached.",
+  "Make t13 a real original-vs-corrected comparison by seeding a `<stem>_corrected.predictions.slp`. The demo has no corrected file.",
+  "Add features for the results dashboard, the data-quality warning and the trajectory viewer. They need pipeline output to observe.",
+  "Explore excluding Barnes videos the cohort geometry doesn't fit (the exclusions file). This control was never tried."
+ ],
+ "screens_at": "pilot/public/runs/sleap-barnes-nor/20261101-070727/",
+ "screens_filed": {
+  "screens/004.webp": "screens/004.webp",
+  "screens/011.webp": "screens/011.webp",
+  "screens/028.webp": "screens/028.webp",
+  "screens/039.webp": "screens/039.webp",
+  "screens/045.webp": "screens/045.webp"
+ }
+}

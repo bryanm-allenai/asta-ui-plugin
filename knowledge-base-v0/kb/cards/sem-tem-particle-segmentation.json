@@ -1,0 +1,548 @@
+{
+  "schema": "astaui.card/1",
+  "id": "sem-tem-particle-segmentation",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T04:15:19Z"
+  },
+  "app": {
+    "title": "Segmentation Studio: SEM/TEM particle segmentation and size distribution",
+    "summary": "A person sets the model, compute device, pixel size, preprocessing and a size filter in a sidebar, then loads a batch of microscopy images by uploading them or pointing to a folder. They can enhance contrast or downsample the images and check each one against its original side by side, then load a segmentation model and run it on every image. Each detected particle is cut out, measured in physical units and filtered by size. The person looks over each image's mask overlay, particle crops and measurement table, studies size distributions for one image or all of them, and exports per-image and combined measurement tables or a full package of masks, crops, figures and metadata.",
+    "task": {
+      "text": "Segment particles in a batch of microscopy images with a pretrained model, measure each particle's size and shape in physical units, and get particle size distributions and measurement tables out.",
+      "verbs": [
+        "derive",
+        "summarize",
+        "identify",
+        "review"
+      ]
+    },
+    "data": {
+      "text": "A batch of grayscale microscopy images, each turned into a set of per-particle masks and a table of size and shape measurements",
+      "item": "a particle segmented from one microscopy image, with its mask, crop and measurements",
+      "shapes": [
+        "image collection",
+        "image",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "measuring particles from microscope images after imaging, before reporting size distributions",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar settings drive a tabbed pipeline (load, preprocess, segment, results, distributions, export), and each tab stays empty until the step before it has run. In the results and distributions tabs, picking an image or the pooled set redraws the mask overlay, crops, tables, histograms and statistics for that selection.",
+      "views": [
+        "sidebar list",
+        "form",
+        "thumbnail grid",
+        "side-by-side panes",
+        "image viewer",
+        "table view",
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "filter",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline",
+        "overview and detail",
+        "side-by-side comparison",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "deep-learning particle segmentation and particle size distribution analysis in electron microscopy",
+      "disciplines": [
+        "materials science"
+      ],
+      "terms": [
+        "electron microscopy",
+        "particle size distribution",
+        "image segmentation"
+      ]
+    },
+    "workflow": {
+      "name": "segment objects in a batch of images, measure them, and summarize their size distribution",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload TIF/PNG/JPG/BMP files or browse to a folder. 16-bit and float images are scaled to 8-bit, and a thumbnail grid previews the batch.",
+          "parts": [
+            "load-tab"
+          ]
+        },
+        {
+          "step": "prepare the items before computing",
+          "here": "CLAHE (clip limit, tile size) and rebinning set in the sidebar are applied to every image, and an original-vs-processed pair can be checked per image",
+          "parts": [
+            "settings-sidebar",
+            "preprocess-tab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Load a SAM/SAM2/MobileSAM/FastSAM/YOLOv8 checkpoint on CPU, CUDA or MPS and run it. Each mask is cut out and measured for area, axes, equivalent diameter and Feret diameters in nm using the pixel size.",
+          "parts": [
+            "segmentation-tab"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Particles outside a min/max value of the chosen size metric are dropped from both the masks and the measurements",
+          "parts": [
+            "settings-sidebar",
+            "segmentation-tab"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Pick an image to see its summary statistics, mask overlay with particle IDs, a grid of particle crops and the full measurement table",
+          "parts": [
+            "results-tab"
+          ]
+        },
+        {
+          "step": "summarize the collection",
+          "here": "Size distribution figures and statistics for one image or all images pooled, with x-axis limits, plus a single-property histogram with an adjustable bin count",
+          "parts": [
+            "distributions-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download per-image and combined measurement CSVs, or generate a ZIP or save a folder with raw/processed images, masks, per-particle masks, crops, mask metadata and 300 dpi figures",
+          "parts": [
+            "export-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "pixel measurements are converted to physical units (nm, nm²) from a pixel size entered by the person",
+        "the person can swap between several pretrained foundation and segmentation model families and compute devices, and local checkpoints are found automatically or downloaded",
+        "minimum Feret diameter is computed from a minimum-area rectangle, alongside max Feret, equivalent diameter and ellipse axes",
+        "every preprocessing stage (raw, rebinned, CLAHE, processed) is saved with the results, so the analysis trail can be retraced",
+        "figures are rendered at 300 dpi so they can go straight into a publication"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "settings-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Workspace settings sidebar",
+      "summary": "Sets the model source and checkpoint, compute device, pixel size, preprocessing options and size-filter thresholds that the tabs use.",
+      "views": [
+        "sidebar list",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 640,
+          "end": 820,
+          "role": "logic",
+          "symbol": "render_sidebar",
+          "anchor": "4163aff726b0",
+          "first": "def render_sidebar():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 106,
+          "end": 112,
+          "role": "style",
+          "anchor": "d25f2da2e8d5",
+          "first": ".sidebar-shell {"
+        },
+        {
+          "file": "code/app.py",
+          "start": 214,
+          "end": 243,
+          "role": "logic",
+          "symbol": "select_folder_dialog",
+          "anchor": "d74b3861bc60",
+          "first": "def select_folder_dialog() -> Optional[str]:"
+        },
+        {
+          "file": "code/segmentation.py",
+          "start": 79,
+          "end": 90,
+          "role": "logic",
+          "symbol": "find_models_in_folder",
+          "anchor": "978b2ab12b72",
+          "first": "def find_models_in_folder(models_folder: str) -> Dict[str, str]:"
+        },
+        {
+          "file": "code/segmentation.py",
+          "start": 68,
+          "end": 76,
+          "role": "logic",
+          "symbol": "get_available_devices",
+          "anchor": "3338fee24065",
+          "first": "def get_available_devices() -> List[str]:"
+        },
+        {
+          "file": "code/segmentation.py",
+          "start": 16,
+          "end": 43,
+          "role": "data",
+          "anchor": "2863f4f1f379",
+          "first": "MODEL_TYPES = {"
+        }
+      ]
+    },
+    {
+      "id": "load-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Load images",
+      "summary": "Brings in a batch of microscopy images by upload or from a folder, scales them to 8-bit and previews them as thumbnails.",
+      "views": [
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 856,
+          "end": 979,
+          "role": "logic",
+          "anchor": "8305ee503fd9",
+          "first": "with tab_load:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 496,
+          "end": 505,
+          "role": "markup",
+          "symbol": "render_empty_state",
+          "anchor": "022c80ab652a",
+          "first": "def render_empty_state(title: str, body: str) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 167,
+          "end": 182,
+          "role": "style",
+          "anchor": "bf513271ed9f",
+          "first": ".empty-state {"
+        },
+        {
+          "file": "code/utils.py",
+          "start": 41,
+          "end": 64,
+          "role": "logic",
+          "symbol": "load_image",
+          "anchor": "1fca808e6701",
+          "first": "def load_image(file_path: str) -> Optional[np.ndarray]:"
+        },
+        {
+          "file": "code/utils.py",
+          "start": 67,
+          "end": 90,
+          "role": "logic",
+          "symbol": "load_image_from_bytes",
+          "anchor": "30336fa9905b",
+          "first": "def load_image_from_bytes(file_bytes: bytes, filename: str) -> Optional[np.ndarray]:"
+        },
+        {
+          "file": "code/utils.py",
+          "start": 29,
+          "end": 38,
+          "role": "logic",
+          "symbol": "get_image_files",
+          "anchor": "bb5230213199",
+          "first": "def get_image_files(folder_path: str) -> List[str]:"
+        }
+      ]
+    },
+    {
+      "id": "preprocess-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Preprocess and compare",
+      "summary": "Applies CLAHE and rebinning to every image and shows the chosen image's original and processed versions side by side with their sizes.",
+      "views": [
+        "side-by-side panes",
+        "image viewer"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 984,
+          "end": 1046,
+          "role": "logic",
+          "anchor": "b43a6f477f9b",
+          "first": "with tab_preprocess:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 269,
+          "end": 296,
+          "role": "logic",
+          "symbol": "preprocess_images",
+          "anchor": "cfec2defd2af",
+          "first": "def preprocess_images(images, use_clahe: bool = False, clahe_clip: float = 2.0,"
+        },
+        {
+          "file": "code/utils.py",
+          "start": 93,
+          "end": 104,
+          "role": "logic",
+          "symbol": "apply_clahe",
+          "anchor": "5df3adde061b",
+          "first": "def apply_clahe(image: np.ndarray, clip_limit: float = 2.0,"
+        },
+        {
+          "file": "code/utils.py",
+          "start": 107,
+          "end": 113,
+          "role": "logic",
+          "symbol": "rebinning",
+          "anchor": "c947acacef5a",
+          "first": "def rebinning(image: np.ndarray, factor: int) -> np.ndarray:"
+        }
+      ]
+    },
+    {
+      "id": "segmentation-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Run segmentation",
+      "summary": "Loads the chosen model, runs inference on every image with progress, extracts and measures each particle, applies the size filter and reports totals.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1051,
+          "end": 1170,
+          "role": "logic",
+          "anchor": "c27ac2b6cedd",
+          "first": "with tab_segment:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 299,
+          "end": 330,
+          "role": "logic",
+          "symbol": "process_segmentation_results",
+          "anchor": "26f05c9b352d",
+          "first": "def process_segmentation_results(results, images, px_size: float,"
+        },
+        {
+          "file": "code/segmentation.py",
+          "start": 93,
+          "end": 109,
+          "role": "logic",
+          "symbol": "load_model",
+          "anchor": "5692456e7723",
+          "first": "def load_model(model_name: str, model_path: str):"
+        },
+        {
+          "file": "code/segmentation.py",
+          "start": 112,
+          "end": 148,
+          "role": "logic",
+          "symbol": "run_inference",
+          "anchor": "d19c5e8455f5",
+          "first": "def run_inference(model, images: List[np.ndarray], model_name: str,"
+        },
+        {
+          "file": "code/segmentation.py",
+          "start": 162,
+          "end": 228,
+          "role": "logic",
+          "symbol": "extract_particles",
+          "anchor": "8affb23f6f36",
+          "first": "def extract_particles(result, image: np.ndarray) -> List[ParticleData]:"
+        },
+        {
+          "file": "code/analysis.py",
+          "start": 87,
+          "end": 115,
+          "role": "logic",
+          "symbol": "analyze_particles",
+          "anchor": "28a6c4404471",
+          "first": "def analyze_particles(particles, px_size: float,"
+        },
+        {
+          "file": "code/analysis.py",
+          "start": 43,
+          "end": 84,
+          "role": "logic",
+          "symbol": "measure_particle",
+          "anchor": "4a7e55f06a44",
+          "first": "def measure_particle(mask_binary: np.ndarray, px_size: float) -> Optional[Dict[str, float]]:"
+        }
+      ]
+    },
+    {
+      "id": "results-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Segmentation results per image",
+      "summary": "For a selected image, shows its summary statistics, a mask overlay with particle IDs, a grid of particle crops and the full measurement table.",
+      "views": [
+        "image viewer",
+        "thumbnail grid",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1175,
+          "end": 1240,
+          "role": "logic",
+          "anchor": "faddd8d324e0",
+          "first": "with tab_results:"
+        },
+        {
+          "file": "code/visualization.py",
+          "start": 43,
+          "end": 73,
+          "role": "logic",
+          "symbol": "create_mask_overlay_image",
+          "anchor": "6a5aed7f3c96",
+          "first": "def create_mask_overlay_image(image: np.ndarray, particles,"
+        },
+        {
+          "file": "code/visualization.py",
+          "start": 103,
+          "end": 155,
+          "role": "logic",
+          "symbol": "plot_particle_crops",
+          "anchor": "d6763c9a7e79",
+          "first": "def plot_particle_crops(particles, measurements_df: pd.DataFrame,"
+        },
+        {
+          "file": "code/visualization.py",
+          "start": 287,
+          "end": 311,
+          "role": "logic",
+          "symbol": "create_summary_stats",
+          "anchor": "c19ec5762ff0",
+          "first": "def create_summary_stats(df: pd.DataFrame) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "distributions-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Particle property distributions",
+      "summary": "Shows size and shape distribution figures and summary statistics for one image or all images pooled, with x-axis limits and a single-property histogram whose bins can be adjusted.",
+      "views": [
+        "bar chart",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1245,
+          "end": 1374,
+          "role": "logic",
+          "anchor": "97d5a18ab81a",
+          "first": "with tab_distrib:"
+        },
+        {
+          "file": "code/visualization.py",
+          "start": 158,
+          "end": 224,
+          "role": "logic",
+          "symbol": "plot_distributions",
+          "anchor": "c242ca8a3749",
+          "first": "def plot_distributions(df: pd.DataFrame, model_name: str = \"\","
+        },
+        {
+          "file": "code/visualization.py",
+          "start": 227,
+          "end": 267,
+          "role": "logic",
+          "symbol": "plot_interactive_histogram",
+          "anchor": "113253aca67e",
+          "first": "def plot_interactive_histogram(df: pd.DataFrame,"
+        }
+      ]
+    },
+    {
+      "id": "export-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Export results",
+      "summary": "Downloads per-image and combined measurement CSVs, and builds a ZIP or a saved folder holding every image stage, masks, crops, metadata and figures.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1379,
+          "end": 1489,
+          "role": "logic",
+          "anchor": "d0e3a801490e",
+          "first": "with tab_export:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 333,
+          "end": 488,
+          "role": "logic",
+          "symbol": "save_results_to_dir",
+          "anchor": "63c2e706f999",
+          "first": "def save_results_to_dir(save_dir: str, images, particles_list,"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,829 @@
+{
+  "schema": "astaui.card/1",
+  "id": "live-earthquake-stats",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T21:17:26Z"
+  },
+  "app": {
+    "title": "Live Earthquake Statistics",
+    "summary": "The page loads a week of events from a public catalog feed, then keeps polling two shorter feeds and merges every response into one catalog. The person picks a region, which scopes everything. A map, headline counts and four analysis cards then update: a magnitude-frequency fit with a completeness threshold, a decay fit for the busiest aftershock sequence, hours flagged as unusually busy, and a depth-magnitude scatter. Alongside these runs a log of every revision and deletion the source made while the page was open. Any chart can be switched to a table, and hovering or clicking an event shows its details or opens its source record.",
+    "task": {
+      "text": "Watch a live event catalog for one region, keep its standard statistics up to date as new and revised records arrive, and log every correction the source makes.",
+      "verbs": [
+        "monitor",
+        "derive",
+        "summarize",
+        "explore",
+        "curate"
+      ]
+    },
+    "data": {
+      "text": "A rolling seven-day catalog of timestamped events, each with coordinates, depth, magnitude and review status. It is merged from repeated feed responses, so the same record can change version over time.",
+      "item": "one catalogued event with its time, location, depth, magnitude, magnitude type and review status",
+      "shapes": [
+        "events",
+        "geospatial",
+        "table",
+        "time series",
+        "versions"
+      ]
+    },
+    "stage": {
+      "text": "watching a live catalog as it arrives, with running statistics, before any study of a particular sequence",
+      "terms": [
+        "explore",
+        "analyze",
+        "collect"
+      ]
+    },
+    "mechanism": {
+      "text": "One region switch scopes a large map, a row of headline numbers and several analysis cards. All of them read one shared analysis, which is recomputed whenever the merged catalog changes. Each card can flip to a table twin, and a running revision log lists how records changed between polls.",
+      "views": [
+        "map",
+        "summary stats",
+        "bar chart",
+        "scatter plot",
+        "list",
+        "table view"
+      ],
+      "interactions": [
+        "filter",
+        "hover for detail",
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard",
+        "version history",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "statistical seismology on a live earthquake catalog",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "seismology",
+        "statistical seismology",
+        "earthquake catalogs"
+      ]
+    },
+    "workflow": {
+      "name": "monitor a live event feed and keep its statistics current",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "the past week loads once, then the past-hour feed is polled every 60 s and the past-day feed every 5 min. Each response is merged by event id, and a status strip shows each feed's state",
+          "parts": [
+            "feed-region-controls"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "a segmented switch picks all events, global M4.5+, or one of four regional boxes. The choice scopes the map, every card and every fit. Pause freezes the display while polling continues",
+          "parts": [
+            "feed-region-controls"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "every event is plotted on an equal-area map, sized by magnitude and coloured by depth. Rings ripple out from the last hour's events, and a callout follows the latest notable one. Headline tiles give counts for the last day and hour",
+          "parts": [
+            "stage-map",
+            "kpi-tiles",
+            "latest-list"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "fits are recomputed on each catalog change: the completeness magnitude and b-value with a bootstrap range, an Omori-Utsu decay fit for the busiest mainshock, and a Poisson test that flags busy hours",
+          "parts": [
+            "fmd-card",
+            "omori-card",
+            "hourly-card",
+            "kpi-tiles"
+          ]
+        },
+        {
+          "step": "keep a record of changes",
+          "here": "each newer version of an event is compared field by field. Changes to magnitude, type, status, depth, epicentre, place or id are logged, as are deletions and restorations, newest first",
+          "parts": [
+            "revision-log"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "hovering a dot or bar shows its values. Clicking a map dot, or a place in a list, opens the event's source page. Every card's Table button lists the numbers behind it",
+          "parts": [
+            "stage-map",
+            "latest-list",
+            "fmd-card",
+            "hourly-card"
+          ]
+        }
+      ],
+      "distinctive": [
+        "the source keeps revising its records, so the merge compares version timestamps, follows id changes across networks, and counts an event as deleted only when it is missing under all its ids and still well inside the window",
+        "statistics are fitted only above an estimated completeness threshold, which is re-estimated in every bootstrap resample, so the uncertainty interval includes the threshold's own uncertainty",
+        "fits refuse to run below a minimum number of events and say how many they would need, instead of showing a number",
+        "each hour is tested against a baseline built from the previous 24 hours, so a burst cannot raise its own baseline",
+        "every chart has a table twin and an expandable 'how this is measured' panel with the equations and live fitted values"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "feed-region-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Feed status, region switch and pause",
+      "summary": "Shows each polled feed's state, lets the person scope the whole page to one region, and pauses the display while data keeps arriving.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 120,
+          "end": 120,
+          "role": "markup",
+          "symbol": "#status",
+          "anchor": "ba9fb51827f0",
+          "first": "<div class=\"status\" id=\"status\"></div>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 125,
+          "end": 132,
+          "role": "markup",
+          "symbol": "#region",
+          "anchor": "3324e4dd7d19",
+          "first": "<div class=\"seg\" role=\"group\" aria-labelledby=\"region-l\" id=\"region\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 134,
+          "end": 134,
+          "role": "markup",
+          "symbol": "#pause",
+          "anchor": "db9bd3d7699c",
+          "first": "<button class=\"btn\" id=\"pause\" type=\"button\" aria-pressed=\"false\">Pause display</button>"
+        },
+        {
+          "file": "code/assets/live.css",
+          "start": 108,
+          "end": 108,
+          "role": "style",
+          "symbol": ".seg",
+          "anchor": "a8883b89070c",
+          "first": ".seg{display:inline-flex;border:1px solid var(--rule-2);background:var(--surface)}"
+        },
+        {
+          "file": "code/assets/live.css",
+          "start": 95,
+          "end": 96,
+          "role": "style",
+          "symbol": ".feed",
+          "anchor": "8a833cb1143d",
+          "first": ".feed{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11.5px;color:var(--ink-2);"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 793,
+          "end": 800,
+          "role": "logic",
+          "symbol": "setRegion",
+          "anchor": "d81652583614",
+          "first": "function setRegion(key) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 63,
+          "end": 80,
+          "role": "logic",
+          "symbol": "loadWeek",
+          "anchor": "5e20dd6ce19d",
+          "first": "async function loadWeek(attempt = 0) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 81,
+          "end": 90,
+          "role": "logic",
+          "symbol": "ingest",
+          "anchor": "5f1bff47d2b3",
+          "first": "function ingest(d, which) {"
+        },
+        {
+          "file": "code/assets/ui.js",
+          "start": 101,
+          "end": 110,
+          "role": "logic",
+          "symbol": "initPause",
+          "anchor": "de5e30b43fad",
+          "first": "export function initPause(btn, feeds = []) {"
+        },
+        {
+          "file": "code/assets/ui.js",
+          "start": 177,
+          "end": 177,
+          "role": "logic",
+          "symbol": "poll",
+          "anchor": "0ca109f74f6f",
+          "first": "export function poll(url, { every, feed, onData, timeoutMs = 20000, parse = 'json' }) {"
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 27,
+          "end": 34,
+          "role": "data",
+          "symbol": "REGIONS",
+          "anchor": "4cfef17ae746",
+          "first": "export const REGIONS = ["
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 36,
+          "end": 41,
+          "role": "logic",
+          "symbol": "inRegion",
+          "anchor": "fc2b23ec126a",
+          "first": "export function inRegion(region, e) {"
+        }
+      ]
+    },
+    {
+      "id": "stage-map",
+      "level": "view",
+      "parent": null,
+      "title": "Live event map",
+      "summary": "Plots every event in the region, sized by magnitude and coloured by depth, with ripples on recent arrivals, a callout for the latest notable event, hover details, click-through to the source record and a table view.",
+      "views": [
+        "map",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 137,
+          "end": 162,
+          "role": "markup",
+          "symbol": "#stage",
+          "anchor": "8cb0182fca03",
+          "first": "<section class=\"stage\" id=\"stage\" aria-label=\"Map of the week's earthquakes: size by magnitude, color by depth, rings on"
+        },
+        {
+          "file": "code/index.html",
+          "start": 17,
+          "end": 17,
+          "role": "style",
+          "symbol": "#stage .chart canvas",
+          "anchor": "0b23a53e4c36",
+          "first": "#stage .chart canvas{cursor:crosshair}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 34,
+          "end": 34,
+          "role": "style",
+          "symbol": "#spot",
+          "anchor": "054af9d821aa",
+          "first": "#spot{width:250px;pointer-events:none}"
+        },
+        {
+          "file": "code/assets/live.css",
+          "start": 220,
+          "end": 220,
+          "role": "style",
+          "symbol": ".stage",
+          "anchor": "55e7a1053514",
+          "first": ".stage{position:relative;background:var(--surface);border:1px solid var(--rule-2);margin:0 0 8px;overflow:hidden;box-sha"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 339,
+          "end": 399,
+          "role": "logic",
+          "symbol": "drawStage",
+          "anchor": "a44a0e0e55e2",
+          "first": "function drawStage(c, p, pane) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 253,
+          "end": 271,
+          "role": "logic",
+          "symbol": "baseLayer",
+          "anchor": "b5dd3960d3e0",
+          "first": "function baseLayer(p, proj, W, H, dpr) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 275,
+          "end": 296,
+          "role": "logic",
+          "symbol": "dotLayer",
+          "anchor": "2bb84b5f54c3",
+          "first": "function dotLayer(p, proj, W, H, dpr, A) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 307,
+          "end": 327,
+          "role": "logic",
+          "symbol": "placeSpot",
+          "anchor": "9c7bcd5b7869",
+          "first": "function placeSpot(q, W, H, pts) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 328,
+          "end": 337,
+          "role": "logic",
+          "symbol": "paintSpot",
+          "anchor": "d9ef851940a1",
+          "first": "function paintSpot(A, now) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 427,
+          "end": 441,
+          "role": "logic",
+          "symbol": "paintStageLegend",
+          "anchor": "719a696ca797",
+          "first": "function paintStageLegend() {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 400,
+          "end": 411,
+          "role": "logic",
+          "anchor": "292f7f522db5",
+          "first": "const stage = new Pane($('#stage-mount'), {"
+        }
+      ]
+    },
+    {
+      "id": "kpi-tiles",
+      "level": "view",
+      "parent": null,
+      "title": "Headline numbers",
+      "summary": "Tiles for events in the last day and hour, the b-value with its range, the completeness magnitude, catalog changes seen and data age, each with a short plain-language subline.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 164,
+          "end": 171,
+          "role": "markup",
+          "anchor": "4f24ca64c64f",
+          "first": "<div class=\"kpis\">"
+        },
+        {
+          "file": "code/assets/live.css",
+          "start": 122,
+          "end": 122,
+          "role": "style",
+          "symbol": ".kpi",
+          "anchor": "cf1b586c293f",
+          "first": ".kpi{background:var(--surface);border:1px solid var(--rule-2);padding:11px 13px 10px;min-width:0;box-shadow:var(--shadow"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 669,
+          "end": 673,
+          "role": "logic",
+          "symbol": "setKpi",
+          "anchor": "80efc85b2a4f",
+          "first": "function setKpi(id, value, sub, na) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 676,
+          "end": 711,
+          "role": "logic",
+          "anchor": "16abbf64bcb7",
+          "first": "function paintDom() {"
+        }
+      ]
+    },
+    {
+      "id": "fmd-card",
+      "level": "view",
+      "parent": null,
+      "title": "Magnitude-frequency fit",
+      "summary": "Shows counts per magnitude bin and cumulative counts on a log scale, marks the completeness magnitude, draws the Gutenberg-Richter fit above it, and has hover and a table view.",
+      "views": [
+        "bar chart",
+        "scatter plot",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 174,
+          "end": 189,
+          "role": "markup",
+          "symbol": "#fmd",
+          "anchor": "b61ba8a59237",
+          "first": "<section class=\"card card--4\" id=\"fmd\">"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 450,
+          "end": 496,
+          "role": "logic",
+          "symbol": "drawFmd",
+          "anchor": "3748eea243c1",
+          "first": "function drawFmd(c, p, pane) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 497,
+          "end": 506,
+          "role": "logic",
+          "anchor": "3b9fd70e6214",
+          "first": "new Pane($('#fmd-mount'), { height: cardChart, aria: 'Frequency magnitude distribution on a log scale', draw: drawFmd })"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 724,
+          "end": 733,
+          "role": "logic",
+          "anchor": "a156990b3b79",
+          "first": "// frequency magnitude"
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 248,
+          "end": 253,
+          "role": "logic",
+          "symbol": "completeness",
+          "anchor": "59b96c0f8998",
+          "first": "export function completeness(mags, correction = MAXC_CORRECTION) {"
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 304,
+          "end": 304,
+          "role": "logic",
+          "symbol": "gutenbergRichter",
+          "anchor": "e204871997f5",
+          "first": "export function gutenbergRichter(mags, opts = {}) {"
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 276,
+          "end": 276,
+          "role": "logic",
+          "symbol": "bootstrapB",
+          "anchor": "30ab79c8e257",
+          "first": "export function bootstrapB(mags, { n = BOOT_N, seed = 1, correction = MAXC_CORRECTION, minAbove = MIN_B_EVENTS } = {}) {"
+        }
+      ]
+    },
+    {
+      "id": "omori-card",
+      "level": "view",
+      "parent": null,
+      "title": "Aftershock decay fit",
+      "summary": "Finds the mainshock with the most aftershocks inside its space-time window, plots the aftershock rate against time since it on log-log axes, and fits an Omori-Utsu decay when there are enough events.",
+      "views": [
+        "scatter plot",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 191,
+          "end": 208,
+          "role": "markup",
+          "symbol": "#omori",
+          "anchor": "05d22d73b84a",
+          "first": "<section class=\"card card--4\" id=\"omori\">"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 549,
+          "end": 601,
+          "role": "logic",
+          "symbol": "drawOmori",
+          "anchor": "a2d5e46f5fb3",
+          "first": "function drawOmori(c, p, pane) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 602,
+          "end": 611,
+          "role": "logic",
+          "anchor": "a88041783fc6",
+          "first": "new Pane($('#omori-mount'), { height: cardChart, aria: 'Aftershock rate against time since the mainshock, log log', draw"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 747,
+          "end": 764,
+          "role": "logic",
+          "anchor": "d30d0e0cb4f1",
+          "first": "// aftershocks"
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 334,
+          "end": 334,
+          "role": "logic",
+          "symbol": "findSequence",
+          "anchor": "7cd4b943897d",
+          "first": "export function findSequence(events, { minMag = MIN_MAIN_MAG } = {}) {"
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 366,
+          "end": 366,
+          "role": "logic",
+          "symbol": "omoriFit",
+          "anchor": "838cf648ca00",
+          "first": "export function omoriFit(times, T, { cGrid = C_GRID, pGrid = P_GRID } = {}) {"
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 396,
+          "end": 396,
+          "role": "logic",
+          "symbol": "logBinnedRate",
+          "anchor": "a71a179ef835",
+          "first": "export function logBinnedRate(times, T, { t0, perDecade = 4 } = {}) {"
+        }
+      ]
+    },
+    {
+      "id": "hourly-card",
+      "level": "view",
+      "parent": null,
+      "title": "Busy-hour bars",
+      "summary": "Bars for event counts in each hour of the week, with hours flagged by a Poisson tail test against a trailing baseline. Hovering shows the baseline and tail probability.",
+      "views": [
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 222,
+          "end": 233,
+          "role": "markup",
+          "symbol": "#hourly",
+          "anchor": "9813e194420c",
+          "first": "<section class=\"card card--12\" id=\"hourly\">"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 525,
+          "end": 545,
+          "role": "logic",
+          "anchor": "b86b8b149c2d",
+          "first": "// ---------------------------------------------------------------- hourly counts"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 735,
+          "end": 745,
+          "role": "logic",
+          "anchor": "2ec1b2dd15b9",
+          "first": "// hourly"
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 421,
+          "end": 426,
+          "role": "logic",
+          "symbol": "hourlyCounts",
+          "anchor": "3e7093d436ff",
+          "first": "export function hourlyCounts(times, end, hours = 168) {"
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 431,
+          "end": 431,
+          "role": "logic",
+          "symbol": "burstFlags",
+          "anchor": "ee4b0243e352",
+          "first": "export function burstFlags(counts, { base = BURST_BASE_HOURS, p = BURST_P, floor = BURST_FLOOR } = {}) {"
+        }
+      ]
+    },
+    {
+      "id": "revision-log",
+      "level": "view",
+      "parent": null,
+      "title": "Catalog revision log",
+      "summary": "Lists every revision, id change, deletion and restoration found when newer feed responses were merged, newest first, with what changed in plain words and a summary of mean magnitude shifts.",
+      "views": [
+        "list",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "version history"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 210,
+          "end": 220,
+          "role": "markup",
+          "symbol": "#revs",
+          "anchor": "949c46732544",
+          "first": "<section class=\"card card--4\" id=\"revs\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 89,
+          "end": 89,
+          "role": "style",
+          "symbol": "#rev-list",
+          "anchor": "45e633408c79",
+          "first": "#rev-list{flex:1;max-height:300px;overflow:auto}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 91,
+          "end": 91,
+          "role": "style",
+          "symbol": ".rvr",
+          "anchor": "8f65a3a29b35",
+          "first": ".rvr{display:grid;grid-template-columns:62px minmax(0,1fr);gap:1px 10px;padding:6px 0;border-bottom:1px solid var(--rule"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 646,
+          "end": 660,
+          "role": "logic",
+          "symbol": "paintRevs",
+          "anchor": "c358a6089fc5",
+          "first": "function paintRevs(log, now) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 626,
+          "end": 626,
+          "role": "logic",
+          "symbol": "scopedLog",
+          "anchor": "226720b8916e",
+          "first": "function scopedLog() { return cat.log.filter(r => inRegion(S.region, r.after || r.before) || (r.before && inRegion(S.reg"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 661,
+          "end": 666,
+          "role": "logic",
+          "anchor": "450fd439d434",
+          "first": "ui.tableView($('#revs'), () => ({"
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 120,
+          "end": 120,
+          "role": "logic",
+          "symbol": "mergeCatalog",
+          "anchor": "96979d8034cc",
+          "first": "export function mergeCatalog(state, features, opts = {}) {"
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 71,
+          "end": 82,
+          "role": "logic",
+          "symbol": "diffEvent",
+          "anchor": "abf1aa84ca3c",
+          "first": "export function diffEvent(a, b) {"
+        },
+        {
+          "file": "code/quakes/seismo.js",
+          "start": 211,
+          "end": 226,
+          "role": "logic",
+          "symbol": "describeChange",
+          "anchor": "921e90edf98d",
+          "first": "export function describeChange(rec) {"
+        }
+      ]
+    },
+    {
+      "id": "latest-list",
+      "level": "view",
+      "parent": null,
+      "title": "Newest events",
+      "summary": "Lists the 30 most recent events in the region with time, magnitude, place, depth and review status. New arrivals are flashed, places link to their source records, and the footer counts how many are still unreviewed.",
+      "views": [
+        "list",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 235,
+          "end": 239,
+          "role": "markup",
+          "symbol": "#latest",
+          "anchor": "54747a7c7794",
+          "first": "<section class=\"card card--8\" id=\"latest\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 62,
+          "end": 62,
+          "role": "style",
+          "symbol": "#latest-list",
+          "anchor": "30b996f7f251",
+          "first": "#latest-list{container-type:inline-size;max-height:420px;overflow:auto}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 63,
+          "end": 63,
+          "role": "style",
+          "symbol": ".evr",
+          "anchor": "d444b5a4c264",
+          "first": ".evr{display:grid;grid-template-columns:84px 74px minmax(0,1fr) 64px 92px;gap:2px 10px;padding:6px 0;border-bottom:1px s"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 628,
+          "end": 640,
+          "role": "logic",
+          "symbol": "paintLatest",
+          "anchor": "541ae99fb231",
+          "first": "function paintLatest(A, now) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 422,
+          "end": 426,
+          "role": "logic",
+          "symbol": "eventLink",
+          "anchor": "221569181464",
+          "first": "function eventLink(e) {"
+        },
+        {
+          "file": "code/quakes/app.js",
+          "start": 641,
+          "end": 644,
+          "role": "logic",
+          "anchor": "a5cc7a6cc4d2",
+          "first": "ui.tableView($('#latest'), () => {"
+        }
+      ]
+    }
+  ]
+}

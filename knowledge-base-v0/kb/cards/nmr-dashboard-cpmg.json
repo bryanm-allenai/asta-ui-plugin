@@ -1,0 +1,758 @@
+{
+  "schema": "astaui.card/1",
+  "id": "nmr-dashboard-cpmg",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T09:33:46Z"
+  },
+  "app": {
+    "title": "NMR Dashboard: relaxometry processing in the browser (CPMG, T1 recovery, T2–D)",
+    "summary": "A person drops a folder of spectrometer data, or opens a bundled sample. The page reads the acquisition parameters and uses the sequence name to decide which analysis to offer. They check the raw echoes and the summed decay, then choose how to process the echoes and which models to fit: a multi-exponential fit, a regularised inverse Laplace spectrum, or a 2D T2–D inversion with a few-population model. Optionally they can leave out the first points. After the run they read the fits, the fit-quality and model-comparison tables, the spectra and any depth-resolved maps. If they turned it on, they also get MCMC and bootstrap intervals compared side by side. They end with a saved folder or zip of tables, figures, a PDF report and a provenance record. They can also export a params file and script, or run the same settings over every dataset as a time series.",
+    "task": {
+      "text": "Fit relaxation and diffusion models to measured decay curves, with intervals, and save a reproducible record of the result for one dataset or a series.",
+      "verbs": [
+        "derive",
+        "explore",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Instrument output from a single-sided NMR spectrometer: trains of echoes measured over time, sometimes over a second delay axis, plus the acquisition parameters. A folder can hold many datasets taken over time.",
+      "item": "one acquisition: an echo train (or a set of trains at several delays) with its parameter file",
+      "shapes": [
+        "time series",
+        "field",
+        "table",
+        "versions"
+      ]
+    },
+    "stage": {
+      "text": "analysing raw relaxometry decays into fitted times and spectra, from first look to saved results",
+      "terms": [
+        "analyze",
+        "explore",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "Numbered tabs unlock in order: load, raw data, process, results, batch. One settings form feeds a single Run button, and the results tab collects collapsible sections of linked charts and tables. Uncertainty runs, saving and batch all reuse the same settings.",
+      "views": [
+        "form",
+        "line chart",
+        "heatmap",
+        "table view",
+        "scatter plot",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "exclude and refit",
+        "hover for detail",
+        "select",
+        "export",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "status pipeline",
+        "linked views",
+        "overview and detail",
+        "side-by-side comparison",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "multi-exponential and inverse-Laplace analysis of NMR relaxation and diffusion decays",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "nmr relaxometry",
+        "inverse laplace transform",
+        "t2 d correlation"
+      ]
+    },
+    "workflow": {
+      "name": "fit models to measured curves and save the results with uncertainties",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drop or browse for a data folder or .tnt files, or pick a sample. If the folder holds several datasets, a chooser appears. A parameters table shows what was read, and the sequence name decides which analysis is offered.",
+          "parts": [
+            "load-panel"
+          ]
+        },
+        {
+          "step": "look over the raw data",
+          "here": "An echo-magnitude heat map, a single echo (real, imaginary and magnitude) picked with a slider, and the summed decay on linear or log axes. Previous and Next buttons step through the loaded datasets.",
+          "parts": [
+            "raw-panel"
+          ]
+        },
+        {
+          "step": "choose the computation and its settings",
+          "here": "Integrate each echo, or Fourier-transform it to get signal against depth. Choose 1–4 exponential components with an optional offset, the ILT range and α, how many early echoes to exclude, and the confidence level. Settings can also be filled in from a params file.",
+          "parts": [
+            "process-form"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run processing gives the decay with its fits and residuals, a component table with intervals, fit quality, a ΔAIC/ΔBIC model comparison and the T2 spectrum with a peak table. In FT mode it also gives T2(z) maps with a linked cross-section viewer.",
+          "parts": [
+            "fit-results",
+            "spatial-viewer"
+          ]
+        },
+        {
+          "step": "check how far the result can be trusted",
+          "here": "Optional MCMC and bootstrap runs start after a time estimate and a confirmation. They show traces, a corner plot and histograms, plus a table comparing the three interval methods that flags the odd one out.",
+          "parts": [
+            "uncertainty-section"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Save into a new processed_ folder, another folder or a .zip: CSV tables, figures in a chosen format and dpi, a PDF report, params_used.toml and provenance.json. A separate button exports the params plus a script to rerun the analysis offline.",
+          "parts": [
+            "save-card",
+            "process-form"
+          ]
+        },
+        {
+          "step": "apply the same settings to every item",
+          "here": "Batch runs the checked settings on every dataset in the folder and logs each one as ok, skipped or failed. It writes a time-series summary and fit tables. It warns if the settings were not first tried on a single dataset.",
+          "parts": [
+            "batch-panel"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The acquisition's sequence name decides the analysis and which controls are shown: a decay, a saturation recovery or a 2D T2–D correlation.",
+        "Fourier-transforming each echo in a static gradient turns time into depth, so every fit is repeated at each position. A linked cross-section viewer then follows the spectrum peaks along depth.",
+        "Diffusion coefficients that the measured b-values cannot resolve are shaded and flagged. One button limits the inversion grid to that range.",
+        "Least-squares, MCMC and bootstrap intervals are set side by side, and any value outside all the other methods' intervals is marked.",
+        "Every save records input file hashes, the resolved settings and the software versions. The settings can be exported as a params file plus a script that reruns the same analysis."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "load-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Load",
+      "summary": "Takes a dropped or browsed data folder, .tnt files or a bundled sample, finds every dataset in it and shows the acquisition parameters and the detected analysis.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 32,
+          "end": 58,
+          "role": "markup",
+          "symbol": "#panel-load",
+          "anchor": "f58b6a7bd569",
+          "first": "<section role=\"tabpanel\" id=\"panel-load\" aria-labelledby=\"tab-load\">"
+        },
+        {
+          "file": "code/style.css",
+          "start": 20,
+          "end": 21,
+          "role": "style",
+          "symbol": "#drop",
+          "anchor": "92ef608d31be",
+          "first": "#drop { border:2px dashed var(--line); border-radius:12px; background:var(--card); padding:2.5rem 1rem;"
+        },
+        {
+          "file": "code/style.css",
+          "start": 22,
+          "end": 22,
+          "role": "style",
+          "symbol": "#drop:hover, #drop:focus-visible, #drop.over",
+          "anchor": "344f390349ad",
+          "first": "#drop:hover, #drop:focus-visible, #drop.over { border-color:var(--accent); outline:none; }"
+        },
+        {
+          "file": "code/app.js",
+          "start": 212,
+          "end": 231,
+          "role": "logic",
+          "symbol": "openFolder",
+          "anchor": "bfe129a5cc88",
+          "first": "async function openFolder(dir) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 159,
+          "end": 168,
+          "role": "logic",
+          "symbol": "findDatasets",
+          "anchor": "d1a10fe1de89",
+          "first": "async function findDatasets(dir, prefix = \"\", depth = 0, maxDepth = 3) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 388,
+          "end": 396,
+          "role": "logic",
+          "symbol": "browse",
+          "anchor": "70589fce61e8",
+          "first": "async function browse() {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 353,
+          "end": 398,
+          "role": "logic",
+          "anchor": "7568c490bd3e",
+          "first": "// ── drop zone ─────────────────────────────────────────────────────────────"
+        },
+        {
+          "file": "code/app.js",
+          "start": 295,
+          "end": 308,
+          "role": "logic",
+          "symbol": "initSamples",
+          "anchor": "39549c52fdad",
+          "first": "async function initSamples() {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 431,
+          "end": 467,
+          "role": "logic",
+          "symbol": "showResult",
+          "anchor": "396a04c6a963",
+          "first": "function showResult(r) {"
+        }
+      ]
+    },
+    {
+      "id": "raw-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Raw data",
+      "summary": "Shows the echoes as collected: the summed decay with log-axis toggles, one echo picked with a slider, and a heat map of every echo, with buttons to step between datasets.",
+      "views": [
+        "line chart",
+        "heatmap"
+      ],
+      "interactions": [
+        "toggle view",
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 61,
+          "end": 80,
+          "role": "markup",
+          "symbol": "#panel-raw",
+          "anchor": "f88d6470913e",
+          "first": "<section role=\"tabpanel\" id=\"panel-raw\" aria-labelledby=\"tab-raw\" hidden>"
+        },
+        {
+          "file": "code/style.css",
+          "start": 53,
+          "end": 53,
+          "role": "style",
+          "symbol": ".record-nav",
+          "anchor": "3b50148460a0",
+          "first": ".record-nav { display:flex; align-items:center; gap:1rem; margin:.25rem 0 1rem; }"
+        },
+        {
+          "file": "code/raw.js",
+          "start": 34,
+          "end": 68,
+          "role": "logic",
+          "symbol": "renderRaw",
+          "anchor": "06ff5c8bba20",
+          "first": "export function renderRaw() {"
+        },
+        {
+          "file": "code/raw.js",
+          "start": 70,
+          "end": 74,
+          "role": "logic",
+          "symbol": "initRaw",
+          "anchor": "111d5b23f326",
+          "first": "export function initRaw() {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 183,
+          "end": 191,
+          "role": "logic",
+          "symbol": "updateRecordNav",
+          "anchor": "7d775ffcdbad",
+          "first": "function updateRecordNav() {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 193,
+          "end": 196,
+          "role": "logic",
+          "symbol": "stepDataset",
+          "anchor": "091c4a595545",
+          "first": "function stepDataset(delta) {"
+        }
+      ]
+    },
+    {
+      "id": "process-form",
+      "level": "view",
+      "parent": null,
+      "title": "Processing settings and run bar",
+      "summary": "A form for echo processing, the models to fit, excluded early points and advanced uncertainty options, with buttons to run, load a params file or export params plus a script.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "exclude and refit",
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 83,
+          "end": 283,
+          "role": "markup",
+          "symbol": "#panel-process",
+          "anchor": "fe4816288468",
+          "first": "<section role=\"tabpanel\" id=\"panel-process\" aria-labelledby=\"tab-process\" hidden>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 286,
+          "end": 302,
+          "role": "markup",
+          "symbol": "#run-bar",
+          "anchor": "6fac7d253e00",
+          "first": "<div id=\"run-bar\" class=\"run-bar\" hidden>"
+        },
+        {
+          "file": "code/style.css",
+          "start": 62,
+          "end": 62,
+          "role": "style",
+          "symbol": "fieldset",
+          "anchor": "c9758a478598",
+          "first": "fieldset { border:1px solid var(--line); border-radius:10px; margin:0 0 1rem; padding:.75rem 1rem 1rem; }"
+        },
+        {
+          "file": "code/style.css",
+          "start": 105,
+          "end": 105,
+          "role": "style",
+          "symbol": ".run-bar",
+          "anchor": "e9b6920053b5",
+          "first": ".run-bar { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem 1rem; margin:1.25rem 0 0; padding-top:1rem; bord"
+        },
+        {
+          "file": "code/process.js",
+          "start": 87,
+          "end": 155,
+          "role": "logic",
+          "symbol": "readSettings",
+          "anchor": "eadc40be6e2f",
+          "first": "export function readSettings() {"
+        },
+        {
+          "file": "code/process.js",
+          "start": 180,
+          "end": 244,
+          "role": "logic",
+          "symbol": "initProcess",
+          "anchor": "3537d9e3ffc6",
+          "first": "export function initProcess() {"
+        },
+        {
+          "file": "code/kinds.js",
+          "start": 8,
+          "end": 21,
+          "role": "logic",
+          "symbol": "applyKind",
+          "anchor": "d7028c516090",
+          "first": "export function applyKind(kind) {"
+        },
+        {
+          "file": "code/paramsload.js",
+          "start": 77,
+          "end": 96,
+          "role": "logic",
+          "symbol": "initParamsLoad",
+          "anchor": "aa288beef399",
+          "first": "export function initParamsLoad() {"
+        }
+      ]
+    },
+    {
+      "id": "fit-results",
+      "level": "view",
+      "parent": null,
+      "title": "Decay, fits and T2 spectrum",
+      "summary": "Shows the measured decay with fitted curves and residuals, the component table with intervals, the fit-quality and model-comparison tables, and the regularised T2 spectrum with its peak table and α sweep.",
+      "views": [
+        "line chart",
+        "table view",
+        "summary stats",
+        "scatter plot"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 441,
+          "end": 479,
+          "role": "markup",
+          "anchor": "42603dae19d8",
+          "first": "<details id=\"fit-section\" class=\"section\" open>"
+        },
+        {
+          "file": "code/results.js",
+          "start": 239,
+          "end": 274,
+          "role": "logic",
+          "symbol": "renderFit",
+          "anchor": "116f5c5e3d95",
+          "first": "function renderFit(r) {"
+        },
+        {
+          "file": "code/results.js",
+          "start": 276,
+          "end": 343,
+          "role": "logic",
+          "symbol": "renderMultiexp",
+          "anchor": "86dd25cb526e",
+          "first": "function renderMultiexp(r) {"
+        },
+        {
+          "file": "code/results.js",
+          "start": 345,
+          "end": 411,
+          "role": "logic",
+          "symbol": "renderIlt",
+          "anchor": "5b07be022c64",
+          "first": "function renderIlt(r) {"
+        },
+        {
+          "file": "code/results.js",
+          "start": 413,
+          "end": 427,
+          "role": "logic",
+          "symbol": "renderResults",
+          "anchor": "2b2567252207",
+          "first": "export function renderResults() {"
+        }
+      ]
+    },
+    {
+      "id": "spatial-viewer",
+      "level": "component",
+      "parent": "fit-results",
+      "title": "Depth-resolved fits and ILT cross-section viewer",
+      "summary": "Plots T2, amplitude and reduced χ² against depth. A linked viewer shows the T2-by-depth map: sliders or a click move the cut, and the side panels show the spectrum at that depth and the signal at that T2.",
+      "views": [
+        "heatmap",
+        "line chart"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views",
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 380,
+          "end": 402,
+          "role": "markup",
+          "symbol": "#spatial-results",
+          "anchor": "ef0ca6b98fcb",
+          "first": "<details id=\"spatial-results\" class=\"section\" hidden>"
+        },
+        {
+          "file": "code/style.css",
+          "start": 110,
+          "end": 110,
+          "role": "style",
+          "symbol": ".viewer-controls",
+          "anchor": "4c98f2396e84",
+          "first": ".viewer-controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(18rem,1fr)); gap:.5rem 1.5rem; padding:.25"
+        },
+        {
+          "file": "code/results.js",
+          "start": 76,
+          "end": 148,
+          "role": "logic",
+          "symbol": "renderSpatial",
+          "anchor": "0a2f6b2bd952",
+          "first": "function renderSpatial(r) {"
+        },
+        {
+          "file": "code/results.js",
+          "start": 153,
+          "end": 236,
+          "role": "logic",
+          "symbol": "renderViewer",
+          "anchor": "f801a5f49ba5",
+          "first": "function renderViewer(il, tracks, window) {"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-section",
+      "level": "component",
+      "parent": "fit-results",
+      "title": "Uncertainty: MCMC and bootstrap",
+      "summary": "Runs the optional samplers after a time estimate and a confirmation, with progress and a stop button. It shows traces, a corner plot and bootstrap histograms, and a table that compares the interval methods and flags outliers.",
+      "views": [
+        "table view",
+        "line chart",
+        "bar chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 481,
+          "end": 518,
+          "role": "markup",
+          "anchor": "e8f6364534fa",
+          "first": "<details id=\"unc-results\" class=\"section\" hidden>"
+        },
+        {
+          "file": "code/style.css",
+          "start": 116,
+          "end": 116,
+          "role": "style",
+          "symbol": ".unc-bar",
+          "anchor": "2d565e76b748",
+          "first": ".unc-bar { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem 1rem; margin:.5rem 0; }"
+        },
+        {
+          "file": "code/uncertainty.js",
+          "start": 97,
+          "end": 176,
+          "role": "logic",
+          "symbol": "runUncertainty",
+          "anchor": "9fc8a4f51851",
+          "first": "export async function runUncertainty() {"
+        },
+        {
+          "file": "code/uncertainty.js",
+          "start": 256,
+          "end": 277,
+          "role": "logic",
+          "symbol": "renderCompare",
+          "anchor": "2cb7fd9d7dc6",
+          "first": "function renderCompare(u) {"
+        },
+        {
+          "file": "code/uncertainty.js",
+          "start": 279,
+          "end": 314,
+          "role": "logic",
+          "symbol": "renderMcmc",
+          "anchor": "4a9832cb7ab3",
+          "first": "function renderMcmc(r) {"
+        },
+        {
+          "file": "code/uncertainty.js",
+          "start": 318,
+          "end": 363,
+          "role": "logic",
+          "symbol": "renderBoot",
+          "anchor": "05a025c66d8d",
+          "first": "function renderBoot(r) {"
+        }
+      ]
+    },
+    {
+      "id": "save-card",
+      "level": "component",
+      "parent": "fit-results",
+      "title": "Save, plot settings and provenance",
+      "summary": "Writes tables, figures, a PDF report, the settings used and a provenance record into a new results folder or a zip. It also holds the plot-style settings and shows how the results were produced.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "version history"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 308,
+          "end": 363,
+          "role": "markup",
+          "anchor": "2e5e0912ecff",
+          "first": "<details id=\"prov-details\" class=\"prov\" hidden>"
+        },
+        {
+          "file": "code/style.css",
+          "start": 172,
+          "end": 172,
+          "role": "style",
+          "symbol": ".save-card",
+          "anchor": "a7858cbb2e0d",
+          "first": ".save-card { margin:1rem 0; padding:.75rem 1rem; border:1px solid var(--line); border-radius:8px; background:var(--card)"
+        },
+        {
+          "file": "code/save.js",
+          "start": 79,
+          "end": 96,
+          "role": "logic",
+          "symbol": "initSave",
+          "anchor": "950fb8703dc6",
+          "first": "export function initSave() {"
+        },
+        {
+          "file": "code/save.js",
+          "start": 43,
+          "end": 47,
+          "role": "logic",
+          "symbol": "saveToFolder",
+          "anchor": "9acc7d80df56",
+          "first": "async function saveToFolder(dir) {"
+        },
+        {
+          "file": "code/save.js",
+          "start": 50,
+          "end": 63,
+          "role": "logic",
+          "symbol": "saveReportOnly",
+          "anchor": "59c60b22d4a1",
+          "first": "async function saveReportOnly() {"
+        },
+        {
+          "file": "code/provenance.js",
+          "start": 25,
+          "end": 40,
+          "role": "logic",
+          "symbol": "refreshProvenance",
+          "anchor": "3f4dcdecdebc",
+          "first": "export async function refreshProvenance() {"
+        },
+        {
+          "file": "code/plotstyle.js",
+          "start": 81,
+          "end": 114,
+          "role": "logic",
+          "symbol": "initPlotStyle",
+          "anchor": "f538cecf8e56",
+          "first": "export function initPlotStyle(redraw) {"
+        }
+      ]
+    },
+    {
+      "id": "batch-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Batch",
+      "summary": "Runs the current settings on every loaded dataset, one after another, after a confirmation that says whether the settings were tested on one dataset first. It logs each outcome and ends with fit tables and a time-series summary.",
+      "views": [
+        "list",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 521,
+          "end": 556,
+          "role": "markup",
+          "anchor": "0f40ab3ff283",
+          "first": "<!-- 5 · Batch -->"
+        },
+        {
+          "file": "code/style.css",
+          "start": 182,
+          "end": 182,
+          "role": "style",
+          "symbol": ".batch-card",
+          "anchor": "118b9263a009",
+          "first": ".batch-card { margin:1.5rem 0; padding:.75rem 1rem; border:1px solid var(--line); border-radius:8px; background:var(--ca"
+        },
+        {
+          "file": "code/style.css",
+          "start": 183,
+          "end": 183,
+          "role": "style",
+          "symbol": ".batch-log",
+          "anchor": "94926b696cda",
+          "first": ".batch-log { list-style:none; margin:.5rem 0 0; padding:0; max-height:16rem; overflow:auto; font-size:.9rem; }"
+        },
+        {
+          "file": "code/batch.js",
+          "start": 77,
+          "end": 151,
+          "role": "logic",
+          "symbol": "runBatch",
+          "anchor": "d707b0abc7ee",
+          "first": "async function runBatch() {"
+        },
+        {
+          "file": "code/batch.js",
+          "start": 28,
+          "end": 46,
+          "role": "logic",
+          "symbol": "refreshBatch",
+          "anchor": "f741fdec1958",
+          "first": "export function refreshBatch() {"
+        },
+        {
+          "file": "code/batch.js",
+          "start": 55,
+          "end": 75,
+          "role": "logic",
+          "symbol": "showFitTables",
+          "anchor": "b9c641da1d45",
+          "first": "function showFitTables(tables) {"
+        }
+      ]
+    }
+  ]
+}

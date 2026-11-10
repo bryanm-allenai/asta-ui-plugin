@@ -1,0 +1,731 @@
+{
+  "schema": "astaui.card/1",
+  "id": "arp-survey-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T22:34:30Z"
+  },
+  "app": {
+    "title": "Arp Catalog · iTelescope Project dashboard",
+    "summary": "A person picks a night, an observing site, a minimum number of observable hours and a moon tolerance, then computes which catalog targets can be observed that night. For each target the dashboard gives its observable window, transit time, moon phase and separation, a moon-risk rating, an assigned telescope and an estimated cost. The person narrows and sorts the list, compares the targets' windows on visibility bars and checks the moon-risk calendar for the coming weeks. Clicking a row moves a target through Pending, Scheduled, Done and Skipped, and the Scheduled targets are written out as telescope plan files, one per telescope. After imaging, each session is logged with a quality rating that marks the target done. Low-rated sessions go into a re-image queue. Progress by season is tracked and exported as CSV and target lists.",
+    "task": {
+      "text": "Plan each night's observing toward imaging every object in a fixed catalog, write the telescope plan files, and track which objects are done, need re-imaging or remain.",
+      "verbs": [
+        "plan",
+        "derive",
+        "record",
+        "curate",
+        "rate",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A fixed catalog of sky targets with coordinates, angular size, season and filter strategy. Alongside it come per-night moon-risk ratings for each target, telescope specs and rates, a log of imaging sessions with quality ratings and notes, and a status for each target.",
+      "item": "a target object in the catalog, with sky coordinates, angular size and a filter strategy",
+      "shapes": [
+        "table",
+        "time series",
+        "events",
+        "judgements",
+        "notes"
+      ]
+    },
+    "stage": {
+      "text": "planning observing nights and logging completed imaging across a long catalog survey",
+      "terms": [
+        "plan",
+        "collect",
+        "maintain"
+      ]
+    },
+    "mechanism": {
+      "text": "Computing a session fills both the planner table and the visibility bars. Clicking a row cycles its status, and that status drives both views, the plan-file export and the progress panes. The imaging-log form rates each session with stars, marks the target done and feeds the re-image queue and the summary metrics on the overview.",
+      "views": [
+        "table view",
+        "timeline",
+        "heatmap",
+        "bar chart",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "search",
+        "filter",
+        "sort",
+        "select",
+        "score",
+        "write notes",
+        "export",
+        "import",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard",
+        "status pipeline",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "observation planning with moon avoidance for a catalog imaging survey in astronomy",
+      "disciplines": [
+        "astronomy"
+      ],
+      "terms": [
+        "observation planning",
+        "moon avoidance",
+        "astrophotography"
+      ]
+    },
+    "workflow": {
+      "name": "schedule a fixed list of items session by session and track completion of the whole list",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "The catalog, moon-risk data and telescope specs are embedded in the page. A Load NED coords button replaces the catalog coordinates with precise ones from a CSV.",
+          "parts": [
+            "ned-loader"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Date, site, minimum hours and moon filter, then Compute session: it finds the dark window and each target's rise, transit and set, moon separation and Good/Marginal/Avoid risk, assigned telescope and point cost. Results are sorted by transit.",
+          "parts": [
+            "session-planner"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Search by number or name, filter by telescope or filter strategy, and hide done targets. Visibility bars sort by transit, hours or number. The moon calendar shows a strip of daily risk for each target, filtered by tonight's risk.",
+          "parts": [
+            "session-planner",
+            "visibility",
+            "moon-calendar"
+          ]
+        },
+        {
+          "step": "move items through named stages",
+          "here": "Clicking a planner row cycles the target through Pending, Scheduled, Done and Skipped. The status is saved in the browser and shown in every view.",
+          "parts": [
+            "session-planner"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Generate ACP plan takes only the Scheduled targets and writes one plan file per telescope, with a header giving imaging time, total duration and cost. The person can copy it or download all the files.",
+          "parts": [
+            "acp-export"
+          ]
+        },
+        {
+          "step": "record each observation with a quality score",
+          "here": "The imaging log form takes target, date, telescope, exposure, filters, 1 to 5 stars and notes. Saving marks the target Done, and entries rated 2 stars or less go to a re-image list. The log can be exported as CSV.",
+          "parts": [
+            "imaging-log"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "The overview shows imaged and remaining counts, a progress bar for each season and the re-image queue. The export tab filters targets by season and by remaining, done or re-image. It exports a CSV, a list of remaining targets and a status file.",
+          "parts": [
+            "overview",
+            "progress-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Moon risk is rated Good, Marginal or Avoid from the moon's phase and its angular separation from the target. The required separation grows as the moon gets fuller.",
+        "Each target gets a telescope by angular-size tier at the chosen site, and a point cost that is summed for the night.",
+        "Plan files contain only the Scheduled targets and are split one file per telescope, in the observatory's plan-directive format.",
+        "Sessions rated 2 stars or less go into a re-image queue, so a target marked done can still come back.",
+        "Targets are grouped into seasons by right ascension, and progress is tracked per season against the full catalog."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "overview",
+      "level": "view",
+      "parent": null,
+      "title": "Overview",
+      "summary": "Shows imaged and remaining counts, progress bars by season, a 30-day strip of how many targets have good moon conditions, and the re-image queue.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "heatmap"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/arp_project.html",
+          "start": 126,
+          "end": 153,
+          "role": "markup",
+          "symbol": "#pane-overview",
+          "anchor": "4b5395f78801",
+          "first": "<div class=\"pane active\" id=\"pane-overview\">"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 43,
+          "end": 43,
+          "role": "style",
+          "symbol": ".metric",
+          "anchor": "fcc99c027283",
+          "first": ".metric{background:var(--bg2);border-radius:var(--radius);padding:12px 16px}"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 77,
+          "end": 77,
+          "role": "style",
+          "symbol": ".progress-fill",
+          "anchor": "6a6bab8892a8",
+          "first": ".progress-fill{background:var(--accent);border-radius:3px;height:5px;transition:width .3s}"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 81,
+          "end": 81,
+          "role": "style",
+          "symbol": ".strip-day",
+          "anchor": "1e6486880077",
+          "first": ".strip-day{display:inline-block;width:8px;height:14px;border-radius:1px;margin:0 0.5px;vertical-align:middle}"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 734,
+          "end": 783,
+          "role": "logic",
+          "symbol": "renderOverview",
+          "anchor": "79b448616518",
+          "first": "function renderOverview(){"
+        }
+      ]
+    },
+    {
+      "id": "session-planner",
+      "level": "view",
+      "parent": null,
+      "title": "Tonight's plan",
+      "summary": "Computes the observable targets for a chosen date and site, with windows, transit, moon risk, telescope and cost. The person filters the table and clicks rows to cycle each target's status.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "search",
+        "filter",
+        "select"
+      ],
+      "patterns": [
+        "status pipeline",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/arp_project.html",
+          "start": 156,
+          "end": 229,
+          "role": "markup",
+          "symbol": "#pane-planner",
+          "anchor": "e940a38eaa24",
+          "first": "<div class=\"pane\" id=\"pane-planner\">"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 786,
+          "end": 858,
+          "role": "logic",
+          "symbol": "computePlanner",
+          "anchor": "68e373bc5aee",
+          "first": "function computePlanner(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 860,
+          "end": 895,
+          "role": "logic",
+          "symbol": "filterPlanner",
+          "anchor": "bb553328757c",
+          "first": "function filterPlanner(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 897,
+          "end": 903,
+          "role": "logic",
+          "symbol": "cycleStatus",
+          "anchor": "e8ce0ab701fd",
+          "first": "function cycleStatus(arp){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 451,
+          "end": 456,
+          "role": "data",
+          "symbol": "OBS",
+          "anchor": "628e5bb6e24d",
+          "first": "const OBS = {"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 458,
+          "end": 466,
+          "role": "data",
+          "symbol": "SITE_OBS",
+          "anchor": "3187d190f3f2",
+          "first": "const SITE_OBS = {"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 397,
+          "end": 397,
+          "role": "data",
+          "symbol": "TARGETS",
+          "anchor": "8aa4309cf5fe",
+          "first": "const TARGETS = [{\"a\":82,\"n\":\"NGC 2535 + 36\",\"ra\":8.1872,\"dec\":25.2067,\"sz\":5.2,\"site\":\"New Mexico / Spain\",\"flt\":\"LRGB\""
+        }
+      ]
+    },
+    {
+      "id": "acp-export",
+      "level": "component",
+      "parent": "session-planner",
+      "title": "ACP plan output",
+      "summary": "Builds one telescope plan file per telescope from the Scheduled targets, previews the plan, and lets the person copy it or download every file.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/arp_project.html",
+          "start": 219,
+          "end": 228,
+          "role": "markup",
+          "symbol": "#acp-out",
+          "anchor": "e9bb9ce305b5",
+          "first": "<div id=\"acp-out\" style=\"display:none;margin-top:16px\">"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 85,
+          "end": 85,
+          "role": "style",
+          "symbol": "pre",
+          "anchor": "547eaa74ef4a",
+          "first": "pre{font-family:'SF Mono','Fira Code',monospace;font-size:12px;white-space:pre-wrap;max-height:320px;overflow-y:auto;pad"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 905,
+          "end": 992,
+          "role": "logic",
+          "symbol": "generateACP",
+          "anchor": "8ae54f7b56d7",
+          "first": "function generateACP(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 994,
+          "end": 997,
+          "role": "logic",
+          "symbol": "copyACP",
+          "anchor": "940a9bb9b839",
+          "first": "function copyACP(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 998,
+          "end": 1008,
+          "role": "logic",
+          "symbol": "downloadACP",
+          "anchor": "06025524059e",
+          "first": "function downloadACP(){"
+        }
+      ]
+    },
+    {
+      "id": "visibility",
+      "level": "view",
+      "parent": null,
+      "title": "Visibility",
+      "summary": "Draws each computed target's observable window as a bar across the night, with a tick at transit, filterable by hours and moon risk and sortable by transit, hours or number.",
+      "views": [
+        "timeline",
+        "table view"
+      ],
+      "interactions": [
+        "search",
+        "filter",
+        "sort"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/arp_project.html",
+          "start": 232,
+          "end": 267,
+          "role": "markup",
+          "symbol": "#pane-visibility",
+          "anchor": "c553b53a117c",
+          "first": "<div class=\"pane\" id=\"pane-visibility\">"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 78,
+          "end": 78,
+          "role": "style",
+          "symbol": ".vis-bar",
+          "anchor": "c57d1a0f533c",
+          "first": ".vis-bar{height:14px;background:var(--bg2);border-radius:2px;position:relative;overflow:visible;width:100%;min-width:100"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 79,
+          "end": 79,
+          "role": "style",
+          "symbol": ".vis-fill",
+          "anchor": "9c411b9933c0",
+          "first": ".vis-fill{position:absolute;height:100%;background:var(--accent);border-radius:2px;opacity:.7}"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 80,
+          "end": 80,
+          "role": "style",
+          "symbol": ".vis-transit",
+          "anchor": "923a8425b361",
+          "first": ".vis-transit{position:absolute;width:2px;height:100%;background:var(--purple)}"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1011,
+          "end": 1061,
+          "role": "logic",
+          "symbol": "filterVisibility",
+          "anchor": "5ad189e5f5c6",
+          "first": "function filterVisibility(){"
+        }
+      ]
+    },
+    {
+      "id": "moon-calendar",
+      "level": "view",
+      "parent": null,
+      "title": "Moon calendar",
+      "summary": "Shows tonight's moon-risk counts, a 30-day bar chart of how many targets are rated good, and a strip of colored daily risk cells for each target, filterable by tonight's risk.",
+      "views": [
+        "heatmap",
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "search",
+        "filter",
+        "hover for detail"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/arp_project.html",
+          "start": 270,
+          "end": 296,
+          "role": "markup",
+          "symbol": "#pane-moon",
+          "anchor": "4ff9de884461",
+          "first": "<div class=\"pane\" id=\"pane-moon\">"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 81,
+          "end": 81,
+          "role": "style",
+          "symbol": ".strip-day",
+          "anchor": "1e6486880077",
+          "first": ".strip-day{display:inline-block;width:8px;height:14px;border-radius:1px;margin:0 0.5px;vertical-align:middle}"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1064,
+          "end": 1095,
+          "role": "logic",
+          "symbol": "renderMoon",
+          "anchor": "14acaa4959f3",
+          "first": "function renderMoon(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1097,
+          "end": 1117,
+          "role": "logic",
+          "symbol": "filterMoon",
+          "anchor": "ab21a4f6a2ac",
+          "first": "function filterMoon(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 446,
+          "end": 446,
+          "role": "data",
+          "symbol": "MOON",
+          "anchor": "8a29b5afcda9",
+          "first": "const MOON = {\"gen\":\"2026-04-15\",\"days\":60,\"new\":\"2026-04-17\",\"full\":\"2026-05-01\",\"phases\":[6.5,2.1,0.2,1.1,4.9,11.3,19."
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 484,
+          "end": 484,
+          "role": "data",
+          "symbol": "RISK_COL",
+          "anchor": "e7b6abcd5faf",
+          "first": "const RISK_COL = {G:\"#97C459\",M:\"#EF9F27\",A:\"#E24B4A\"};"
+        }
+      ]
+    },
+    {
+      "id": "imaging-log",
+      "level": "view",
+      "parent": null,
+      "title": "Imaging log",
+      "summary": "Records each imaging session with a 1 to 5 star quality rating and notes, marks the target Done, and lists, filters, deletes and exports log entries. It also shows log stats and the re-image candidates.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "score",
+        "write notes",
+        "search",
+        "filter",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/arp_project.html",
+          "start": 299,
+          "end": 353,
+          "role": "markup",
+          "symbol": "#pane-log",
+          "anchor": "623dfaba267d",
+          "first": "<div class=\"pane\" id=\"pane-log\">"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 82,
+          "end": 82,
+          "role": "style",
+          "symbol": ".star-interactive",
+          "anchor": "a22afa279673",
+          "first": ".star-interactive{cursor:pointer;font-size:18px;line-height:1}"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1121,
+          "end": 1126,
+          "role": "logic",
+          "symbol": "setStars",
+          "anchor": "c68b97c76c01",
+          "first": "function setStars(n){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1128,
+          "end": 1145,
+          "role": "logic",
+          "symbol": "addLog",
+          "anchor": "4615b8bbd909",
+          "first": "function addLog(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1147,
+          "end": 1153,
+          "role": "logic",
+          "symbol": "clearLogForm",
+          "anchor": "f9f72dc3624f",
+          "first": "function clearLogForm(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1155,
+          "end": 1159,
+          "role": "logic",
+          "symbol": "deleteLog",
+          "anchor": "e466ba49e5f2",
+          "first": "function deleteLog(id){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1161,
+          "end": 1185,
+          "role": "logic",
+          "symbol": "renderLog",
+          "anchor": "3f3ab09f4870",
+          "first": "function renderLog(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1187,
+          "end": 1201,
+          "role": "logic",
+          "symbol": "renderLogStats",
+          "anchor": "fad0536d60bd",
+          "first": "function renderLogStats(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1203,
+          "end": 1210,
+          "role": "logic",
+          "symbol": "exportLog",
+          "anchor": "a73541ea5ef7",
+          "first": "function exportLog(){"
+        }
+      ]
+    },
+    {
+      "id": "progress-export",
+      "level": "view",
+      "parent": null,
+      "title": "Progress export",
+      "summary": "Summarizes completion overall and by season. It lists targets filtered by season and by remaining, done or re-image status, with their log history. The person exports a CSV, a list of remaining targets or a status file.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/arp_project.html",
+          "start": 356,
+          "end": 389,
+          "role": "markup",
+          "symbol": "#pane-export",
+          "anchor": "1a7b721c61cd",
+          "first": "<div class=\"pane\" id=\"pane-export\">"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1213,
+          "end": 1238,
+          "role": "logic",
+          "symbol": "renderExport",
+          "anchor": "d874ea814b58",
+          "first": "function renderExport(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1240,
+          "end": 1282,
+          "role": "logic",
+          "symbol": "renderExpTable",
+          "anchor": "979e15721524",
+          "first": "function renderExpTable(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1284,
+          "end": 1309,
+          "role": "logic",
+          "symbol": "exportCSV",
+          "anchor": "4f806ed6a187",
+          "first": "function exportCSV(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1311,
+          "end": 1319,
+          "role": "logic",
+          "symbol": "exportTargetList",
+          "anchor": "ad6ad93ae19b",
+          "first": "function exportTargetList(){"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 1321,
+          "end": 1327,
+          "role": "logic",
+          "symbol": "exportStatus",
+          "anchor": "7e44f4a4f9a5",
+          "first": "function exportStatus(){"
+        }
+      ]
+    },
+    {
+      "id": "ned-loader",
+      "level": "component",
+      "parent": null,
+      "title": "Load NED coords",
+      "summary": "Loads a CSV of precise coordinates that replaces the catalog positions in every calculation, and shows which coordinate source is in use.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/arp_project.html",
+          "start": 110,
+          "end": 110,
+          "role": "markup",
+          "symbol": "#ned-file-input",
+          "anchor": "14a808d9671a",
+          "first": "<label style=\"cursor:pointer;padding:4px 10px;border-radius:var(--radius);border:0.5px solid var(--border2);font-size:12"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 402,
+          "end": 438,
+          "role": "logic",
+          "symbol": "loadNedCoords",
+          "anchor": "3828a86bb715",
+          "first": "function loadNedCoords(input) {"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 441,
+          "end": 444,
+          "role": "logic",
+          "symbol": "getCoords",
+          "anchor": "4d3e16907442",
+          "first": "function getCoords(target) {"
+        },
+        {
+          "file": "code/arp_project.html",
+          "start": 400,
+          "end": 400,
+          "role": "data",
+          "symbol": "NED_COORDS",
+          "anchor": "809210d219ea",
+          "first": "let NED_COORDS = {};  // {arp_num: {ra: decimal_hours, dec: decimal_deg}}"
+        }
+      ]
+    }
+  ]
+}

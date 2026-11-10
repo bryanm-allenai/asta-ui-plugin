@@ -1,0 +1,830 @@
+{
+  "schema": "astaui.card/1",
+  "id": "gelfigure",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T16:10:53Z"
+  },
+  "app": {
+    "title": "GelFigure",
+    "summary": "A person drops in a raw gel image, or several exposures of one gel, and the interface straightens and crops it, finds the lanes, decides whether it is a DNA or protein gel and fits a size ladder to the marker lane. The person checks and corrects each automatic step on the raw image: contrast, rotation, crop box, lane lines, the marker's ladder and its band positions. On the figure beside it, they type lane names and add group lines, +/− condition rows, target-band arrows with estimated sizes, boxes, brackets and side text, and cut unwanted lanes, which leaves a splice mark. A pre-flight check flags integrity and legibility problems, and the result is exported as a publication figure along with supplementary files: the uncropped image, the original bytes and a processing log.",
+    "task": {
+      "text": "Turn a raw electrophoresis gel image into a labelled, journal-compliant figure with calibrated band sizes and a record of every adjustment.",
+      "verbs": [
+        "annotate",
+        "derive",
+        "identify",
+        "clean"
+      ]
+    },
+    "data": {
+      "text": "A single raw grayscale or colour image of a gel from an imager or scanner, optionally several exposures of the same gel, plus a catalogue of size ladders with known band sizes.",
+      "item": "a lane on a gel image, with its bands",
+      "shapes": [
+        "image",
+        "image collection",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "preparing gel images as publication figures after the run, before writing up",
+      "terms": [
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "A numbered side panel walks through image, lanes, marker, annotations and layout. A raw-image canvas, where the crop box, lane lines and marker bands are dragged, drives a live figure preview beside it, where text and annotations are edited in place. Exports pass through a pre-flight check with one-click fixes.",
+      "views": [
+        "image viewer",
+        "side-by-side panes",
+        "form",
+        "list",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "drag to arrange",
+        "select",
+        "inline edit",
+        "apply label",
+        "keyboard shortcuts",
+        "exclude and refit",
+        "toggle view",
+        "undo",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "gel electrophoresis figure preparation in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "molecular biology",
+        "gel electrophoresis",
+        "sds page"
+      ]
+    },
+    "workflow": {
+      "name": "turn a raw instrument image into an annotated publication figure",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "drop or choose a TIFF/PNG/JPG (or several exposures, of which the least saturated is picked), open a saved .gelfig project, or load the synthetic example",
+          "parts": [
+            "side-panel",
+            "raw-editor"
+          ]
+        },
+        {
+          "step": "correct the automatic geometry and contrast by hand",
+          "here": "auto straighten, quarter turns and flips, black/white points with a histogram and a clipping readout, a red crop box to drag, and lane lines whose two end guides space the middle evenly",
+          "parts": [
+            "image-controls",
+            "lane-controls",
+            "raw-editor"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "pick the marker lane and its ladder from the bp or kDa catalogue; bands are matched with a robust fit, and dragging one band refits the rest",
+          "parts": [
+            "marker-panel",
+            "raw-editor"
+          ]
+        },
+        {
+          "step": "select a stretch and label it with a category",
+          "here": "type lane names on the figure, drag across names for a group line, click cells to cycle +/−, and click a band for an arrow whose size is estimated from the marker",
+          "parts": [
+            "figure-preview",
+            "annotation-tools"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "H cuts a lane out of the figure and adds a visible splice gap or line; empty lanes are suggested for removal but never cut silently",
+          "parts": [
+            "lane-controls"
+          ]
+        },
+        {
+          "step": "check the result against field rules before release",
+          "here": "pre-flight lists effective resolution below 300 dpi, camera saturation, contrast clipping, tiny fonts, gamma and extrapolated sizes, each with a one-click fix",
+          "parts": [
+            "export-preflight"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "PNG or TIFF at 300/600/1200 dpi, SVG, editable PPTX, the uncropped image with the same processing, the original bytes with SHA-256, and a JSON processing log",
+          "parts": [
+            "export-preflight"
+          ]
+        }
+      ],
+      "distinctive": [
+        "image-integrity rules from journal policy are built in: only linear whole-image adjustments by default, gamma locked unless unlocked, and cut lanes always marked with a splice",
+        "band sizes come from a ladder catalogue matched to the marker lane, and sizes outside the ladder are flagged with ≈",
+        "lanes are numbered by well across the whole gel, so changing the crop never loses names or markers",
+        "the gel's effective resolution is tracked separately from the export resolution, with a suggested width that keeps 300 dpi",
+        "each export can be accompanied by supplementary files: the uncropped processed image, the original file bytes and a processing log"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "side-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Step-by-step side panel",
+      "summary": "Holds the start screen before an image is loaded, then the numbered sections (image, lanes, marker, annotations, layout), each showing a status and the next step.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 68,
+          "end": 271,
+          "role": "markup",
+          "symbol": "#panel",
+          "anchor": "20c2c1ab7448",
+          "first": "<aside id=\"panel\">"
+        },
+        {
+          "file": "code/css/style.css",
+          "start": 82,
+          "end": 82,
+          "role": "style",
+          "symbol": "#panel",
+          "anchor": "19b94b891ccb",
+          "first": "#panel { width: 316px; flex: none; background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; }"
+        },
+        {
+          "file": "code/css/style.css",
+          "start": 117,
+          "end": 117,
+          "role": "style",
+          "symbol": ".sec",
+          "anchor": "8828a8509e5f",
+          "first": ".sec { padding: 14px 16px; border-bottom: 1px solid var(--line-2); }"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 881,
+          "end": 884,
+          "role": "logic",
+          "symbol": "renderPanel",
+          "anchor": "f34a8dfe4761",
+          "first": "function renderPanel() {"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 733,
+          "end": 770,
+          "role": "logic",
+          "symbol": "updateStatus",
+          "anchor": "917ec0d89755",
+          "first": "function updateStatus() {"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 70,
+          "end": 116,
+          "role": "logic",
+          "anchor": "dfee0178d94f",
+          "first": "/* ---------- loading ---------- */"
+        }
+      ]
+    },
+    {
+      "id": "image-controls",
+      "level": "component",
+      "parent": "side-panel",
+      "title": "Image section: gel type, orientation and contrast",
+      "summary": "Lets the person override the DNA/protein guess, rotate or flip the image, and set linear black and white points against a histogram that reports clipping and saturation.",
+      "views": [
+        "form",
+        "bar chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 92,
+          "end": 153,
+          "role": "markup",
+          "symbol": "section.sec:1",
+          "anchor": "95243658f79b",
+          "first": "<section class=\"sec\">"
+        },
+        {
+          "file": "code/css/style.css",
+          "start": 145,
+          "end": 145,
+          "role": "style",
+          "symbol": "#histo",
+          "anchor": "7712b989c60d",
+          "first": "#histo { width: 100%; height: 40px; display: block; border-radius: var(--r-sm); background: #f6f8fa; }"
+        },
+        {
+          "file": "code/css/style.css",
+          "start": 146,
+          "end": 146,
+          "role": "style",
+          "symbol": ".seg",
+          "anchor": "3212586bc070",
+          "first": ".seg { display: inline-flex; background: #f1f3f6; border-radius: 8px; padding: 3px; gap: 2px; }"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 270,
+          "end": 344,
+          "role": "logic",
+          "anchor": "55fbd8c440d3",
+          "first": "/* ---------- 1 image ---------- */"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 825,
+          "end": 844,
+          "role": "logic",
+          "symbol": "drawHisto",
+          "anchor": "a78e697fa7aa",
+          "first": "function drawHisto() {"
+        },
+        {
+          "file": "code/js/engine.js",
+          "start": 218,
+          "end": 258,
+          "role": "logic",
+          "symbol": "deskew",
+          "anchor": "42661fd0519a",
+          "first": "function deskew(img, bright) {"
+        },
+        {
+          "file": "code/js/engine.js",
+          "start": 1241,
+          "end": 1303,
+          "role": "logic",
+          "symbol": "detectGelType",
+          "anchor": "7858c420eef8",
+          "first": "function detectGelType(input) {"
+        }
+      ]
+    },
+    {
+      "id": "lane-controls",
+      "level": "component",
+      "parent": "side-panel",
+      "title": "Lane alignment section",
+      "summary": "Sets the lane count, re-detects lanes and markers inside the crop, lists lanes with show/hide, suggests empty lanes to cut, and chooses how splices are marked.",
+      "views": [
+        "list",
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "exclude and refit",
+        "keyboard shortcuts"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 156,
+          "end": 191,
+          "role": "markup",
+          "symbol": "section.sec:2",
+          "anchor": "142ab7257a98",
+          "first": "<section class=\"sec\">"
+        },
+        {
+          "file": "code/css/style.css",
+          "start": 227,
+          "end": 227,
+          "role": "style",
+          "symbol": ".splice-box",
+          "anchor": "3ad2728f0ec4",
+          "first": ".splice-box { margin-top: 10px; padding: 9px 11px; border-radius: var(--r); background: #f6f8fb; }"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 345,
+          "end": 401,
+          "role": "logic",
+          "anchor": "d460e83a4c9f",
+          "first": "/* ---------- 2 lane alignment ---------- */"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 602,
+          "end": 625,
+          "role": "logic",
+          "symbol": "renderLanes",
+          "anchor": "87cd82f07839",
+          "first": "function renderLanes() {"
+        },
+        {
+          "file": "code/js/engine.js",
+          "start": 597,
+          "end": 717,
+          "role": "logic",
+          "symbol": "detectLaneLattice",
+          "anchor": "de4706372d19",
+          "first": "function detectLaneLattice(img, bright, crop, meta, pitchHint) {"
+        }
+      ]
+    },
+    {
+      "id": "marker-panel",
+      "level": "component",
+      "parent": "side-panel",
+      "title": "Marker section and ladder calibration",
+      "summary": "Assigns a marker lane and a ladder from the built-in or custom catalogue, shows the fit quality, keeps favourite ladders, and calibrates bands against a reference card beside the image.",
+      "views": [
+        "list",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "apply label",
+        "exclude and refit"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 194,
+          "end": 222,
+          "role": "markup",
+          "symbol": "section.sec:3",
+          "anchor": "004a8a22fd45",
+          "first": "<section class=\"sec\">"
+        },
+        {
+          "file": "code/css/style.css",
+          "start": 169,
+          "end": 169,
+          "role": "style",
+          "symbol": ".mk-card",
+          "anchor": "2b9183acef29",
+          "first": ".mk-card { border: 1px solid var(--line); border-radius: var(--r); padding: 8px 10px; margin-bottom: 8px; }"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 461,
+          "end": 545,
+          "role": "logic",
+          "anchor": "ac459b8f8d26",
+          "first": "/* ---------- 4 markers ---------- */"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 546,
+          "end": 967,
+          "role": "logic",
+          "symbol": "renderMarkers",
+          "anchor": "ea2ba10cf42e",
+          "first": "function renderMarkers() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 1089,
+          "end": 1190,
+          "role": "logic",
+          "anchor": "14df80ee3408",
+          "first": "App.matchMarkers = function (fresh, subset) {"
+        },
+        {
+          "file": "code/js/marker-ui.js",
+          "start": 132,
+          "end": 190,
+          "role": "logic",
+          "symbol": "bandPicker",
+          "anchor": "2c4a19621574",
+          "first": "function bandPicker(m,y,oldBp){"
+        },
+        {
+          "file": "code/js/engine.js",
+          "start": 1035,
+          "end": 1068,
+          "role": "logic",
+          "symbol": "matchMulti",
+          "anchor": "f82cf1c94b9c",
+          "first": "function matchMulti(lanes, h, mode) {"
+        },
+        {
+          "file": "code/js/ladders.js",
+          "start": 9,
+          "end": 33,
+          "role": "data",
+          "symbol": "DNA",
+          "anchor": "ebbd6327029d",
+          "first": "const DNA = ["
+        },
+        {
+          "file": "code/js/ladders.js",
+          "start": 40,
+          "end": 88,
+          "role": "data",
+          "symbol": "PROTEIN",
+          "anchor": "110fc51c63ef",
+          "first": "const PROTEIN = ["
+        }
+      ]
+    },
+    {
+      "id": "annotation-tools",
+      "level": "component",
+      "parent": "side-panel",
+      "title": "Annotation tools",
+      "summary": "A palette of figure annotations (group line, target-band arrow with an estimated size, condition row, region box, side bracket, side text) and a list of those already placed.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "apply label",
+        "select",
+        "inline edit"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 225,
+          "end": 236,
+          "role": "markup",
+          "symbol": "section.sec:4",
+          "anchor": "630f83a82ac4",
+          "first": "<section class=\"sec\">"
+        },
+        {
+          "file": "code/css/style.css",
+          "start": 229,
+          "end": 229,
+          "role": "style",
+          "symbol": ".tools",
+          "anchor": "641014f99a3f",
+          "first": ".tools { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }"
+        },
+        {
+          "file": "code/css/style.css",
+          "start": 230,
+          "end": 230,
+          "role": "style",
+          "symbol": ".tool",
+          "anchor": "2c7a1424d55a",
+          "first": ".tool { border: 1px solid var(--line); background: #fff; border-radius: var(--r); padding: 8px 6px; cursor: pointer; tex"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 628,
+          "end": 967,
+          "role": "logic",
+          "symbol": "renderAnno",
+          "anchor": "06ed91785bb4",
+          "first": "function renderAnno() {"
+        },
+        {
+          "file": "code/js/figedit.js",
+          "start": 17,
+          "end": 39,
+          "role": "logic",
+          "symbol": "setMode",
+          "anchor": "ae8abd1518db",
+          "first": "function setMode(m) {"
+        },
+        {
+          "file": "code/js/figedit.js",
+          "start": 374,
+          "end": 421,
+          "role": "logic",
+          "symbol": "arrowPopover",
+          "anchor": "d00a5fcf8673",
+          "first": "function arrowPopover(k, anchor) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 1254,
+          "end": 1290,
+          "role": "logic",
+          "anchor": "92d5442fb788",
+          "first": "App.estimateInfo = function (yAbs) {"
+        }
+      ]
+    },
+    {
+      "id": "raw-editor",
+      "level": "view",
+      "parent": null,
+      "title": "Raw image canvas",
+      "summary": "Shows the raw gel with the red crop box, blue lane lines and yellow marker bands, all draggable, with zoom, pan, an exposure strip and keyboard shortcuts for lanes.",
+      "views": [
+        "image viewer",
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "drag to arrange",
+        "select",
+        "keyboard shortcuts"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 274,
+          "end": 295,
+          "role": "markup",
+          "symbol": "#rawCol",
+          "anchor": "6ee6f75c4525",
+          "first": "<section class=\"pane-col\" id=\"rawCol\">"
+        },
+        {
+          "file": "code/css/style.css",
+          "start": 92,
+          "end": 93,
+          "role": "style",
+          "symbol": "#editorBox",
+          "anchor": "76f63325c4f1",
+          "first": "#editorBox { flex: 1; position: relative; overflow: hidden; outline: none; background:"
+        },
+        {
+          "file": "code/css/style.css",
+          "start": 203,
+          "end": 203,
+          "role": "style",
+          "symbol": ".expo-item",
+          "anchor": "5340bc9d9c0f",
+          "first": ".expo-item { flex: none; width: 92px; border: 2px solid transparent; border-radius: 8px; padding: 3px; cursor: pointer; "
+        },
+        {
+          "file": "code/js/editor.js",
+          "start": 47,
+          "end": 203,
+          "role": "logic",
+          "symbol": "draw",
+          "anchor": "e320ac653a7b",
+          "first": "function draw() {"
+        },
+        {
+          "file": "code/js/editor.js",
+          "start": 219,
+          "end": 255,
+          "role": "logic",
+          "symbol": "hitTest",
+          "anchor": "7cef43da6b98",
+          "first": "function hitTest(sx, sy, shift, hit) {"
+        },
+        {
+          "file": "code/js/editor.js",
+          "start": 316,
+          "end": 371,
+          "role": "logic",
+          "anchor": "c954e74d84c8",
+          "first": "cv.addEventListener('pointerdown', (e) => {"
+        },
+        {
+          "file": "code/js/editor.js",
+          "start": 447,
+          "end": 494,
+          "role": "logic",
+          "symbol": "endPointer",
+          "anchor": "cf4c05026c4f",
+          "first": "function endPointer(e, cancelled) {"
+        },
+        {
+          "file": "code/js/editor.js",
+          "start": 498,
+          "end": 540,
+          "role": "logic",
+          "anchor": "c9486ce48464",
+          "first": "cv.addEventListener('dblclick', (e) => {"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 136,
+          "end": 154,
+          "role": "logic",
+          "symbol": "renderExposures",
+          "anchor": "538304fc9acb",
+          "first": "function renderExposures() {"
+        }
+      ]
+    },
+    {
+      "id": "figure-preview",
+      "level": "view",
+      "parent": null,
+      "title": "Live figure with in-place editing",
+      "summary": "Renders the finished figure as SVG next to the raw image. Clicking a lane name, group, condition cell or annotation edits it in place, and toolbars above set names, fonts and the name angle.",
+      "views": [
+        "image viewer",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "inline edit",
+        "select",
+        "apply label"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 296,
+          "end": 352,
+          "role": "markup",
+          "anchor": "9c2f0cb598d0",
+          "first": "<section class=\"pane-col\" id=\"figCol\">"
+        },
+        {
+          "file": "code/css/style.css",
+          "start": 103,
+          "end": 103,
+          "role": "style",
+          "symbol": "#preview",
+          "anchor": "b77fe55a05d5",
+          "first": "#preview { margin: auto; padding: 24px; }"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 857,
+          "end": 877,
+          "role": "logic",
+          "symbol": "updatePreview",
+          "anchor": "73b31b5945af",
+          "first": "function updatePreview() {"
+        },
+        {
+          "file": "code/js/render.js",
+          "start": 138,
+          "end": 161,
+          "role": "logic",
+          "symbol": "composeGel",
+          "anchor": "4a8feb066aff",
+          "first": "function composeGel(S, cropCanvas, scalePtPerPx) {"
+        },
+        {
+          "file": "code/js/render.js",
+          "start": 289,
+          "end": 329,
+          "role": "logic",
+          "symbol": "drawLaneNames",
+          "anchor": "ba28321dda18",
+          "first": "const drawLaneNames = () => {"
+        },
+        {
+          "file": "code/js/render.js",
+          "start": 330,
+          "end": 347,
+          "role": "logic",
+          "symbol": "drawConditions",
+          "anchor": "6f40aa995c51",
+          "first": "const drawConditions = () => {"
+        },
+        {
+          "file": "code/js/figedit.js",
+          "start": 161,
+          "end": 187,
+          "role": "logic",
+          "symbol": "openEd",
+          "anchor": "02d71ade4fb1",
+          "first": "function openEd(kind, id) {"
+        },
+        {
+          "file": "code/js/figedit.js",
+          "start": 461,
+          "end": 467,
+          "role": "logic",
+          "symbol": "makeGroup",
+          "anchor": "b8fbbc52cf55",
+          "first": "function makeGroup(a, b) {"
+        },
+        {
+          "file": "code/js/figedit.js",
+          "start": 449,
+          "end": 540,
+          "role": "logic",
+          "anchor": "396055d2391e",
+          "first": "prev.addEventListener('pointerdown', e => {"
+        }
+      ]
+    },
+    {
+      "id": "export-preflight",
+      "level": "component",
+      "parent": null,
+      "title": "Export menu with pre-flight check",
+      "summary": "Before export, checks the figure against image-integrity and legibility rules and offers fixes. It then writes the figure and the supplementary files: uncropped image, original bytes and processing log.",
+      "views": [
+        "list",
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "rubric"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 49,
+          "end": 59,
+          "role": "markup",
+          "symbol": "#exportMenu",
+          "anchor": "c905cb0231b2",
+          "first": "<div class=\"menu hidden right\" id=\"exportMenu\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 559,
+          "end": 568,
+          "role": "markup",
+          "anchor": "dc34f0915f0c",
+          "first": "<div id=\"preflightDlg\" class=\"dlg hidden\"><div class=\"dlg-body pf\">"
+        },
+        {
+          "file": "code/css/style.css",
+          "start": 210,
+          "end": 210,
+          "role": "style",
+          "symbol": ".pf-item",
+          "anchor": "debca9f17304",
+          "first": ".pf-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--line-2); fo"
+        },
+        {
+          "file": "code/js/ui.js",
+          "start": 195,
+          "end": 241,
+          "role": "logic",
+          "anchor": "529f32de466c",
+          "first": "/* ---------- export (with pre-flight) ---------- */"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 1368,
+          "end": 1405,
+          "role": "logic",
+          "anchor": "542029a1acc8",
+          "first": "/* Pre-flight before export: problems a reviewer or a journal check would catch."
+        },
+        {
+          "file": "code/js/export.js",
+          "start": 172,
+          "end": 185,
+          "role": "logic",
+          "symbol": "exportTIFF",
+          "anchor": "1610dbbeffd8",
+          "first": "async function exportTIFF(svg, wPt, hPt, dpi, name, S) {"
+        },
+        {
+          "file": "code/js/export.js",
+          "start": 193,
+          "end": 224,
+          "role": "logic",
+          "symbol": "exportUncropped",
+          "anchor": "eca828e6e316",
+          "first": "function exportUncropped(S, fullCanvas, name) {"
+        },
+        {
+          "file": "code/js/export.js",
+          "start": 232,
+          "end": 276,
+          "role": "logic",
+          "symbol": "processingLog",
+          "anchor": "35456ab81975",
+          "first": "function processingLog(S) {"
+        }
+      ]
+    }
+  ]
+}

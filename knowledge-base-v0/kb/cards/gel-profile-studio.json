@@ -1,0 +1,733 @@
+{
+  "schema": "astaui.card/1",
+  "id": "gel-profile-studio",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T14:49:16Z"
+  },
+  "app": {
+    "title": "Gel Profile Studio — agarose gel lane densitometry",
+    "summary": "A person opens a gel image, rotates it if needed, sets the gel area to analyse, and places lane lines by clicking or by automatic lane detection. Each lane becomes an intensity profile along migration distance, with segmented bands. The person can change polarity, background correction, smoothing and normalization, rename lanes, and overlay chosen lanes to compare them. A ladder lane calibrates migration distance to fragment size. Optional checks match expected fragment sizes against the observed bands and compute statistics across replicate gels. The results are exported as profile or band CSVs, a comparison SVG, an annotated image, a report or a project file.",
+    "task": {
+      "text": "Turn a gel image into per-lane intensity profiles with measured bands, size them against a ladder, and check them against expected fragments.",
+      "verbs": [
+        "derive",
+        "compare",
+        "identify",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A gel image with lanes, read as one-dimensional intensity profiles along migration distance, plus a set of known marker sizes",
+      "item": "a lane on a gel image and its intensity profile",
+      "shapes": [
+        "image",
+        "grid of series",
+        "table",
+        "image collection"
+      ]
+    },
+    "stage": {
+      "text": "analysing gel images after electrophoresis, before reporting band sizes and amounts",
+      "terms": [
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Lane lines placed on the gel canvas each drive a profile card in the side panel that recomputes whenever a processing setting changes. A Compare tab overlays the chosen lanes on one chart, and modals handle ladder calibration, expected-fragment checks, replicate batches and exports.",
+      "views": [
+        "image viewer",
+        "line chart",
+        "list",
+        "table view",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "drag to arrange",
+        "inline edit",
+        "toggle view",
+        "hover for detail",
+        "import",
+        "export",
+        "keyboard shortcuts"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "lane densitometry of agarose gel electrophoresis in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "gel densitometry",
+        "dna ladder calibration",
+        "molecular biology"
+      ]
+    },
+    "workflow": {
+      "name": "extract per-lane profiles from an image and calibrate them against a standard",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Open, drop or paste a gel image (TIFF is decoded on demand), or reload a project JSON. Rotate the image 90° and set the gel area to exclude borders and labels.",
+          "parts": [
+            "gel-workspace",
+            "project-export"
+          ]
+        },
+        {
+          "step": "mark each item on the image",
+          "here": "Click lane centres or use Auto-detect lanes. Drag the lines to move them, set the lane width with a slider, and delete the selected lane with the Delete key.",
+          "parts": [
+            "gel-workspace"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Each lane is averaged into a migration profile, with a choice of bright or dark signal, background correction (local flanks or rolling baseline), smoothing and normalization. Bands are segmented between valleys to give area, prominence, abundance and clipping.",
+          "parts": [
+            "profile-panel"
+          ]
+        },
+        {
+          "step": "calibrate against a known standard",
+          "here": "Choose a ladder preset or enter custom sizes, then click the ladder lane. Peaks are matched to sizes in order, and log10(bp) is fitted against migration with R² and a residual error.",
+          "parts": [
+            "ladder-calibration"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "The Compare tab overlays the chosen lanes on one chart, can align them by correlation shift, and shows values on hover.",
+          "parts": [
+            "compare-overlay"
+          ]
+        },
+        {
+          "step": "check results against expectations",
+          "here": "Expected fragment sizes are matched to observed bands in calibrated log-size space and called matched, uncertain, missing or extra. Replicate gels are run with the same lane positions to give mean, SD and CV.",
+          "parts": [
+            "expected-fragments",
+            "batch-replicates"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Export profile, band, verification or replicate CSVs, a comparison SVG, an annotated PNG, a standalone HTML report, or a project JSON.",
+          "parts": [
+            "project-export",
+            "expected-fragments",
+            "batch-replicates"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Sizes come from a log-linear fit of log10(bp) against migration distance on a ladder lane, with an approximate 95% size interval.",
+        "Background can be subtracted from flanking strips beside each lane or from a rolling baseline.",
+        "Lanes with saturated (clipped) pixels are flagged because clipping breaks quantitation.",
+        "Expected digest or PCR fragments are scored probabilistically, with penalties for missing and extra bands.",
+        "Lane positions are reused across replicate gels to report coefficient of variation."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "gel-workspace",
+      "level": "view",
+      "parent": null,
+      "title": "Gel image with lane lines",
+      "summary": "Shows the gel image, where the person sets the analysis area and places, drags and deletes lane lines.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "drag to arrange",
+        "keyboard shortcuts"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 109,
+          "end": 140,
+          "role": "markup",
+          "symbol": "section.workspace",
+          "anchor": "57255a9b98cd",
+          "first": "<section class=\"workspace\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 53,
+          "end": 53,
+          "role": "style",
+          "symbol": ".stage",
+          "anchor": "e59297e9c000",
+          "first": ".stage{position:relative;flex:1;min-height:520px;border:1px solid var(--border);border-radius:var(--radius);background:#"
+        },
+        {
+          "file": "code/index.html",
+          "start": 57,
+          "end": 57,
+          "role": "style",
+          "symbol": "#overlayCanvas",
+          "anchor": "68c975048fec",
+          "first": "#overlayCanvas{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 440,
+          "end": 460,
+          "role": "logic",
+          "symbol": "loadFile",
+          "anchor": "54adf4d0dd83",
+          "first": "async function loadFile(file){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 474,
+          "end": 474,
+          "role": "logic",
+          "symbol": "setDecodedImage",
+          "anchor": "60275c9a047d",
+          "first": "function setDecodedImage({source,width,height}){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 493,
+          "end": 498,
+          "role": "logic",
+          "symbol": "setGelBounds",
+          "anchor": "8fa00aa3924f",
+          "first": "function setGelBounds(next,announce=false){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 500,
+          "end": 518,
+          "role": "logic",
+          "anchor": "36aa33b8cfe2",
+          "first": "overlay.addEventListener('pointerdown',e=>{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 519,
+          "end": 530,
+          "role": "logic",
+          "symbol": "autoDetectLanes",
+          "anchor": "71245193418b",
+          "first": "function autoDetectLanes(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 532,
+          "end": 539,
+          "role": "logic",
+          "symbol": "addLane",
+          "anchor": "edfb7194165f",
+          "first": "function addLane(x,isLadder){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 673,
+          "end": 680,
+          "role": "logic",
+          "symbol": "renderOverlay",
+          "anchor": "1293e266d3ff",
+          "first": "function renderOverlay(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 754,
+          "end": 756,
+          "role": "logic",
+          "symbol": "rotateImage90",
+          "anchor": "b247f3c52659",
+          "first": "async function rotateImage90(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 374,
+          "end": 377,
+          "role": "logic",
+          "anchor": "3fc94693bd1b",
+          "first": "document.addEventListener('keydown',e=>{"
+        }
+      ]
+    },
+    {
+      "id": "ladder-calibration",
+      "level": "component",
+      "parent": "gel-workspace",
+      "title": "Ladder lane calibration",
+      "summary": "Takes a marker preset or custom sizes, and after the person clicks the ladder lane it fits migration distance to fragment size.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 166,
+          "end": 182,
+          "role": "markup",
+          "symbol": "#ladderModal",
+          "anchor": "93b23879d565",
+          "first": "<div class=\"modal-backdrop\" id=\"ladderModal\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 88,
+          "end": 88,
+          "role": "style",
+          "symbol": ".ladder-box",
+          "anchor": "29b3544d170c",
+          "first": ".ladder-box{border:1px solid var(--border);border-radius:6px;padding:12px;background:#0d1117;margin-top:12px}.ladder-sta"
+        },
+        {
+          "file": "code/index.html",
+          "start": 291,
+          "end": 366,
+          "role": "data",
+          "symbol": "ladderPresets",
+          "anchor": "b728d440200c",
+          "first": "const ladderPresets = {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 404,
+          "end": 414,
+          "role": "logic",
+          "anchor": "bdf0a35b2848",
+          "first": "const presetSel=$('#ladderPreset');"
+        },
+        {
+          "file": "code/index.html",
+          "start": 540,
+          "end": 545,
+          "role": "logic",
+          "symbol": "suggestLadder",
+          "anchor": "8442f73049de",
+          "first": "function suggestLadder(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 603,
+          "end": 615,
+          "role": "logic",
+          "symbol": "calibrateFromLadder",
+          "anchor": "7f92271bc423",
+          "first": "function calibrateFromLadder(lane){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 616,
+          "end": 635,
+          "role": "logic",
+          "symbol": "bestOrderedCalibration",
+          "anchor": "7e23d8497b1f",
+          "first": "function bestOrderedCalibration(peaks,sizes,h){"
+        }
+      ]
+    },
+    {
+      "id": "profile-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Intensity profiles",
+      "summary": "Shows one card per lane, with an editable name, a profile chart, band area, abundance and clipping, all driven by the shared processing controls.",
+      "views": [
+        "list",
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "inline edit",
+        "select",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 142,
+          "end": 162,
+          "role": "markup",
+          "symbol": "aside.profiles",
+          "anchor": "a17595895916",
+          "first": "<aside class=\"profiles\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 79,
+          "end": 79,
+          "role": "style",
+          "symbol": ".profile-card",
+          "anchor": "a1b7fca57d2b",
+          "first": ".profile-card{border:1px solid var(--border);border-radius:var(--radius);background:var(--panel);overflow:hidden}.profil"
+        },
+        {
+          "file": "code/index.html",
+          "start": 74,
+          "end": 74,
+          "role": "style",
+          "symbol": ".global-controls",
+          "anchor": "a2eef3e696e8",
+          "first": ".global-controls{border:1px solid var(--border);border-radius:var(--radius);background:var(--panel);padding:10px;margin-"
+        },
+        {
+          "file": "code/index.html",
+          "start": 416,
+          "end": 422,
+          "role": "logic",
+          "anchor": "c89273db6864",
+          "first": "$('#laneWidth').oninput=e=>{state.laneWidth=+e.target.value;$('#laneWidthVal').textContent=state.laneWidth+' px';recompu"
+        },
+        {
+          "file": "code/index.html",
+          "start": 548,
+          "end": 568,
+          "role": "logic",
+          "symbol": "computeLane",
+          "anchor": "55da801e9646",
+          "first": "function computeLane(lane){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 588,
+          "end": 600,
+          "role": "logic",
+          "symbol": "segmentBands",
+          "anchor": "cc8eaed13891",
+          "first": "function segmentBands(arr,sensitivity=.16){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 684,
+          "end": 698,
+          "role": "logic",
+          "symbol": "renderProfiles",
+          "anchor": "55234cbe9363",
+          "first": "function renderProfiles(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 734,
+          "end": 750,
+          "role": "logic",
+          "symbol": "drawChart",
+          "anchor": "c4049b664872",
+          "first": "function drawChart(canvas,lanes,isCompare,hoverIndex){"
+        }
+      ]
+    },
+    {
+      "id": "compare-overlay",
+      "level": "component",
+      "parent": "profile-panel",
+      "title": "Compare overlaid lanes",
+      "summary": "Overlays the chosen lanes on one chart, with optional alignment by correlation and a hover tooltip showing exact values.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail",
+        "multi-select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 62,
+          "end": 62,
+          "role": "style",
+          "symbol": ".compare-view",
+          "anchor": "a401077aaec0",
+          "first": ".compare-view{display:grid;gap:10px}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 66,
+          "end": 66,
+          "role": "style",
+          "symbol": ".lane-toggle",
+          "anchor": "7c5f5a950888",
+          "first": ".lane-toggle{--lane-color:var(--blue);display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);back"
+        },
+        {
+          "file": "code/index.html",
+          "start": 72,
+          "end": 72,
+          "role": "style",
+          "symbol": ".chart-tooltip",
+          "anchor": "7a9d5ff76478",
+          "first": ".chart-tooltip{position:absolute;z-index:4;display:none;pointer-events:none;min-width:142px;max-width:250px;padding:7px "
+        },
+        {
+          "file": "code/index.html",
+          "start": 699,
+          "end": 710,
+          "role": "logic",
+          "symbol": "renderCompareView",
+          "anchor": "831f631c0140",
+          "first": "function renderCompareView(list){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 733,
+          "end": 733,
+          "role": "logic",
+          "symbol": "plotValues",
+          "anchor": "f189881d0c3e",
+          "first": "function plotValues(lane,lanes,field='processed'){const source=lane[field]||[];if(!state.alignProfiles||lanes.length<2||"
+        },
+        {
+          "file": "code/index.html",
+          "start": 714,
+          "end": 725,
+          "role": "logic",
+          "symbol": "initProfileChart",
+          "anchor": "fa7612e2cbba",
+          "first": "function initProfileChart(canvas,lanes,isCompare){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 726,
+          "end": 731,
+          "role": "logic",
+          "symbol": "updateChartTooltip",
+          "anchor": "d4adc57554d2",
+          "first": "function updateChartTooltip(canvas,tip,lanes,index,point,isCompare){"
+        }
+      ]
+    },
+    {
+      "id": "expected-fragments",
+      "level": "view",
+      "parent": null,
+      "title": "Expected digest / PCR fragments",
+      "summary": "Matches the expected fragment sizes to observed bands and calls each one matched, uncertain, missing or extra, then exports the result as a CSV.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 208,
+          "end": 222,
+          "role": "markup",
+          "symbol": "#quantModal",
+          "anchor": "b281ca3c53a7",
+          "first": "<div class=\"modal-backdrop\" id=\"quantModal\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 89,
+          "end": 89,
+          "role": "style",
+          "symbol": ".quant-box",
+          "anchor": "f18a6a768e47",
+          "first": ".quant-box{border:1px solid var(--border);border-radius:6px;padding:10px;background:#0d1117;margin-top:10px}.quant-box h"
+        },
+        {
+          "file": "code/index.html",
+          "start": 643,
+          "end": 649,
+          "role": "logic",
+          "symbol": "assignExpected",
+          "anchor": "1d33c21a2168",
+          "first": "function assignExpected(lane,expected,tolerance){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 650,
+          "end": 653,
+          "role": "logic",
+          "symbol": "runExpectedVerification",
+          "anchor": "47269f03a7c7",
+          "first": "function runExpectedVerification(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 654,
+          "end": 656,
+          "role": "logic",
+          "anchor": "436c70aa7eeb",
+          "first": "function renderExpectedResults(){const box=$('#expectedResults');if(!state.expectedResults.length){box.innerHTML='<span "
+        }
+      ]
+    },
+    {
+      "id": "batch-replicates",
+      "level": "view",
+      "parent": null,
+      "title": "Batch / replicate analysis",
+      "summary": "Applies the current lane positions and settings to replicate gel images, reports mean, SD and CV for each lane, and exports them.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 224,
+          "end": 234,
+          "role": "markup",
+          "symbol": "#batchModal",
+          "anchor": "612df2a60436",
+          "first": "<div class=\"modal-backdrop\" id=\"batchModal\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 658,
+          "end": 664,
+          "role": "logic",
+          "symbol": "runBatchAnalysis",
+          "anchor": "91f645cbb41d",
+          "first": "async function runBatchAnalysis(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 665,
+          "end": 666,
+          "role": "logic",
+          "anchor": "8e453ef89586",
+          "first": "function renderBatchResults(){const box=$('#batchResults'),b=state.batch;if(!b){box.innerHTML='<span style=\"color:var(--"
+        }
+      ]
+    },
+    {
+      "id": "project-export",
+      "level": "view",
+      "parent": null,
+      "title": "Project and exports",
+      "summary": "Records the title, gel ID and notes, saves or loads a project JSON, and exports profile or band CSVs, a comparison SVG, an annotated PNG and an HTML report.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export",
+        "import",
+        "write notes"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 184,
+          "end": 206,
+          "role": "markup",
+          "symbol": "#projectModal",
+          "anchor": "41758f39e58c",
+          "first": "<div class=\"modal-backdrop\" id=\"projectModal\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 761,
+          "end": 763,
+          "role": "logic",
+          "symbol": "exportCsv",
+          "anchor": "941a0e2591ec",
+          "first": "function exportCsv(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 764,
+          "end": 764,
+          "role": "logic",
+          "anchor": "7e9b37d69503",
+          "first": "function exportBandCsv(){if(!state.lanes.length){toast('Add at least one lane first.',true);return}const rows=[['lane','"
+        },
+        {
+          "file": "code/index.html",
+          "start": 765,
+          "end": 767,
+          "role": "logic",
+          "symbol": "exportComparisonSvg",
+          "anchor": "1ef128132c9b",
+          "first": "function exportComparisonSvg(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 769,
+          "end": 771,
+          "role": "logic",
+          "symbol": "saveAnnotatedPng",
+          "anchor": "88672429e3e7",
+          "first": "async function saveAnnotatedPng(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 772,
+          "end": 774,
+          "role": "logic",
+          "symbol": "saveProject",
+          "anchor": "6ffc2e94d727",
+          "first": "async function saveProject(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 775,
+          "end": 839,
+          "role": "logic",
+          "symbol": "prepareProjectImport",
+          "anchor": "068dfc833e45",
+          "first": "function prepareProjectImport(value){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 840,
+          "end": 843,
+          "role": "logic",
+          "symbol": "loadProject",
+          "anchor": "cc630341d27b",
+          "first": "async function loadProject(file){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 845,
+          "end": 851,
+          "role": "logic",
+          "symbol": "exportReport",
+          "anchor": "3728f3e49c11",
+          "first": "async function exportReport(){"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,495 @@
+{
+  "schema": "astaui.card/1",
+  "id": "gathervis-seismic-viewer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T20:36:51Z"
+  },
+  "app": {
+    "title": "gathervis: pre-stack seismic gather viewer",
+    "summary": "A person opens a set of recorded seismic shots in the browser, optionally with source and receiver coordinates. They check the acquisition layout over a map of how many traces fall in each midpoint bin, and tap a source to open its shot record. They step through shots with a slider or the arrow keys, re-sort each shot's traces, and change the display, filter and gain until events stand out. Then they draw windows to take amplitude and f-k spectra, pick first breaks by hand or with an STA/LTA trigger, and draw top and bottom mutes. They come away with exported picks, mute lines, analysis windows and full-resolution images.",
+    "task": {
+      "text": "Quality-check recorded seismic shot gathers one shot at a time, measure their frequency content, and pick first breaks and mute lines that carry across the whole survey.",
+      "verbs": [
+        "explore",
+        "identify",
+        "annotate",
+        "derive",
+        "clean",
+        "locate"
+      ]
+    },
+    "data": {
+      "text": "A survey of seismic recordings: for each shot, many receiver traces sampled over time, with optional source and receiver coordinates. Large files are read lazily from memory-mapped arrays or SEG-Y.",
+      "item": "a shot gather: every receiver trace recorded for one source, laid out as trace against time",
+      "shapes": [
+        "grid of series",
+        "time series",
+        "geospatial",
+        "field",
+        "events"
+      ]
+    },
+    "stage": {
+      "text": "quality-checking raw pre-stack shot records during processing, before velocity analysis and stacking",
+      "terms": [
+        "explore",
+        "clean",
+        "annotate"
+      ]
+    },
+    "mechanism": {
+      "text": "A geometry map with the fold underneath and a shot-gather panel share one cursor, so tapping a source and moving the shot slider or arrow keys both select the same shot. Display and processing settings in a sidebar redraw the panel, and tools on the panel (analysis windows, picks, mute nodes) are stored by trace or offset so they follow the data through shot changes and re-sorts.",
+      "views": [
+        "map",
+        "heatmap",
+        "image viewer",
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "keyboard shortcuts",
+        "zoom and pan",
+        "toggle view",
+        "filter",
+        "brush",
+        "hover for detail",
+        "inline edit",
+        "sort",
+        "export",
+        "import"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail",
+        "focus and context"
+      ]
+    },
+    "field": {
+      "text": "pre-stack seismic data processing and QC in exploration geophysics",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "seismic processing",
+        "geophysics",
+        "first break picking"
+      ]
+    },
+    "workflow": {
+      "name": "step through recordings, condition them, and mark events to export",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A NumPy array, raw binary memmap or SEG-Y file is loaded, with source and receiver coordinates taken from an .npz file or from the trace headers.",
+          "parts": [
+            "geometry-map",
+            "shot-browser"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The Geometry tab draws sources and receivers over a CMP fold map. Bin size can be edited, and the grid, live bins, fold range and trace total are listed as a geometry check. Tapping a source opens that shot.",
+          "parts": [
+            "geometry-map"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "A shot slider, a shot-number box, ←/→ (Shift steps ten, Home/End jump to the ends) and a Sort selector that lays traces out as recorded, by receiver line, by offset or by azimuth.",
+          "parts": [
+            "shot-browser"
+          ]
+        },
+        {
+          "step": "condition the display so the signal shows",
+          "here": "Density or wiggle display, colormap, clip percentile, polarity flip, an Ormsby low-, high- or band-pass filter, and AGC or trace-balance gain. All of it is applied per shot as it is drawn.",
+          "parts": [
+            "display-processing"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Box or polygon windows drawn on the gather give amplitude spectra (per trace, mean or middle trace, in linear or dB) and an f-k spectrum of the first window.",
+          "parts": [
+            "analysis-windows"
+          ]
+        },
+        {
+          "step": "mark events on each item",
+          "here": "Click to place first-break or event picks, run gapped STA/LTA auto-picking and snap picks to a peak or trough. Top and bottom mutes are drawn as nodes stored against offset, with a survey-wide default and per-gather exceptions.",
+          "parts": [
+            "event-picking",
+            "mute-tool"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Picks go out as CSV (shot, trace, time_s), mutes and windows as JSON, and the gather as a full-resolution PNG. The view's state sits in the URL so it can be shared.",
+          "parts": [
+            "event-picking",
+            "mute-tool",
+            "analysis-windows",
+            "shot-browser"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Fold is computed from coordinates alone, so the survey overview costs nothing however large the trace data is",
+        "Picks are stored against the trace and mutes against offset, not the screen column, so they survive re-sorting and carry over to other shots",
+        "Mute lines have one survey-wide default plus per-gather exceptions, with Make default and Revert, and a taper so the cut does not add false energy",
+        "The same 3-D shot can be re-laid out by acquisition order, receiver line, offset or azimuth on one 2-D panel",
+        "Spectra use the raw gated samples with no taper or smoothing, and report the frequency spacing of the window"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "geometry-map",
+      "level": "view",
+      "parent": null,
+      "title": "Geometry map with CMP fold",
+      "summary": "Shows sources and receivers over a midpoint-fold heatmap with editable bins. Tapping a source opens that shot's gather and highlights its spread.",
+      "views": [
+        "map",
+        "heatmap",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "toggle view",
+        "inline edit",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 2536,
+          "end": 2613,
+          "role": "logic",
+          "symbol": "LayoutMap",
+          "anchor": "c204993d162e",
+          "first": "class LayoutMap:"
+        },
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 2616,
+          "end": 2736,
+          "role": "logic",
+          "symbol": "FoldMap",
+          "anchor": "d60a183b325b",
+          "first": "class FoldMap:"
+        },
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 2517,
+          "end": 2533,
+          "role": "logic",
+          "symbol": "_map_figure",
+          "anchor": "07fa9b6e1498",
+          "first": "def _map_figure(geo, height=None):"
+        },
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 3221,
+          "end": 3279,
+          "role": "logic",
+          "anchor": "dd2c11457469",
+          "first": "class GeometryView(_View):"
+        },
+        {
+          "file": "code/gathervis/survey.py",
+          "start": 141,
+          "end": 157,
+          "role": "logic",
+          "symbol": "fold",
+          "anchor": "2841a91b0e6b",
+          "first": "def fold(geo, bin_size=None, max_bins: int = MAX_BINS) -> BinGrid:"
+        },
+        {
+          "file": "code/gathervis/survey.py",
+          "start": 31,
+          "end": 66,
+          "role": "data",
+          "symbol": "BinGrid",
+          "anchor": "ef1ee1d65070",
+          "first": "class BinGrid(NamedTuple):"
+        }
+      ]
+    },
+    {
+      "id": "shot-browser",
+      "level": "view",
+      "parent": null,
+      "title": "Shot gathers panel",
+      "summary": "Draws one shot as a trace-by-time image or wiggle panel. A slider, keys and the sort selector move through shots, and a button exports a full-resolution PNG.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "keyboard shortcuts",
+        "sort",
+        "zoom and pan",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 2330,
+          "end": 2514,
+          "role": "logic",
+          "symbol": "ShotBrowser",
+          "anchor": "78df50e5e2ea",
+          "first": "class ShotBrowser:"
+        },
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 504,
+          "end": 849,
+          "role": "logic",
+          "symbol": "ImagePane",
+          "anchor": "82549d3fe0a1",
+          "first": "class ImagePane:"
+        },
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 3185,
+          "end": 3220,
+          "role": "logic",
+          "anchor": "1d3cdd22384d",
+          "first": "class GatherView(_View):"
+        },
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 3509,
+          "end": 3581,
+          "role": "logic",
+          "anchor": "7cfc35fda653",
+          "first": "def _make_key_binder(self):"
+        },
+        {
+          "file": "code/gathervis/sortkeys.py",
+          "start": 120,
+          "end": 157,
+          "role": "logic",
+          "symbol": "arrange",
+          "anchor": "50b9fb9f2329",
+          "first": "def arrange(g, ishot: int, sort: str = AS_RECORDED, line: int = 0) -> ShotPanel:"
+        },
+        {
+          "file": "code/gathervis/render.py",
+          "start": 233,
+          "end": 262,
+          "role": "logic",
+          "symbol": "png_bytes",
+          "anchor": "52b85c26c2b2",
+          "first": "def png_bytes(rgb: np.ndarray, level: int = None) -> bytes:"
+        },
+        {
+          "file": "code/gathervis/state.py",
+          "start": 313,
+          "end": 359,
+          "role": "logic",
+          "symbol": "Cursor",
+          "anchor": "cb74bbac1fd7",
+          "first": "class Cursor:"
+        }
+      ]
+    },
+    {
+      "id": "display-processing",
+      "level": "component",
+      "parent": "shot-browser",
+      "title": "Display and processing controls",
+      "summary": "Sidebar settings for display mode, colormap, clip, polarity, band-pass filter and AGC or trace-balance gain, which redraw the gather as they change.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "filter",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 1522,
+          "end": 1560,
+          "role": "logic",
+          "symbol": "_display_controls",
+          "anchor": "022913718075",
+          "first": "def _display_controls(state, panes, redraw, cmap, perc):"
+        },
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 3686,
+          "end": 3805,
+          "role": "logic",
+          "anchor": "a53d80356338",
+          "first": "def _make_controls(self, cmap, perc):"
+        },
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 244,
+          "end": 265,
+          "role": "logic",
+          "symbol": "_process_gather",
+          "anchor": "f6e7e1f32580",
+          "first": "def _process_gather(arr, dt, state):"
+        },
+        {
+          "file": "code/gathervis/process.py",
+          "start": 71,
+          "end": 94,
+          "role": "logic",
+          "symbol": "bandpass",
+          "anchor": "5d5c3eeab572",
+          "first": "def bandpass(a, dt: float, f1=None, f2=None, f3=None, f4=None) -> np.ndarray:"
+        },
+        {
+          "file": "code/gathervis/process.py",
+          "start": 97,
+          "end": 139,
+          "role": "logic",
+          "symbol": "agc",
+          "anchor": "0f424a7b3032",
+          "first": "def agc(a, dt: float, window: float = 0.5) -> np.ndarray:"
+        },
+        {
+          "file": "code/gathervis/state.py",
+          "start": 56,
+          "end": 169,
+          "role": "logic",
+          "symbol": "Display",
+          "anchor": "f89f28ea94b2",
+          "first": "class Display:"
+        }
+      ]
+    },
+    {
+      "id": "analysis-windows",
+      "level": "component",
+      "parent": "shot-browser",
+      "title": "Analysis windows and spectra",
+      "summary": "Box or polygon windows drawn on the gather give amplitude spectra and an f-k spectrum. The window set can be exported and imported as JSON.",
+      "views": [
+        "line chart",
+        "heatmap"
+      ],
+      "interactions": [
+        "brush",
+        "hover for detail",
+        "export",
+        "import"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 862,
+          "end": 1235,
+          "role": "logic",
+          "symbol": "WindowTool",
+          "anchor": "ef03eb4a5611",
+          "first": "class WindowTool:"
+        }
+      ]
+    },
+    {
+      "id": "event-picking",
+      "level": "component",
+      "parent": "shot-browser",
+      "title": "Event and first-break picking",
+      "summary": "Picks are placed, dragged and deleted on the gather, auto-picked with STA/LTA, snapped to a peak or trough, stored per shot by trace, and exported or imported as CSV.",
+      "views": [],
+      "interactions": [
+        "select",
+        "inline edit",
+        "export",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 1238,
+          "end": 1519,
+          "role": "logic",
+          "symbol": "PickTool",
+          "anchor": "959e69890a79",
+          "first": "class PickTool:"
+        },
+        {
+          "file": "code/gathervis/process.py",
+          "start": 183,
+          "end": 205,
+          "role": "logic",
+          "symbol": "pick_first_breaks",
+          "anchor": "53ec18e15ad6",
+          "first": "def pick_first_breaks(a, dt: float, sta: float = 0.02, lta: float = 0.2,"
+        }
+      ]
+    },
+    {
+      "id": "mute-tool",
+      "level": "component",
+      "parent": "shot-browser",
+      "title": "Top and bottom mutes",
+      "summary": "Node-drawn mute lines stored against offset, with a survey default and per-gather exceptions, previewed with Apply mute and saved as JSON.",
+      "views": [],
+      "interactions": [
+        "inline edit",
+        "toggle view",
+        "export",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gathervis/viewer.py",
+          "start": 1597,
+          "end": 1899,
+          "role": "logic",
+          "symbol": "MuteTool",
+          "anchor": "07bbe4581b3c",
+          "first": "class MuteTool:"
+        },
+        {
+          "file": "code/gathervis/mute.py",
+          "start": 156,
+          "end": 286,
+          "role": "data",
+          "symbol": "Mutes",
+          "anchor": "757bcb5822df",
+          "first": "class Mutes:"
+        },
+        {
+          "file": "code/gathervis/mute.py",
+          "start": 90,
+          "end": 153,
+          "role": "logic",
+          "symbol": "apply",
+          "anchor": "2b381211dd82",
+          "first": "def apply(gather, x, dt, top=None, bottom=None, t0=0.0, taper=0.04):"
+        }
+      ]
+    }
+  ]
+}

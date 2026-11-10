@@ -1,0 +1,950 @@
+{
+  "schema": "astaui.card/1",
+  "id": "sieve-variant-pathogenicity",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T11:53:47Z"
+  },
+  "app": {
+    "title": "SIEVE — structure-based missense variant interpretation dashboard",
+    "summary": "A person enters a gene symbol, a protein variant and a protein accession, and the interface runs a staged pipeline. The pipeline fetches the predicted 3D structure, audits per-residue model confidence, builds a residue contact network and simulates the variant's loss of contacts, while a tracker shows each stage as it finishes. The person then looks at the structure in 3D with the variant site highlighted, the confidence profile along the sequence and the contact neighbourhood around the site. They read a layered assessment that ends in a five-tier classification with database and literature evidence, and can export it as JSON, Markdown or a printable brief. A separate validation run scores every labelled variant of the gene with the same rules and reports a confusion matrix and agreement statistics.",
+    "task": {
+      "text": "Classify a single protein variant as likely pathogenic or benign from structural, network and conservation evidence, and check how well the rules agree with known labels.",
+      "verbs": [
+        "derive",
+        "decide",
+        "identify",
+        "explore",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A predicted 3D protein structure with per-residue confidence, a residue contact graph with per-residue centrality metrics, per-residue conservation scores, and a set of database variants with known clinical labels.",
+      "item": "a single amino-acid substitution at one residue of a protein",
+      "shapes": [
+        "3d structure",
+        "sequence",
+        "network",
+        "table",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "interpreting a candidate variant after it has been identified, before a clinical report is written",
+      "terms": [
+        "analyze",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "Three input fields drive a backend pipeline whose stages light up in a tracker. When it finishes, a 3D viewer, a confidence line chart and a force-directed contact network all centre on the variant residue, and clicking a residue in 3D opens its network metrics. An assessment panel and a tier summary turn the computed evidence into a classification with export buttons, and a separate validation panel benchmarks the rules against labelled variants as a confusion matrix.",
+      "views": [
+        "form",
+        "3d structure viewer",
+        "line chart",
+        "network diagram",
+        "detail panel",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail",
+        "zoom and pan",
+        "toggle view",
+        "filter",
+        "drag to arrange",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail",
+        "focus and context"
+      ]
+    },
+    "field": {
+      "text": "structure-based missense variant pathogenicity prediction in clinical genomics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "variant interpretation",
+        "structural bioinformatics",
+        "protein contact network"
+      ]
+    },
+    "workflow": {
+      "name": "classify one item into a tier from computed evidence, then benchmark the rules against known labels",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Type a gene symbol, a variant such as R155H and a protein accession. Editing any field re-runs the analysis after a short pause, and Enter or Analyze Variant runs it at once. Genes that are already cached take a faster path that only recomputes the variant.",
+          "parts": [
+            "analysis-panel"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The backend fetches the predicted structure, annotations and database variants, extracts per-residue confidence, builds an 8 Å Cα contact graph with centrality metrics, and removes the residue's edges to measure the change in path length and components. A five-stage tracker marks each stage done or failed.",
+          "parts": [
+            "analysis-panel",
+            "variant-assessment"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "See the whole protein in 3D, coloured by confidence or another scheme, with the variant residue drawn in red and labelled. Below it are the confidence profile along the sequence with the variant marked, and the contact neighbourhood within 1–4 hops, set with a radius slider.",
+          "parts": [
+            "structure-viewer",
+            "confidence-profile",
+            "contact-network"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Click any residue in the 3D view to open its confidence, degree, betweenness percentile and clustering. Hover a network node to see the same metrics.",
+          "parts": [
+            "residue-detail",
+            "contact-network"
+          ]
+        },
+        {
+          "step": "reach a classification with its evidence",
+          "here": "The assessment shows the network tier, the analysis track chosen by confidence routing, a 3D conservation neighbourhood score, and the disruption numbers. The summary gives tier 1–5 with a rationale, the database significance and counts of agreeing and disagreeing studies.",
+          "parts": [
+            "variant-assessment",
+            "clinical-summary"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Export the report as JSON, download the Markdown report written by the server, or open a printable clinical brief.",
+          "parts": [
+            "clinical-summary"
+          ]
+        },
+        {
+          "step": "check the rules against known labels",
+          "here": "Run Validation scores every labelled database variant of the gene with the same network and chemistry rules. It shows MCC, accuracy, sensitivity and specificity with a 2×2 confusion matrix, and highlights MCC when it is above 0.4.",
+          "parts": [
+            "validation-suite"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Per-residue model confidence decides which analysis track a variant takes (structured, low-confidence or disordered), smoothed over a three-residue window.",
+        "A variant is simulated by deleting the residue's contacts in the graph and measuring the change in average path length and connected components.",
+        "Chemical distance between the two amino acids, and the mean conservation of the residue's 3D neighbours, can move a variant up or down a tier.",
+        "The same rules can be benchmarked against every labelled variant of the gene, so the person sees how far to trust the single call."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "analysis-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis inputs and pipeline tracker",
+      "summary": "Takes the gene, variant and accession, runs the full or fast pipeline, and shows each stage as done, active or failed.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/index.html",
+          "start": 46,
+          "end": 80,
+          "role": "markup",
+          "symbol": "#panel-analysis",
+          "anchor": "897a034c44d7",
+          "first": "<section class=\"panel analysis-control\" id=\"panel-analysis\">"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 222,
+          "end": 226,
+          "role": "style",
+          "symbol": ".input-group input",
+          "anchor": "6c767f3cb33c",
+          "first": ".input-group input {"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 258,
+          "end": 262,
+          "role": "style",
+          "symbol": ".pipeline-tracker",
+          "anchor": "0c79535f307a",
+          "first": ".pipeline-tracker {"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 263,
+          "end": 267,
+          "role": "style",
+          "symbol": ".tracker-step",
+          "anchor": "4e126c8248e9",
+          "first": ".tracker-step {"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 272,
+          "end": 276,
+          "role": "style",
+          "symbol": ".step-dot",
+          "anchor": "26c2c71ddd9a",
+          "first": ".step-dot {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 140,
+          "end": 147,
+          "role": "logic",
+          "anchor": "a0ba1f03bce6",
+          "first": "$('#btn-analyze').addEventListener('click', () => runAnalysis());"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 198,
+          "end": 203,
+          "role": "logic",
+          "symbol": "scheduleAnalysis",
+          "anchor": "7dd20c33c21a",
+          "first": "function scheduleAnalysis() {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 206,
+          "end": 262,
+          "role": "logic",
+          "symbol": "runAnalysis",
+          "anchor": "937024b1d7fb",
+          "first": "async function runAnalysis() {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 109,
+          "end": 120,
+          "role": "logic",
+          "symbol": "applyTrackerStages",
+          "anchor": "1c21d004f3f1",
+          "first": "function applyTrackerStages(stages) {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 101,
+          "end": 108,
+          "role": "logic",
+          "symbol": "setTrackerActive",
+          "anchor": "b6cc8d23e210",
+          "first": "function setTrackerActive(idx) {"
+        },
+        {
+          "file": "code/server.py",
+          "start": 511,
+          "end": 561,
+          "role": "logic",
+          "symbol": "analyze",
+          "anchor": "9b18972167f0",
+          "first": "async def analyze(req: AnalyzeRequest):"
+        },
+        {
+          "file": "code/server.py",
+          "start": 488,
+          "end": 507,
+          "role": "logic",
+          "symbol": "analyze_variant",
+          "anchor": "e388dc7f0bdc",
+          "first": "async def analyze_variant(req: VariantRequest):"
+        },
+        {
+          "file": "code/server.py",
+          "start": 220,
+          "end": 227,
+          "role": "logic",
+          "symbol": "ready",
+          "anchor": "f01054b78330",
+          "first": "async def ready(gene: str, uniprot: str):"
+        }
+      ]
+    },
+    {
+      "id": "structure-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "3D protein structure",
+      "summary": "Shows the predicted structure in 3D with a choice of representation and colour scheme, highlights and labels the variant residue, and can refocus the camera on it.",
+      "views": [
+        "3d structure viewer"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/index.html",
+          "start": 83,
+          "end": 139,
+          "role": "markup",
+          "symbol": "#panel-structure",
+          "anchor": "ce03682082d0",
+          "first": "<section class=\"panel structure-panel\" id=\"panel-structure\">"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 285,
+          "end": 285,
+          "role": "style",
+          "symbol": ".structure-controls",
+          "anchor": "ca0f2748132c",
+          "first": ".structure-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 288,
+          "end": 294,
+          "role": "style",
+          "symbol": ".ctrl-btn",
+          "anchor": "c9038506b40d",
+          "first": ".ctrl-btn {"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 309,
+          "end": 312,
+          "role": "style",
+          "symbol": "#ngl-viewport",
+          "anchor": "fd0feeeb2a9c",
+          "first": "#ngl-viewport {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 149,
+          "end": 162,
+          "role": "logic",
+          "anchor": "7975027c087b",
+          "first": "// structure representation buttons"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 281,
+          "end": 302,
+          "role": "logic",
+          "symbol": "loadStructure",
+          "anchor": "06e8e08dab3b",
+          "first": "async function loadStructure() {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 304,
+          "end": 322,
+          "role": "logic",
+          "symbol": "updateStructureRepr",
+          "anchor": "45a51c59a7ec",
+          "first": "function updateStructureRepr() {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 324,
+          "end": 327,
+          "role": "logic",
+          "symbol": "focusMutation",
+          "anchor": "9b859620972d",
+          "first": "function focusMutation() {"
+        },
+        {
+          "file": "code/server.py",
+          "start": 230,
+          "end": 234,
+          "role": "data",
+          "symbol": "get_structure",
+          "anchor": "efda55d24875",
+          "first": "async def get_structure(uniprot: str):"
+        }
+      ]
+    },
+    {
+      "id": "residue-detail",
+      "level": "component",
+      "parent": "structure-viewer",
+      "title": "Picked-residue metrics",
+      "summary": "Clicking a residue in the 3D view opens its confidence, degree, betweenness percentile and clustering coefficient beside the structure.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/index.html",
+          "start": 131,
+          "end": 137,
+          "role": "markup",
+          "symbol": "#residue-detail",
+          "anchor": "217ce7398b51",
+          "first": "<div class=\"residue-detail\" id=\"residue-detail\" style=\"display:none;\">"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 315,
+          "end": 319,
+          "role": "style",
+          "symbol": ".residue-detail",
+          "anchor": "28fdf092b4ff",
+          "first": ".residue-detail {"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 320,
+          "end": 323,
+          "role": "style",
+          "symbol": ".detail-header",
+          "anchor": "c24f767e19cb",
+          "first": ".detail-header {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 329,
+          "end": 348,
+          "role": "logic",
+          "symbol": "onResiduePick",
+          "anchor": "dad596e13f42",
+          "first": "function onResiduePick(pp) {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 269,
+          "end": 278,
+          "role": "logic",
+          "symbol": "loadCentrality",
+          "anchor": "e6619cae6393",
+          "first": "async function loadCentrality() {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 165,
+          "end": 165,
+          "role": "logic",
+          "anchor": "e70b2f3b7032",
+          "first": "$('#detail-close').addEventListener('click', () => { $('#residue-detail').style.display = 'none'; });"
+        },
+        {
+          "file": "code/build_graph.py",
+          "start": 109,
+          "end": 142,
+          "role": "data",
+          "symbol": "compute_centrality",
+          "anchor": "b366e9fa2ddc",
+          "first": "def compute_centrality(G: nx.Graph) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "confidence-profile",
+      "level": "view",
+      "parent": null,
+      "title": "Confidence profile",
+      "summary": "Plots model confidence along the residue positions, coloured by confidence band, with the variant marked and summary statistics above.",
+      "views": [
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/index.html",
+          "start": 142,
+          "end": 159,
+          "role": "markup",
+          "symbol": "#panel-confidence",
+          "anchor": "66108861b808",
+          "first": "<section class=\"panel confidence-panel\" id=\"panel-confidence\">"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 337,
+          "end": 339,
+          "role": "style",
+          "symbol": ".stat-box",
+          "anchor": "d7bc1469dbea",
+          "first": ".stat-box {"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 342,
+          "end": 342,
+          "role": "style",
+          "symbol": "#plddt-chart",
+          "anchor": "b955e95a4111",
+          "first": "#plddt-chart { flex: 1; min-height: 200px; position: relative; }"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 351,
+          "end": 376,
+          "role": "logic",
+          "symbol": "loadPlddt",
+          "anchor": "638306c139f5",
+          "first": "async function loadPlddt() {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 378,
+          "end": 418,
+          "role": "logic",
+          "symbol": "renderPlddtChart",
+          "anchor": "3cfd267c0b0e",
+          "first": "function renderPlddtChart(rows, mutRes) {"
+        },
+        {
+          "file": "code/plddt_audit.py",
+          "start": 81,
+          "end": 113,
+          "role": "data",
+          "symbol": "parse_plddt",
+          "anchor": "873b56602d9d",
+          "first": "def parse_plddt(pdb_path: str) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "contact-network",
+      "level": "view",
+      "parent": null,
+      "title": "Structural contact network",
+      "summary": "Draws the force-directed contact neighbourhood around the variant residue within a hop radius set by a slider, colours high-betweenness nodes, and shows each node's metrics on hover.",
+      "views": [
+        "network diagram"
+      ],
+      "interactions": [
+        "filter",
+        "hover for detail",
+        "drag to arrange"
+      ],
+      "patterns": [
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/index.html",
+          "start": 162,
+          "end": 187,
+          "role": "markup",
+          "symbol": "#panel-network",
+          "anchor": "11518c64c050",
+          "first": "<section class=\"panel network-panel\" id=\"panel-network\">"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 349,
+          "end": 353,
+          "role": "style",
+          "symbol": "#network-graph",
+          "anchor": "e6ec0c043125",
+          "first": "#network-graph {"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 355,
+          "end": 359,
+          "role": "style",
+          "symbol": ".network-legend",
+          "anchor": "a78f9c2bbc5d",
+          "first": ".network-legend {"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 346,
+          "end": 346,
+          "role": "style",
+          "symbol": ".radius-control",
+          "anchor": "73d6fcb83ac6",
+          "first": ".radius-control { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-sec); }"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 168,
+          "end": 171,
+          "role": "logic",
+          "anchor": "c5fcf162189b",
+          "first": "$('#network-radius').addEventListener('input', (e) => { $('#radius-value').textContent = e.target.value; });"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 421,
+          "end": 434,
+          "role": "logic",
+          "symbol": "loadGraph",
+          "anchor": "0a48fb29ab6b",
+          "first": "async function loadGraph(radius = 2) {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 436,
+          "end": 485,
+          "role": "logic",
+          "symbol": "renderD3Graph",
+          "anchor": "45c051052f9f",
+          "first": "function renderD3Graph(data) {"
+        },
+        {
+          "file": "code/server.py",
+          "start": 312,
+          "end": 342,
+          "role": "logic",
+          "symbol": "get_graph",
+          "anchor": "fe996682c443",
+          "first": "async def get_graph(gene: str, mutation: str = Query(...), radius: int = Query(2, ge=1, le=4), uniprot: str = Query(...,"
+        },
+        {
+          "file": "code/build_graph.py",
+          "start": 52,
+          "end": 104,
+          "role": "logic",
+          "symbol": "build_contact_graph",
+          "anchor": "4a7485dc8e6c",
+          "first": "def build_contact_graph(pdb_path: str, cutoff: float = CONTACT_CUTOFF_A) -> tuple[nx.Graph, pd.DataFrame]:"
+        }
+      ]
+    },
+    {
+      "id": "variant-assessment",
+      "level": "view",
+      "parent": null,
+      "title": "Variant assessment",
+      "summary": "Shows the network-disruption tier, the confidence-routed track, the 3D conservation neighbourhood score and the per-variant disruption numbers behind the call.",
+      "views": [
+        "detail panel",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/index.html",
+          "start": 190,
+          "end": 205,
+          "role": "markup",
+          "symbol": "#panel-assessment",
+          "anchor": "b77e66c09073",
+          "first": "<section class=\"panel assessment-panel\" id=\"panel-assessment\">"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 375,
+          "end": 379,
+          "role": "style",
+          "symbol": ".assess-tier",
+          "anchor": "47db5c863631",
+          "first": ".assess-tier {"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 196,
+          "end": 200,
+          "role": "style",
+          "symbol": ".tier-pill",
+          "anchor": "1b18bd67f48c",
+          "first": ".tier-pill {"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 368,
+          "end": 371,
+          "role": "style",
+          "symbol": ".data-row",
+          "anchor": "8a3005daa748",
+          "first": ".data-row {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 501,
+          "end": 570,
+          "role": "logic",
+          "symbol": "renderAssessment",
+          "anchor": "ce2723dca41d",
+          "first": "function renderAssessment(data) {"
+        },
+        {
+          "file": "code/server.py",
+          "start": 63,
+          "end": 69,
+          "role": "logic",
+          "symbol": "_compute_layer0_and_report",
+          "anchor": "b5697f5ecd3f",
+          "first": "def _compute_layer0_and_report("
+        },
+        {
+          "file": "code/build_graph.py",
+          "start": 147,
+          "end": 215,
+          "role": "logic",
+          "symbol": "simulate_mutation",
+          "anchor": "e88c85c9ff25",
+          "first": "def simulate_mutation(G: nx.Graph, resnum: int) -> dict:"
+        },
+        {
+          "file": "code/build_graph.py",
+          "start": 220,
+          "end": 267,
+          "role": "logic",
+          "symbol": "layer0_classification",
+          "anchor": "a3dc5ee5c93a",
+          "first": "def layer0_classification(centrality_row: pd.Series, mutation_result: dict, grantham_d: Optional[int] = None) -> tuple[s"
+        }
+      ]
+    },
+    {
+      "id": "clinical-summary",
+      "level": "view",
+      "parent": null,
+      "title": "Clinical summary and report export",
+      "summary": "Gives the five-tier classification with its rationale, the database significance, stability and literature evidence, and buttons to export the report as JSON, Markdown or a printable brief.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/index.html",
+          "start": 208,
+          "end": 238,
+          "role": "markup",
+          "symbol": "#panel-report",
+          "anchor": "2cd4d3aed143",
+          "first": "<section class=\"panel report-panel\" id=\"panel-report\">"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 386,
+          "end": 390,
+          "role": "style",
+          "symbol": ".report-summary",
+          "anchor": "f4c1974a3b50",
+          "first": ".report-summary {"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 402,
+          "end": 402,
+          "role": "style",
+          "symbol": ".evidence-card",
+          "anchor": "a22ba801b3a4",
+          "first": ".evidence-card { border: 1px solid var(--border); background: var(--bg-alt); padding: 14px; }"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 406,
+          "end": 406,
+          "role": "style",
+          "symbol": ".sig-tag",
+          "anchor": "c3e58fe9e933",
+          "first": ".sig-tag { display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: 700; font-family: var(--mono); margin-"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 488,
+          "end": 499,
+          "role": "logic",
+          "symbol": "loadReport",
+          "anchor": "e7cb97dd7266",
+          "first": "async function loadReport() {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 572,
+          "end": 653,
+          "role": "logic",
+          "symbol": "renderReport",
+          "anchor": "098ba75cbee7",
+          "first": "function renderReport(data) {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 174,
+          "end": 176,
+          "role": "logic",
+          "anchor": "ce078fac25c9",
+          "first": "$('#btn-export-json').addEventListener('click', exportJSON);"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 701,
+          "end": 705,
+          "role": "logic",
+          "symbol": "exportJSON",
+          "anchor": "40bc3f5bdeb8",
+          "first": "function exportJSON() {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 706,
+          "end": 710,
+          "role": "logic",
+          "symbol": "exportMarkdown",
+          "anchor": "9f77fa4945b1",
+          "first": "function exportMarkdown() {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 711,
+          "end": 714,
+          "role": "logic",
+          "symbol": "exportBrief",
+          "anchor": "6d6162fefed7",
+          "first": "function exportBrief() {"
+        },
+        {
+          "file": "code/server.py",
+          "start": 301,
+          "end": 309,
+          "role": "logic",
+          "symbol": "get_report_markdown",
+          "anchor": "11d8f89f1632",
+          "first": "async def get_report_markdown(gene: str, mutation: str):"
+        },
+        {
+          "file": "code/server.py",
+          "start": 284,
+          "end": 297,
+          "role": "logic",
+          "symbol": "get_clinical_brief",
+          "anchor": "dae0e98260c2",
+          "first": "async def get_clinical_brief(gene: str, mutation: str, print: bool = Query(False)):"
+        },
+        {
+          "file": "code/report_generator.py",
+          "start": 41,
+          "end": 47,
+          "role": "logic",
+          "symbol": "classify_tier",
+          "anchor": "59df8ee1dead",
+          "first": "def classify_tier("
+        }
+      ]
+    },
+    {
+      "id": "validation-suite",
+      "level": "view",
+      "parent": null,
+      "title": "Validation suite",
+      "summary": "On request, scores every labelled database variant of the gene with the same rules and reports MCC, accuracy, sensitivity, specificity and a confusion matrix.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "agreement summary"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/index.html",
+          "start": 241,
+          "end": 261,
+          "role": "markup",
+          "symbol": "#panel-validation",
+          "anchor": "b7923952aac9",
+          "first": "<section class=\"panel validation-panel\" id=\"panel-validation\">"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 414,
+          "end": 417,
+          "role": "style",
+          "symbol": ".metrics-display",
+          "anchor": "e74b02fe37db",
+          "first": ".metrics-display {"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 418,
+          "end": 418,
+          "role": "style",
+          "symbol": ".metric-box",
+          "anchor": "1d94329640a4",
+          "first": ".metric-box { padding: 14px; background: var(--bg-alt); border: 1px solid var(--border); text-align: center; }"
+        },
+        {
+          "file": "code/dashboard/styles-new.css",
+          "start": 424,
+          "end": 424,
+          "role": "style",
+          "symbol": ".confusion-matrix",
+          "anchor": "ee91f098ae7a",
+          "first": ".confusion-matrix { overflow-x: auto; }"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 177,
+          "end": 177,
+          "role": "logic",
+          "anchor": "ee3b9aa21bba",
+          "first": "$('#btn-run-validation').addEventListener('click', runValidation);"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 656,
+          "end": 676,
+          "role": "logic",
+          "symbol": "runValidation",
+          "anchor": "260857176aab",
+          "first": "async function runValidation() {"
+        },
+        {
+          "file": "code/dashboard/app-new.js",
+          "start": 678,
+          "end": 698,
+          "role": "logic",
+          "symbol": "renderValidation",
+          "anchor": "9ced1880c370",
+          "first": "function renderValidation(data) {"
+        },
+        {
+          "file": "code/server.py",
+          "start": 353,
+          "end": 484,
+          "role": "logic",
+          "symbol": "run_validation",
+          "anchor": "1a5907c2ae5c",
+          "first": "async def run_validation(gene: str, uniprot: str = Query(...)):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "data",
+      "list": "shapes",
+      "term": "3d structure"
+    },
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "3d structure viewer"
+    }
+  ]
+}

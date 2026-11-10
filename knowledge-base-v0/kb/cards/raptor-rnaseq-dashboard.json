@@ -1,0 +1,496 @@
+{
+  "schema": "astaui.card/1",
+  "id": "raptor-rnaseq-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:07:35Z"
+  },
+  "app": {
+    "title": "RAPTOR Dashboard (RNA-seq analysis pipeline)",
+    "summary": "A person brings in RNA-seq count matrices, either by searching and downloading public datasets or by uploading their own, and can pool several studies with batch correction. They run a quality assessment that scores the data, flags outlier samples by agreement across several detection methods and checks for batch effects, and they can download the counts with outliers removed. They then import differential expression result files from several tools, set significance thresholds and compare how much the methods' significant genes overlap. Finally they combine the methods into one consensus gene list, filter it by confidence tier and direction, and export gene lists and a written report.",
+    "task": {
+      "text": "Turn count matrices and differential expression results from several methods into a quality-checked, tiered consensus list of changed genes.",
+      "verbs": [
+        "derive",
+        "compare",
+        "clean",
+        "summarize",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Gene-by-sample count matrices with sample metadata, and per-gene differential expression result tables (fold change, p-value, adjusted p-value) from several statistical methods",
+      "item": "a gene, with its fold change and p-values from each differential expression method",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "combining differential expression results after quality control of counts, before writing up",
+      "terms": [
+        "analyze",
+        "clean",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A multipage dashboard leads the person through numbered sections on each page: upload or acquire data, configure, run, then read metric tiles, tabbed plots and filterable tables. Every page keeps its results in session state, so later pages (ensemble, reports) build on what earlier pages produced.",
+      "views": [
+        "table view",
+        "summary stats",
+        "scatter plot",
+        "heatmap",
+        "bar chart",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "select",
+        "multi-select",
+        "filter",
+        "toggle view",
+        "hover for detail",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "status pipeline",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "differential expression analysis of RNA-seq count data in transcriptomics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "transcriptomics",
+        "differential expression",
+        "rna seq"
+      ]
+    },
+    "workflow": {
+      "name": "combine results from several methods into one consensus list",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Search GEO, SRA, TCGA or ArrayExpress, or upload a count matrix CSV with optional sample metadata. Several studies can be pooled with gene ID harmonisation and batch correction.",
+          "parts": [
+            "data-acquisition",
+            "pool-datasets",
+            "quality-assessment"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Pick a normalisation and set how many of six outlier detectors must agree. Running the assessment gives an overall and per-component quality score, flagged outlier samples and a batch-effect check. Filtered counts with outliers removed can be downloaded.",
+          "parts": [
+            "quality-assessment"
+          ]
+        },
+        {
+          "step": "bring in results from each method",
+          "here": "Upload DESeq2, edgeR or limma result files. The format is detected automatically, FDR and log2FC thresholds are set, and all files are standardised in one go.",
+          "parts": [
+            "import-de"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Per-file counts of significant, up and down genes, overlap and distribution tabs, and a pairwise Jaccard overlap check of the methods chosen for the ensemble",
+          "parts": [
+            "import-de",
+            "ensemble"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Choose Fisher's, Brown's or rank aggregation, optionally require the same direction and pre-filter by FDR and |log2FC|, then run it to get combined p-values and a meta fold change for each gene",
+          "parts": [
+            "ensemble"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Consensus genes are sorted into p-value tiers (0.001, 0.01, 0.05). The full table can be filtered by tier and up or down direction, and the top 20 genes are listed.",
+          "parts": [
+            "consensus-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download CSVs for tier 1, all genes, up genes or down genes, and generate a QC, DE, ensemble or complete markdown report",
+          "parts": [
+            "consensus-table",
+            "reports"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Outlier calls are made by consensus: a slider sets how many of six detection methods must agree before a sample is flagged",
+        "Consensus genes are graded into confidence tiers by combined p-value, and each tier is labelled with its suggested next use (qPCR validation, pathway analysis, exploratory)",
+        "An optional same-direction rule drops genes whose fold change disagrees across methods",
+        "Public studies can be pooled with gene ID harmonisation and batch correction before analysis",
+        "Quantification and the differential expression runs happen outside the dashboard. It starts from count matrices and from result files made in R."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "home-overview",
+      "level": "view",
+      "parent": null,
+      "title": "Home and workflow guide",
+      "summary": "Lists the modules in sidebar navigation and shows a staged workflow guide and tips, so the person knows which page comes next.",
+      "views": [
+        "summary stats",
+        "list"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/raptor/dashboard/app.py",
+          "start": 55,
+          "end": 320,
+          "role": "markup",
+          "anchor": "12c497420bc2",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/raptor/dashboard/assets/styles/style_loader.py",
+          "start": 27,
+          "end": 51,
+          "role": "logic",
+          "symbol": "load_custom_css",
+          "anchor": "37a3b3d0222f",
+          "first": "def load_custom_css(css_file: str = \"custom_styles.css\") -> None:"
+        },
+        {
+          "file": "code/raptor/dashboard/assets/styles/custom_styles.css",
+          "start": 172,
+          "end": 178,
+          "role": "style",
+          "symbol": "[data-testid=\"metric-container\"]",
+          "anchor": "431198b5be4f",
+          "first": "[data-testid=\"metric-container\"] {"
+        }
+      ]
+    },
+    {
+      "id": "data-acquisition",
+      "level": "view",
+      "parent": null,
+      "title": "Data acquisition",
+      "summary": "Searches public repositories or takes an upload, keeps the datasets in a library and exports them for analysis.",
+      "views": [
+        "table view",
+        "detail panel"
+      ],
+      "interactions": [
+        "search",
+        "select",
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/raptor/dashboard/pages/01_📡_Data_Acquisition.py",
+          "start": 530,
+          "end": 1993,
+          "role": "markup",
+          "anchor": "2baf2e214df9",
+          "first": "# ============================================================================="
+        },
+        {
+          "file": "code/raptor/dashboard/pages/01_📡_Data_Acquisition.py",
+          "start": 1994,
+          "end": 3686,
+          "role": "markup",
+          "anchor": "53fc828084ee",
+          "first": "# TAB 2: Data Library"
+        },
+        {
+          "file": "code/raptor/dashboard/pages/01_📡_Data_Acquisition.py",
+          "start": 5013,
+          "end": 5250,
+          "role": "logic",
+          "anchor": "46c14449ee1e",
+          "first": "# TAB 5: Export"
+        }
+      ]
+    },
+    {
+      "id": "pool-datasets",
+      "level": "component",
+      "parent": "data-acquisition",
+      "title": "Pool datasets and check them",
+      "summary": "Merges selected studies with gene ID harmonisation and batch correction, then shows QC plots of the pooled data (library sizes, PCA, correlations).",
+      "views": [
+        "scatter plot",
+        "heatmap",
+        "summary stats"
+      ],
+      "interactions": [
+        "multi-select"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/raptor/dashboard/pages/01_📡_Data_Acquisition.py",
+          "start": 3687,
+          "end": 5012,
+          "role": "logic",
+          "anchor": "577424ecab14",
+          "first": "# ============================================================================="
+        },
+        {
+          "file": "code/raptor/dashboard/pages/01_📡_Data_Acquisition.py",
+          "start": 217,
+          "end": 259,
+          "role": "logic",
+          "symbol": "_cached_pca",
+          "anchor": "073f3afe3c82",
+          "first": "def _cached_pca(data_hash, counts_values, n_samples, n_comp=6, gene_id_type='ensembl'):"
+        },
+        {
+          "file": "code/raptor/dashboard/pages/01_📡_Data_Acquisition.py",
+          "start": 263,
+          "end": 282,
+          "role": "logic",
+          "symbol": "_cached_correlation",
+          "anchor": "f8dd09a40f8e",
+          "first": "def _cached_correlation(data_hash, counts_values, columns, method='pearson', gene_id_type='ensembl'):"
+        },
+        {
+          "file": "code/raptor/dashboard/pages/01_📡_Data_Acquisition.py",
+          "start": 286,
+          "end": 303,
+          "role": "logic",
+          "symbol": "_cached_lib_stats",
+          "anchor": "ee82d889daed",
+          "first": "def _cached_lib_stats(data_hash, counts_values, gene_id_type='ensembl'):"
+        }
+      ]
+    },
+    {
+      "id": "quality-assessment",
+      "level": "view",
+      "parent": null,
+      "title": "Quality assessment",
+      "summary": "Loads a count matrix and metadata, runs a scored QC with consensus outlier detection and a batch-effect check, and plots PCA, correlation, distribution, RLE, dendrogram and mean-variance in tabs.",
+      "views": [
+        "summary stats",
+        "scatter plot",
+        "heatmap",
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "hover for detail",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/raptor/dashboard/pages/02_✅_Quality.py",
+          "start": 109,
+          "end": 1090,
+          "role": "logic",
+          "anchor": "35395a922ed4",
+          "first": "st.markdown(\"## 1. Load Count Data\")"
+        },
+        {
+          "file": "code/raptor/dashboard/assets/styles/custom_styles.css",
+          "start": 279,
+          "end": 285,
+          "role": "style",
+          "symbol": "[data-testid=\"stFileUploadDropzone\"] section",
+          "anchor": "ee336b15b237",
+          "first": "[data-testid=\"stFileUploadDropzone\"] section {"
+        }
+      ]
+    },
+    {
+      "id": "import-de",
+      "level": "view",
+      "parent": null,
+      "title": "Import DE results",
+      "summary": "Uploads result files from several DE tools, detects their format, applies significance thresholds, standardises them, and compares significant genes and overlap across files.",
+      "views": [
+        "table view",
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/raptor/dashboard/pages/05_📥_Import_DE.py",
+          "start": 148,
+          "end": 820,
+          "role": "logic",
+          "anchor": "93eb7f6b2544",
+          "first": "st.markdown(\"## 1. Upload DE Result Files\")"
+        }
+      ]
+    },
+    {
+      "id": "ensemble",
+      "level": "view",
+      "parent": null,
+      "title": "Ensemble analysis",
+      "summary": "Selects the DE results to combine, previews their pairwise overlap, picks a p-value combination method with a direction rule and pre-filters, and runs it to give consensus counts and confidence tiers.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "multi-select",
+        "select",
+        "filter"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/raptor/dashboard/pages/07_🔬_Ensemble.py",
+          "start": 140,
+          "end": 466,
+          "role": "logic",
+          "anchor": "2ca25c31cfb1",
+          "first": "selected_files = st.multiselect("
+        },
+        {
+          "file": "code/raptor/ensemble.py",
+          "start": 1424,
+          "end": 1426,
+          "role": "logic",
+          "symbol": "ensemble_brown",
+          "anchor": "0c760295f25b",
+          "first": "def ensemble_brown(de_results: Dict[str, Any], **kwargs) -> EnsembleResult:"
+        },
+        {
+          "file": "code/raptor/ensemble.py",
+          "start": 1419,
+          "end": 1421,
+          "role": "logic",
+          "symbol": "ensemble_fisher",
+          "anchor": "e4dbf29c95c5",
+          "first": "def ensemble_fisher(de_results: Dict[str, Any], **kwargs) -> EnsembleResult:"
+        },
+        {
+          "file": "code/raptor/ensemble.py",
+          "start": 1252,
+          "end": 1259,
+          "role": "logic",
+          "symbol": "ensemble_rra",
+          "anchor": "c21fcab2ba32",
+          "first": "def ensemble_rra("
+        }
+      ]
+    },
+    {
+      "id": "consensus-table",
+      "level": "component",
+      "parent": "ensemble",
+      "title": "Consensus genes by tier",
+      "summary": "Shows the tier breakdown, the distribution of combined p-values and the top genes, filters the full table by tier and direction, and downloads the tier 1, all, up and down gene lists.",
+      "views": [
+        "table view",
+        "bar chart"
+      ],
+      "interactions": [
+        "filter",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/raptor/dashboard/pages/07_🔬_Ensemble.py",
+          "start": 467,
+          "end": 660,
+          "role": "logic",
+          "anchor": "86085359667f",
+          "first": "tab1, tab2, tab3 = st.tabs([\"Tiers\", \"P-values\", \"🔝 Top Genes\"])"
+        },
+        {
+          "file": "code/raptor/dashboard/assets/styles/custom_styles.css",
+          "start": 247,
+          "end": 251,
+          "role": "style",
+          "symbol": ".dataframe",
+          "anchor": "9c21f004e979",
+          "first": ".dataframe {"
+        }
+      ]
+    },
+    {
+      "id": "reports",
+      "level": "view",
+      "parent": null,
+      "title": "Reports",
+      "summary": "Generates a markdown report for QC, DE, ensemble, biomarker or the complete analysis from the session's results, and downloads it.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/raptor/dashboard/pages/09_📋_Reports.py",
+          "start": 120,
+          "end": 810,
+          "role": "logic",
+          "anchor": "9e455c21614f",
+          "first": "report_type = st.radio("
+        },
+        {
+          "file": "code/raptor/dashboard/pages/09_📋_Reports.py",
+          "start": 418,
+          "end": 423,
+          "role": "logic",
+          "symbol": "generate_complete_report_markdown",
+          "anchor": "3fe2def7f38a",
+          "first": "def generate_complete_report_markdown("
+        }
+      ]
+    }
+  ]
+}

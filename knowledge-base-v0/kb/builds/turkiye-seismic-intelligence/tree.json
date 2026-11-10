@@ -1,0 +1,774 @@
+{
+ "interface": {
+  "title": "DepremNabız AI — Türkiye Seismic Intelligence & Resilience Platform",
+  "field": "Seismology / earthquake hazard and exposure analytics (with Sentinel-1 InSAR discovery)",
+  "stage_of_work": "Exploratory analysis and screening of earthquake catalogues; decision-support prototyping",
+  "what_it_is_for": "Load a Türkiye earthquake catalogue (synthetic demo, live USGS, or an uploaded CSV/Excel file), read summary statistics and a Gutenberg-Richter b-value, look at maps, time series and distributions, screen for statistical event-rate anomalies, count nearby exposure points around each event, and browse Sentinel-1 acquisitions, candidate pairs and processed InSAR displacement points."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "I started from the built-in synthetic demo catalogue (620 events, latest 2026-08-02) with its 180 synthetic exposure points and demo Sentinel-1 catalogue. I also used the uploaded test files earthquakes_upload.csv, exposure_points_upload.csv and displacement_points.csv. The server did have network access: Live USGS returned 6 records (30 days, M≥2.1) and then 19 records (90 days, M≥1.5), and Live Copernicus STAC returned real Sentinel-1C/1D GRD items."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Characterise recent seismicity in a region, screen it for unusual activity and nearby assets, and line up satellite deformation data",
+  "specific": "Explore a Türkiye earthquake catalogue in DepremNabız AI: b-value, anomaly screen, DBSCAN clusters, urban exposure within a radius, and Sentinel-1/InSAR deformation",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Load an event catalogue and check its provenance",
+    "specific": "Pick the sidebar Mode (Demo data / Live USGS / Upload local file) and read the source banner (source · record count · latest timestamp)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Open the bundled example dataset and read headline statistics",
+      "specific": "Demo data mode: read Events 620, Maximum magnitude 4.9, Median depth 9.0 km, Shallow share ≤20 km 88.2%, b-value 0.64",
+      "screens": [
+       "screens/005.webp",
+       "screens/006.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "loaded page with Mode = Demo data (default)",
+        "screens": [
+         "screens/005.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Change the completeness cutoff and see how the scaling estimate shifts",
+      "specific": "Move the Minimum magnitude slider from 1.50 to 2.10. The slider filters events only in Live USGS mode (as a query parameter); in Demo and Upload modes it only sets the b-value cutoff, which never goes below 1.0. So in demo mode the event count stays at 620 (events of M 1.2 remain on the map) and only the b-value changes (0.64 → 0.66)",
+      "screens": [
+       "screens/010.webp",
+       "screens/011.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed PageUp on Minimum magnitude slider (1.50 → 2.10)",
+        "screens": [
+         "screens/010.webp",
+         "screens/011.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Review data-quality metrics of a clean reference table as a baseline",
+      "specific": "Demo-mode baseline on the Data quality tab: rows 620, valid_time_share 1, valid_coordinate_share 1, magnitude_completeness 1, duplicate_event_ids 0, invalid_coordinates 0. Compare against the uploaded catalogue in the import task (screens/042.webp)",
+      "screens": [
+       "screens/015.webp",
+       "screens/042.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Data quality tab",
+        "screens": [
+         "screens/015.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Pull live records from an authoritative public catalogue with a time window and magnitude threshold",
+      "specific": "Live USGS mode: banner reads 'Official USGS Earthquake Catalog API'. 30 days and M≥2.1 gave 6 records (max 5.1); 90 days and M≥1.5 gave 19 records (max 5.2); b-value shows n/a. The replay confirmed only the 30-day case",
+      "screens": [
+       "screens/036.webp",
+       "screens/037.webp",
+       "screens/038.webp",
+       "screens/039.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Live USGS radio",
+        "screens": [
+         "screens/036.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed End on Live lookback (days) slider (30 → 90)",
+        "screens": [
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed PageDown on Minimum magnitude slider (2.10 → 1.50)",
+        "screens": [
+         "screens/038.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Catalogue analytics tab",
+        "screens": [
+         "screens/039.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Import your own messy table and check how it was cleaned",
+      "specific": "Upload local file: earthquakes_upload.csv → 'User-supplied local catalogue · records: 8', max 7.8. The aliased columns were mapped, and the exported CSV has 8 rows and lacks tr-upload-006. Confirmed defect: clean_events drops invalid-coordinate and duplicate-ID rows before quality_report runs (streamlit_app.py:64,79; pipeline.py:84-89), so the Data quality tab shows duplicate_event_ids 0 and invalid_coordinates 0 and the dropped rows are never reported",
+      "screens": [
+       "screens/040.webp",
+       "screens/041.webp",
+       "screens/042.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Upload local file radio",
+        "screens": [
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Upload and gave earthquakes_upload.csv",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Data quality tab",
+        "screens": [
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Download filtered catalogue CSV and read the file (8 rows, tr-upload-006 absent)",
+        "screens": [
+         "screens/041.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Visualise and statistically screen the catalogue",
+    "specific": "Catalogue analytics tab: earthquake-event map with DBSCAN cluster labels, overview charts (daily counts, magnitude through time, magnitude histogram, magnitude–depth), rolling event-rate anomaly screen, and filtered-catalogue CSV download",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Locate events on a map and inspect each event's spatial-cluster label",
+      "specific": "Earthquake-event map: pan and zoom from the default view at 0°,0° to Türkiye. Hover shows place, lat/lon, time, depth and the DBSCAN cluster label (e.g. 'Southeast synthetic cluster', cluster=1). Clustering uses fixed settings (eps 35 km, min_samples 4; analytics.py:75-79) that the user cannot change",
+      "screens": [
+       "screens/007.webp",
+       "screens/012.webp",
+       "screens/013.webp",
+       "screens/014.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled wheel on map to zoom out",
+        "screens": [
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged map to pan north-east to Türkiye",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered an event marker",
+        "screens": [
+         "screens/014.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Read time series and distributions of event size and depth",
+      "specific": "Daily event counts, Magnitude through time (coloured by depth), Magnitude distribution histogram, Magnitude–depth relationship",
+      "screens": [
+       "screens/006.webp",
+       "screens/008.webp",
+       "screens/039.webp",
+       "screens/041.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled page down past the map",
+        "screens": [
+         "screens/008.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Flag days with unusually high event rates against a rolling baseline (statistical, not a forecast)",
+      "specific": "Rolling event-rate anomaly screen: daily count vs a 14-day rolling baseline, with days at |z|≥2.5 marked as red-X 'Screened anomaly' (fixed settings, analytics.py:43-47, not user-adjustable). Demo: 2026-05-28 and around Jun 30, both 12 events/day. No anomalies on the 8-event upload",
+      "screens": [
+       "screens/008.webp",
+       "screens/051.webp",
+       "screens/052.webp",
+       "screens/053.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered red X anomaly marker (May 28, 2026, 12)",
+        "screens": [
+         "screens/051.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked 'Daily count' legend entry to hide it",
+        "screens": [
+         "screens/052.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged a zoom box over late May–early July",
+        "screens": [
+         "screens/052.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "double-clicked plot to reset axes",
+        "screens": [
+         "screens/053.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the working table",
+      "specific": "Download filtered catalogue CSV → depremnabiz_catalogue.csv (event_id, time_utc, latitude, longitude, depth_km, magnitude, magnitude_type, place, source, url)",
+      "screens": [
+       "screens/009.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Download filtered catalogue CSV (demo, 96 KB)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Download filtered catalogue CSV (uploaded catalogue, 8 rows)",
+        "screens": [
+         "screens/041.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Screen assets near each event",
+    "specific": "Urban exposure tab: radius-based exposure screening (an exposure proxy, not a damage estimate)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Count assets within a set distance of each event using the built-in points",
+      "specific": "Synthetic demo exposure (180 points). The screen covers the 50 largest-magnitude events (frame.nlargest(50, 'magnitude'), streamlit_app.py:192) and lists event_id, magnitude, nearby_points, exposure_weight and radius_km, sorted by exposure_weight, plus an Exposure points map coloured by category",
+      "screens": [
+       "screens/016.webp",
+       "screens/046.webp",
+       "screens/048.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Urban exposure tab",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "zoomed out and dragged Exposure points map to Türkiye",
+        "screens": [
+         "screens/048.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Upload your own asset list and repeat the screen at different radii",
+      "specific": "Explorer-only (not replayed). Upload exposure_points_upload.csv (7 points). At 50 km tr-upload-001 has 2 nearby points (weight 811444); at 115 km tr-upload-003 leads with 4 points (1130044); at 10 km only tr-upload-009 has 1 point. Missing weights count as 1.0 in the table (exposure.py:27), but they reach the map as NaN, so the Exposure points map does not render (see screens_never_reached)",
+      "screens": [
+       "screens/043.webp",
+       "screens/044.webp",
+       "screens/045.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Upload and gave exposure_points_upload.csv",
+        "screens": [
+         "screens/043.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Screening radius slider 50 → 115 km",
+        "screens": [
+         "screens/044.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Screening radius slider 115 → 10 km",
+        "screens": [
+         "screens/045.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked × to remove the uploaded exposure file (back to synthetic points)",
+        "screens": [
+         "screens/046.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Find satellite acquisitions and inspect processed ground-deformation results",
+    "specific": "Satellite deformation tab: Sentinel-1 discovery and deformation-product exploration",
+    "children": [
+     {
+      "kind": "task",
+      "general": "List available radar acquisitions and the repeat-pass pairs suited to interferometry",
+      "specific": "Demo catalogue: S1-DEMO items (datetime, orbit_state, relative_orbit 87/167, IW, VV+VH) and Candidate same-orbit pairs (12-day gap, relative orbit 87, ascending)",
+      "screens": [
+       "screens/017.webp",
+       "screens/028.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Satellite deformation tab",
+        "screens": [
+         "screens/017.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered Candidate same-orbit pairs table to show its toolbar",
+        "screens": [
+         "screens/028.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Query a live satellite archive for a date range",
+      "specific": "Live Copernicus STAC: Start date 2026/09/02, End date 2026/11/01 → Search Sentinel-1 acquisitions returned S1C/S1D IW GRDH items. Pairs listed with gap_days 0.0003 (adjacent frames from the same pass, not true repeat-pass pairs)",
+      "screens": [
+       "screens/030.webp",
+       "screens/032.webp",
+       "screens/033.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Live Copernicus STAC radio",
+        "screens": [
+         "screens/030.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Search Sentinel-1 acquisitions",
+        "screens": [
+         "screens/032.webp",
+         "screens/033.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Upload processed displacement points and read summary statistics and a map",
+      "specific": "Upload displacement_points.csv → JSON summary (points 10, median_mm −23.5, min_mm −210.8, max_mm 0.4, p95_abs_mm 198.02) and 'Uploaded displacement points' map coloured by displacement_mm. Points sit near Kahramanmaraş/Malatya; hover shows −210.8 mm at 38.089, 37.239",
+      "screens": [
+       "screens/020.webp",
+       "screens/025.webp",
+       "screens/026.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Upload and gave displacement_points.csv",
+        "screens": [
+         "screens/019.webp",
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled wheel to zoom out and dragged map to Türkiye",
+        "screens": [
+         "screens/024.webp",
+         "screens/025.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "zoomed in and hovered largest displacement point",
+        "screens": [
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Read how results may and may not be interpreted",
+    "specific": "Methods & limits tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Check interpretation rules and scope limits",
+      "specific": "Anomaly = statistical deviation, not a forecast; b-value depends on completeness; clusters come from DBSCAN parameters (fixed in code, no UI control); exposure ≠ damage; deformation processing belongs in SNAP/ISCE/GMTSAR/MintPy",
+      "screens": [
+       "screens/034.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Methods & limits tab",
+        "screens": [
+         "screens/034.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Switchable data-source loader with provenance banner",
+   "general": "Choose between a bundled example, a live web feed (with time window and threshold) or an uploaded file; every view then recomputes, and a banner states source, record count and latest timestamp",
+   "specific": "Sidebar Mode radio (Demo data / Live USGS / Upload local file) with Live lookback (days) and Minimum magnitude sliders and a CSV/XLSX uploader; green banner 'Source: … · records: N · latest: …' and five metric cards (Events, Maximum magnitude, Median depth, Shallow share ≤20 km, b-value)",
+   "steps": [
+    "Pick a mode in the sidebar radio",
+    "For live mode, set lookback days and minimum magnitude",
+    "For upload mode, drop a CSV/Excel file",
+    "Read the source banner and the metric cards"
+   ],
+   "serves_tasks": [
+    "Open the bundled example dataset and read headline statistics",
+    "Pull live records from an authoritative public catalogue with a time window and magnitude threshold",
+    "Import your own messy table and check how it was cleaned"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/036.webp",
+    "screens/038.webp",
+    "screens/041.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Cutoff-dependent scaling estimate",
+   "general": "Recompute a power-law magnitude–frequency slope when a completeness cutoff is changed, without removing events below the cutoff from the other views",
+   "specific": "b-value estimate card driven by the Minimum magnitude slider (floor 1.0). Moving the slider 1.50 → 2.10 changes the b-value 0.64 → 0.66 while Events stays 620; it filters events only in Live USGS mode. Shows n/a for small catalogues",
+   "steps": [
+    "Load a catalogue",
+    "Move the Minimum magnitude slider",
+    "Watch the b-value card update"
+   ],
+   "serves_tasks": [
+    "Change the completeness cutoff and see how the scaling estimate shifts"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/011.webp",
+    "screens/039.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Rolling-baseline anomaly screen chart",
+   "general": "Plot a daily count series against its rolling baseline and mark days that exceed it; inspect flagged points by hover, hide series via the legend, and box-zoom into a window",
+   "specific": "Rolling event-rate anomaly screen (Daily count, 14-day Rolling baseline, red-X Screened anomaly at |z|≥2.5; settings fixed in code) with Plotly hover, legend toggle, zoom box and double-click reset",
+   "steps": [
+    "Load a catalogue",
+    "Hover a red X to read its date and count",
+    "Click a legend entry to hide the raw count",
+    "Drag a box to zoom into the period",
+    "Double-click to reset axes"
+   ],
+   "serves_tasks": [
+    "Flag days with unusually high event rates against a rolling baseline (statistical, not a forecast)"
+   ],
+   "screens": [
+    "screens/008.webp",
+    "screens/051.webp",
+    "screens/052.webp",
+    "screens/053.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Event map with cluster labels on hover",
+   "general": "Show point events on a pannable, zoomable basemap, coloured and sized by a value, with a hover card giving each point's attributes and its spatial-cluster label",
+   "specific": "Earthquake-event map (Plotly scattermap on OpenStreetMap) coloured by magnitude; hover shows place, lat/lon, time_utc, depth_km, source, DBSCAN cluster (eps 35 km, min_samples 4, fixed), magnitude. It opens at 0°,0° and must be panned to Türkiye",
+   "steps": [
+    "Scroll the wheel to zoom out",
+    "Drag to pan to the study region",
+    "Hover a marker to read its attributes and cluster id"
+   ],
+   "serves_tasks": [
+    "Locate events on a map and inspect each event's spatial-cluster label"
+   ],
+   "screens": [
+    "screens/013.webp",
+    "screens/014.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Radius-based proximity screening of assets around events",
+   "general": "Upload a list of asset locations (with optional weights and categories), set a search radius, and get per-event counts and summed weights of assets within that distance for the largest events, plus a category map",
+   "specific": "Urban exposure tab: Exposure points CSV uploader, Screening radius (km) slider (5–150), table of event_id / magnitude / nearby_points / exposure_weight / radius_km for the 50 largest-magnitude events, sorted by weight (missing weights count as 1.0), Exposure points map by category; falls back to 180 synthetic points",
+   "steps": [
+    "Upload an exposure-points CSV, or keep the synthetic demo points",
+    "Drag the Screening radius slider",
+    "Read the per-event nearby_points and exposure_weight",
+    "Pan the Exposure points map to the region"
+   ],
+   "serves_tasks": [
+    "Count assets within a set distance of each event using the built-in points",
+    "Upload your own asset list and repeat the screen at different radii"
+   ],
+   "screens": [
+    "screens/043.webp",
+    "screens/044.webp",
+    "screens/045.webp",
+    "screens/048.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Satellite acquisition search with repeat-pass pair builder",
+   "general": "Search an imagery archive (demo or live) for a date range, list the scenes, and derive candidate same-track image pairs with their time gaps",
+   "specific": "Satellite catalogue radio (Demo catalogue / Live Copernicus STAC), Start/End date pickers, Search Sentinel-1 acquisitions button, acquisitions table and Candidate same-orbit pairs table (reference_id, secondary_id, gap_days, relative_orbit, orbit_state)",
+   "steps": [
+    "Choose Demo catalogue or Live Copernicus STAC",
+    "Set start and end dates",
+    "Press Search Sentinel-1 acquisitions",
+    "Read the acquisitions table",
+    "Read the candidate same-orbit pairs"
+   ],
+   "serves_tasks": [
+    "List available radar acquisitions and the repeat-pass pairs suited to interferometry",
+    "Query a live satellite archive for a date range"
+   ],
+   "screens": [
+    "screens/017.webp",
+    "screens/030.webp",
+    "screens/033.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Point-measurement upload with summary statistics and value-coloured map",
+   "general": "Upload a table of located measurements and get count, median, min, max and 95th-percentile absolute value, plus a map coloured by value with hover inspection",
+   "specific": "Optional processed InSAR points CSV (latitude, longitude, displacement_mm) → JSON summary (points, median_mm, min_mm, max_mm, p95_abs_mm) and 'Uploaded displacement points' map with a diverging displacement_mm colour scale",
+   "steps": [
+    "Upload the displacement CSV",
+    "Read the JSON summary",
+    "Zoom and pan the map to the points",
+    "Hover a point to read its displacement"
+   ],
+   "serves_tasks": [
+    "Upload processed displacement points and read summary statistics and a map"
+   ],
+   "screens": [
+    "screens/020.webp",
+    "screens/025.webp",
+    "screens/026.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Catalogue quality report",
+   "general": "Report the share of valid times and coordinates, magnitude completeness, and counts of duplicate and invalid rows for the loaded table",
+   "specific": "Data quality tab metric table (rows, valid_time_share, valid_coordinate_share, magnitude_completeness, duplicate_event_ids, invalid_coordinates). It is computed after clean_events has already dropped bad coordinates and duplicate IDs, so those counts read 0 even when the input had such rows",
+   "steps": [
+    "Load or upload a catalogue",
+    "Open the Data quality tab",
+    "Read the metrics and compare row count with the input"
+   ],
+   "serves_tasks": [
+    "Review data-quality metrics of a clean reference table as a baseline",
+    "Import your own messy table and check how it was cleaned"
+   ],
+   "screens": [
+    "screens/015.webp",
+    "screens/042.webp"
+   ],
+   "id": "f8",
+   "check": "replayed"
+  },
+  {
+   "name": "Cleaned-catalogue CSV export",
+   "general": "Export the cleaned, standardised event table as a CSV with fixed columns",
+   "specific": "Download filtered catalogue CSV button → depremnabiz_catalogue.csv (event_id, time_utc, latitude, longitude, depth_km, magnitude, magnitude_type, place, source, url)",
+   "steps": [
+    "Load or upload a catalogue",
+    "Press Download filtered catalogue CSV",
+    "Compare exported rows with the input"
+   ],
+   "serves_tasks": [
+    "Export the working table",
+    "Import your own messy table and check how it was cleaned"
+   ],
+   "screens": [
+    "screens/009.webp",
+    "screens/041.webp"
+   ],
+   "id": "f9",
+   "check": "replayed"
+  },
+  {
+   "name": "Catalogue overview chart set",
+   "general": "Show a linked set of overview charts for an event table: daily counts, size through time coloured by depth, size histogram, and size versus depth with depth increasing downward",
+   "specific": "Catalogue analytics charts: Daily event counts, Magnitude through time (coloured by depth_km), Magnitude distribution histogram, Magnitude–depth relationship (depth axis reversed)",
+   "steps": [
+    "Load a catalogue",
+    "Scroll below the event map",
+    "Read the four charts"
+   ],
+   "serves_tasks": [
+    "Read time series and distributions of event size and depth"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/008.webp",
+    "screens/039.webp",
+    "screens/041.webp"
+   ],
+   "id": "f10",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Exposure points map for the uploaded exposure_points_upload.csv: replaced by a Plotly error 'Invalid element(s) received for the size property of scattermap.marker … [nan]' (screens/043.webp). Missing weights are treated as 1.0 in the screening table (exposure.py:27) but are passed to the map as NaN marker sizes"
+ ],
+ "not_done": [
+  "Confirmed defect: the Data quality tab cannot flag the duplicate and invalid-coordinate rows in earthquakes_upload.csv. clean_events drops them before quality_report runs (streamlit_app.py:64,79; pipeline.py:84-89), so the tab reports duplicate_event_ids 0 and invalid_coordinates 0 (screens/042.webp), while the exported CSV has 8 rows with tr-upload-006 missing",
+  "The Download as CSV icon on the Candidate same-orbit pairs table produced no downloaded file (it may use a save-file picker the headless browser cannot answer)",
+  "Clicking a category in the Exposure points map legend did not visibly hide that category (screens/049.webp). Re-enabling the 'Daily count' trace on the anomaly chart after hiding it also did not visibly take effect",
+  "Every map opens centred near 0°,0° (Gulf of Guinea) and has to be zoomed and panned to Türkiye by hand",
+  "Did not explore the Türkçe/Español language tabs of the project/author sections (not scientific function)"
+ ],
+ "applied": [
+  "Removed the incorrect not_done claim that exposure screening ranks every event; recorded in t10, f5 that it screens the 50 largest-magnitude events, then sorts by exposure_weight",
+  "Gave t4 and its not_done entry the code-level cause (clean_events drops rows before quality_report) and called it a confirmed defect",
+  "t11: added that missing weights count as 1.0 in the table but reach the map as NaN; moved the map crash out of the task text into screens_never_reached with that cause; marked t11 explorer-only (check left not_confirmed)",
+  "Added feature f10 for the overview chart set serving t7 (check taken from the t7 replay)",
+  "Split f8 into a quality report (f8) and a catalogue CSV export (f9)",
+  "Narrowed f2 to the cutoff-dependent b-value to remove overlap with f1's metric cards",
+  "Moved the 'no DBSCAN or anomaly controls' item from screens_never_reached to a notes list, with the fixed settings",
+  "Added fixed DBSCAN settings (eps 35 km, min_samples 4) to t6 and f4, and the fixed anomaly settings (14-day baseline, |z|≥2.5) to t8 and f3",
+  "Made t5 the explicit demo-mode quality baseline and moved it next to the demo tasks",
+  "t2 specific now says Minimum magnitude filters events only in Live USGS mode and otherwise only sets the b-value cutoff (floor 1.0)",
+  "Changed t6 'group label' to 'spatial-cluster label'",
+  "Expanded the terse phase-2 specific label",
+  "Noted in t3 that the replay confirmed only the 30-day case, and in t13 that the 0.0003-day pairs are same-pass frames"
+ ],
+ "open_fixes": [
+  "Replay t11 (upload exposure_points_upload.csv, drag radius to 115 and 10 km, see the NaN map error); the checker ran out of actions, so it rests on the explorer's screens alone",
+  "Run exposure screening and the anomaly screen on Live USGS data; every check so far used demo data or uploads",
+  "Try the Excel (.xlsx/.xls) catalogue upload path, which was never exercised",
+  "Have the checker export the uploaded catalogue and confirm tr-upload-006 is absent; the replay did not download it",
+  "Replay the Live USGS 90-day, M≥1.5 case (19 records) and scroll to the live STAC pairs table (gap_days 0.0003); the replay confirmed neither",
+  "Retry the Candidate same-orbit pairs Download as CSV icon in a browser that can accept a save-file picker"
+ ],
+ "screens_at": "pilot/public/runs/turkiye-seismic-intelligence/20261101-202842/",
+ "screens_filed": {
+  "screens/005.webp": "screens/005.webp",
+  "screens/007.webp": "screens/007.webp",
+  "screens/016.webp": "screens/016.webp",
+  "screens/017.webp": "screens/017.webp",
+  "screens/034.webp": "screens/034.webp"
+ }
+}

@@ -1,0 +1,530 @@
+{
+  "schema": "astaui.card/1",
+  "id": "ligandnexus",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T07:02:39Z"
+  },
+  "app": {
+    "title": "LigandNexus",
+    "summary": "A person picks a parent molecule by database ID or by name and checks its structure, with the atoms that can bind a metal highlighted. They pull every database record that contains it as a substructure, from a live chemistry database or an uploaded structure file. In numbered tabs that unlock one after another, they clean the library with rule-based filters, sort each derivative's substituents by functional group and by distance from the binding atom, and pick a representative candidate set balanced between electron-donating and electron-withdrawing groups. At any stage they can score the set against drug-likeness rules and filter on them. They export the chosen set as CSV or Excel, or send it on to build 3D geometries and input files for quantum-chemistry programs.",
+    "task": {
+      "text": "Build a small, balanced set of candidate ligands from a parent molecule's database derivatives and hand it on to computational chemistry.",
+      "verbs": [
+        "clean",
+        "derive",
+        "organize",
+        "decide",
+        "summarize",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A library of chemical compounds pulled from a database by substructure search. Each compound has a structure string and computed or downloaded properties. Each compound's substituents are then sorted into categories.",
+      "item": "one derivative compound with its structure string and properties",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "curating a ligand library pulled from a database, before quantum-chemistry calculations",
+      "terms": [
+        "clean",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "Tabs run as a pipeline: each step stays disabled until the one before has produced its table, and each shows before/after counts with a bar chart of what was removed or found. A drug-likeness panel can work on the output of any stage. Whatever it leaves on screen is what the export tab offers and what the 3D geometry page can load.",
+      "views": [
+        "table view",
+        "bar chart",
+        "summary stats",
+        "form",
+        "detail panel"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "filter",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "virtual screening of ligand derivatives in coordination chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "cheminformatics",
+        "coordination chemistry",
+        "virtual screening"
+      ]
+    },
+    "workflow": {
+      "name": "narrow a retrieved library to a balanced candidate set and export it",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Check the parent molecule by database ID or name, then run a substructure search in a chosen database or an uploaded structure file, up to a maximum number of records",
+          "parts": [
+            "molecule-input",
+            "source-picker"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Checkboxes drop compounds with metals, salts, net charge, a missing core, or too much mass over the core. Before/after/dropped counts are shown, with a bar chart by reason",
+          "parts": [
+            "clean-step"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Each compound's substituents are cut off at the core and given a functional group and a bond distance to the nearest binding atom. A bar chart shows the most frequent groups",
+          "parts": [
+            "classify-step"
+          ]
+        },
+        {
+          "step": "decide which items to keep",
+          "here": "A slider caps the number of candidates. The set is chosen with a minimum and maximum per group-by-position and an optional donor/acceptor balance, with counts of each",
+          "parts": [
+            "select-step"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "On any stage, compute drug-likeness rules and a blood–brain-barrier estimate, see pass counts as cards, and filter by checkboxes",
+          "parts": [
+            "admet-panel"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Choose which stage's table to export, as CSV or as Excel with optional 2D structure images. Or load the set into the 3D page for geometry files and Gaussian/ORCA/Psi4 inputs",
+          "parts": [
+            "export-step",
+            "geometry-3d"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Substituents are placed by their bond distance from the metal-binding atom (alpha, beta, gamma), not only by what kind of group they are",
+        "The candidate selection enforces a minimum share of electron-donating and electron-withdrawing substituents",
+        "The rule-based scoring panel can attach to any stage of the pipeline, and what it filters is exactly what gets exported",
+        "Data sources range from live database search to downloaded dumps searched locally by substructure",
+        "The chosen set can go straight on to force-field 3D geometries and quantum-chemistry input files"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "molecule-input",
+      "level": "component",
+      "parent": "coordination-pipeline",
+      "title": "Parent molecule check",
+      "summary": "Looks up a parent molecule by database ID or name and shows its structure, formula and highlighted metal-binding atoms before any search.",
+      "views": [
+        "detail panel",
+        "form"
+      ],
+      "interactions": [
+        "search"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/coordinacion.py",
+          "start": 32,
+          "end": 76,
+          "role": "markup",
+          "anchor": "cfe9a8b0a863",
+          "first": "with tabs[0]:"
+        },
+        {
+          "file": "code/views/common.py",
+          "start": 136,
+          "end": 157,
+          "role": "logic",
+          "symbol": "resolver_entrada",
+          "anchor": "1c5408762cd9",
+          "first": "def resolver_entrada(texto, modo):"
+        },
+        {
+          "file": "code/ligandnexus/chem.py",
+          "start": 262,
+          "end": 298,
+          "role": "logic",
+          "symbol": "imagen_donadores",
+          "anchor": "631f6fb77f33",
+          "first": "def imagen_donadores(smiles, size=(440, 340), numerar=True, dark=False):"
+        }
+      ]
+    },
+    {
+      "id": "source-picker",
+      "level": "component",
+      "parent": "coordination-pipeline",
+      "title": "Database and derivative search",
+      "summary": "Picks a source database or an uploaded structure file and pulls every compound containing the parent as a substructure into a table.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "search"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/coordinacion.py",
+          "start": 77,
+          "end": 102,
+          "role": "markup",
+          "anchor": "a363201e2499",
+          "first": "st.subheader(\"Recuperar derivados\")"
+        },
+        {
+          "file": "code/views/common.py",
+          "start": 163,
+          "end": 194,
+          "role": "logic",
+          "symbol": "selector_fuente",
+          "anchor": "5f22a4af924f",
+          "first": "def selector_fuente(key):"
+        },
+        {
+          "file": "code/views/common.py",
+          "start": 197,
+          "end": 204,
+          "role": "logic",
+          "symbol": "buscar_derivados_fuente",
+          "anchor": "3f8b7f2e1298",
+          "first": "def buscar_derivados_fuente(entry, smiles_core, max_records, log, subido=None):"
+        }
+      ]
+    },
+    {
+      "id": "coordination-pipeline",
+      "level": "view",
+      "parent": null,
+      "title": "Coordination analysis tabs",
+      "summary": "Numbered tabs that unlock in order, carrying the library from retrieval through cleaning, classification and selection to export.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/views/coordinacion.py",
+          "start": 21,
+          "end": 299,
+          "role": "markup",
+          "symbol": "render",
+          "anchor": "7678bc579d38",
+          "first": "def render():"
+        },
+        {
+          "file": "code/views/coordinacion.py",
+          "start": 17,
+          "end": 18,
+          "role": "logic",
+          "symbol": "_hecho",
+          "anchor": "5e930e8eb3b9",
+          "first": "def _hecho(k):"
+        }
+      ]
+    },
+    {
+      "id": "clean-step",
+      "level": "component",
+      "parent": "coordination-pipeline",
+      "title": "Clean the library",
+      "summary": "Applies checkbox filters for metals, salts, charge, missing core and excess mass, and shows before, after and dropped counts with a bar chart by reason.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "form"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/coordinacion.py",
+          "start": 105,
+          "end": 139,
+          "role": "markup",
+          "anchor": "a66c73d4c29b",
+          "first": "with tabs[1]:"
+        },
+        {
+          "file": "code/ligandnexus/screening.py",
+          "start": 74,
+          "end": 115,
+          "role": "logic",
+          "symbol": "aplicar_filtros",
+          "anchor": "7ef08f482dae",
+          "first": "def aplicar_filtros(df, smiles_col, smarts_nucleo,"
+        }
+      ]
+    },
+    {
+      "id": "classify-step",
+      "level": "component",
+      "parent": "coordination-pipeline",
+      "title": "Classify substituents",
+      "summary": "Gives each substituent a functional group and a bond distance to the binding atom, then charts the most frequent groups.",
+      "views": [
+        "bar chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/coordinacion.py",
+          "start": 142,
+          "end": 168,
+          "role": "markup",
+          "anchor": "fd85a955aab8",
+          "first": "with tabs[2]:"
+        },
+        {
+          "file": "code/ligandnexus/screening.py",
+          "start": 124,
+          "end": 173,
+          "role": "logic",
+          "symbol": "clasificar_dataframe",
+          "anchor": "3a674c37d798",
+          "first": "def clasificar_dataframe(df, smiles_col, smarts_nucleo, min_atomos_sub=1,"
+        },
+        {
+          "file": "code/ligandnexus/chem.py",
+          "start": 394,
+          "end": 458,
+          "role": "logic",
+          "symbol": "extraer_sustituyentes",
+          "anchor": "21565d78fc55",
+          "first": "def extraer_sustituyentes(smiles_mol, smarts_core, gf_compilados=None) -> list:"
+        }
+      ]
+    },
+    {
+      "id": "select-step",
+      "level": "component",
+      "parent": "coordination-pipeline",
+      "title": "Select a balanced candidate set",
+      "summary": "Chooses up to a set number of candidates, with limits per group-by-position and an optional donor/acceptor balance, and reports how many of each type were kept.",
+      "views": [
+        "summary stats",
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/coordinacion.py",
+          "start": 171,
+          "end": 203,
+          "role": "markup",
+          "anchor": "3206a29bf889",
+          "first": "with tabs[3]:"
+        },
+        {
+          "file": "code/ligandnexus/screening.py",
+          "start": 195,
+          "end": 267,
+          "role": "logic",
+          "symbol": "seleccionar_curada",
+          "anchor": "398ea00bdf34",
+          "first": "def seleccionar_curada(df_clas, max_por_mol=150, min_por_gf=2, max_por_gf=8,"
+        }
+      ]
+    },
+    {
+      "id": "admet-panel",
+      "level": "component",
+      "parent": "coordination-pipeline",
+      "title": "Drug-likeness panel",
+      "summary": "Computes drug-likeness rules and a blood–brain-barrier estimate for the chosen stage's compounds, shows pass counts, and filters the set by those criteria.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "filter",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/views/coordinacion.py",
+          "start": 210,
+          "end": 243,
+          "role": "markup",
+          "anchor": "2251c273e7c4",
+          "first": "with tabs[4]:"
+        },
+        {
+          "file": "code/views/common.py",
+          "start": 345,
+          "end": 466,
+          "role": "logic",
+          "symbol": "panel_admet",
+          "anchor": "91b6d28573c9",
+          "first": "def panel_admet(df, smiles_col, key=\"admet\"):"
+        },
+        {
+          "file": "code/views/common.py",
+          "start": 323,
+          "end": 342,
+          "role": "logic",
+          "symbol": "firma_conjunto",
+          "anchor": "3963688b1a49",
+          "first": "def firma_conjunto(df, smiles_col=None):"
+        },
+        {
+          "file": "code/ligandnexus/admet.py",
+          "start": 264,
+          "end": 298,
+          "role": "logic",
+          "symbol": "evaluar_dataframe",
+          "anchor": "b5c4bf3bf6b3",
+          "first": "def evaluar_dataframe(df, smiles_col, prefijo=\"\", progreso=None, memoria=True):"
+        },
+        {
+          "file": "code/ligandnexus/admet.py",
+          "start": 301,
+          "end": 318,
+          "role": "logic",
+          "symbol": "resumen",
+          "anchor": "66ea0c65ad4e",
+          "first": "def resumen(df_admet, prefijo=\"\") -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "export-step",
+      "level": "component",
+      "parent": "coordination-pipeline",
+      "title": "Export a stage",
+      "summary": "Exports any finished stage, or the drug-likeness-filtered set, as CSV or as an Excel workbook with optional 2D structure images.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/coordinacion.py",
+          "start": 246,
+          "end": 299,
+          "role": "markup",
+          "anchor": "433abe164dd6",
+          "first": "with tabs[5]:"
+        },
+        {
+          "file": "code/ligandnexus/excel.py",
+          "start": 28,
+          "end": 92,
+          "role": "logic",
+          "symbol": "exportar_excel",
+          "anchor": "4496ce2137bd",
+          "first": "def exportar_excel(df, smiles_col, ruta_salida, titulo=\"derivados\","
+        }
+      ]
+    },
+    {
+      "id": "geometry-3d",
+      "level": "view",
+      "parent": null,
+      "title": "3D geometries and calculation inputs",
+      "summary": "Takes one molecule or a set from the pipeline, makes force-field 3D geometries, shows the first one in a 3D viewer, and downloads zipped coordinate files and Gaussian/ORCA/Psi4 inputs.",
+      "views": [
+        "form",
+        "image viewer",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/geometria.py",
+          "start": 44,
+          "end": 237,
+          "role": "markup",
+          "symbol": "render",
+          "anchor": "db68e2c2458a",
+          "first": "def render():"
+        },
+        {
+          "file": "code/views/geometria.py",
+          "start": 16,
+          "end": 41,
+          "role": "logic",
+          "symbol": "_origen_conjunto",
+          "anchor": "e6098b5d3bc1",
+          "first": "def _origen_conjunto():"
+        },
+        {
+          "file": "code/ligandnexus/geometry.py",
+          "start": 26,
+          "end": 65,
+          "role": "logic",
+          "symbol": "generar_3d",
+          "anchor": "327c5f290101",
+          "first": "def generar_3d(smiles, n_confs=10, semilla=42, max_iter=2000):"
+        },
+        {
+          "file": "code/ligandnexus/geometry.py",
+          "start": 101,
+          "end": 118,
+          "role": "logic",
+          "symbol": "construir_input_gaussian",
+          "anchor": "d67b160350a6",
+          "first": "def construir_input_gaussian(nombre, carga, mult, lineas_xyz, *, mem=\"8GB\","
+        },
+        {
+          "file": "code/views/common.py",
+          "start": 116,
+          "end": 131,
+          "role": "logic",
+          "symbol": "mostrar_3d",
+          "anchor": "feb5cbb7a62e",
+          "first": "def mostrar_3d(pdb_block, height=420, estilo=\"stick\"):"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,742 @@
+{
+  "schema": "astaui.card/1",
+  "id": "sanskrit-matrix-editor",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:13:54Z"
+  },
+  "app": {
+    "title": "Matrix editor for aligned manuscript witnesses",
+    "summary": "A person opens one or more aligned files (TEI XML or CSV), with one witness per row and one aligned reading per column. They fix the alignment in the matrix: they select, merge, group, insert or delete columns, edit cells and reorder rows, mark columns as insignificant or binary, and switch between normalized and diplomatic readings, with undo and redo. They can open each witness as running text and load a phylogenetic tree in NeXML. Clicking a reading highlights it in every view and colours the tree by variant. Clicking an internal node of the tree reconstructs that ancestor's text by parsimony and adds it to the matrix as a new row. The corrected alignment is saved, or exported as a TEI corpus, a TEI critical apparatus, CSV, or NEXUS for tree-building software.",
+    "task": {
+      "text": "Correct a multiple alignment of a text's witnesses, then reconstruct ancestral readings from a tree to produce a critical text and apparatus.",
+      "verbs": [
+        "clean",
+        "compare",
+        "derive",
+        "annotate",
+        "write"
+      ]
+    },
+    "data": {
+      "text": "Several versions of one text aligned into a matrix of witnesses by aligned positions, plus a rooted phylogenetic tree over those witnesses.",
+      "item": "an aligned reading: one witness's text at one position in the alignment",
+      "shapes": [
+        "sequence",
+        "table",
+        "versions",
+        "hierarchy",
+        "text corpus"
+      ]
+    },
+    "stage": {
+      "text": "correcting a machine collation of witnesses and reconstructing the text from a tree, before publishing the edition",
+      "terms": [
+        "clean",
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "An editable alignment matrix is linked to running-text views of each witness and to tree views. Selecting a column or reading highlights it everywhere, colours the tree's leaves by variant and fills in reconstructed readings. Clicking a tree node runs a parsimony reconstruction in a background worker and appends the result to the matrix as a new row.",
+      "views": [
+        "table view",
+        "document reader",
+        "tree view",
+        "sidebar list"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "brush",
+        "inline edit",
+        "drag to arrange",
+        "apply label",
+        "toggle view",
+        "hover for detail",
+        "keyboard shortcuts",
+        "undo",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "computer-aided collation and stemmatic reconstruction in textual criticism",
+      "disciplines": [
+        "humanities"
+      ],
+      "terms": [
+        "textual criticism",
+        "stemmatics",
+        "sanskrit philology"
+      ]
+    },
+    "workflow": {
+      "name": "correct an alignment of versions and reconstruct their common ancestor",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "One or more aligned TEI XML or CSV files are loaded into the matrix. Several files are joined into one matrix. A NeXML tree can be added later from the Trees menu.",
+          "parts": [
+            "file-loader"
+          ]
+        },
+        {
+          "step": "fix the alignment by editing positions and versions",
+          "here": "Columns are selected by click or drag, then merged, grouped, inserted, deleted or renormalized. Cells are edited with Enter, and rows are dragged to reorder. Empty columns and rows can be removed in bulk. Ctrl-Z and Ctrl-Shift-Z undo and redo.",
+          "parts": [
+            "alignment-matrix",
+            "column-tools"
+          ]
+        },
+        {
+          "step": "label positions that should not count",
+          "here": "Columns are marked 'insignificant' or 'binary', and the View menu switches between normalized and diplomatic readings.",
+          "parts": [
+            "column-tools",
+            "editor-menu"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Each witness can be opened as running text. The arrow keys step through readings, and a selected reading is highlighted in the matrix, in every text and on the tree, where the leaves are coloured by variant.",
+          "parts": [
+            "witness-text",
+            "tree-view"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Clicking an internal node of the tree asks for a label. A Fitch parsimony pass in a web worker then reconstructs that node's reading at every position and adds it to the matrix as a new row. Hovering over a node shows its reconstructed reading.",
+          "parts": [
+            "reconstruction",
+            "tree-view"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The corrected matrix is saved with Save As, or exported as a TEI corpus, a TEI apparatus, CSV, or NEXUS character data for tree-building software.",
+          "parts": [
+            "exporter"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Ancestral readings are worked out by Fitch parsimony over a tree loaded from NeXML, and each reconstructed node becomes an extra version in the same matrix.",
+        "Hand edits to a reconstructed row are recorded as emendations and shown apart from the computed reading.",
+        "Columns can be flagged 'insignificant' or 'binary', which changes how they are treated, and each reading has both a normalized and a diplomatic form.",
+        "The NEXUS export turns each aligned position into a character, with one state per distinct reading, ready for phylogenetic software.",
+        "Text views can be switched between several Indic scripts by transliteration."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "editor-menu",
+      "level": "view",
+      "parent": null,
+      "title": "Menu bar and witness list",
+      "summary": "A sticky top menu with View, Edit, Column, Row, Cell and Export boxes. Items are greyed out until something suitable is selected, and the list of loaded witnesses opens each one as text.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "toggle view",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/matrix-editor/src/index.html",
+          "start": 13,
+          "end": 38,
+          "role": "markup",
+          "symbol": "#stickytop",
+          "anchor": "8327c4cb4664",
+          "first": "<div id=\"stickytop\">"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 218,
+          "end": 230,
+          "role": "style",
+          "symbol": "#menu",
+          "anchor": "bc7db68cff93",
+          "first": "#menu {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 248,
+          "end": 259,
+          "role": "style",
+          "symbol": "#menu ul",
+          "anchor": "8b0a4c3ca298",
+          "first": "#menu ul {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 261,
+          "end": 263,
+          "role": "style",
+          "symbol": "#menu li.greyedout",
+          "anchor": "b29c5e7c30d1",
+          "first": "#menu li.greyedout {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 549,
+          "end": 671,
+          "role": "logic",
+          "symbol": "menuPopulate",
+          "anchor": "bba004d9f5db",
+          "first": "const menuPopulate = function() {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 539,
+          "end": 547,
+          "role": "logic",
+          "symbol": "mssMenuPopulate",
+          "anchor": "d19f89b7825d",
+          "first": "const mssMenuPopulate = function() {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 2516,
+          "end": 2608,
+          "role": "logic",
+          "symbol": "menuBox",
+          "anchor": "d8b449327834",
+          "first": "class menuBox {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 2494,
+          "end": 2515,
+          "role": "logic",
+          "symbol": "menuItem",
+          "anchor": "1b43d2f1fc22",
+          "first": "class menuItem {"
+        }
+      ]
+    },
+    {
+      "id": "file-loader",
+      "level": "component",
+      "parent": "editor-menu",
+      "title": "Alignment and tree file inputs",
+      "summary": "Loads one or more aligned TEI XML or CSV files into a single matrix, and loads NeXML trees.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/matrix-editor/src/index.html",
+          "start": 16,
+          "end": 22,
+          "role": "markup",
+          "symbol": "#matrixmenu",
+          "anchor": "264c821972ee",
+          "first": "<div id=\"matrixmenu\" class=\"menubox\">"
+        },
+        {
+          "file": "code/matrix-editor/src/index.html",
+          "start": 28,
+          "end": 34,
+          "role": "markup",
+          "symbol": "#treemenu",
+          "anchor": "908d6119570c",
+          "first": "<div style=\"display: none\" id=\"treemenu\" class=\"menubox\">"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 276,
+          "end": 282,
+          "role": "logic",
+          "symbol": "fileSelect",
+          "anchor": "ba33148e925b",
+          "first": "const fileSelect = function(func,e) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 284,
+          "end": 290,
+          "role": "logic",
+          "symbol": "csvOrXml",
+          "anchor": "014f92de03c0",
+          "first": "const csvOrXml = function(f,fs,e) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 346,
+          "end": 378,
+          "role": "logic",
+          "symbol": "csvLoad",
+          "anchor": "a3a9e8aa1051",
+          "first": "const csvLoad = function(f,fs,e) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 380,
+          "end": 400,
+          "role": "logic",
+          "symbol": "matrixLoad",
+          "anchor": "d512ccbb198a",
+          "first": "const matrixLoad = function(f,fs,e) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 402,
+          "end": 537,
+          "role": "logic",
+          "symbol": "matrixLoadAdditional",
+          "anchor": "a230d3ae57f5",
+          "first": "const matrixLoadAdditional = function(fs) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 292,
+          "end": 321,
+          "role": "logic",
+          "symbol": "treeFileLoad",
+          "anchor": "308f81214b0f",
+          "first": "const treeFileLoad = function(f,fs,e) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 323,
+          "end": 344,
+          "role": "logic",
+          "symbol": "treeXMLLoad",
+          "anchor": "7273fae92287",
+          "first": "const treeXMLLoad = function(nexml,stemmaid,show=true) {"
+        }
+      ]
+    },
+    {
+      "id": "alignment-matrix",
+      "level": "view",
+      "parent": null,
+      "title": "Alignment matrix",
+      "summary": "A table with one row per witness and one column per aligned position. Cells and column ranges are selected by click or drag, cells are edited in place, rows are dragged to reorder, and the arrow keys move between cells.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "brush",
+        "inline edit",
+        "drag to arrange",
+        "keyboard shortcuts",
+        "undo"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 3387,
+          "end": 3476,
+          "role": "logic",
+          "symbol": "MatrixBox",
+          "anchor": "8d8999579d3b",
+          "first": "class MatrixBox extends Box {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 420,
+          "end": 427,
+          "role": "style",
+          "symbol": ".matrix table",
+          "anchor": "efeaf0937e1d",
+          "first": ".matrix table {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 438,
+          "end": 448,
+          "role": "style",
+          "symbol": ".matrix tr.header th",
+          "anchor": "49c8ba5ab356",
+          "first": ".matrix tr.header th {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 489,
+          "end": 494,
+          "role": "style",
+          "symbol": ".matrix td",
+          "anchor": "4930e039d329",
+          "first": ".matrix td {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 545,
+          "end": 548,
+          "role": "style",
+          "symbol": ".highlit, .highlit > .space",
+          "anchor": "a34e9a12c8f1",
+          "first": ".highlit, .highlit > .space {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 793,
+          "end": 887,
+          "role": "logic",
+          "anchor": "4daaaff05350",
+          "first": "keyDown(e) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 994,
+          "end": 1101,
+          "role": "logic",
+          "anchor": "8c80b105b712",
+          "first": "thDragStart(e) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 1617,
+          "end": 1671,
+          "role": "logic",
+          "anchor": "90140f0722d8",
+          "first": "finishEditCell: function(e,cancel = false) {"
+        }
+      ]
+    },
+    {
+      "id": "column-tools",
+      "level": "component",
+      "parent": "alignment-matrix",
+      "title": "Column operations",
+      "summary": "Merges, groups, inserts, deletes and renormalizes the selected columns, and marks them insignificant or binary, each as an undoable action.",
+      "views": [],
+      "interactions": [
+        "apply label",
+        "undo"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 1856,
+          "end": 1889,
+          "role": "logic",
+          "symbol": "merge",
+          "anchor": "fb947a544902",
+          "first": "const merge = function(rowfunc,cellfunc,nums) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 1925,
+          "end": 1938,
+          "role": "logic",
+          "symbol": "unmerge",
+          "anchor": "76df2f742b84",
+          "first": "const unmerge = function(rowfunc,cellfunc,oldels) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 1316,
+          "end": 1342,
+          "role": "logic",
+          "symbol": "insert",
+          "anchor": "582f81bb6941",
+          "first": "const insert = function(rowfunc,cellfunc,els,newfunc) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 1400,
+          "end": 1416,
+          "role": "logic",
+          "symbol": "remove",
+          "anchor": "0b8b1d3456ad",
+          "first": "const remove = function(rowfunc,cellfunc) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 1521,
+          "end": 1559,
+          "role": "logic",
+          "anchor": "b7879e4c3afa",
+          "first": "startMarkAs: function(type,nums,e) {"
+        },
+        {
+          "file": "code/matrix-editor/src/lib/actions.mjs",
+          "start": 1,
+          "end": 57,
+          "role": "logic",
+          "symbol": "actions",
+          "anchor": "cbc75278eeba",
+          "first": "const actions = function(Utils) {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 496,
+          "end": 498,
+          "role": "style",
+          "symbol": "td[data-insignificant='true']",
+          "anchor": "235d73c50f5e",
+          "first": "td[data-insignificant='true'] {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 516,
+          "end": 520,
+          "role": "style",
+          "symbol": ".matrix td.group-start",
+          "anchor": "5db458184801",
+          "first": ".matrix td.group-start {"
+        }
+      ]
+    },
+    {
+      "id": "witness-text",
+      "level": "view",
+      "parent": null,
+      "title": "Witness text view",
+      "summary": "Shows one witness as running text. Clicking a word highlights the same position in the matrix and on the trees, and the text's script can be changed by transliteration.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 3339,
+          "end": 3385,
+          "role": "logic",
+          "symbol": "EdBox",
+          "anchor": "4c7e352a9569",
+          "first": "class EdBox extends Box {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 889,
+          "end": 929,
+          "role": "logic",
+          "anchor": "1840928724c3",
+          "first": "textClick(e,skipRight = false) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 2692,
+          "end": 2711,
+          "role": "logic",
+          "symbol": "cyclescript",
+          "anchor": "a23845d3553c",
+          "first": "cyclescript() {"
+        },
+        {
+          "file": "code/matrix-editor/src/lib/transliterate.mjs",
+          "start": 181,
+          "end": 209,
+          "role": "logic",
+          "symbol": "changeScript",
+          "anchor": "d32a604a2e1b",
+          "first": "const changeScript = function(orignode,script,placeholder = false,cur_lang = 'sa') {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 360,
+          "end": 362,
+          "role": "style",
+          "symbol": ".lemma:hover",
+          "anchor": "79fa56ebbfca",
+          "first": ".lemma:hover {"
+        }
+      ]
+    },
+    {
+      "id": "tree-view",
+      "level": "view",
+      "parent": null,
+      "title": "Phylogenetic tree view",
+      "summary": "Draws a loaded NeXML tree with the selected reading shown at each leaf, colours the branches by variant, and shows reconstructed readings when the pointer is over a node.",
+      "views": [
+        "tree view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 2754,
+          "end": 3337,
+          "role": "logic",
+          "symbol": "TreeBox",
+          "anchor": "393937e0de7b",
+          "first": "class TreeBox extends Box {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 733,
+          "end": 778,
+          "role": "logic",
+          "symbol": "treeMouseover",
+          "anchor": "40a77a5d82f3",
+          "first": "treeMouseover(e) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 780,
+          "end": 791,
+          "role": "logic",
+          "symbol": "treeClick",
+          "anchor": "4405636902df",
+          "first": "treeClick(e) {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 142,
+          "end": 144,
+          "role": "style",
+          "symbol": ".tree-box",
+          "anchor": "5f9a1523b465",
+          "first": ".tree-box {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 103,
+          "end": 107,
+          "role": "style",
+          "symbol": ".witness, .internal",
+          "anchor": "c0ad2717731c",
+          "first": ".witness, .internal {"
+        },
+        {
+          "file": "code/matrix-editor/src/lib/jsphylosvg-custom.mjs",
+          "start": 13,
+          "end": 13,
+          "role": "logic",
+          "symbol": "Smits",
+          "anchor": "a8bc8cd72db9",
+          "first": "var Smits = {};Smits.Common = {"
+        }
+      ]
+    },
+    {
+      "id": "reconstruction",
+      "level": "component",
+      "parent": "tree-view",
+      "title": "Node reconstruction",
+      "summary": "For a clicked internal node, asks for a label and runs Fitch parsimony in a worker to reconstruct that ancestor's reading at every position. The result is appended to the matrix as a new row.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 1560,
+          "end": 1593,
+          "role": "logic",
+          "anchor": "c04a0f920ed1",
+          "first": "startReconstruction: function(e) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 1692,
+          "end": 1719,
+          "role": "logic",
+          "anchor": "21305e7843f1",
+          "first": "doReconstruction: function(tree,key,label) {"
+        },
+        {
+          "file": "code/matrix-editor/src/worker.js",
+          "start": 4,
+          "end": 114,
+          "role": "logic",
+          "symbol": "Fitch",
+          "anchor": "4a1559a5ed0a",
+          "first": "const Fitch = function(mss,levels) {"
+        },
+        {
+          "file": "code/matrix-editor/src/script.js",
+          "start": 2904,
+          "end": 2919,
+          "role": "logic",
+          "symbol": "fitch",
+          "anchor": "1f78b661c880",
+          "first": "fitch() {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 508,
+          "end": 510,
+          "role": "style",
+          "symbol": "td[data-emended='true'], span.lemma[data-emended='true']",
+          "anchor": "769dd3ab9be2",
+          "first": "td[data-emended='true'], span.lemma[data-emended='true'] {"
+        }
+      ]
+    },
+    {
+      "id": "exporter",
+      "level": "component",
+      "parent": "editor-menu",
+      "title": "Save and export",
+      "summary": "Saves the matrix, or exports it after an options dialog as a TEI corpus, a TEI apparatus, CSV, or NEXUS character data.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/matrix-editor/src/lib/export.mjs",
+          "start": 5,
+          "end": 440,
+          "role": "logic",
+          "symbol": "Exporter",
+          "anchor": "e6083281ba2c",
+          "first": "const Exporter = function(Utils,Xslt) {"
+        },
+        {
+          "file": "code/matrix-editor/src/lib/xslt.mjs",
+          "start": 16,
+          "end": 33,
+          "role": "logic",
+          "symbol": "xslt",
+          "anchor": "a21d345fc81f",
+          "first": "const xslt = function(_state) {"
+        },
+        {
+          "file": "code/matrix-editor/src/style.css",
+          "start": 616,
+          "end": 621,
+          "role": "style",
+          "symbol": ".popup",
+          "anchor": "95651732e7a0",
+          "first": ".popup {"
+        }
+      ]
+    }
+  ]
+}

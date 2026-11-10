@@ -1,0 +1,517 @@
+{
+ "interface": {
+  "title": "MetaboSpatial-CCI",
+  "field": "Spatial transcriptomics / immunometabolism (metabolite-mediated cell-cell communication)",
+  "stage_of_work": "Downstream analysis and interpretation of spatial expression data that has already been processed",
+  "what_it_is_for": "Infer metabolite secretion from enzyme expression, diffuse it with a reaction-diffusion model over the tissue spots, score metabolite-receptor interactions, deconvolve spots into cell types and build a cell-type communication network, starting from a spatial AnnData (.h5ad) file or a built-in demo."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "Used the built-in demo dataset (500 spots, 500 genes, 50 metabolites, as shown in the header and Overview metrics). No .h5ad test file was available, so the upload route (Upload button, 200MB H5AD limit, 'Please upload an h5ad file') was seen but not used. The demo is not the same across server processes: app.py:219 takes list(real_genes)[:80] from a Python set, so which real genes get named depends on the hash seed. In this session every run gave 0 metabolite-receptor interactions and an all-zero hub table, and a KeyError: 'Mean Score' at app.py line 496 blocked the Interactions, CCI Network and Download tabs. The replay, using the same default settings, got 3 interactions, a non-zero Tumor hub and concentration values about 6× lower."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Infer which cell populations communicate through secreted small molecules from spatially resolved expression data",
+  "specific": "Run the secretion → diffusion → receptor-scoring → deconvolution/CCI pipeline on an uploaded .h5ad or the demo Visium-like dataset, then explore concentration maps, interactions and hub cell types",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Choose input data and analysis settings",
+    "specific": "Set the sidebar Parameters: data source, metabolite database, diffusion model, statistics",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Pick the dataset to analyse: your own spatially resolved expression file, or a built-in example",
+      "specific": "In Data Input, choose 'Upload h5ad File', the main route for your own data, or 'Demo Data' (the default). Upload mode shows an Upload button (200MB H5AD limit), 'Please upload an h5ad file' and Status 'Waiting for data'. No file was uploaded in this run, so the upload route was not exercised. All results below come from Demo Data",
+      "screens": [
+       "screens/005.webp",
+       "screens/011.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 'Upload h5ad File' radio (upload prompt shown; no file uploaded)",
+        "screens": [
+         "screens/011.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "used 'Demo Data' radio (default) for all runs",
+        "screens": [
+         "screens/005.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Choose the reference knowledge base of molecules and their receptors",
+      "specific": "The Metabolite Database dropdown offers 'v2.0 (31 metabolites)' and 'v1.0 (15 metabolites)'. In this install both options load the same database file, so switching changes nothing: the Metabolites card stays at 50",
+      "screens": [
+       "screens/006.webp",
+       "screens/048.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Metabolite Database dropdown",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected 'v1.0 (15 metabolites)'",
+        "screens": [
+         "screens/048.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Choose the numerical method and spatial scale for the transport model",
+      "specific": "Set Solver Method (FFT Convolution (fast) vs Finite Difference (flexible)) and the Pixel size (μm) slider (1–100, default 10)",
+      "screens": [
+       "screens/008.webp",
+       "screens/025.webp",
+       "screens/041.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Solver Method dropdown",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected 'Finite Difference (flexible)'",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Pixel size slider and pressed PageUp (10 → 20 μm)",
+        "screens": [
+         "screens/025.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Set the significance-testing effort and the cell-type unmixing method",
+      "specific": "Set the Permutations (for p-value) slider (steps of 50, default 200) and the Deconvolution Method (NNLS (recommended) vs Simple Mean Score). Simple Mean Score currently makes the run fail; see not_done",
+      "screens": [
+       "screens/009.webp",
+       "screens/026.webp",
+       "screens/049.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Deconvolution Method dropdown",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Permutations slider and pressed Home (200 → 50)",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected 'Simple Mean Score'",
+        "screens": [
+         "screens/049.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Run the analysis and read the summary",
+    "specific": "Press Run Analysis and read the Overview tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Run the whole pipeline with default settings and check the headline counts",
+      "specific": "Run Analysis on Demo Data (FFT, 10 μm, 200 permutations, NNLS). The Overview cards show Spots 500, Genes 500 and Metabolites 50. The Interactions count differs between server restarts of the demo: this run showed 0, the replay showed 3. When interactions exist, a TypeError from a bar chart (app.py:553) appears below the Overview content",
+      "screens": [
+       "screens/013.webp",
+       "screens/014.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed '🚀 Run Analysis'",
+        "screens": [
+         "screens/012.webp",
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled the Overview tab",
+        "screens": [
+         "screens/014.webp",
+         "screens/015.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Re-run the analysis with changed settings",
+      "specific": "Change settings in the sidebar and press Run Analysis again. The results tabs update and the selected metabolite is kept. FFT at 20 μm and v1.0 + NNLS both finished, with the same interaction count as the default run in that server process (0 here, 3 in the replay)",
+      "screens": [
+       "screens/044.webp",
+       "screens/051.webp",
+       "screens/052.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Run Analysis with FFT / 20 μm",
+        "screens": [
+         "screens/043.webp",
+         "screens/044.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run Analysis with v1.0 DB + NNLS",
+        "screens": [
+         "screens/052.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Inspect spatial maps of the modelled molecules",
+    "specific": "Metabolites tab: Net Secretion Rate vs Predicted Concentration maps",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Compare where a molecule is produced with where it ends up after spreading",
+      "specific": "Pick a metabolite in 'Select Metabolite'. The Net Secretion Rate map (red/blue, secretion + / uptake −) and the Predicted Concentration map (viridis) appear side by side, each with mean/max/min. Either map can be opened fullscreen. The exact patterns depend on the demo instance. In both runs Lactate was uptake only (concentration 0), and Adenosine's scattered secretion became a smooth central gradient. Prostaglandin E2 had a mixed sign and became a smooth gradient, but its peak was in a different place in each run (upper-left here, upper-middle in the replay)",
+      "screens": [
+       "screens/017.webp",
+       "screens/020.webp",
+       "screens/047.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the '🧪 Metabolites' tab",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Select Metabolite dropdown",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected 'Adenosine'",
+        "screens": [
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected 'Prostaglandin E2'",
+        "screens": [
+         "screens/047.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "optional: hovered over the concentration map and clicked its fullscreen icon",
+        "screens": [
+         "screens/053.webp",
+         "screens/054.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "See how the spatial scale setting changes the predicted concentration field",
+      "specific": "With FFT, compare the Adenosine Predicted Concentration at pixel size 10 μm and 20 μm. At 20 μm the mean rose about 1.8× and the spread fell about 3.6×, in both runs. The absolute values differ between demo instances",
+      "screens": [
+       "screens/020.webp",
+       "screens/045.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "set Pixel size 20 μm, pressed Run Analysis, reopened Metabolites tab",
+        "screens": [
+         "screens/045.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Score and test candidate molecule–receptor interactions",
+    "specific": "Overview's Top 10 Metabolite-Receptor Interactions table. The full Interactions tab was not reached",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Scan the top-ranked candidate molecule–receptor pairs with their spatial association and significance",
+      "specific": "Read the '🔝 Top 10 Metabolite-Receptor Interactions' table on the Overview (Rank, Metabolite, Receptor, Mean Score, Moran's I, P-value, Significance). It was empty in this run (0 interactions). The replay's demo instance filled it with 3 pairs",
+      "screens": [
+       "screens/014.webp",
+       "check/screens/010.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled the Overview tab to the Top 10 table",
+        "screens": [
+         "screens/014.webp"
+        ]
+       }
+      ],
+      "id": "n1"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Build the cell-type communication network and find hubs",
+    "specific": "Overview's Top Hub Cell Types table. The CCI Network and Download tabs were not reached",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Rank cell populations by how central they are in the communication network",
+      "specific": "Read the '🏆 Top Hub Cell Types' table (cell_type, degree, strength, eigenvector_centrality) for 10 cell types (Tumor, CD8_T, CD4_T, Treg, NK_cells, B_cells, Plasma_cells, Macrophages, M1_macrophage, M2_macrophage). The values depend on the interactions found. They were all 0 in this run (no interactions), while the replay had a non-zero Tumor hub",
+      "screens": [
+       "screens/014.webp",
+       "screens/015.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to the Top Hub Cell Types table",
+        "screens": [
+         "screens/015.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "not_confirmed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Paired source-vs-spread spatial map viewer",
+   "general": "Pick one variable from a list and see two linked spatial scatter maps side by side: the raw source/production field and the field after a transport model. Each map has its own colour scale and summary statistics, and either map can be enlarged to fullscreen",
+   "specific": "In the Metabolites tab (after a completed run), choose a metabolite in 'Select Metabolite'. Left: '<metabolite>: Net Secretion Rate' (diverging red/blue, secretion + / uptake −) with mean/max/min. Right: '<metabolite>: Predicted Concentration' (viridis, offset colourbar) with mean/max/min. The fullscreen icon enlarges a map",
+   "steps": [
+    "open the Metabolites tab after a run",
+    "choose a metabolite from the Select Metabolite dropdown",
+    "compare the secretion-rate map with the diffused-concentration map and their mean/max/min boxes",
+    "hover a map and click its fullscreen icon to enlarge it"
+   ],
+   "serves_tasks": [
+    "Compare where a molecule is produced with where it ends up after spreading",
+    "See how the spatial scale setting changes the predicted concentration field"
+   ],
+   "screens": [
+    "screens/017.webp",
+    "screens/020.webp",
+    "screens/047.webp",
+    "screens/054.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Transport-model solver and grid-resolution controls",
+   "general": "A small control group that chooses the numerical solver for the transport model (fast spectral vs flexible grid) and the spatial grid resolution, applied on the next run",
+   "specific": "Diffusion Model sidebar section: Solver Method (FFT Convolution (fast) / Finite Difference (flexible)) and the Pixel size (μm) slider (1–100, keyboard steps). The new settings take effect when Run Analysis is pressed. Finite Difference ran for minutes without finishing. Pressing Stop in the top bar was not shown to cancel the run: the spinner was still visible afterwards",
+   "steps": [
+    "pick a solver in Solver Method",
+    "drag or key the Pixel size slider",
+    "press Run Analysis to apply the settings"
+   ],
+   "serves_tasks": [
+    "Choose the numerical method and spatial scale for the transport model",
+    "See how the spatial scale setting changes the predicted concentration field",
+    "Re-run the analysis with changed settings"
+   ],
+   "screens": [
+    "screens/008.webp",
+    "screens/025.webp",
+    "screens/020.webp",
+    "screens/045.webp",
+    "screens/040.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Pipeline parameter sidebar with a single run button",
+   "general": "One side panel that collects the input choice (own file upload vs example data), reference database, quality-control thresholds, model and statistics options, and starts the whole multi-step analysis with one button. A spinner shows progress and errors are reported inline",
+   "specific": "⚙️ Parameters sidebar: Data Input radio (Demo Data / Upload h5ad File), Metabolite Database (v2.0 / v1.0, which load the same file in this install), QC sliders (Min genes per spot, Min counts per spot, Normalization target sum), Diffusion Model, Statistics (Permutations, Deconvolution Method), then '🚀 Run Analysis'. The status shows 'Running MetaboSpatial-CCI pipeline... This may take a minute.' Errors appear inline, e.g. 'Error running pipeline: Unknown method: mean_score' plus a traceback",
+   "steps": [
+    "upload an .h5ad or choose Demo Data",
+    "choose the metabolite database",
+    "adjust QC, diffusion and statistics settings",
+    "press Run Analysis and wait for the spinner",
+    "read the results tabs or the inline error"
+   ],
+   "serves_tasks": [
+    "Pick the dataset to analyse: your own spatially resolved expression file, or a built-in example",
+    "Choose the reference knowledge base of molecules and their receptors",
+    "Set the significance-testing effort and the cell-type unmixing method",
+    "Run the whole pipeline with default settings and check the headline counts",
+    "Re-run the analysis with changed settings"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/011.webp",
+    "screens/027.webp",
+    "screens/051.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Run summary: metric cards, top-N table and hub ranking table",
+   "general": "After an analysis, a summary page shows headline counts as metric cards, a table of the top-ranked candidate interactions with their significance, and a table ranking groups by network centrality (degree, strength, eigenvector centrality)",
+   "specific": "📊 Overview tab: Spots / Genes / Metabolites / Interactions cards, a '🔝 Top 10 Metabolite-Receptor Interactions' table (Rank, Metabolite, Receptor, Mean Score, Moran's I, P-value, Significance), and a '🏆 Top Hub Cell Types' table with degree, strength and eigenvector_centrality per cell type. When interactions exist, a TypeError from a bar chart (app.py:553) appears below the tables",
+   "steps": [
+    "run the analysis",
+    "read the metric cards",
+    "scan the Top 10 interactions table",
+    "read the hub cell types ranking"
+   ],
+   "serves_tasks": [
+    "Run the whole pipeline with default settings and check the headline counts",
+    "Scan the top-ranked candidate molecule–receptor pairs with their spatial association and significance",
+    "Rank cell populations by how central they are in the communication network"
+   ],
+   "screens": [
+    "screens/013.webp",
+    "screens/014.webp",
+    "screens/015.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Header status strip",
+   "general": "A strip at the top of the page that summarises the loaded dataset (name, size, size of the reference database) and whether the tool is ready or waiting for input",
+   "specific": "The header shows the data name, the spot/gene/metabolite counts and a Status that reads 'Waiting for data' in upload mode before a file is given",
+   "steps": [
+    "choose a data source",
+    "read the dataset summary and Status in the header"
+   ],
+   "serves_tasks": [
+    "Pick the dataset to analyse: your own spatially resolved expression file, or a built-in example"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/011.webp"
+   ],
+   "id": "f5"
+  }
+ ],
+ "screens_never_reached": [
+  "🔗 Interactions tab content (full ranked interaction table with mean score, z-score, permutation p-value, Moran's I, significant flag, significant/total count and Top 15 bar chart): this run showed only KeyError: 'Mean Score' (app.py line 496), which happens only when a run has 0 interactions (screens/021.webp). With interactions present, as in the replay's demo instance, the tab should be reachable",
+  "🕸️ CCI Network tab content (sender × receiver strength heatmap and sender/receiver strength bars): blocked here by the same 0-interaction KeyError (screens/022.webp). With interactions present, the bar chart raises a TypeError at app.py:553, and per code review the heatmap draws before it",
+  "📥 Download tab content (CSV download buttons): blocked here by the same 0-interaction KeyError (screens/023.webp). It may still be blocked when interactions exist",
+  "Finite Difference solver results: the run was still going after several minutes. Stop was pressed but was not shown to cancel it (screens/039.webp, screens/040.webp)",
+  "Simple Mean Score deconvolution results: the pipeline failed with ValueError 'Unknown method: mean_score. Use nnls, rlr, or marker_score' (screens/051.webp)",
+  "Upload h5ad results: no test file was available"
+ ],
+ "not_done": [
+  "Review the full ranked list of metabolite-receptor interactions in the Interactions tab: every run in this session gave 0 interactions, and the tab crashed with the 0-interaction KeyError. The replay of the same settings got 3 interactions, so the demo varies between server processes (app.py:219 set ordering)",
+  "Assess significance with permutation testing: the permutation slider worked, but the full p-value table was not reached. In this session only the empty Top 10 table was seen",
+  "Read the cell-type CCI network: the CCI Network tab crashed (KeyError with 0 interactions; TypeError at app.py:553 in the bar chart when interactions exist). The Overview hub table was all 0 here",
+  "Export interaction and hub tables as CSV: the Download tab crashed, so nothing was downloaded",
+  "Compare FFT vs Finite Difference maps: the Finite Difference run did not finish within several minutes. Stop was pressed, but the cancel was not seen to take effect",
+  "Simple Mean Score deconvolution: the run failed inline with 'ValueError: Unknown method: mean_score. Use nnls, rlr, or marker_score'",
+  "Set quality-control filters (min genes per spot, min counts per spot, normalization target sum): the sliders exist but were never changed; the demo always kept 500 spots",
+  "Switching the database to v1.0 changed nothing (Metabolites still 50), because both options load the same database file in this install",
+  "Run the pipeline on your own .h5ad, the main input route: no test files were provided"
+ ],
+ "applied": [
+  "added a phase for scoring/testing interactions with a task n1 for the Overview Top 10 table (screens/014, check/screens/010)",
+  "added a network/hubs phase and moved t6 into it",
+  "rewrote t5, t6, t8 and t9 specifics so one run's values are not presented as fixed; noted the demo varies between server restarts (app.py:219)",
+  "t9 now keeps only the direction and ratio (mean ≈1.8× up, spread ≈3.6× down) and drops the absolute values",
+  "t2 now says v1.0 and v2.0 load the same file, so switching changes nothing",
+  "t7 narrowed to the real re-run task; the Finite Difference/Stop and Simple Mean Score dead ends moved to not_done; noted Stop was not shown to cancel (t7 notes, f2)",
+  "folded t10 into t8 as an optional fullscreen action",
+  "dropped the 'selected again' and 'Demo Data again' actions from t1, t3 and t4",
+  "made the own-.h5ad upload route the first, main option in t1, marked not exercised",
+  "removed the misleading one-of branch from t3 (the slider is not an alternative to the solver)",
+  "narrowed f2 to the solver/resolution control group and removed its compare claim",
+  "added feature f5 (header status strip); f4 now lists the Top 10 table's columns and the TypeError",
+  "corrected screens_never_reached and not_done: the KeyError blocks the tabs only with 0 interactions, the CCI Network bar chart raises a TypeError at app.py:553 when interactions exist, and Download may still be blocked",
+  "added QC filtering and own-file upload to not_done",
+  "updated serves_tasks after the relabels and merges"
+ ],
+ "open_fixes": [
+  "Re-run from a fresh server process (one whose demo yields interactions) to reach the Interactions tab, then add tasks for reviewing the ranked table, the significance counts and the Top 15 bar chart; this run never showed that tab's content",
+  "Reach the CCI Network tab with interactions present to record the sender × receiver heatmap as a task under the network phase; it was never seen",
+  "Open the Download tab with interactions present and try the CSV export, to add an export task or confirm it is blocked; not reached here",
+  "Add features for the ranked interaction table with significance and bar chart, the sender × receiver heatmap with strength bars, and the one-click CSV export, once a run shows them",
+  "Add a QC-filtering task: the min genes, min counts and target-sum sliders were never changed in this run",
+  "Exercise the own-.h5ad upload path with a real test file; none was available",
+  "Let a Finite Difference run finish, or confirm whether Stop cancels it, to compare solver outputs; the run never completed"
+ ],
+ "screens_at": "pilot/public/runs/metabospatial-cci/20261101-065841/",
+ "screens_filed": {
+  "screens/005.webp": "screens/005.webp",
+  "screens/013.webp": "screens/013.webp",
+  "screens/017.webp": "screens/017.webp",
+  "screens/014.webp": "screens/014.webp"
+ }
+}

@@ -166,7 +166,7 @@ def check_workflow(raw: Any, chk: CardCheck, where: str, part_ids: Optional[set]
 
 def _line_count(build: Build, rel: str) -> Optional[int]:
     try:
-        return build.read_code(rel).count("\n") + 1
+        return build.line_count(rel)
     except (FileNotFoundError, IsADirectoryError, KBError):
         return None
 

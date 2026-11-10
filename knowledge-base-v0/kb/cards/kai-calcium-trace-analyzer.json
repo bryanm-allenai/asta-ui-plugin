@@ -1,0 +1,604 @@
+{
+  "schema": "astaui.card/1",
+  "id": "kai-calcium-trace-analyzer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:27:56Z"
+  },
+  "app": {
+    "title": "KAI - Calcium Imaging Analyzer",
+    "summary": "A person loads a raw fluorescence trace, plus an optional ambient trace that can be shifted and scaled and then subtracted. They set a pacing rate, pick a smoothing level and detect peaks, which splits the trace into periods running from one minimum to the next. In edit mode, clicking the trace drops or restores whole periods, and adds or removes minima to move period boundaries. The kept periods are overlaid on a normalised time axis with a mean ± SD band, summarised as transient metrics for the raw and filtered signals, and exported as an Excel workbook, PNG figures and a session JSON.",
+    "task": {
+      "text": "Turn a periodic calcium-imaging trace into curated periods and per-period transient metrics (APD20/50/90, rise and decay times, slopes, AUC) that can be exported.",
+      "verbs": [
+        "derive",
+        "clean",
+        "summarize",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "One time series of signal intensity from a CSV or Excel file, with an optional ambient background series in the same format. Detection splits it into repeated periods, each with its own computed metrics.",
+      "item": "one period of a periodic trace, from one minimum to the next",
+      "shapes": [
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "measuring transients from raw imaging traces, after recording and before statistics across samples",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar drives a step-by-step pipeline (load, ambient subtraction, pacing, smoothing, peak detection) that feeds a signal plot. In edit mode, clicks on that plot change minima and toggle periods, and each change recomputes the periods list, the overlay of normalised periods and the metrics table in the other tabs.",
+      "views": [
+        "line chart",
+        "list",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "exclude and refit",
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "periodic calcium transient analysis in calcium imaging",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "calcium imaging",
+        "calcium transients",
+        "action potential duration"
+      ]
+    },
+    "workflow": {
+      "name": "split a periodic signal into cycles, curate them, and export per-cycle metrics",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Load Raw takes a CSV or XLSX trace. Load Ambient (optional) takes a background trace, which is resampled, shifted by an offset in ms, scaled and then subtracted when Apply is pressed.",
+          "parts": [
+            "load-and-correct"
+          ]
+        },
+        {
+          "step": "clean the signal before measuring",
+          "here": "A manual pacing rate in Hz guides filtering and detection. A smoothing dial from S=0 to 5 picks Savitzky–Golay, Butterworth or Gaussian smoothing, and the filtered line is drawn over the raw one.",
+          "parts": [
+            "smoothing-and-detection",
+            "signal-plot"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Detect Peaks finds alternating minima and maxima adaptively, using the pacing rate. The trace is then cut into periods from one minimum to the next, and the period boundaries are drawn on the plot.",
+          "parts": [
+            "smoothing-and-detection",
+            "signal-plot",
+            "periods-list"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "In Edit Mode, clicking near a maximum toggles its whole period (removed periods are shaded red), and clicking near a minimum inserts or removes a boundary. Clicks snap to the nearest extremum, alternation is enforced, and periods and metrics are recomputed.",
+          "parts": [
+            "signal-plot"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "The kept periods are resampled to 200 points, normalised to their baseline and overlaid on τ ∈ [0,1], with a mean ± SD band.",
+          "parts": [
+            "period-overlay"
+          ]
+        },
+        {
+          "step": "summarize across items",
+          "here": "The metrics table lists the mean and std of APD20/50/90, rise_10_90, decay_90_10, time to peak, upstroke and downstroke angles, AUC and more, for the raw and filtered signals side by side.",
+          "parts": [
+            "metrics-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Export XLSX/CSV produces a workbook with sheets for parameters, periods, per-period and aggregated metrics and the resampled periods. It also offers signal and overlay PNGs and a session JSON with the peaks, the removed periods and the settings.",
+          "parts": [
+            "export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "An ambient background trace can be aligned by a time offset and a scale factor before it is subtracted from the raw trace",
+        "One smoothing dial (0–5) maps to tuned filter backends, and every metric is reported for both the raw and the filtered signal so the effect of smoothing can be seen",
+        "A known pacing frequency guides peak spacing and filtering",
+        "One click on the trace snaps to a local extremum: a maximum toggles its whole period, and a minimum edits a period boundary",
+        "Waveform metrics from cardiac physiology (APD20/50/90, 10–90% rise and decay times, upstroke angles) are computed for each period"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "session-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Session sidebar",
+      "summary": "Holds the processing controls in the order they are used and shows the current status.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 267,
+          "end": 282,
+          "role": "markup",
+          "anchor": "622f01b41367",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 332,
+          "end": 335,
+          "role": "markup",
+          "anchor": "9c2b86371884",
+          "first": "st.text(st.session_state.status)"
+        }
+      ]
+    },
+    {
+      "id": "load-and-correct",
+      "level": "component",
+      "parent": "session-sidebar",
+      "title": "Load raw and ambient, with alignment",
+      "summary": "Uploads the raw trace and an optional ambient trace, then subtracts the ambient after applying a time offset and a scale.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 283,
+          "end": 306,
+          "role": "markup",
+          "anchor": "9a51b9de7775",
+          "first": "raw_file = st.file_uploader(\"Load Raw...\", type=['csv', 'xlsx', 'xls'])"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 401,
+          "end": 415,
+          "role": "logic",
+          "symbol": "apply_offset_scale",
+          "anchor": "1915cd6b8eae",
+          "first": "def apply_offset_scale(offset_ms, scale):"
+        },
+        {
+          "file": "code/src/io.py",
+          "start": 32,
+          "end": 85,
+          "role": "logic",
+          "symbol": "load_signal",
+          "anchor": "305f6f3fa7c3",
+          "first": "def load_signal(path_or_file, *, sheet: Optional[str] = None, time_col: Optional[str] = None, value_col: Optional[str] ="
+        },
+        {
+          "file": "code/src/io.py",
+          "start": 97,
+          "end": 110,
+          "role": "logic",
+          "symbol": "subtract_ambient",
+          "anchor": "1227004c7385",
+          "first": "def subtract_ambient(t_raw: np.ndarray, y_raw: np.ndarray, t_amb: np.ndarray, y_amb: np.ndarray, *, offset_ms: float = 0"
+        }
+      ]
+    },
+    {
+      "id": "smoothing-and-detection",
+      "level": "component",
+      "parent": "session-sidebar",
+      "title": "Pacing, smoothing and peak detection",
+      "summary": "Sets the pacing rate and the smoothing level, runs adaptive peak detection and switches click editing on or off.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 308,
+          "end": 327,
+          "role": "markup",
+          "anchor": "86046cff4567",
+          "first": "st.header(\"Pacing (manual)\")"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 417,
+          "end": 421,
+          "role": "logic",
+          "symbol": "on_set_pacing",
+          "anchor": "c881b5962ad1",
+          "first": "def on_set_pacing(hz):"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 441,
+          "end": 443,
+          "role": "logic",
+          "symbol": "on_smooth_changed",
+          "anchor": "61d760b523e9",
+          "first": "def on_smooth_changed(S):"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 429,
+          "end": 439,
+          "role": "logic",
+          "symbol": "refresh_signal",
+          "anchor": "a5431f25a9ba",
+          "first": "def refresh_signal(live=False):"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 445,
+          "end": 456,
+          "role": "logic",
+          "symbol": "detect_peaks",
+          "anchor": "ed633e26bf79",
+          "first": "def detect_peaks():"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 458,
+          "end": 460,
+          "role": "logic",
+          "symbol": "toggle_edit",
+          "anchor": "e6f771a532fb",
+          "first": "def toggle_edit():"
+        },
+        {
+          "file": "code/src/filters.py",
+          "start": 57,
+          "end": 186,
+          "role": "logic",
+          "symbol": "FilterEngine",
+          "anchor": "5a364e14e414",
+          "first": "class FilterEngine:"
+        },
+        {
+          "file": "code/src/detect.py",
+          "start": 86,
+          "end": 178,
+          "role": "logic",
+          "symbol": "find_peaks_adaptive",
+          "anchor": "20f8f39623e2",
+          "first": "def find_peaks_adaptive("
+        }
+      ]
+    },
+    {
+      "id": "signal-plot",
+      "level": "view",
+      "parent": null,
+      "title": "Signal tab",
+      "summary": "Plots the raw or ambient-corrected trace with the filtered line, the minima and maxima, the numbered period boundaries and shaded removed spans. In edit mode, clicks on the plot curate the periods.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "select",
+        "exclude and refit",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 337,
+          "end": 363,
+          "role": "markup",
+          "anchor": "08ca53b59223",
+          "first": "with tab1:"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 20,
+          "end": 161,
+          "role": "logic",
+          "symbol": "SignalPlotStreamlit",
+          "anchor": "68cc98a6c9dd",
+          "first": "class SignalPlotStreamlit:"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 462,
+          "end": 489,
+          "role": "logic",
+          "symbol": "on_click_peak",
+          "anchor": "a79db66371f7",
+          "first": "def on_click_peak(x_click):"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 388,
+          "end": 399,
+          "role": "logic",
+          "symbol": "calculate_removed_spans",
+          "anchor": "2d20a7d4aed6",
+          "first": "def calculate_removed_spans():"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 491,
+          "end": 520,
+          "role": "logic",
+          "symbol": "recompute_periods",
+          "anchor": "f6bf36c37725",
+          "first": "def recompute_periods():"
+        },
+        {
+          "file": "code/src/detect.py",
+          "start": 218,
+          "end": 246,
+          "role": "logic",
+          "symbol": "snap_to_local_extremum",
+          "anchor": "d7f8ed74b575",
+          "first": "def snap_to_local_extremum(t: np.ndarray, y: np.ndarray, x_click: float, *, radius_ms: float = 60.0) -> Tuple[int, str]:"
+        },
+        {
+          "file": "code/src/detect.py",
+          "start": 268,
+          "end": 302,
+          "role": "logic",
+          "symbol": "enforce_alternation",
+          "anchor": "c275fc6886ed",
+          "first": "def enforce_alternation("
+        },
+        {
+          "file": "code/src/segment.py",
+          "start": 46,
+          "end": 86,
+          "role": "logic",
+          "symbol": "build_period_indices",
+          "anchor": "ad7dddda47b4",
+          "first": "def build_period_indices("
+        }
+      ]
+    },
+    {
+      "id": "periods-list",
+      "level": "view",
+      "parent": null,
+      "title": "Periods tab",
+      "summary": "Lists each kept period by its original number, with its sample count and duration.",
+      "views": [
+        "list"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 365,
+          "end": 366,
+          "role": "markup",
+          "anchor": "e82fbd220041",
+          "first": "with tab2:"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 522,
+          "end": 531,
+          "role": "logic",
+          "symbol": "render_periods_tab",
+          "anchor": "e0824119469d",
+          "first": "def render_periods_tab():"
+        }
+      ]
+    },
+    {
+      "id": "period-overlay",
+      "level": "view",
+      "parent": null,
+      "title": "Overlay tab",
+      "summary": "Overlays the kept periods on a normalised time axis, resampled and baseline-normalised, with a mean line and a ±SD band.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 368,
+          "end": 369,
+          "role": "markup",
+          "anchor": "94ebdb6cf40c",
+          "first": "with tab3:"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 533,
+          "end": 552,
+          "role": "logic",
+          "symbol": "update_overlay_plot",
+          "anchor": "38121acf6bad",
+          "first": "def update_overlay_plot():"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 164,
+          "end": 199,
+          "role": "logic",
+          "symbol": "draw_periods_overlay_streamlit",
+          "anchor": "62f56fbd457f",
+          "first": "def draw_periods_overlay_streamlit(tau, Xn, mean, std, labels=None, labeled_max=12):"
+        },
+        {
+          "file": "code/src/segment.py",
+          "start": 124,
+          "end": 144,
+          "role": "logic",
+          "symbol": "resample_periods",
+          "anchor": "2449198f4ff8",
+          "first": "def resample_periods("
+        },
+        {
+          "file": "code/src/segment.py",
+          "start": 147,
+          "end": 184,
+          "role": "logic",
+          "symbol": "normalize_periods",
+          "anchor": "01ce0addaf8e",
+          "first": "def normalize_periods("
+        },
+        {
+          "file": "code/src/segment.py",
+          "start": 187,
+          "end": 196,
+          "role": "logic",
+          "symbol": "average_period",
+          "anchor": "b140c34abfe1",
+          "first": "def average_period(X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:"
+        }
+      ]
+    },
+    {
+      "id": "metrics-table",
+      "level": "view",
+      "parent": null,
+      "title": "Metrics tab",
+      "summary": "Shows the mean and std of each transient metric across the kept periods, for the raw and filtered signals side by side.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 371,
+          "end": 372,
+          "role": "markup",
+          "anchor": "db397c53df3e",
+          "first": "with tab4:"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 554,
+          "end": 567,
+          "role": "logic",
+          "symbol": "compute_metrics_aggregates",
+          "anchor": "fe6a7945a68f",
+          "first": "def compute_metrics_aggregates():"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 569,
+          "end": 601,
+          "role": "logic",
+          "symbol": "render_metrics_tab",
+          "anchor": "a16d591a7f33",
+          "first": "def render_metrics_tab():"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 603,
+          "end": 621,
+          "role": "logic",
+          "symbol": "normalize_agg",
+          "anchor": "0367a92fa272",
+          "first": "def normalize_agg(agg):"
+        },
+        {
+          "file": "code/src/metrics.py",
+          "start": 182,
+          "end": 192,
+          "role": "logic",
+          "symbol": "metrics_for_periods",
+          "anchor": "41311f55b173",
+          "first": "def metrics_for_periods(periods: Sequence[Tuple[np.ndarray, np.ndarray]]) -> List[Dict[str, float]]:"
+        },
+        {
+          "file": "code/src/metrics.py",
+          "start": 195,
+          "end": 211,
+          "role": "logic",
+          "symbol": "aggregate_metrics",
+          "anchor": "5e1d5d29c26e",
+          "first": "def aggregate_metrics(period_metrics: Sequence[Dict[str, float]]) -> Dict[str, float]:"
+        }
+      ]
+    },
+    {
+      "id": "export",
+      "level": "component",
+      "parent": "session-sidebar",
+      "title": "Export bundle",
+      "summary": "Builds an Excel workbook of parameters, periods, metrics and resampled periods, along with signal and overlay PNGs and a session JSON, each offered as a download.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 329,
+          "end": 330,
+          "role": "markup",
+          "anchor": "dded8e475921",
+          "first": "if st.button(\"Export XLSX/CSV\"):"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 623,
+          "end": 701,
+          "role": "logic",
+          "symbol": "export_all",
+          "anchor": "c45d5f66c2f9",
+          "first": "def export_all():"
+        }
+      ]
+    }
+  ]
+}

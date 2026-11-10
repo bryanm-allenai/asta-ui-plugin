@@ -1,0 +1,683 @@
+{
+  "schema": "astaui.card/1",
+  "id": "edf-analyzer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T19:29:38Z"
+  },
+  "app": {
+    "title": "EDF-Analyzer",
+    "summary": "A person uploads a multichannel physiological recording. The file is checked for size, format and identifying header fields, and the person sets the subject's age and sex group. The app works out what type each channel is and gives a confidence; the person can sort the channels and correct the type. They page through the raw traces, then compute spectral, aperiodic, complexity, heart-beat, heart-rate-variability and rhythm measures on separate pages. An automatic artifact mask, which the person can edit by clicking, gives a corrected version of each measure next to the version for the whole recording. Finally the person builds tabular and visual reports that record how they were made.",
+    "task": {
+      "text": "Derive quantitative brain-signal and heart-signal measures from one routine recording, compare them before and after artifact removal, and export a report that records how they were made.",
+      "verbs": [
+        "derive",
+        "clean",
+        "identify",
+        "explore",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "One multichannel recording of biosignals sampled over time, with channel labels and header metadata, plus subject age and sex for the reference ranges.",
+      "item": "a channel of a continuous recording, analysed in epochs and windows of time",
+      "shapes": [
+        "time series",
+        "grid of series",
+        "per element",
+        "events",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "computing quantitative measures from a routine recording, with artifact cleanup, before writing up findings",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar of pages leads from upload through channel identification, a raw-signal viewer and several analysis pages to a report page. Channel corrections and the artifact mask, which the person edits on a clickable timeline, feed every later computation, and each measure is shown for the whole recording next to the cleaned version.",
+      "views": [
+        "line chart",
+        "heatmap",
+        "bar chart",
+        "summary stats",
+        "table view",
+        "timeline",
+        "form",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "import",
+        "apply label",
+        "sort",
+        "select",
+        "toggle view",
+        "exclude and refit",
+        "hover for detail",
+        "zoom and pan",
+        "keyboard shortcuts",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail",
+        "side-by-side comparison",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "quantitative EEG spectral analysis and heart-rate variability in clinical neurophysiology",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "clinical neurophysiology",
+        "quantitative eeg",
+        "heart rate variability"
+      ]
+    },
+    "workflow": {
+      "name": "derive measures from a multichannel recording, clean out artifacts, and export a report with provenance",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a recording file. It is validated for size, sample count and format, and its header is checked for identifying fields, which must be acknowledged before loading. Then pick the subject's age group and sex.",
+          "parts": [
+            "file-patient"
+          ]
+        },
+        {
+          "step": "identify what each channel is and correct it",
+          "here": "A classifier labels each channel by type (brain, heart, eye, muscle, reference, vital) with a confidence. The person sorts the list and overrides a type, or resets all overrides.",
+          "parts": [
+            "channel-report"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Page through the recording in epochs with arrow keys, montage and filter choices, with the heart trace fixed at the bottom.",
+          "parts": [
+            "eeg-viewer"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Power spectra, band power and ratios, alpha peak, aperiodic exponent and complexity per channel. R-peak detection with RR cleaning, time- and frequency-domain variability measures graded against age-dependent reference ranges, and rhythm screening that flags irregular rhythm and ectopic beats.",
+          "parts": [
+            "eeg-spectrum",
+            "ecg-hrv",
+            "rhythm-screening"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "A rule-based mask marks movement artifacts and suggests bad channels. The person adds or removes segments on a clickable timeline, and spectral and variability measures are shown for the whole recording next to the cleaned version.",
+          "parts": [
+            "artifact-selection",
+            "rhythm-screening"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Generate tabular PDF/Excel reports (whole recording vs corrected) and a visual PDF summary, each with version, commit, file hash and an analysis fingerprint. A report is marked stale when the settings change.",
+          "parts": [
+            "report"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every measure is computed twice, on the whole recording and on the artifact-corrected recording, and the two are shown side by side",
+        "Each method is labelled by how faithful the implementation is to its source and by the level of evidence behind it, and simplified defaults are shown next to full reference implementations",
+        "Variability values are graded against reference ranges that depend on age and sex, with pediatric ranges",
+        "Reports carry a provenance fingerprint and are flagged stale once file, age, sex or channel corrections change",
+        "The upload checks the header for identifying fields, and uploaded files are deleted automatically after a time limit"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "file-patient",
+      "level": "view",
+      "parent": null,
+      "title": "File & patient",
+      "summary": "Uploads and validates the recording, warns about identifying header fields, and sets the subject's age and sex group used for reference ranges.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/file_patient.py",
+          "start": 50,
+          "end": 304,
+          "role": "markup",
+          "symbol": "render",
+          "anchor": "60e888ad9254",
+          "first": "def render():"
+        },
+        {
+          "file": "code/core/edf_validation.py",
+          "start": 180,
+          "end": 285,
+          "role": "logic",
+          "symbol": "validate_edf",
+          "anchor": "eeb7855e3f7a",
+          "first": "def validate_edf(path: str, lang: str = \"de\") -> ValidationResult:"
+        },
+        {
+          "file": "code/core/loader.py",
+          "start": 28,
+          "end": 45,
+          "role": "logic",
+          "symbol": "check_privacy",
+          "anchor": "30fcc5b9884a",
+          "first": "def check_privacy(path: str) -> dict:"
+        },
+        {
+          "file": "code/core/shared.py",
+          "start": 586,
+          "end": 763,
+          "role": "logic",
+          "symbol": "load_and_prepare",
+          "anchor": "abd38ec51ec9",
+          "first": "def load_and_prepare(path: str):"
+        }
+      ]
+    },
+    {
+      "id": "channel-report",
+      "level": "view",
+      "parent": null,
+      "title": "Channel identification",
+      "summary": "Shows each channel's detected type with a confidence and a signal preview, and lets the person sort the channels and override a type.",
+      "views": [
+        "list",
+        "summary stats",
+        "line chart"
+      ],
+      "interactions": [
+        "sort",
+        "apply label",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/views/channel_report.py",
+          "start": 72,
+          "end": 473,
+          "role": "markup",
+          "symbol": "render",
+          "anchor": "8b33b02d82e4",
+          "first": "def render():"
+        },
+        {
+          "file": "code/core/channel_classifier.py",
+          "start": 108,
+          "end": 113,
+          "role": "logic",
+          "symbol": "classify_channels",
+          "anchor": "b3522a5a571c",
+          "first": "def classify_channels("
+        },
+        {
+          "file": "code/core/channel_classifier.py",
+          "start": 411,
+          "end": 713,
+          "role": "logic",
+          "symbol": "_classify_one",
+          "anchor": "8e467d30ea2d",
+          "first": "def _classify_one(f: dict, ch_name: str, is_bids_eeg_file: bool = False) -> ChannelResult:"
+        },
+        {
+          "file": "code/core/shared.py",
+          "start": 1123,
+          "end": 1190,
+          "role": "logic",
+          "symbol": "apply_channel_overrides",
+          "anchor": "743682010072",
+          "first": "def apply_channel_overrides(edf: dict) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "eeg-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "Signal viewer",
+      "summary": "Pages through the raw multichannel traces epoch by epoch, with montage and display filters and the heart trace kept at the bottom.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "keyboard shortcuts",
+        "zoom and pan",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/views/eeg_viewer.py",
+          "start": 13,
+          "end": 107,
+          "role": "markup",
+          "symbol": "render",
+          "anchor": "3038e6c4bc0d",
+          "first": "def render():"
+        },
+        {
+          "file": "code/core/shared.py",
+          "start": 832,
+          "end": 901,
+          "role": "logic",
+          "symbol": "eeg_figure",
+          "anchor": "bf56e39150b8",
+          "first": "def eeg_figure(derivs, t, spacing, annotations, t_s, t_e):"
+        },
+        {
+          "file": "code/core/shared.py",
+          "start": 992,
+          "end": 1004,
+          "role": "logic",
+          "symbol": "epoch_nav",
+          "anchor": "6b55d98a8b7c",
+          "first": "def epoch_nav(edf, key, label=\"EEG\", epoch_sec=None):"
+        },
+        {
+          "file": "code/core/shared.py",
+          "start": 947,
+          "end": 971,
+          "role": "logic",
+          "symbol": "inject_arrow_key_nav",
+          "anchor": "3bfd327ed278",
+          "first": "def inject_arrow_key_nav():"
+        }
+      ]
+    },
+    {
+      "id": "eeg-spectrum",
+      "level": "view",
+      "parent": null,
+      "title": "Spectrum & aperiodic",
+      "summary": "Computes power spectra, spectrograms, band power and ratios, alpha peak, asymmetry, the aperiodic exponent and complexity per channel or region.",
+      "views": [
+        "line chart",
+        "heatmap",
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/views/eeg_spectrum.py",
+          "start": 727,
+          "end": 1418,
+          "role": "markup",
+          "symbol": "render",
+          "anchor": "c0207ca1916d",
+          "first": "def render():"
+        },
+        {
+          "file": "code/views/eeg_spectrum.py",
+          "start": 323,
+          "end": 428,
+          "role": "logic",
+          "symbol": "_fft_figure",
+          "anchor": "1482a13099ba",
+          "first": "def _fft_figure(signals: dict, t_start, t_end, fs, panel_id,"
+        },
+        {
+          "file": "code/views/eeg_spectrum.py",
+          "start": 431,
+          "end": 490,
+          "role": "logic",
+          "symbol": "_render_bandpower_and_ratios",
+          "anchor": "f3ab8d84e722",
+          "first": "def _render_bandpower_and_ratios(bp_all, panel_id):"
+        },
+        {
+          "file": "code/analysis/spectral.py",
+          "start": 120,
+          "end": 190,
+          "role": "logic",
+          "symbol": "_compute_psd",
+          "anchor": "dc85869484fb",
+          "first": "def _compute_psd(sig, fs, nperseg=None, multitaper=False, amp_thresh_uv=9999.0):"
+        },
+        {
+          "file": "code/views/aperiodic.py",
+          "start": 120,
+          "end": 399,
+          "role": "markup",
+          "symbol": "render",
+          "anchor": "e31140ee8606",
+          "first": "def render():"
+        },
+        {
+          "file": "code/analysis/aperiodic.py",
+          "start": 54,
+          "end": 107,
+          "role": "logic",
+          "symbol": "fit_aperiodic",
+          "anchor": "6e1140761d06",
+          "first": "def fit_aperiodic(freqs: np.ndarray, psd: np.ndarray,"
+        }
+      ]
+    },
+    {
+      "id": "ecg-hrv",
+      "level": "view",
+      "parent": null,
+      "title": "Heart & variability",
+      "summary": "Detects heart beats, cleans the RR series and computes time- and frequency-domain variability measures, each graded against age-dependent reference ranges.",
+      "views": [
+        "line chart",
+        "scatter plot",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "rubric"
+      ],
+      "spans": [
+        {
+          "file": "code/views/ecg_hrv.py",
+          "start": 160,
+          "end": 993,
+          "role": "markup",
+          "symbol": "render",
+          "anchor": "df4c5e24f289",
+          "first": "def render():"
+        },
+        {
+          "file": "code/views/ecg_hrv.py",
+          "start": 50,
+          "end": 151,
+          "role": "logic",
+          "symbol": "compute_rr",
+          "anchor": "11f2491c81e0",
+          "first": "def compute_rr(path, channel):"
+        },
+        {
+          "file": "code/views/ecg_hrv.py",
+          "start": 508,
+          "end": 909,
+          "role": "logic",
+          "symbol": "_render_lab_panel",
+          "anchor": "7ad0f8ae7ba8",
+          "first": "def _render_lab_panel(rr_seg: np.ndarray, r_times_seg: np.ndarray,"
+        },
+        {
+          "file": "code/analysis/hrv_reference.py",
+          "start": 151,
+          "end": 385,
+          "role": "logic",
+          "symbol": "classify_parameter",
+          "anchor": "66eed75bb8bb",
+          "first": "def classify_parameter(param: str, value: float, age: float, heart_rate: float,"
+        },
+        {
+          "file": "code/analysis/hrv_freq.py",
+          "start": 125,
+          "end": 186,
+          "role": "logic",
+          "symbol": "compute_frequency_domain",
+          "anchor": "6afd49c079f5",
+          "first": "def compute_frequency_domain(rr_ms: np.ndarray, t_s: np.ndarray, method: str = \"welch\","
+        }
+      ]
+    },
+    {
+      "id": "rhythm-screening",
+      "level": "view",
+      "parent": null,
+      "title": "Rhythm screening",
+      "summary": "Screens the heart signal for irregular rhythm and ectopic beats before the variability analysis. It shows aligned beat ensembles and rejected segments, and the person can remove beats by hand.",
+      "views": [
+        "line chart",
+        "summary stats",
+        "timeline"
+      ],
+      "interactions": [
+        "select",
+        "exclude and refit",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/views/rhythm_screening.py",
+          "start": 109,
+          "end": 675,
+          "role": "markup",
+          "symbol": "render",
+          "anchor": "b6a618a2f89e",
+          "first": "def render():"
+        },
+        {
+          "file": "code/views/rhythm_screening.py",
+          "start": 51,
+          "end": 90,
+          "role": "logic",
+          "symbol": "_detect",
+          "anchor": "7f2a69ac503b",
+          "first": "def _detect(edf_path: str, ch: str, method: str | None):"
+        },
+        {
+          "file": "code/analysis/rhythm_screening.py",
+          "start": 115,
+          "end": 152,
+          "role": "logic",
+          "symbol": "classify_afib_risk",
+          "anchor": "8b8d4068eac2",
+          "first": "def classify_afib_risk(sig: np.ndarray, r_peaks: np.ndarray, fs: float,"
+        },
+        {
+          "file": "code/analysis/ectopy_detection.py",
+          "start": 68,
+          "end": 121,
+          "role": "logic",
+          "symbol": "detect_ectopic_beats",
+          "anchor": "c7f18bfa867a",
+          "first": "def detect_ectopic_beats(sig: np.ndarray, r_peaks: np.ndarray, fs: float) -> list[dict]:"
+        }
+      ]
+    },
+    {
+      "id": "artifact-selection",
+      "level": "view",
+      "parent": null,
+      "title": "Artifact correction",
+      "summary": "Builds an automatic artifact mask and suggests bad channels. The person can add or remove segments on a clickable timeline and compare spectral and variability measures before and after correction.",
+      "views": [
+        "timeline",
+        "line chart",
+        "side-by-side panes",
+        "table view"
+      ],
+      "interactions": [
+        "exclude and refit",
+        "select",
+        "inline edit",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/views/artifact_selection.py",
+          "start": 605,
+          "end": 855,
+          "role": "markup",
+          "symbol": "render",
+          "anchor": "4a0b0030572e",
+          "first": "def render():"
+        },
+        {
+          "file": "code/views/artifact_selection.py",
+          "start": 352,
+          "end": 485,
+          "role": "logic",
+          "symbol": "_render_review_viewer",
+          "anchor": "f4defbd711e2",
+          "first": "def _render_review_viewer(edf, res, res_auto):"
+        },
+        {
+          "file": "code/views/artifact_selection.py",
+          "start": 537,
+          "end": 602,
+          "role": "logic",
+          "symbol": "_render_segment_editor",
+          "anchor": "3282877c6c6f",
+          "first": "def _render_segment_editor(res_auto, dur):"
+        },
+        {
+          "file": "code/views/artifact_selection.py",
+          "start": 149,
+          "end": 222,
+          "role": "logic",
+          "symbol": "_render_spectral_compare",
+          "anchor": "27933e7be90e",
+          "first": "def _render_spectral_compare(edf, res):"
+        },
+        {
+          "file": "code/views/artifact_selection.py",
+          "start": 225,
+          "end": 282,
+          "role": "logic",
+          "symbol": "_render_hrv_compare",
+          "anchor": "3743a4ad168e",
+          "first": "def _render_hrv_compare(edf, edf_path, res, overrides_key):"
+        },
+        {
+          "file": "code/views/artifact_canvas/index.html",
+          "start": 11,
+          "end": 11,
+          "role": "markup",
+          "symbol": "#rev",
+          "anchor": "61eb4c4eae9d",
+          "first": "<canvas id=\"rev\"></canvas>"
+        },
+        {
+          "file": "code/views/artifact_canvas/index.html",
+          "start": 27,
+          "end": 88,
+          "role": "logic",
+          "symbol": "draw",
+          "anchor": "b13904234f09",
+          "first": "function draw() {"
+        },
+        {
+          "file": "code/analysis/artifacts.py",
+          "start": 128,
+          "end": 134,
+          "role": "logic",
+          "symbol": "compute_artifact_mask",
+          "anchor": "99a0692b3aa2",
+          "first": "def compute_artifact_mask("
+        }
+      ]
+    },
+    {
+      "id": "report",
+      "level": "view",
+      "parent": null,
+      "title": "Report",
+      "summary": "Generates tabular PDF/Excel reports comparing the whole recording with the corrected one, plus a visual PDF summary, all stamped with provenance and marked stale when the settings change.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/report.py",
+          "start": 133,
+          "end": 522,
+          "role": "markup",
+          "symbol": "render",
+          "anchor": "38f051f2a018",
+          "first": "def render():"
+        },
+        {
+          "file": "code/views/report.py",
+          "start": 429,
+          "end": 436,
+          "role": "logic",
+          "symbol": "_export_bytes",
+          "anchor": "640b52c8e9b1",
+          "first": "def _export_bytes(path, disp, age, sex, pediatric, overrides_key):"
+        },
+        {
+          "file": "code/analysis/report_export.py",
+          "start": 230,
+          "end": 378,
+          "role": "logic",
+          "symbol": "collect_sections",
+          "anchor": "da041e2c06de",
+          "first": "def collect_sections(edf: dict, edf_path: str, corr_segments=None,"
+        },
+        {
+          "file": "code/analysis/report_export.py",
+          "start": 704,
+          "end": 789,
+          "role": "logic",
+          "symbol": "build_pdf",
+          "anchor": "3aa32ecedf96",
+          "first": "def build_pdf(sections, disp_name: str) -> bytes:"
+        },
+        {
+          "file": "code/analysis/report_export.py",
+          "start": 638,
+          "end": 685,
+          "role": "logic",
+          "symbol": "build_excel",
+          "anchor": "60699603e109",
+          "first": "def build_excel(sections, edf, disp_name: str) -> bytes:"
+        },
+        {
+          "file": "code/analysis/glory_report.py",
+          "start": 866,
+          "end": 892,
+          "role": "logic",
+          "symbol": "build_glory_pdf",
+          "anchor": "0ef894234a59",
+          "first": "def build_glory_pdf(edf: dict, edf_path: str, disp_name: str = \"EDF\","
+        }
+      ]
+    }
+  ]
+}

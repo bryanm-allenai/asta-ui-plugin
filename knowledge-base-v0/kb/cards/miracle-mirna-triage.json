@@ -1,0 +1,619 @@
+{
+  "schema": "astaui.card/1",
+  "id": "miracle-mirna-triage",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:39:30Z"
+  },
+  "app": {
+    "title": "miRacle — Explainable miRNA candidate triage",
+    "summary": "A person brings in a short genomic DNA or RNA sequence by pasting it, uploading a FASTA, loading a bundled control, or fetching a reference-genome interval by chromosome and coordinates, and chooses whether annotated protein-coding regions are masked. One scan folds local structures on both strands, keeps the hairpins that pass loose structural gates, and ranks them with a trained classifier. The candidates appear along a track of the input and in a ranked table, and the person opens one at a time to see its fold, its score, which features moved the score, independent reference and decoy matches, and an evidence ladder that keeps computed and experimental evidence apart. The person gets a ranked shortlist of the candidates worth taking to the lab, exported as CSV or FASTA, with per-candidate structure drawings as SVG.",
+    "task": {
+      "text": "Rank the hairpins found in a submitted genomic sequence by how precursor-like they are, and lay out separate lines of evidence for each, so the researcher can pick the few to validate experimentally first.",
+      "verbs": [
+        "triage",
+        "derive",
+        "identify",
+        "compare",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "One nucleotide sequence (or reference-genome interval), from which many candidate stretches are cut out, folded and scored. Each candidate has computed structure features, a model score and matches against reference and decoy sets.",
+      "item": "a candidate hairpin: a stretch of the submitted sequence on one strand, with its predicted secondary structure, folding energy and score",
+      "shapes": [
+        "sequence",
+        "spans",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "screening a genomic region for candidates and shortlisting them before experimental validation",
+      "terms": [
+        "analyze",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "A scan turns the input into ranked candidates, shown as an overview (a strand-by-position track coloured by score, plus a ranked table). A dropdown opens one candidate in detail with evidence cards, a switchable structure drawing and a feature-sensitivity bar chart, and an Evidence tab follows the same selection. Separate tabs set a positive and a negative control side by side through the same pipeline, and show the model's held-out benchmark.",
+      "views": [
+        "form",
+        "sequence track",
+        "table view",
+        "summary stats",
+        "detail panel",
+        "structure diagram",
+        "bar chart",
+        "side-by-side panes",
+        "heatmap"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "toggle view",
+        "hover for detail",
+        "sort",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "master-detail",
+        "side-by-side comparison",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "RNA secondary-structure prediction and machine-learning classification of microRNA precursor candidates in genomics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "bioinformatics",
+        "microrna",
+        "rna secondary structure"
+      ]
+    },
+    "workflow": {
+      "name": "find candidates in an input, rank them by a model score, and inspect the evidence for each to shortlist follow-up",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Paste or upload a FASTA, load one of the bundled positive or negative controls, or enter chromosome, start and end to fetch an hg38 interval. Choose CDS, all-exon or no protein-region masking.",
+          "parts": [
+            "input-panel"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Run candidate scan' folds local windows on both strands with ViennaRNA, keeps hairpins that pass loose gates, removes overlaps and scores each one with the trained classifier.",
+          "parts": [
+            "input-panel",
+            "candidate-overview"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Run metrics (input length, candidate count, runtime, model), a position track with + and − strand lanes coloured by score, and a sortable ranked table with energy, pairing and nearest reference.",
+          "parts": [
+            "candidate-overview"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "'Inspect candidate' opens evidence cards (score, MFE, pairing, nearest reference, evidence level, nearest non-miRNA decoy), the fold as a 2D drawing or base-pair arcs, one-feature sensitivity bars and the list of evidence the analysis does not provide.",
+          "parts": [
+            "candidate-detail",
+            "structure-viewer"
+          ]
+        },
+        {
+          "step": "weigh separate lines of evidence for the item",
+          "here": "The Evidence tab shows a ladder of layers (computed fold, model score, curated match, Rfam conflict, mature arm, machinery experiments), cross-species matches, a curated literature card, and a table of the miRNA pathway proteins with each one's candidate-specific result.",
+          "parts": [
+            "evidence-ladder"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Pick a positive and a negative control and run both through the same pipeline: score separation against the decision threshold, grouped evidence bars, an exact-value table, and both folds and sensitivity charts next to each other.",
+          "parts": [
+            "control-comparison"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download the shortlist as CSV (with dot-bracket, scores and reference matches) or as FASTA, and each candidate's structure as SVG.",
+          "parts": [
+            "candidate-overview",
+            "structure-viewer"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Candidates are scanned on both DNA strands and placed on strand lanes along the input coordinates.",
+        "Masking of coding regions depends on genome coordinates: it applies only when the FASTA header carries a length-matched hg38 interval.",
+        "The model score is deliberately kept apart from the reference-match, decoy-conflict, literature and machinery evidence, and these combine into a graded evidence label instead of one number.",
+        "Explanations come from one-feature-at-a-time sensitivity (each feature swapped for its training median), and every candidate is shown with the evidence the analysis cannot provide.",
+        "A held-out benchmark tab (model selection on validation, a confusion matrix, stress tests on the negative sets) sits beside the triage, so the user can judge how far to trust the score."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "input-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Sequence input and scan",
+      "summary": "Brings in a sequence by paste, upload, bundled control or hg38 coordinates, sets the protein-region masking, and runs the candidate scan.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 339,
+          "end": 468,
+          "role": "markup",
+          "anchor": "e9bb29edfc50",
+          "first": "with discover_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 75,
+          "end": 77,
+          "role": "logic",
+          "symbol": "read_example",
+          "anchor": "1ac25c9716b1",
+          "first": "def read_example(name: str) -> str:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 80,
+          "end": 81,
+          "role": "logic",
+          "symbol": "set_example",
+          "anchor": "db2395bf0912",
+          "first": "def set_example(name: str) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 92,
+          "end": 94,
+          "role": "logic",
+          "symbol": "load_hg38_region",
+          "anchor": "4bac5de76580",
+          "first": "def load_hg38_region(chromosome: str, start: int, end: int) -> str:"
+        },
+        {
+          "file": "code/mirna_app/genome.py",
+          "start": 145,
+          "end": 154,
+          "role": "logic",
+          "symbol": "fetch_hg38_region",
+          "anchor": "074c38f693ea",
+          "first": "def fetch_hg38_region(chromosome: str, start: int, end: int) -> str:"
+        },
+        {
+          "file": "code/mirna_app/exon_mask.py",
+          "start": 78,
+          "end": 82,
+          "role": "logic",
+          "symbol": "mask_hg38_coding_exons",
+          "anchor": "99e3234cdca5",
+          "first": "def mask_hg38_coding_exons("
+        },
+        {
+          "file": "code/mirna_app/pipeline.py",
+          "start": 104,
+          "end": 109,
+          "role": "logic",
+          "symbol": "analyze",
+          "anchor": "9424da0b247e",
+          "first": "def analyze("
+        }
+      ]
+    },
+    {
+      "id": "candidate-overview",
+      "level": "view",
+      "parent": null,
+      "title": "Ranked candidates",
+      "summary": "Shows run metrics, a strand-by-position track of every candidate coloured by score, and a ranked table, with CSV and FASTA downloads.",
+      "views": [
+        "summary stats",
+        "sequence track",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "sort",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 470,
+          "end": 511,
+          "role": "markup",
+          "anchor": "7db43c820634",
+          "first": "result: AnalysisResult | None = st.session_state.get(\"analysis_result\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 159,
+          "end": 189,
+          "role": "logic",
+          "symbol": "position_figure",
+          "anchor": "ef2d6edc3dec",
+          "first": "def position_figure(result: AnalysisResult) -> go.Figure:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 97,
+          "end": 115,
+          "role": "logic",
+          "symbol": "result_frame",
+          "anchor": "b94a72d689bc",
+          "first": "def result_frame(result: AnalysisResult) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 118,
+          "end": 147,
+          "role": "logic",
+          "symbol": "candidates_csv",
+          "anchor": "fb5226def53d",
+          "first": "def candidates_csv(result: AnalysisResult) -> bytes:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 150,
+          "end": 156,
+          "role": "logic",
+          "symbol": "candidates_fasta",
+          "anchor": "6d9ef6442cd9",
+          "first": "def candidates_fasta(result: AnalysisResult) -> bytes:"
+        }
+      ]
+    },
+    {
+      "id": "candidate-detail",
+      "level": "view",
+      "parent": null,
+      "title": "Candidate inspection",
+      "summary": "Opens the selected candidate as evidence cards, a 'why it ranked here' feature-sensitivity chart and the list of evidence the analysis does not provide.",
+      "views": [
+        "detail panel",
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 504,
+          "end": 541,
+          "role": "markup",
+          "anchor": "2eae08bfc4aa",
+          "first": "selected_id = st.selectbox("
+        },
+        {
+          "file": "code/app.py",
+          "start": 584,
+          "end": 593,
+          "role": "markup",
+          "anchor": "228c157bfc37",
+          "first": "with explanation_column:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 55,
+          "end": 60,
+          "role": "style",
+          "anchor": "25c77389b686",
+          "first": ".evidence {border:1px solid #25354b; background:linear-gradient(145deg,#0b1627,#0a1220); border-radius:16px; padding:1re"
+        },
+        {
+          "file": "code/app.py",
+          "start": 286,
+          "end": 290,
+          "role": "logic",
+          "symbol": "evidence_card",
+          "anchor": "8ce73028435d",
+          "first": "def evidence_card(label: str, value: str, note: str) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 192,
+          "end": 209,
+          "role": "logic",
+          "symbol": "influence_figure",
+          "anchor": "85242a79ed7f",
+          "first": "def influence_figure(candidate: CandidateResult) -> go.Figure:"
+        },
+        {
+          "file": "code/mirna_app/evidence.py",
+          "start": 231,
+          "end": 245,
+          "role": "logic",
+          "symbol": "evidence_level",
+          "anchor": "76be2206a917",
+          "first": "def evidence_level(candidate: CandidateResult) -> tuple[str, str]:"
+        },
+        {
+          "file": "code/mirna_app/model.py",
+          "start": 85,
+          "end": 113,
+          "role": "logic",
+          "symbol": "explain",
+          "anchor": "56b476252c77",
+          "first": "def explain(self, features: dict[str, float], limit: int = 5) -> list[Influence]:"
+        }
+      ]
+    },
+    {
+      "id": "structure-viewer",
+      "level": "component",
+      "parent": "candidate-detail",
+      "title": "Secondary-structure viewer",
+      "summary": "Draws the candidate's predicted fold as a ViennaRNA 2D layout or as base-pair arcs, with a nucleotide colour key, a dot-bracket view and an SVG download.",
+      "views": [
+        "structure diagram"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 542,
+          "end": 583,
+          "role": "markup",
+          "anchor": "58d39591095a",
+          "first": "structure_column, explanation_column = st.columns([0.57, 0.43], gap=\"large\")"
+        },
+        {
+          "file": "code/mirna_app/visualization.py",
+          "start": 120,
+          "end": 132,
+          "role": "logic",
+          "symbol": "structure_visual",
+          "anchor": "bd6edaf3eaac",
+          "first": "def structure_visual(sequence: str, structure: str, layout: str = \"vienna\") -> tuple[str, str]:"
+        },
+        {
+          "file": "code/mirna_app/visualization.py",
+          "start": 71,
+          "end": 84,
+          "role": "logic",
+          "symbol": "_vienna_svg",
+          "anchor": "48f5b74133e1",
+          "first": "def _vienna_svg(sequence: str, structure: str) -> str | None:"
+        },
+        {
+          "file": "code/mirna_app/visualization.py",
+          "start": 87,
+          "end": 117,
+          "role": "logic",
+          "symbol": "_arc_svg",
+          "anchor": "45d5a4efb21f",
+          "first": "def _arc_svg(sequence: str, structure: str) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "control-comparison",
+      "level": "view",
+      "parent": null,
+      "title": "Compare controls",
+      "summary": "Runs a chosen positive and a chosen negative control through the same pipeline and sets their top candidates side by side: score separation, evidence bars, an exact-value table, folds and sensitivities.",
+      "views": [
+        "side-by-side panes",
+        "summary stats",
+        "bar chart",
+        "table view",
+        "structure diagram"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 595,
+          "end": 737,
+          "role": "markup",
+          "anchor": "6bb7bfc6f736",
+          "first": "with comparison_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 31,
+          "end": 41,
+          "role": "data",
+          "anchor": "3b19a2347d85",
+          "first": "COMPARISON_POSITIVE_CONTROLS = {"
+        },
+        {
+          "file": "code/app.py",
+          "start": 85,
+          "end": 88,
+          "role": "logic",
+          "symbol": "analyze_bundled_control",
+          "anchor": "4dcca0346782",
+          "first": "def analyze_bundled_control(name: str) -> AnalysisResult:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 212,
+          "end": 216,
+          "role": "logic",
+          "symbol": "comparison_figure",
+          "anchor": "52dc04f2c309",
+          "first": "def comparison_figure("
+        },
+        {
+          "file": "code/app.py",
+          "start": 245,
+          "end": 249,
+          "role": "logic",
+          "symbol": "comparison_table",
+          "anchor": "73ab78b81f19",
+          "first": "def comparison_table("
+        }
+      ]
+    },
+    {
+      "id": "evidence-ladder",
+      "level": "view",
+      "parent": null,
+      "title": "Evidence ladder and protein context",
+      "summary": "For the selected candidate, lays out each evidence layer with what it supports and does not prove, plus cross-species matches, a curated literature card, mature arms and candidate-specific pathway-protein results.",
+      "views": [
+        "table view",
+        "detail panel"
+      ],
+      "interactions": [],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 739,
+          "end": 905,
+          "role": "markup",
+          "anchor": "676067b07339",
+          "first": "with evidence_tab:"
+        },
+        {
+          "file": "code/mirna_app/evidence.py",
+          "start": 231,
+          "end": 245,
+          "role": "logic",
+          "symbol": "evidence_level",
+          "anchor": "76be2206a917",
+          "first": "def evidence_level(candidate: CandidateResult) -> tuple[str, str]:"
+        },
+        {
+          "file": "code/mirna_app/evidence.py",
+          "start": 107,
+          "end": 127,
+          "role": "logic",
+          "symbol": "mature_arms",
+          "anchor": "50148ba770df",
+          "first": "def mature_arms(candidate: CandidateResult) -> list[tuple[str, str]]:"
+        },
+        {
+          "file": "code/mirna_app/evidence.py",
+          "start": 182,
+          "end": 196,
+          "role": "logic",
+          "symbol": "machinery_evidence",
+          "anchor": "e57a5fda3614",
+          "first": "def machinery_evidence(candidate: CandidateResult) -> list[MachineryEvidence]:"
+        },
+        {
+          "file": "code/mirna_app/evidence.py",
+          "start": 207,
+          "end": 228,
+          "role": "logic",
+          "symbol": "literature_context",
+          "anchor": "70c659a49892",
+          "first": "def literature_context(candidate: CandidateResult) -> LiteratureContext | None:"
+        },
+        {
+          "file": "code/assets/references/external_machinery_interactions.csv",
+          "start": 1,
+          "end": 16,
+          "role": "data",
+          "anchor": "2058ba514ad0",
+          "first": "fasta_file,refseq_accession,gene_symbol,mature_mirna,mature_sequence,protein,result,evidence_type,experiment,biological_"
+        },
+        {
+          "file": "code/assets/references/literature_summaries.csv",
+          "start": 1,
+          "end": 5,
+          "role": "data",
+          "anchor": "cabc63fef98f",
+          "first": "reference_prefix,display_name,summary,evidence,caveat,source_label,source_url"
+        }
+      ]
+    },
+    {
+      "id": "evaluation-benchmark",
+      "level": "view",
+      "parent": null,
+      "title": "Held-out benchmark",
+      "summary": "Reports the classifier's model selection, its test metrics against other models and a baseline, a confusion matrix, and stress tests on each negative set, so the user can judge how far to trust the score.",
+      "views": [
+        "summary stats",
+        "table view",
+        "bar chart",
+        "heatmap"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 907,
+          "end": 1006,
+          "role": "markup",
+          "anchor": "337032f01a2a",
+          "first": "with evaluation_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 293,
+          "end": 331,
+          "role": "logic",
+          "symbol": "confusion_figure",
+          "anchor": "7f82d6f75e52",
+          "first": "def confusion_figure(confusion: dict[str, int]) -> go.Figure:"
+        },
+        {
+          "file": "code/artifacts/evaluation/metrics.json",
+          "start": 1,
+          "end": 147,
+          "role": "data",
+          "anchor": "acec28c3e1f1",
+          "first": "{"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "structure diagram"
+    }
+  ]
+}

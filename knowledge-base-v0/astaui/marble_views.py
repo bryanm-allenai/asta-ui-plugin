@@ -20,15 +20,18 @@ read whole.
 
 from __future__ import annotations
 
+import hashlib
 import html as _html
 import os
 import re
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from urllib.parse import quote
 
-from .atlas import CHANNELS, COLOURS, TERM_LISTS, Atlas
+from .atlas import CARD_KEYS, CHANNELS, COLOURS, TERM_LISTS, Atlas
+from . import clusters as clustering
 from .cards import part_spans, slug
 from .kb import user_config
 
@@ -56,16 +59,31 @@ DOC = f"--doc \"<this document's path in the drive; it was {DOC_HINT}>\""
 # names 127.0.0.1, which no scientist can reach. The owner's own setting, so it
 # is not written into code anyone can read.
 DRIVE_URL = os.environ.get("ASTAUI_DRIVE_URL") or user_config().get("drive-url") or "<the address this drive answers at from outside>"
-MODE_WORD = {"card": "Card", "workflow": "Workflow", "structure": "Structure", "data": "Data", "summary": "Summary",
+MODE_WORD = {"card": "All", "workflow": "Workflow", "structure": "Structure", "data": "Data", "summary": "Summary",
              "prompt": "Prompts", "raw": "Prompts and code"}
+
+
+# Where the data an agent ran a build on came from, as Agent Runs says it.
+DATA_WORD = {"built-in": "Built into the page", "loaded example": "A file it was given", "none": "None"}
 
 
 # Where a build came from, as the Sharing lens says it: how it came (its kind),
 # who may see it (its consent) and what it was filed from (its sources).
 KIND_WORD = {"study": "From the study's participants", "contributed": "Filed by the people who built them",
-             "seed": "Written for the prototype"}
-KIND_ORDER = ("study", "contributed", "seed")
+             "seed": "Written for the prototype", "public": "Found in public repositories"}
+KIND_ORDER = ("study", "contributed", "public", "seed")
 CONSENT_WORD = {"synthetic": "Anyone (invented)", "team": "Project team", "public": "Anyone"}
+# The same, short, as the map's Show boxes say it (with the longer words as
+# each box's title); marble_show.css hides the builds of each.
+# What the map's Cluster by offers, after None: islands of builds in the same
+# discipline (the card's first field), or the clusters found in one dimension.
+# Only these get islands; the key is the value of data-arrange on kb-map-tools.
+FIELD = "field"
+CLUSTER_BY = ((FIELD, "Discipline"), ("w", "Workflow"), ("d", "Data"), ("t", "Task"))
+SHOW = (("study", "From the study", "From the study's participants"),
+        ("contributed", "Filed by their makers", "Filed by the people who built them"),
+        ("public", "Found on the web", "Found in public repositories"),
+        ("seed", "Made up", "Written for the prototype"))
 SOURCE_WORD = {"prompt log": "Prompt log", "repo": "Repository", "skill file": "Skill file"}
 CHECK_BRIEF = ("A scientist sent the build {id} (\"{title}\") {where}. Check it before it "
                "joins the knowledge base, as the asta-ui:review-publish skill says (Ai2/AstaUI/knowledge-base-v0/skills/"
@@ -197,6 +215,12 @@ def run_btn(label: str, brief: str, scope: str, cls: str = "run") -> str:
     return btn(esc(label), cls, data_marble_on="press", data_marble_scope=scope, data_marble_run=brief)
 
 
+def num3(v: float) -> str:
+    """A place on the map, short: three decimals, no leading zero."""
+    s = f"{v:.3f}"
+    return s[1:] if s.startswith("0.") else s
+
+
 def day(s: Optional[str]) -> str:
     """A date as the page says it: Oct 25, 2026."""
     try:
@@ -254,6 +278,21 @@ class Views:
         self.ev = console.evaluation(embedder, run=False)
         self.requests = a.requests(self.layouts) if self.layouts else []
         self.family = a.family_of()
+        self.older = self.older_map(kb, embedder or kb.config.get("embedder", "lexical"))
+
+    def older_map(self, kb, embedder: str) -> Optional[Dict[str, Any]]:
+        """Where the older cards, written from the prompts and the code, put each
+        build, turned to sit as close as they can to the cards' own layouts so
+        flipping between the two moves only the builds whose cards moved."""
+        from .index import Index
+
+        older = kb.older()
+        if older is None or not older.card_ids() or not self.layouts:
+            return None
+        oa = Atlas(older, Index(older, embedder))
+        layouts = oa.layouts(align_to=self.layouts, keys=CARD_KEYS)
+        return {"layouts": layouts, "requests": {q["id"]: q for q in oa.requests(layouts)},
+                "faith": oa.faithfulness(layouts), "n": len(oa.cards)}
 
     def tags(self, i: str) -> str:
         return "|" + "|".join(f"{k}:{v.replace('|', ' ')}" for k, vs in self.facts[i].items() for v in vs) + "|"
@@ -375,7 +414,7 @@ class Views:
         ranks = self.ranks()
         if self.ev.get("never"):
             items.append((3, "eval", "", "The evaluation has not run with this embedder", "It measures how often search finds what each test request wants.",
-                          "Open Evaluation", {"data_go": "eval"}))
+                          "Open Score Tables", {"data_go": "eval"}))
         for qid, r in ranks.items():
             rank = (r.get("ranks") or {}).get("card")
             if rank != 1:
@@ -391,12 +430,17 @@ class Views:
         unused = sum(1 for l in self.terms for r in l["rows"] if r["status"] == "vocab" and not r["builds"])
         if unused:
             items.append((5, "unused", "", f"{plural(unused, 'word')} in the ontology no build uses",
-                          "They are kept for builds to come; retire the ones that will never fit.", "Open Coverage", {"data_go": "coverage"}))
+                          "They are kept for builds to come; retire the ones that will never fit.", "Open Coverage Matrix", {"data_go": "coverage"}))
         items.sort(key=lambda t: (t[0], t[1]))
         attn: List[Block] = []
+        seen: set = set()
         for _, key, level, title, why, action, attrs in items[:14]:
             act = btn(esc(action), "link", **attrs) if action else ""
-            attn.append(blk(f"kb-at-{key_of(key)}", "div", el("i", "", "dot", data_s=level or None)
+            aid = f"kb-at-{key_of(key)}"
+            if aid in seen:  # long build names can cut two keys to the same 40 characters
+                aid = f"kb-at-{key_of(key)[:33]}-{hashlib.sha1(key.encode()).hexdigest()[:6]}"
+            seen.add(aid)
+            attn.append(blk(aid, "div", el("i", "", "dot", data_s=level or None)
                             + el("div", tx("b", title) + tx("p", why), "atext") + act, "att"))
         if len(items) > 14:
             attn.append(blk("kb-at-more", "p", esc(f"And {len(items) - 14} more of the same kinds."), "muted small"))
@@ -479,12 +523,16 @@ class Views:
         self.prep()
         a = self.atlas
         if not self.layouts:
-            return {"kb-map-pts": [], "kb-map-legend": [], "kb-map-chan": [], "kb-map-pos": []}
+            return {"kb-map-pts": [], "kb-map-legend": [], "kb-map-chan": [], "kb-map-pos": [], "kb-map-gpos": [], "kb-map-from": []}
         sides = {key: self.label_sides(lay) for key, lay in self.layouts.items()}
+        isles, gplaces, gfocus, gcap, member = self.islands()
         pts: List[Block] = []
         rules: List[str] = []
+        old = self.older or {"layouts": {}, "requests": {}, "faith": {}}
         for i in a.ids:
-            rules.append(f'.pt[data-pick="b:{i}"]{{' + ";".join(f"--{k}x:{v[i][0]};--{k}y:{v[i][1]}" for k, v in self.layouts.items() if i in v) + "}")
+            rules.append(f'.pt[data-pick="b:{i}"]{{' + ";".join(
+                [f"--{k}x:{v[i][0]};--{k}y:{v[i][1]}" for k, v in self.layouts.items() if i in v]
+                + [f"--o{k}x:{v[i][0]};--o{k}y:{v[i][1]}" for k, v in old["layouts"].items() if i in v]) + "}")
             attrs: Dict[str, Any] = {"data_pick": f"b:{i}", "data_title": self.short[i]}
             for opt, _ in COLOURS:
                 attrs[f"data_s{opt}"] = self.colours[opt]["slot"].get(i, 0)
@@ -495,14 +543,19 @@ class Views:
                 if nb:
                     attrs[f"data_n{k}"] = " ".join(j for j, _ in nb[:3])
             attrs["data_tags"] = self.tags(i)
+            attrs["data_g"] = " ".join(member.get(i, [])) or None
             pts.append(blk(f"kb-pt-{i}", "button", el("span", "", "dot") + tx("span", self.short[i], "lab"), "pt", type="button", **attrs))
         for q in self.requests:
             if not q["pos"]:
                 continue
-            rules.append(f'.rq[data-pick="q:{q["id"]}"]{{' + ";".join(f"--{k}x:{x};--{k}y:{y}" for k, (x, y) in q["pos"].items()) + "}")
+            oq = old["requests"].get(q["id"]) or {"pos": {}, "nearest": {}}
+            rules.append(f'.rq[data-pick="q:{q["id"]}"]{{' + ";".join(
+                [f"--{k}x:{x};--{k}y:{y}" for k, (x, y) in q["pos"].items()]
+                + [f"--o{k}x:{x};--o{k}y:{y}" for k, (x, y) in oq["pos"].items()]) + "}")
             attrs = {"data_pick": f"q:{q['id']}", "data_in": "".join(q["pos"]), "data_want": " ".join(q["wanted"])}
             for k, j in q["nearest"].items():
                 attrs[f"data_n{k}"] = j
+
             pts.append(blk(f"kb-rq-{q['id']}", "button", el("span", "", "dot") + tx("span", q["id"], "lab"), "rq", type="button", **attrs))
 
         # Place, the default colour, first: a wheel of the colours a dot takes by where it sits.
@@ -525,7 +578,114 @@ class Views:
             keep = (f" This flat picture keeps {pct(f)} of each build's three nearest neighbours; "
                     "the inspector lists the true ones.") if f is not None else ""
             chan.append(blk(f"kb-mc-{key}", "p", esc(f"{label}: {says[0].lower() + says[1:]}.{keep}"), "cap", data_k=key))
-        return {"kb-map-pts": pts, "kb-map-legend": legends, "kb-map-chan": chan, "kb-map-pos": style_blocks("kb-pos", rules)}
+        if self.older:
+            n_new = len(a.ids) - self.older["n"]
+            since = (f" {plural(n_new, 'build')} filed since have no older card and stay where the code put "
+                     f"{'it' if n_new == 1 else 'them'}.") if n_new > 0 else ""
+            for key, name, label, says in CHANNELS:
+                if key not in self.older["layouts"]:
+                    continue
+                f = self.older["faith"].get(key)
+                keep = f" This flat picture keeps {pct(f)} of each build's three nearest neighbours." if f is not None else ""
+                chan.append(blk(f"kb-mc-o{key}", "p", esc(
+                    f"{label}, from the older cards, which were written from each build's prompts and code. "
+                    f"Everything else on this page uses the cards written from the code alone.{since}{keep}"), "cap", data_k=f"o{key}"))
+        return {"kb-map-pts": isles + pts, "kb-map-legend": legends, "kb-map-chan": chan + gcap,
+                "kb-map-pos": style_blocks("kb-pos", rules), "kb-map-gpos": style_blocks("kb-gpos", gplaces + gfocus),
+                "kb-map-from": self.map_from()}
+
+    def map_from(self) -> List[Block]:
+        """A box on the map's bar for each way the builds came, with how many came
+        that way; marble_show.css hides the builds of a box left empty."""
+        a = self.atlas
+        n = Counter(a.builds[i].kind if i in a.builds else "" for i in a.ids)
+        return [blk(f"kb-map-from-{k}", "button", esc(word) + tx("span", n[k], "faint"), "toggle",
+                    type="button", data_from=k, title=title) for k, word, title in SHOW if n[k]]
+
+    def islands(self) -> Tuple[List[Block], List[str], List[str], List[Block], Dict[str, List[str]]]:
+        """The map's Grouped arrangement (clusters.py): for every dimension, its
+        clusters as islands with their names, one block a dimension; every
+        build's place on them, a rule a build as the flat places are; what
+        pressing a cluster's name shows; the caption that says how they were
+        found; and, for each build, its cluster in each dimension (data-g)."""
+        a = self.atlas
+        isles: List[Block] = []
+        places: Dict[str, List[str]] = {}
+        member: Dict[str, List[str]] = {}
+        focus: List[str] = []
+        gcap: List[Block] = []
+        label_of = dict((k, label) for k, _, label, _ in CHANNELS)
+        for key, _ in CLUSTER_BY:
+            by_field = key == FIELD
+            lay = self.layouts.get("c" if by_field else key)
+            raw = self.matrix["raw"].get("c" if by_field else key)
+            if not lay or not raw:
+                continue
+            ids = [i for i in a.ids if i in lay]
+
+            def sim(x: str, y: str, raw: Dict = raw) -> float:
+                return raw.get((x, y), raw.get((y, x), 0.0))
+
+            if by_field:
+                groups = self.fields(ids)
+                label = "Discipline"
+            else:
+                groups = clustering.find(ids, sim)
+                label = label_of[key]
+            order = {g: clustering.typical(m, sim) for g, m in enumerate(groups)}
+            discs, place = clustering.islands(groups, lay, order)
+            for i, (x, y) in place.items():
+                places.setdefault(i, []).append(f"--g{key}x:{num3(x)};--g{key}y:{num3(y)}")
+            when = f'[data-arrange="{key}"]'
+            inner = ""
+            for n, (g, (x, y, r)) in enumerate(zip(groups, discs), 1):
+                gid = f"{key}{n}"
+                for i in g:
+                    member.setdefault(i, []).append(gid)
+                if by_field:
+                    said, words = self.field_name(g), []
+                else:
+                    said, words = clustering.name(g, self.facts, self.short.get(order[n - 1][0], ""))
+                inner += el("div", "", "isle", data_g=gid, style=f"--x:{num3(x)};--y:{num3(y)};--r:{num3(r)}")
+                inner += btn(tx("span", said, "t") + tx("span", len(g), "n"), "clab", data_set="cluster", data_to=gid,
+                             data_tools_id="kb-map-tools", data_toggle=True,
+                             title=(", ".join(words) + ": " if words else "") + plural(len(g), "build"),
+                             style=f"--x:{num3(x)};--y:{num3(y - r)}")
+                tools = f'#kb-map-tools[data-cluster="{gid}"]{when}'
+                focus.append(f'{tools} ~ .plotwrap .pt:not([data-g~="{gid}"]){{opacity:.16}}')
+            isles.append(blk(f"kb-is-{key}", "div", inner, "isles", data_k=key))
+            if by_field:
+                said = (f"By discipline: an island for each field with at least {clustering.SMALLEST} builds, named by the "
+                        f"field each build's card gives first, the smaller fields together. An island sits where its builds "
+                        f"sit on the whole-card map, with the builds most like the rest of their field at the centre. "
+                        f"Press a name to see only its builds.")
+            else:
+                said = (f"{label}, grouped: {plural(len(groups), 'cluster')} found among each build's {clustering.NEIGHBOURS} most "
+                        f"alike in this dimension, each named by the words its cards share most. An island holds one cluster, "
+                        f"near the ones most like it, with its most typical builds at the centre. Press a name to see only its builds.")
+            gcap.append(blk(f"kb-mg-{key}", "p", esc(said), "cap gcap", data_g=key))
+        rules = [f'.pt[data-pick="b:{i}"]{{' + ";".join(v) + "}" for i, v in places.items()]
+        return isles, rules, focus, gcap, member
+
+    def fields(self, ids: List[str]) -> List[List[str]]:
+        """The builds by the discipline their card names first, largest field
+        first; fields with fewer than clustering.SMALLEST builds, and builds with
+        none, share one group at the end."""
+        by: Dict[str, List[str]] = {}
+        for i in ids:
+            by.setdefault((self.facts[i].get("d") or ["none"])[0], []).append(i)
+        rest = sorted(i for f, m in by.items() if f == "none" or len(m) < clustering.SMALLEST for i in m)
+        big = sorted((sorted(m) for f, m in by.items() if f != "none" and len(m) >= clustering.SMALLEST),
+                     key=lambda g: (-len(g), self.facts[g[0]]["d"][0]))
+        return big + ([rest] if rest else [])
+
+    def field_name(self, members: List[str]) -> str:
+        """An island's name by discipline: its field, or Other fields for the rest."""
+        found = {(self.facts[i].get("d") or ["none"])[0] for i in members}
+        if len(found) == 1 and "none" not in found:
+            f = found.pop()
+            return f.upper() if len(f) <= 3 and f.isalpha() else f[:1].upper() + f[1:]
+        return "Other fields"
 
     def label_sides(self, layout: Dict[str, Tuple[float, float]], size: float = 560.0) -> Dict[str, str]:
         """Which side of its point each label sits on, so labels overlap as little as
@@ -562,51 +722,16 @@ class Views:
             placed.append(best[2])
         return out
 
-    # -- similarity ---------------------------------------------------------------------------
-    def similarity(self) -> Dict[str, List[Block]]:
-        self.prep()
-        m = self.matrix
-        order = self.order[:40]
-        n = len(order)
-        if n < 2 or not m["scaled"]:
-            return {"kb-mx-grid": [], "kb-mx-legend": [], "kb-mx-vals": []}
-        style = f"--n:{n}"
-        head = el("span", "", "corner") + "".join(
-            el("span", btn(tx("span", self.short[j]), "chb", data_pick=f"b:{j}"), "ch", id=f"mx-c-{j}") for j in order)
-        blocks = [blk("kb-mx-head", "div", head, "mrow mhead", style=style, data_bs=" ".join(order))]
-        for i in order:
-            cells = []
-            for j in order:
-                if i == j:
-                    cells.append(el("span", "", "cell self"))
-                    continue
-                p = pair_key(i, j)
-                judged = self.pairs.get(p)
-                cells.append(btn("", "cell", data_pick=p, data_c=j, aria_labelledby=f"mx-r-{i} mx-c-{j}",
-                                 data_j=judged.get("judgment") if judged else None,
-                                 data_jn=(judged.get("note") or None) if judged else None))
-            rowh = btn(tx("span", self.short[i]), "rh", id=f"mx-r-{i}", data_pick=f"b:{i}")
-            blocks.append(blk(f"kb-mx-r-{i}", "div", rowh + "".join(cells), "mrow", style=style, data_b=i))
-        cell_rules = []
-        for x in range(n):
-            for y in range(x + 1, n):
-                pr = tuple(sorted((order[x], order[y])))
-                cell_rules.append(f'.cell[data-pick="{pair_key(*pr)}"]{{' + ";".join(f"--v{k}:{round(m['scaled'][k][pr], 3)}" for k in m["scaled"] if pr in m["scaled"][k]) + "}")
-        legends = []
-        for key, name, label, says in CHANNELS:
-            vals = m["raw"].get(key)
-            if not vals:
-                continue
-            lo, hi = min(vals.values()), max(vals.values())
-            steps = "".join(el("i", "", "", style=f"--v:{v}") for v in (0, .25, .5, .75, 1))
-            legends.append(blk(f"kb-ml-{key}", "div", tx("span", f"{label}: least alike", "faint") + tx("span", num(lo), "num")
-                               + el("span", steps, "ramp") + tx("span", num(hi), "num") + tx("span", "most alike", "faint"),
-                               "mlg", data_k=key, data_lo=round(lo, 4), data_hi=round(hi, 4)))
-        return {"kb-mx-grid": blocks, "kb-mx-legend": legends, "kb-mx-vals": style_blocks("kb-mxv", cell_rules)}
-
     def pair_block(self, a: str, b: str) -> Block:
         ps = self.atlas.pair_steps(a, b)
-        bits = [tx("h3", "Their workflows, step by step")]
+        bits = []
+        # What was said of them by eye, under the inspector's buttons for saying it.
+        judged = self.pairs.get(pair_key(a, b))
+        if judged:
+            j = judged.get("judgment", "")
+            said = f"Judged {'the same' if j == 'same' else j}" + (f": {judged['note']}" if judged.get("note") else ".")
+            bits.append(el("div", tx("p", said, "small") + btn("Take it back", "run outline", data_queue="unjudge", data_a=a, data_b=b), "eye"))
+        bits.append(tx("h3", "Their workflows, step by step"))
         defining = [s for s in ps["shared"] if not s["common"]]
         common = [s for s in ps["shared"] if s["common"]]
         if not ps["shared"]:
@@ -625,7 +750,7 @@ class Views:
             bits.append(tx("p", "; ".join(own) + ".", "muted small"))
         html = "".join(bits)
         if len(html) > BLOCK_LIMIT - 300:
-            html = "".join(bits[:4]) + tx("p", "The rest is in the Workflows view.", "muted small")
+            html = "".join(bits[:5 if judged else 4]) + tx("p", "The rest is in the Workflows view.", "muted small")
         return blk(f"kb-mp-{a}--{b}", "div", html, "pair", data_for=pair_key(a, b))
 
     # -- coverage: which builds use which words ------------------------------------------------------
@@ -775,7 +900,7 @@ class Views:
             vals = [v for v in (f.get(key) or []) if v]
             if vals:
                 facts += el("div", tx("dt", label) + el("dd", "".join(btn(esc(v), "fact", data_filter=f"{key}:{v}") for v in vals)))
-        acts = el("div", btn("On the map", "link", data_go="map") + btn("In the grid", "link", data_go="similar")
+        acts = el("div", btn("On the map", "link", data_go="map")
                   + btn("Its words", "link", data_go="coverage") + btn("Its family", "link", data_go="workflows"), "acts")
         rows = ""
         for key, name, label, _ in CHANNELS:
@@ -905,7 +1030,7 @@ class Views:
                 for m in modes:
                     v = r["ranks"].get(m)
                     cells += el("td", tx("span", MODE_WORD.get(m, m), "h") + esc("–" if v is None else v), "num " + ("good" if v == 1 else "faint" if v is None else "err" if v > 3 else ""))
-                trs.append(el("tr", el("td", btn(esc(r["id"]), "nb", data_pick=f"q:{r['id']}") + " " + tx("span", r["request"][:90] + "…", "small")) + cells))
+                trs.append(el("tr", el("td", btn(esc(r["id"]), "nb", data_pick=f"q:{r['id']}") + tx("span", " " + r["request"][:90] + "…", "small")) + cells))
             out.append((tx("h3", "Request by request: where each representation puts the build it should find"), "requests"))
             for part in chunk_rows(trs):
                 out.append((el("div", el("table", head() + "".join(part), "stack ranks"), "tablewrap"), "requests"))
@@ -1079,10 +1204,239 @@ class Views:
         css = Path(__file__).with_name("marble_shots.css").read_text(encoding="utf-8")
         return {"kb-shots": [blk("kb-shots-css", "style", "\n" + css)] + style_blocks("kb-shot", rules)}
 
+    # -- Agent Runs ----------------------------------------------------------------------------------
+    def runs(self) -> Dict[str, List[Block]]:
+        """What an agent did in each build it ran (runs.py reads the pilot's folders).
+        With nothing picked the lens shows every run as a strip of its phases, each
+        as wide as the tasks in it, so the workflows can be read side by side. With a
+        build picked it shows that build's run: what the agent took it to be for,
+        the tree (a column for each phase, a card for each task with its screen and
+        the actions under it), the features it saw and what it could not do, with a
+        note of the owner's own. Every block of a build's run carries data-b, and
+        one rule per build (kb-ru-rules) shows them while that build is picked, so
+        picking is a look and nothing is drawn by script."""
+        from . import runs as _runs
+
+        self.prep()
+        a = self.atlas
+        got = {i: r for i, r in _runs.latest(self.kb.root).items() if i in a.builds}
+        slots: Dict[str, List[Block]] = {k: [] for k in ("kb-ru-all", "kb-ru-heads", "kb-ru-notes", "kb-ru-tree", "kb-ru-feats", "kb-ru-gaps", "kb-ru-rules")}
+        name = lambda i: self.short.get(i) or a.builds[i].title
+
+        def shot(r, ref: Optional[str], label: str, cls: str = "rshot") -> str:
+            href = drive_href(r.screen(ref))
+            if not href:
+                return ""
+            return el("a", el("img", "", src=href, alt=f"The screen after: {label}", loading="lazy", decoding="async"), cls,
+                      href=href, target="_blank", rel="noopener", title="Open the screenshot")
+
+        def first_screen(node: Dict[str, Any]) -> Optional[str]:
+            for n in _runs.walk(node):
+                for ref in n.get("screens") or []:
+                    return ref
+            return None
+
+        def actions(node: Dict[str, Any], r) -> str:
+            acts = [c for c in node.get("children") or [] if c.get("kind") == "action"]
+            if not acts:
+                return ""
+            items = ""
+            for c in acts:
+                links = "".join(el("a", esc(Path(str(ref)).stem.lstrip("0") or "0"), "rsn", href=drive_href(r.screen(ref)), target="_blank",
+                                   rel="noopener", title=f"Screen {Path(str(ref)).stem}")
+                                for ref in c.get("screens") or [] if drive_href(r.screen(ref)))
+                items += el("li", tx("span", c.get("label", "")) + (el("span", links, "rss") if links else ""))
+            return el("details", tx("summary", plural(len(acts), "action")) + el("ol", items), "racts")
+
+        rules: List[str] = []
+        total = {"t": 0, "a": 0, "s": 0, "f": 0, "cost": 0.0, "ms": 0}
+        rows: List[str] = []
+        order = [i for i in self.order if i in got] + sorted(i for i in got if i not in self.order)
+        for i in order:
+            r = got[i]
+            phases = r.phases()
+            tasks = r.count("task")
+            total["t"] += tasks
+            total["a"] += r.count("action")
+            total["s"] += len(r.screens())
+            total["f"] += len(r.features)
+            total["cost"] += float(r.meta.get("total_cost_usd") or 0)
+            total["ms"] += int(r.meta.get("duration_ms") or 0)
+            field = r.interface.get("field") or ""
+
+            # the strip: each phase as wide as its tasks, a tick for each task
+            strip = "".join(
+                el("span", tx("span", ph.get("label", ""), "rpl") + el("span", "".join("<i></i>" for n in _runs.walk(ph) if n.get("kind") == "task"), "rticks"),
+                   "rph", style=f"flex-grow:{max(1, sum(1 for n in _runs.walk(ph) if n.get('kind') == 'task'))}",
+                   title=f"{ph.get('label', '')}: {plural(sum(1 for n in _runs.walk(ph) if n.get('kind') == 'task'), 'task')}")
+                for ph in phases)
+            counts = el("span", tx("span", plural(tasks, "task")) + tx("span", plural(len(r.features), "feature")), "rcount")
+            slots["kb-ru-all"].append(blk(f"kb-ru-o-{i}", "button",
+                                          el("span", tx("span", name(i), "rot") + tx("span", field, "rof"), "ron")
+                                          + el("span", strip, "rstrip") + counts,
+                                          "rorow", type="button", data_pick=f"b:{i}"))
+
+            # what the agent took it to be, and the run itself
+            secs = int(r.meta.get("duration_ms") or 0) // 1000
+            facts = [r.when.strftime("%-d %b, %H:%M"), f"{secs // 60} min {secs % 60:02d} s" if secs >= 60 else f"{secs} s"]
+            if r.meta.get("num_turns"):
+                facts.append(plural(int(r.meta["num_turns"]), "turn"))
+            if r.meta.get("total_cost_usd") is not None:
+                facts.append(f"${float(r.meta['total_cost_usd']):.2f} at API prices")
+            facts.append(plural(len(r.screens()), "screen"))
+            if r.runs > 1:
+                facts.append(f"the latest of {r.runs} runs")
+            data = r.data
+            head = (el("div", tx("h3", r.interface.get("title") or a.builds[i].title)
+                       + (tx("p", field, "rfield") if field else "")
+                       + (tx("p", r.interface.get("what_it_is_for"), "rfor") if r.interface.get("what_it_is_for") else ""), "rhl")
+                    + el("dl", el("div", tx("dt", "Goal") + tx("dd", r.goal.get("label", ""))) +
+                         el("div", tx("dt", "Data") + tx("dd", ". ".join(x for x in [DATA_WORD.get(str(data.get("source", "")).lower(), data.get("source", "")),
+                                                                      str(data.get("note", "")).strip()] if x) or "Not said")) +
+                         el("div", tx("dt", "Run") + tx("dd", " · ".join(facts))), "rdl")
+                    + btn("Show every run", "link rall", data_runs_all=True))
+            slots["kb-ru-heads"].append(blk(f"kb-ru-h-{i}", "div", head, "rhead", data_b=i))
+            slots["kb-ru-notes"].append(blk(f"kb-ru-n-{i}", "p", "", "ask rnote", data_b=i, data_marble_editable="write",
+                                            data_ph="Your notes on this run: is the tree right, and what did it miss?"))
+
+            # the tree: a column for each phase, a card for each task
+            for c, ph in enumerate(phases, 1):
+                tasks_in = [n for n in ph.get("children") or [] if n.get("kind") in ("task", "phase")]
+                slots["kb-ru-tree"].append(blk(f"kb-ru-t-{i}-{c}", "div",
+                                               tx("span", f"Phase {c}", "rpn") + tx("h4", ph.get("label", "")) +
+                                               tx("span", plural(sum(1 for n in _runs.walk(ph) if n.get("kind") == "task"), "task"), "rpc"),
+                                               "rphase", data_b=i, style=f"--c:{c}"))
+                k = 0
+
+                def emit(node: Dict[str, Any], level: int) -> None:
+                    nonlocal k
+                    k += 1
+                    if node.get("kind") == "phase":
+                        slots["kb-ru-tree"].append(blk(f"kb-ru-t-{i}-{c}-{k}", "div", tx("h5", node.get("label", "")), "rsubph",
+                                                       data_b=i, style=f"--c:{c};--l:{level}"))
+                        for n in node.get("children") or []:
+                            if n.get("kind") in ("task", "phase"):
+                                emit(n, level + 1)
+                        return
+                    label = node.get("label", "")
+                    inner = (shot(r, first_screen(node), label) + tx("p", label, "rtl") + actions(node, r)
+                             + "".join(el("div", tx("p", n.get("label", ""), "rtl") + actions(n, r), "rtask-in")
+                                       for n in _runs.walk(node) if n is not node and n.get("kind") == "task"))
+                    slots["kb-ru-tree"].append(blk(f"kb-ru-t-{i}-{c}-{k}", "div", inner, "rtask", data_b=i, style=f"--c:{c};--l:{level}"))
+
+                for n in tasks_in:
+                    emit(n, 0)
+
+            # the features it saw, each with what it serves
+            for n, f in enumerate(r.features, 1):
+                steps = el("ol", "".join(tx("li", s_) for s_ in f.get("steps") or []), "rsteps") if f.get("steps") else ""
+                serves = (el("p", tx("span", "Serves ", "faint") + "; ".join(esc(t) for t in f.get("serves_tasks") or []), "rserves")
+                          if f.get("serves_tasks") else "")
+                slots["kb-ru-feats"].append(blk(f"kb-ru-f-{i}-{n}", "div", shot(r, (f.get("screens") or [None])[0], f.get("name", ""))
+                                                + tx("h4", f.get("name", "")) + tx("p", f.get("what_it_does", ""), "rwhat") + steps + serves,
+                                                "rfeat", data_b=i))
+            if not r.features:
+                slots["kb-ru-feats"].append(blk(f"kb-ru-f-{i}-0", "p", esc("The agent named no features."), "muted rnofeat", data_b=i))
+            gaps = el("ul", "".join(tx("li", g) for g in r.not_done), "rgaps") if r.not_done else tx("p", "Nothing: it did every step it tried.", "muted")
+            slots["kb-ru-gaps"].append(blk(f"kb-ru-g-{i}", "div", gaps, "rgapb", data_b=i))
+
+            sel = f'.app:has(#kb-sel[data-sel="b:{i}"])'
+            rules.append(f'{sel} #kb-v-runs [data-b="{i}"] {{ display: var(--show, block); }}')
+            rules.append(f'{sel} #kb-ru-none {{ display: none; }}')
+            rules.append(f'{sel} #kb-ru-all [data-pick="b:{i}"] {{ background: var(--raised); }}')
+
+        if got:
+            mins = total["ms"] // 60000
+            summary = (f"{plural(len(got), 'build')} run, the latest on {max(r.when for r in got.values()).strftime('%-d %b')}: "
+                       f"{plural(total['t'], 'task')}, {plural(total['a'], 'action')}, {plural(total['s'], 'screenshot')} and "
+                       f"{plural(total['f'], 'feature')}. Those runs took {mins} minutes and would cost ${total['cost']:.2f} at API prices.")
+            slots["kb-ru-all"].insert(0, blk("kb-ru-sum", "p", esc(summary), "rsum"))
+        else:
+            slots["kb-ru-all"].append(blk("kb-ru-sum", "p", esc("No agent has run a build yet. Runs come from "
+                                                                 "knowledge-base-v0/pilot: run.sh <build> runs one."), "rsum"))
+        unrun = [i for i in self.order if i not in got]
+        if unrun:
+            slots["kb-ru-all"].append(blk("kb-ru-unrun", "p", tx("span", "Not run yet: ", "faint")
+                                          + ", ".join(btn(esc(name(i)), "nb", data_pick=f"b:{i}") for i in unrun), "runrun"))
+        slots["kb-ru-rules"] = style_blocks("kb-ru-css", rules)
+        return slots
+
+    # -- Features ------------------------------------------------------------------------------------
+    def features(self) -> Dict[str, List[Block]]:
+        """The features agents named in the builds they ran, grouped across builds by
+        what they let a person do (features.py reads kb/features.json). The groups are
+        a list down the side, each with how many features and builds it holds; the
+        picked group (data-fam on kb-fe-tools, the first when none is) shows its
+        features as cards, each with its screen, its build and what it does. Picking
+        a build marks the groups its features are in and its cards. Every block of a
+        group carries data-g and is hidden; one rule per group (kb-fe-rules) shows
+        them while it is picked, so nothing is drawn by script."""
+        from . import features as _features
+        from .marble import FEATURES_ON
+
+        if not FEATURES_ON:
+            return {}
+        self.prep()
+        a = self.atlas
+        gs = _features.groups(self.kb.root, set(a.builds))
+        slots: Dict[str, List[Block]] = {k: [] for k in ("kb-fe-groups", "kb-fe-heads", "kb-fe-cards", "kb-fe-rules")}
+        name = lambda i: self.short.get(i) or a.builds[i].title
+        if not gs:
+            slots["kb-fe-groups"].append(blk("kb-fe-sum", "p", esc("No agent has named a feature yet. Features come from "
+                                                                    "the runs in Agent Runs."), "fsum"))
+            return slots
+        CHECK = {"replayed": "Replayed by a second agent", "not_confirmed": "A second agent could not confirm it",
+                 "in_place_only": "Confirmed where it stands, not replayed"}
+        total = sum(len(g.members) for g in gs)
+        builds = {f.build for g in gs for f in g.members}
+        slots["kb-fe-groups"].append(blk("kb-fe-sum", "p", esc(f"{total:,} features from {plural(len(builds), 'build')}, "
+                                                                f"in {plural(len([g for g in gs if g.key != _features.UNGROUPED]), 'group')}."),
+                                         "fsum"))
+        top = max(len(g.members) for g in gs) or 1
+        rules: List[str] = []
+        for n, g in enumerate(gs):
+            first = n == 0
+            on = [f'#kb-v-features:has(#kb-fe-tools[data-fam="{g.key}"])'] + (["#kb-v-features:has(#kb-fe-tools:not([data-fam]))"] if first else [])
+            rules.append(", ".join(f'{p} [data-g="{g.key}"]' for p in on) + " { display: var(--show, block); }")
+            rules.append(", ".join(f'{p} #kb-fe-g-{g.key}' for p in on) + " { background: var(--raised); outline: 1px solid var(--stroke); outline-offset: -1px; }")
+            bs = g.builds()
+            slots["kb-fe-groups"].append(blk(
+                f"kb-fe-g-{g.key}", "button",
+                tx("span", g.name, "fgn") + tx("span", f"{len(g.members)}", "fgc num")
+                + el("span", el("i", "", style=f"--v:{round(len(g.members) / top, 3)}"), "fgbar")
+                + tx("span", plural(len(bs), "build"), "fgb") + el("i", "", "fgmark", title="The picked build has features here"),
+                "fgrow" + (" loose" if g.key == _features.UNGROUPED else ""), type="button", data_set="fam", data_to=g.key,
+                data_default=first, data_fb=" ".join(bs)))
+            replayed = sum(1 for f in g.members if f.check == "replayed")
+            facts = f"{plural(len(g.members), 'feature')} in {plural(len(bs), 'build')}"
+            if replayed:
+                facts += f"; a second agent replayed {replayed} of them" if replayed < len(g.members) else "; a second agent replayed every one"
+            slots["kb-fe-heads"].append(blk(f"kb-fe-h-{g.key}", "div", tx("h3", g.name) + (tx("p", g.about, "fabout") if g.about else "")
+                                            + tx("p", facts + ".", "ffacts"), "fghead", data_g=g.key))
+            members = sorted(g.members, key=lambda f: (f.screen() is None, name(f.build).lower(), f.key))
+            for f in members:
+                shot = ""
+                href = drive_href(f.screen())
+                if href:
+                    shot = el("a", el("img", "", src=href, alt=f"{f.name}, in {name(f.build)}", loading="lazy", decoding="async"),
+                              "fshot", href=href, target="_blank", rel="noopener", title="Open the screenshot")
+                chk = CHECK.get(f.check, "")
+                bid = f"kb-fe-c-{f.key.replace('/', '-')}"
+                slots["kb-fe-cards"].append(blk(bid, "article", shot + tx("h4", f.name)
+                                                + btn(esc(name(f.build)), "link fbuild", data_pick=f"b:{f.build}")
+                                                + tx("p", f.general, "fgen") + (tx("p", chk, "fchk", data_c=f.check) if chk else ""),
+                                                "fcard", data_g=g.key, data_b=f.build))
+        for i in sorted(builds):
+            sel = f'.app:has(#kb-sel[data-sel="b:{i}"])'
+            rules.append(f'{sel} #kb-fe-tools [data-fb~="{i}"] .fgmark {{ visibility: visible; }}')
+            rules.append(f'{sel} #kb-fe-cards [data-b="{i}"] {{ border-color: var(--picked); outline: 1px solid var(--picked); outline-offset: -1px; }}')
+        slots["kb-fe-rules"] = style_blocks("kb-fe-css", rules)
+        return slots
+
     # -- everything ----------------------------------------------------------------------------------
     def slots(self) -> Dict[str, List[Block]]:
         out: Dict[str, List[Block]] = {}
-        for part in (self.catalog, self.home, self.sources, self.map, self.similarity, self.coverage, self.workflows,
+        for part in (self.catalog, self.home, self.sources, self.map, self.coverage, self.workflows, self.runs, self.features,
                      self.inspector, self.filter_menu, self.activity, self.shots):
             out.update(part())
         out.update(self.evaluation(run=False))

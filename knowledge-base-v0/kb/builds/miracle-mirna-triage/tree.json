@@ -1,0 +1,744 @@
+{
+ "interface": {
+  "title": "miRacle — Explainable miRNA candidate triage",
+  "field": "RNA biology / genomics (microRNA precursor discovery)",
+  "stage_of_work": "computational triage before wet-lab validation (choosing which candidate loci to test first)",
+  "what_it_is_for": "Fold a short human DNA/RNA sequence with ViennaRNA, score its hairpins with a logistic-regression classifier, and show a ranked, explainable shortlist of pre-miRNA-like candidates with structure, feature sensitivity, matches to curated references and Rfam decoys, and machinery/literature evidence."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "This run explored the Streamlit reference app at http://127.0.0.1:8501/. It did not explore the README's primary browser interface (Next.js/WASM). Most runs used the bundled controls: the MIR21 hg38 region chr17:59,840,773-59,841,772 (1,000 nt), the external MIR1225 DROSHA control loaded into the text box, and the Compare-controls pairs (MIR21 vs. Rfam snoRNA, MIR630 vs. Rfam tRNA). I uploaded one test file, nr_030359_mir630.fa (97 nt RNA). I also pasted one sequence of my own, a mir-155-like hairpin; the trace records it as 63 nt, although an earlier note said 96 nt with flanking bases. The Evaluation tab reads bundled metrics. A UCSC fetch for a coordinate range that is not bundled (chr15:72,495,000-72,495,800) failed because the server has no network. The replay loaded the bundled sub-region chr17:59,841,100-59,841,500 (401 nt) to test the protein-region masking modes."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Pick the few candidate loci in a sequence most worth testing in the lab, with an evidence trail for each",
+  "specific": "Rank precursor-miRNA-like hairpins in a human sequence and check each one's evidence before choosing loci for experiments",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Bring in the sequence to analyse",
+    "specific": "Provide input on the Discover tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load a built-in positive-control example",
+      "specific": "Choose a bundled control from the Example dropdown and press Load selected control (the MIR21 control is preloaded when the app opens)",
+      "screens": [
+       "screens/004.webp",
+       "screens/056.webp",
+       "screens/058.webp",
+       "screens/063.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Example dropdown (about 20 bundled controls: MIR21, external MIR630/632/663A/1207/1290 with AGO2 RIP, MIR1225/… with DROSHA processing, and ±500 nt genomic-context versions)",
+        "screens": [
+         "screens/056.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose External MIR1225 — DROSHA processing, removed the uploaded file and pressed Load selected control",
+        "screens": [
+         "screens/058.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose MIR21 positive control and pressed Load selected control (the box returns to the MIR21 record)",
+        "screens": [
+         "screens/063.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Upload your own sequence file",
+      "specific": "Upload one FASTA/text record with the file uploader",
+      "screens": [
+       "screens/051.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Upload and gave nr_030359_mir630.fa; the box filled with the MIR630 RNA record",
+        "screens": [
+         "screens/051.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Paste your own sequence",
+      "specific": "Type or paste a FASTA record into the Sequence or FASTA box (remove any attached upload first, or it overwrites the pasted text on the next redraw)",
+      "screens": [
+       "check/screens/005.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed '>my_query_region' and a mir-155-like hairpin (63 nt in the trace) into the Sequence or FASTA box; the replay's screen shows a pasted record in the box with the 'Press Ctrl+Enter to apply' hint",
+        "screens": [
+         "check/screens/005.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Fetch a genome interval by coordinates",
+      "specific": "Switch Input method to hg38 genomic coordinates, set Chromosome, Start and End index, and press Load region (bundled regions load locally; other regions need a UCSC download)",
+      "screens": [
+       "screens/045.webp",
+       "screens/046.webp",
+       "screens/048.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose 'hg38 genomic coordinates' in Input method",
+        "screens": [
+         "screens/045.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Load region with the default chr17:59840773-59841772 → 'Loaded … from GRCh38'",
+        "screens": [
+         "screens/046.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Choose how protein-coding regions are excluded",
+      "specific": "Set Protein-region preprocessing (mask protein-coding CDS (recommended) / mask all exons of protein-coding genes / do not mask) before running the scan",
+      "screens": [
+       "screens/049.webp",
+       "screens/059.webp",
+       "check/screens/008.webp",
+       "check/screens/011.webp",
+       "check/screens/018.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Protein-region preprocessing dropdown and saw its three options; kept the default",
+        "screens": [
+         "screens/049.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "(replay) chose 'Mask all exons of protein-coding genes' on chr17:59,841,100–59,841,500 and ran the scan → all 401 nt masked (VMP1 exon), 0 candidates, warning banner",
+        "screens": [
+         "check/screens/008.webp",
+         "check/screens/011.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "(replay) switched back to 'Mask protein-coding CDS' and re-ran → 0 nt excluded, candidates found",
+        "screens": [
+         "check/screens/018.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Generate and rank candidates",
+    "specific": "Run candidate scan (ViennaRNA folding, using RNAfold multi-scale windows of 60/70/90/110 nt as the fallback when RNALfold is unavailable, then logistic regression)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Run the analysis and get a ranked shortlist",
+      "specific": "Press Run candidate scan and read the summary metrics, the strand track and the ranked table",
+      "screens": [
+       "screens/010.webp",
+       "screens/011.webp",
+       "screens/012.webp",
+       "screens/052.webp",
+       "screens/053.webp",
+       "screens/059.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Run candidate scan on MIR21 → 1,000 nt, 10 candidates; #1 is 501–560(+), score 99.5, nearest reference Hsa-Mir-21_pre",
+        "screens": [
+         "screens/007.webp",
+         "screens/010.webp",
+         "screens/011.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run candidate scan on the uploaded MIR630 → 97 nt, 1 candidate scoring 82.9",
+        "screens": [
+         "screens/052.webp",
+         "screens/053.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run candidate scan on the pasted sequence → 3 candidates, #1 at 99.7 matching Hsa-Mir-155_pre, plus a warning that coding-exon exclusion was not applied",
+        "screens": [
+         "screens/059.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "re-ran MIR21 → 10 candidates, runtime 8.24 s",
+        "screens": [
+         "screens/069.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Re-order the shortlist by another measure",
+      "specific": "Click a column header in the candidate table to sort it",
+      "screens": [
+       "screens/061.webp",
+       "screens/069.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the 'MFE (kcal/mol)' header → table sorted ascending by MFE (the sort was kept on the next run)",
+        "screens": [
+         "screens/061.webp",
+         "screens/069.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the shortlist",
+      "specific": "Download the candidates as CSV or FASTA",
+      "screens": [
+       "screens/012.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Download CSV → mirna_candidates.csv (all scanned candidates, including dot-bracket, scores, nearest references, cross-species matches)",
+        "screens": [
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download FASTA → mirna_candidates.fa",
+        "screens": [
+         "screens/012.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Judge individual candidates",
+    "specific": "Inspect a candidate on the Discover tab and its Evidence tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "See why one item ranked where it did",
+      "specific": "Choose a candidate in 'Inspect candidate'; read the score cards, the predicted structure and 'Why it ranked here' with the one-feature sensitivity bars",
+      "screens": [
+       "screens/012.webp",
+       "screens/013.webp",
+       "screens/014.webp",
+       "screens/019.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "read candidate #1: 99.5/100, -24.8 kcal/mol, 83% paired, Known-like, nearest decoy SNORD30",
+        "screens": [
+         "screens/012.webp",
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose '#3 · 651–710 (+) · 53.6/100' in Inspect candidate → Preliminary, below the threshold, no close curated match",
+        "screens": [
+         "screens/017.webp",
+         "screens/018.webp",
+         "screens/019.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "View and export a candidate's structure",
+      "specific": "Switch Structure view between ViennaRNA 2D and Base-pair arcs, open the dot-bracket panel, and download the SVG",
+      "screens": [
+       "screens/015.webp",
+       "screens/016.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose the 'Base-pair arcs' radio button",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened 'Sequence and dot-bracket notation'",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download structure SVG → candidate-1_structure.svg",
+        "screens": [
+         "screens/016.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Review the layered evidence for the selected item",
+      "specific": "Open the Evidence tab: evidence ladder, cross-species precursor similarity, curated literature context, mature arm, and the miRNA machinery table",
+      "screens": [
+       "screens/021.webp",
+       "screens/022.webp",
+       "screens/023.webp",
+       "screens/054.webp",
+       "screens/055.webp",
+       "screens/062.webp",
+       "screens/070.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Evidence for MIR21 #3 → 'Preliminary', weak cross-species matches, no literature card or mature arm, machinery not tested",
+        "screens": [
+         "screens/021.webp",
+         "screens/022.webp",
+         "screens/023.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Evidence for uploaded MIR630 #1 → 'External control + machinery evidence', mature arm hsa-miR-630, AGO2 listed as a supported interaction (RIP)",
+        "screens": [
+         "screens/054.webp",
+         "screens/055.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Evidence for pasted mir-155 #1 → near-exact matches in mouse, orangutan and chimpanzee, mature Hsa-Mir-155_5p, message that no literature card is bundled",
+        "screens": [
+         "screens/062.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Evidence for MIR21 #1 → literature card for miR-21 (PDCD4 target, Lu et al. 2008, PMID 18372920), mature Hsa-Mir-21_5p",
+        "screens": [
+         "screens/070.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Check the method against controls",
+    "specific": "Compare controls tab and Evaluation tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Compare a known positive with a look-alike negative side by side",
+      "specific": "Choose a Positive control and a Negative control, then press Run comparison",
+      "screens": [
+       "screens/033.webp",
+       "screens/034.webp",
+       "screens/035.webp",
+       "screens/036.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Negative control dropdown (unannotated genomic, Rfam tRNA, rRNA, snoRNA, ribozyme) and chose Rfam snoRNA control",
+        "screens": [
+         "screens/025.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the Positive control dropdown (MIR21 known-locus, External MIR630 genomic) and kept MIR21",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run comparison → 99.5 vs 0.1, separation +99.4, threshold 81.2; grouped bars, measures table, both structures and both sensitivity charts",
+        "screens": [
+         "screens/033.webp",
+         "screens/034.webp",
+         "screens/035.webp",
+         "screens/036.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check held-out benchmark performance before trusting scores",
+      "specific": "Read the Evaluation tab: test metrics, model selection, final test performance chart, confusion matrix, negative-set stress tests, dataset composition",
+      "screens": [
+       "screens/037.webp",
+       "screens/038.webp",
+       "screens/040.webp",
+       "screens/041.webp",
+       "screens/042.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Evaluation → logistic regression P 0.774, R 0.889, F1 0.828, PR-AUC 0.912",
+        "screens": [
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked 'Recall' in the chart legend to hide that series, then clicked it again to restore it",
+        "screens": [
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the confusion matrix (TP 48, FN 6, TN 634, FP 14) and the stress tests",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened 'Dataset composition and limitations' → JSON with train/validation/test counts",
+        "screens": [
+         "screens/042.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Read what the evidence does and does not mean",
+      "specific": "Read the Science & limitations tab",
+      "screens": [
+       "screens/043.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Science & limitations tab",
+        "screens": [
+         "screens/043.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Ranked result table with summary and export",
+   "general": "Scan an input for candidate items and list them in a sortable ranked table, with summary metrics, a position track and downloads",
+   "specific": "Run candidate scan → metric tiles (input length, candidates, runtime, model) + display-only strand position track + sortable table of rank/coordinates/strand/score/MFE/paired%/nearest reference → Download CSV/FASTA",
+   "steps": [
+    "Press Run candidate scan",
+    "Read the metric tiles and strand-position track",
+    "Sort the table by clicking a column header",
+    "Download CSV or FASTA"
+   ],
+   "serves_tasks": [
+    "Run the analysis and get a ranked shortlist",
+    "Re-order the shortlist by another measure",
+    "Export the shortlist"
+   ],
+   "screens": [
+    "screens/011.webp",
+    "screens/012.webp",
+    "screens/061.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Linked candidate detail cards",
+   "general": "Pick one item from a ranked list to fill a panel of score and evidence cards for it; the other views follow the same pick",
+   "specific": "'Inspect candidate' dropdown (#N · coordinates (strand) · score) drives the Candidate #N cards (precursor-likeness, folding energy, hairpin pairing, nearest reference, evidence level, nearest non-miRNA decoy); the structure, sensitivity and Evidence tab follow the same selection",
+   "steps": [
+    "Choose a candidate in Inspect candidate",
+    "Read the score and evidence cards that update",
+    "Open the structure, explanation or Evidence tab for the same candidate"
+   ],
+   "serves_tasks": [
+    "See why one item ranked where it did",
+    "Review the layered evidence for the selected item"
+   ],
+   "screens": [
+    "screens/013.webp",
+    "screens/018.webp",
+    "screens/019.webp"
+   ],
+   "id": "f8",
+   "check": "replayed"
+  },
+  {
+   "name": "RNA secondary-structure viewer with view toggle and export",
+   "general": "Show a predicted structure in two layouts, reveal the text notation, and export the figure",
+   "specific": "Structure view radio (ViennaRNA 2D / Base-pair arcs) with nucleotide colour legend, 'Sequence and dot-bracket notation' panel, Download structure SVG",
+   "steps": [
+    "Pick a candidate",
+    "Switch between ViennaRNA 2D and Base-pair arcs",
+    "Open the dot-bracket panel",
+    "Press Download structure SVG"
+   ],
+   "serves_tasks": [
+    "View and export a candidate's structure",
+    "See why one item ranked where it did"
+   ],
+   "screens": [
+    "screens/013.webp",
+    "screens/015.webp",
+    "screens/016.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "One-feature sensitivity explanation",
+   "general": "Explain a model score with plain-language reasons and a bar chart of how much the score moves when each feature is set to a typical value",
+   "specific": "'Why it ranked here' bullets (threshold, geometry, energy, reference and Rfam matches) plus a horizontal bar chart of one-feature sensitivity in score points (feature replaced with the training median)",
+   "steps": [
+    "Pick a candidate",
+    "Read the reason bullets",
+    "Compare bar lengths and signs for each feature",
+    "Check the caveat note that these are not SHAP or causal effects"
+   ],
+   "serves_tasks": [
+    "See why one item ranked where it did",
+    "Compare a known positive with a look-alike negative side by side"
+   ],
+   "screens": [
+    "screens/013.webp",
+    "screens/014.webp",
+    "screens/036.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Multi-source input panel (example / upload / paste / genome coordinates)",
+   "general": "Get an input sequence in one of several ways (a bundled example, a file upload, pasted text, or a genome-coordinate fetch) into one editable text box, with an optional pre-filter",
+   "specific": "Input method dropdown (Sequence/FASTA vs hg38 genomic coordinates); Example dropdown + Load selected control; FASTA uploader; Chromosome/Start/End + Load region (local, else UCSC); Protein-region preprocessing (mask CDS / all exons / none)",
+   "steps": [
+    "Choose Input method",
+    "Load an example, upload a file, paste text, or enter chromosome/start/end and press Load region",
+    "Choose a protein-region masking mode",
+    "Check the success/error banner and the filled text box"
+   ],
+   "serves_tasks": [
+    "Load a built-in positive-control example",
+    "Upload your own sequence file",
+    "Paste your own sequence",
+    "Fetch a genome interval by coordinates",
+    "Choose how protein-coding regions are excluded"
+   ],
+   "screens": [
+    "screens/045.webp",
+    "screens/046.webp",
+    "screens/048.webp",
+    "screens/049.webp",
+    "screens/051.webp",
+    "screens/058.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Positive-vs-negative control comparison",
+   "general": "Run a known positive and a chosen negative through the same pipeline and set their scores, evidence signals, structures and explanations side by side",
+   "specific": "Compare controls tab: Positive control + Negative control dropdowns → Run comparison → score tiles (positive, negative, separation, threshold), verdict banner, grouped bar chart (model score, paired fraction, known-reference match, Rfam conflict), measures table, and paired structure + sensitivity panels",
+   "steps": [
+    "Choose a positive control",
+    "Choose a negative control (genomic, tRNA, rRNA, snoRNA, ribozyme)",
+    "Press Run comparison",
+    "Read the separation tiles and verdict",
+    "Compare the grouped evidence bars and the measures table",
+    "Compare the two structures and sensitivity charts"
+   ],
+   "serves_tasks": [
+    "Compare a known positive with a look-alike negative side by side"
+   ],
+   "screens": [
+    "screens/025.webp",
+    "screens/033.webp",
+    "screens/034.webp",
+    "screens/035.webp",
+    "screens/036.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Layered evidence ladder for a selected item",
+   "general": "For the item picked elsewhere, show separate kinds of evidence (computed, learned, curated identity, conflicts, literature, experiments) with an overall label, keeping them apart rather than merging them",
+   "specific": "Evidence tab: overall evidence label, layer table (structure, supervised model, curated precursor match, Rfam conflict, mature-arm annotation, machinery experiment), cross-species precursor similarity table, curated literature card with PMID, mature sequence table, DROSHA/DGCR8/XPO5/DICER1/TARBP2/AGO2/TNRC6A machinery table",
+   "steps": [
+    "Choose a candidate on Discover",
+    "Open the Evidence tab",
+    "Read the overall label and layer statuses",
+    "Check the cross-species matches and the literature card",
+    "Check the mature arm and the machinery results"
+   ],
+   "serves_tasks": [
+    "Review the layered evidence for the selected item"
+   ],
+   "screens": [
+    "screens/021.webp",
+    "screens/023.webp",
+    "screens/055.webp",
+    "screens/062.webp",
+    "screens/070.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Held-out benchmark dashboard",
+   "general": "Show how much to trust a classifier: chosen-model metrics, comparison with other models and a baseline, an interactive grouped chart, a confusion matrix, stress tests on subsets, and dataset composition",
+   "specific": "Evaluation tab: metric tiles, model-selection table (validation PR-AUC and threshold), final test table + Plotly grouped bars with clickable legend, confusion matrix at threshold 0.812, negative-set stress tests, expandable dataset JSON",
+   "steps": [
+    "Open Evaluation",
+    "Read the selected-model metrics",
+    "Compare models in the table and chart",
+    "Click legend entries to hide or show metrics",
+    "Read the confusion matrix and stress tests",
+    "Open the dataset composition panel"
+   ],
+   "serves_tasks": [
+    "Check held-out benchmark performance before trusting scores"
+   ],
+   "screens": [
+    "screens/037.webp",
+    "screens/038.webp",
+    "screens/040.webp",
+    "screens/041.webp",
+    "screens/042.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Comparison results for External MIR630 genomic control vs Rfam tRNA control: still running ('Running both controls…') when I stopped at about 100 actions (screens/077.webp)",
+  "A successful UCSC fetch for a region that is not bundled: the server could not reach api.genome.ucsc.edu (screens/048.webp)",
+  "Results with 'Do not mask protein regions': neither the explorer nor the replay ran a scan with it. The explorer never ran 'Mask all exons' either; only the replay did, on a 401 nt chr17 sub-region"
+ ],
+ "not_done": [
+  "Fetching a non-MIR21 hg38 locus by coordinates: I chose chr15, typed 72495000 to 72495800 and pressed Load region. An error said the region is not bundled and UCSC could not be reached, because the server has no network (screens/047.webp, screens/048.webp). Only the bundled chr17 MIR21 region loaded",
+  "I did not finish the second control comparison (MIR630 vs tRNA): I stopped at the action limit while it was still running",
+  "I did not upload the other test files (mir21_region.fa, negative_control.fa, the Rfam control FASTAs); the negative controls were run through the Compare tab's bundled options instead",
+  "Clicking a candidate segment on the strand track did not select it, and hovering showed no tooltip (screens/060.webp); the track seems to be display only",
+  "I did not try the table toolbar's column show/hide, search or fullscreen buttons",
+  "I did not read the downloaded FASTA or SVG files; I read only the CSV (it holds more rows than the 10 shown in the table)",
+  "I did not explore the README's primary browser interface (Next.js/WASM); only the Streamlit reference app was used"
+ ],
+ "applied": [
+  "t3: replaced the mis-cited screens/059.webp (scan results, already cited under t6) with the replay's check/screens/005.webp, which shows pasted text in the box",
+  "t3 and data note: corrected the pasted sequence length to what the trace records (63 nt) and added the caveat that an attached upload overwrites pasted text",
+  "t5: added replay actions showing the effect of masking ('all exons' → 401 nt masked, 0 candidates, warning; 'CDS' → candidates found), citing check/screens/008, 011 and 018",
+  "t1: dropped the starting-state action 'app opened with MIR21 already in the box' and noted the preload in the task's specific label",
+  "t1: generalised the Example dropdown list (about 20 controls, including the ±500 nt genomic-context versions)",
+  "phase 2 specific label: marked RNAfold multi-scale windows as the fallback used when RNALfold is unavailable",
+  "data note and not_done: stated that the Streamlit app, not the Next.js/WASM browser app, was explored",
+  "t4: moved the failed UCSC fetch (a dead end) out of the tree into not_done and noted in the specific label that non-bundled regions need UCSC",
+  "screens_never_reached: updated the masking entry to reflect the replay's runs",
+  "features: split f1 into 'Ranked result table with summary and export' (f1) and 'Linked candidate detail cards' (f8)"
+ ],
+ "open_fixes": [
+  "Add the per-candidate 'Evidence this analysis does not provide' panel to t9 and as a small feature (or as part of f3/f8): no kept screen or trace step shows it, so a new run needs to capture it first",
+  "Show masking's effect on the full 1,000 nt MIR21 region, and run 'Do not mask protein regions': the only evidence is the replay's 401 nt sub-region, and no run used 'no masking'",
+  "Add an explicit final step of choosing which loci to take forward: the run did not show any interface element for marking or selecting loci, so a new run should check whether one exists before 'Export the shortlist' stops standing in for it",
+  "Replace the weak t1 evidence screens/063.webp, which looks the same as the opening state, with a capture that shows the box changing after Load selected control; this needs a new run",
+  "Explore the README's primary Next.js/WASM browser interface: this run only covered the Streamlit app",
+  "Capture a successful UCSC fetch and the finished MIR630 vs tRNA comparison: both need a server with network access or more action budget"
+ ],
+ "screens_at": "pilot/public/runs/miracle-mirna-triage/20261029-123008/",
+ "screens_filed": {
+  "screens/004.webp": "screens/004.webp",
+  "screens/010.webp": "screens/010.webp",
+  "screens/012.webp": "screens/012.webp",
+  "screens/033.webp": "screens/033.webp"
+ }
+}

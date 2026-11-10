@@ -1,0 +1,439 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cypmode-cyp-screen",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T17:07:13Z"
+  },
+  "app": {
+    "title": "CYPMode: Mode-Aware CYP450 Inhibition Screening",
+    "summary": "A person brings a set of chemical structure strings in, either by uploading a plain text file with one per line or pasting them into a box, and runs a substructure screen over them. Unparseable entries are counted and skipped, and the rest come back as a table giving, per compound, which named structural motifs matched and a coarse mechanism call, which can be downloaded as CSV. A second panel shows, for a small reference set, the numbers from an independent physics-based structure prediction — a predicted metal-to-nitrogen distance, a yes/no coordination call against a fixed cutoff, and the prediction's own confidence and affinity scores — so the fast screen's calls can be checked against something that was computed a different way. A third panel applies the same screen live to a held-out compound set, joins on whatever rows of the slow structural run have finished so far, reports how many of the set are complete, and exports the merged table.",
+    "task": {
+      "text": "Flag which compounds carry a known structural signature, and check those calls against an independent structural prediction for the compounds where one exists.",
+      "verbs": [
+        "identify",
+        "compare",
+        "derive",
+        "monitor"
+      ]
+    },
+    "data": {
+      "text": "Chemical structure strings, one per compound, screened against a fixed set of named substructure patterns; alongside them a per-compound table of numbers read back from an external structure-prediction run (a distance, a binary call, confidence and affinity scores).",
+      "item": "one compound, given as a structure string",
+      "shapes": [
+        "sequence",
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "screening candidate compounds for a mechanism, and confirming the calls against structural prediction",
+      "terms": [
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "Three tabbed panels, each ending in a table: an input panel with a file upload, a paste box and a run button that produces a per-compound results table with a CSV download; a read-only table of structural-prediction numbers for the reference set; and a third table that recomputes the screen live over a held-out set, left-joins whatever the long-running structural job has produced, and shows a completion count above it.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline"
+      ]
+    },
+    "field": {
+      "text": "substructure alerts and structure-based validation in medicinal chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "medicinal chemistry",
+        "structural alerts",
+        "drug metabolism"
+      ]
+    },
+    "workflow": {
+      "name": "screen a set of items for a known structural signature and check the calls against an independent prediction",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "upload a text file with one structure string per line, or paste them into a box; blank and unparseable entries are counted and skipped rather than stopping the run",
+          "parts": [
+            "smiles-input"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "each structure is matched against a fixed set of named substructure patterns, giving the motifs matched and a coarse two-class mechanism call",
+          "parts": [
+            "motif-rules",
+            "motif-results-table"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "one row per compound with its structure string, the motifs it matched or 'none', and its mechanism call",
+          "parts": [
+            "motif-results-table"
+          ]
+        },
+        {
+          "step": "check the computed call against an independent measurement",
+          "here": "a separate panel reads a checked-in summary of an external structure-prediction run for a small reference set: predicted metal-to-nitrogen distance, a coordination yes/no against a fixed distance cutoff, and the prediction's own confidence and affinity scores",
+          "parts": [
+            "structural-validation-tab"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "the held-out set is screened live and left-joined with whatever rows the hours-long structural job has finished; a counter shows how many of the set are complete, and unfinished compounds appear with empty result columns",
+          "parts": [
+            "challenge-tab",
+            "challenge-progress"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "each table has its own CSV download button, named for the table it came from",
+          "parts": [
+            "motif-results-table",
+            "challenge-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "the screen only claims capability, never a confirmed mechanism, so a whole second panel exists to set its calls against an independently computed structural result with a numeric cutoff",
+        "the expensive structural step runs outside the interface and can take hours per item, so the joined table deliberately shows partial results with empty columns instead of waiting or erroring",
+        "a completion counter over the held-out set tells the person how much of the check has landed so far",
+        "the validation panel reads a small checked-in summary file rather than recomputing, so it behaves the same where the heavy model cannot run, and degrades to a warning if that file is missing or malformed",
+        "entries that cannot be parsed as structures are counted and reported as skipped, and an empty string is treated as invalid even though the parser accepts it"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "motif-screen-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Motif screen panel",
+      "summary": "The first tab: take a set of structure strings in, run the substructure screen, and show the per-compound calls.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 67,
+          "end": 103,
+          "role": "logic",
+          "symbol": "motif_screen_tab",
+          "anchor": "5980b03cf0c1",
+          "first": "def motif_screen_tab():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 194,
+          "end": 202,
+          "role": "markup",
+          "symbol": "app",
+          "anchor": "abf7799fbeda",
+          "first": "def app():"
+        }
+      ]
+    },
+    {
+      "id": "smiles-input",
+      "level": "component",
+      "parent": "motif-screen-tab",
+      "title": "Structure input and validity check",
+      "summary": "Two side-by-side ways in — a file upload of one structure string per line, or a paste box — plus a run button that reports how many entries could not be parsed.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 76,
+          "end": 93,
+          "role": "markup",
+          "anchor": "4d82fdb61f3d",
+          "first": "col1, col2 = st.columns(2)"
+        },
+        {
+          "file": "code/app.py",
+          "start": 28,
+          "end": 38,
+          "role": "logic",
+          "symbol": "read_smiles",
+          "anchor": "245119bc6b4d",
+          "first": "def read_smiles(file, text_input) -> list[str]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 41,
+          "end": 50,
+          "role": "logic",
+          "symbol": "validate_smiles",
+          "anchor": "79989392ef75",
+          "first": "def validate_smiles(smiles_list: list[str]) -> tuple[list[str], list[str]]:"
+        }
+      ]
+    },
+    {
+      "id": "motif-rules",
+      "level": "component",
+      "parent": "motif-screen-tab",
+      "title": "The named pattern set and the call it produces",
+      "summary": "A fixed, named set of substructure patterns is matched against each structure, and presence of any match is turned into a coarse two-class mechanism call.",
+      "views": [],
+      "interactions": [
+        "apply label"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/cypmode/metrics/motifs.py",
+          "start": 24,
+          "end": 33,
+          "role": "data",
+          "anchor": "ea5779df84ca",
+          "first": "TYPE_II_MOTIFS = {"
+        },
+        {
+          "file": "code/cypmode/metrics/motifs.py",
+          "start": 36,
+          "end": 43,
+          "role": "logic",
+          "symbol": "detect_motifs",
+          "anchor": "f8878bffe44c",
+          "first": "def detect_motifs(smiles: str) -> list[str]:"
+        },
+        {
+          "file": "code/cypmode/metrics/motifs.py",
+          "start": 46,
+          "end": 51,
+          "role": "logic",
+          "symbol": "classify_mechanism",
+          "anchor": "24f5a80b18fa",
+          "first": "def classify_mechanism(smiles: str) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "motif-results-table",
+      "level": "component",
+      "parent": "motif-screen-tab",
+      "title": "Screen results table and download",
+      "summary": "One row per valid compound showing its structure string, the patterns it matched, and its mechanism call, with a CSV download of the whole table.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 53,
+          "end": 64,
+          "role": "logic",
+          "symbol": "screen_compounds",
+          "anchor": "3f3e7c6c5090",
+          "first": "def screen_compounds(smiles_list: list[str]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 95,
+          "end": 103,
+          "role": "markup",
+          "anchor": "5e34cc480341",
+          "first": "df = screen_compounds(valid)"
+        }
+      ]
+    },
+    {
+      "id": "structural-validation-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Structural validation panel",
+      "summary": "A read-only table of the reference set's externally computed structural numbers — predicted distance, a binary coordination call, affinity and confidence — so the fast screen's calls can be checked against an independent method.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 106,
+          "end": 138,
+          "role": "logic",
+          "symbol": "structural_validation_tab",
+          "anchor": "fda829bee68e",
+          "first": "def structural_validation_tab():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 23,
+          "end": 23,
+          "role": "data",
+          "anchor": "511d5c268bdd",
+          "first": "VALIDATION_SUMMARY_PATH = Path(\"data/boltz_test/validation_summary.json\")"
+        },
+        {
+          "file": "code/cypmode/validation/structures.py",
+          "start": 170,
+          "end": 200,
+          "role": "logic",
+          "symbol": "summarize_compound",
+          "anchor": "9b2bff32d962",
+          "first": "def summarize_compound(result_dir: str | Path, ligand_smiles: str) -> dict:"
+        },
+        {
+          "file": "code/cypmode/validation/constants.py",
+          "start": 9,
+          "end": 14,
+          "role": "data",
+          "anchor": "e8d1d440a192",
+          "first": "# Dative Fe-N coordination bonds in solved Type II CYP structures run"
+        }
+      ]
+    },
+    {
+      "id": "challenge-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Held-out set panel",
+      "summary": "Screens a held-out compound set live and joins on whatever rows the slow external structural run has completed, leaving unfinished compounds with empty result columns.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 161,
+          "end": 191,
+          "role": "logic",
+          "symbol": "challenge_tab",
+          "anchor": "5f9cf32baa81",
+          "first": "def challenge_tab():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 141,
+          "end": 147,
+          "role": "logic",
+          "symbol": "load_challenge_compounds",
+          "anchor": "76279b1de7d5",
+          "first": "def load_challenge_compounds() -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 150,
+          "end": 158,
+          "role": "logic",
+          "symbol": "merge_challenge_results",
+          "anchor": "5685fdbe52fc",
+          "first": "def merge_challenge_results(compounds_df: pd.DataFrame, results_df: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 24,
+          "end": 25,
+          "role": "data",
+          "anchor": "23c6859d64e1",
+          "first": "CHALLENGE_COMPOUNDS_PATH = Path(\"data/cyp_challenge/structure_track_test_blinded.csv\")"
+        }
+      ]
+    },
+    {
+      "id": "challenge-progress",
+      "level": "component",
+      "parent": "challenge-tab",
+      "title": "Completion counter",
+      "summary": "A single figure showing how many compounds of the held-out set have a finished structural result out of the total.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 178,
+          "end": 183,
+          "role": "logic",
+          "anchor": "f217cb8864cc",
+          "first": "if CHALLENGE_RESULTS_PATH.exists():"
+        }
+      ]
+    },
+    {
+      "id": "challenge-export",
+      "level": "component",
+      "parent": "challenge-tab",
+      "title": "Merged table download",
+      "summary": "Saves the joined table — live screen calls plus whatever structural results exist so far — out as a CSV.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 185,
+          "end": 191,
+          "role": "markup",
+          "anchor": "239027b437e4",
+          "first": "st.dataframe(df, width=\"stretch\")"
+        },
+        {
+          "file": "code/cypmode/validation/batch.py",
+          "start": 33,
+          "end": 64,
+          "role": "data",
+          "symbol": "to_dataframe",
+          "anchor": "30c981de66d2",
+          "first": "def to_dataframe(results: dict, compounds: dict[str, str] | None = None) -> pd.DataFrame:"
+        }
+      ]
+    }
+  ]
+}

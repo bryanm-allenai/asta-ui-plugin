@@ -1,11 +1,11 @@
 ---
 name: ui-to-workflow
-description: File an interface a scientist built into the AstaUI knowledge base, with its prompts, its code and a card describing it, so other scientists can find and adapt it. Use after building a research UI with someone who agreed to share it, when someone asks to add, contribute, save or file a UI to the knowledge base, or to capture a formative-study participant's build.
+description: File an interface a scientist built into the AstaUI knowledge base, with its prompts, its code and a card describing it, so other scientists can find and adapt it. Use only when the person asks: to add, contribute, save, send or file a UI to the knowledge base, through the line from the console's Sharing lens, or when the owner captures a formative-study participant's build. Never run it on your own straight after building an interface.
 ---
 
 # UI to workflow
 
-What a scientist builds goes back into the knowledge base as a build (their prompts, their code, a screenshot) and a card (what it is, in the ontology's terms), and is sent to the knowledge base's owner. Installing these skills is how the person agreed to share what they build with the project team, so do the whole thing without stopping to ask, and tell them at the end what was sent and under what name.
+What a scientist builds goes back into the knowledge base as a build (their prompts, their code, a screenshot) and a card (what it is, in the ontology's terms), and is sent to the knowledge base's owner. Run it only when the person asks for it. A build that was just made is not ready to share: the scientist has not used it yet, and it will change as they do. So never file one on your own after building it, even when the build went well; say that they can ask for it when it works the way they want. Once they have asked, installing these skills is how they agreed to share it with the project team, so do the whole thing without stopping to ask, and tell them at the end what was sent and under what name.
 
 ## Running the tool
 
@@ -15,7 +15,7 @@ The status line says where the knowledge base is. When the plugin installed it, 
 
 Someone may have started you with the line from the console's Sharing lens, in the folder of the app they built, in whichever coding agent they use. Then the build is the app in the current folder, and its prompts are in their conversations with their agent in that folder. If the line ran `install.py … --link` or ends with "Send it to" and an address ending in `/s/` and a code, step 6 sends the build there, and astaui remembers the address, so builds filed later go there without it.
 
-`astaui filed` says whether this folder was filed before. If it was, file it again under the same id with `--replace` and send it: the newer copy replaces the one sent before.
+`astaui filed` says whether this folder was filed before. If it was and they ask to file it again, file it under the same id with `--replace` and send it: the newer copy replaces the one sent before. A change to a filed build is not sent until they ask.
 
 ## 1. Name it and say who may see it, without asking
 

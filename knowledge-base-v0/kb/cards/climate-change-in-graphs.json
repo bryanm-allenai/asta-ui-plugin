@@ -1,0 +1,532 @@
+{
+  "schema": "astaui.card/1",
+  "id": "climate-change-in-graphs",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T06:09:53Z"
+  },
+  "app": {
+    "title": "Climate Change in Graphs",
+    "summary": "A person picks a topic from a home page of buttons: emissions, energy, ice, maps, ocean, physical quantities or temperature. On each topic page they narrow the time axis with a year-range slider or typed bounds. They then use dropdowns to choose which chart, dataset, region, season or variable to show, and pick countries to overlay. Charts set several records or scenarios against each other, with uncertainty bands, moving averages and fitted trendlines that show slope and p-value on hover. Map pages show the spatial pattern of a trend or projection for a chosen period, with hatching where the trend is not significant.",
+    "task": {
+      "text": "Browse published climate indicator records and projections by topic, narrowing time ranges and choosing which series, regions and scenarios to compare.",
+      "verbs": [
+        "explore",
+        "compare",
+        "summarize",
+        "derive",
+        "locate"
+      ]
+    },
+    "data": {
+      "text": "Many published global and regional indicator records: annual and monthly time series with uncertainty, scenario pathways to 2100, per-country tables, and gridded maps of trends and projections. Each is fetched from its source URL, with a bundled file as fallback.",
+      "item": "one indicator series from one dataset, such as an annual anomaly record, a country's yearly emissions or a gridded trend map",
+      "shapes": [
+        "time series",
+        "table",
+        "geospatial",
+        "field",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "exploring and comparing published indicator records and projections, after the source data is published",
+      "terms": [
+        "explore",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A home page of topic buttons leads to pages of stacked charts. On each chart, a year-range slider sets the x-axis, and a dropdown or multiselect chooses which series, countries, season or period are drawn. Hover shows values and, for trendlines, the fitted slope and p-value; map sections swap between precomputed gridded fields chosen from a dropdown.",
+      "views": [
+        "line chart",
+        "map",
+        "small multiples",
+        "bar chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "time slider",
+        "toggle view",
+        "multi-select",
+        "hover for detail",
+        "zoom and pan",
+        "filter"
+      ],
+      "patterns": [
+        "dashboard",
+        "small multiples",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "climate indicator time series, trend fitting and gridded model projections in climate science",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "climate science",
+        "climate indicators",
+        "cmip6 projections"
+      ]
+    },
+    "workflow": {
+      "name": "browse a collection of indicator charts by topic, narrowing time and choosing series",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "each loader fetches a published record from its source URL, falls back to a bundled file if the request fails, and caches the result",
+          "parts": [
+            "data-loaders"
+          ]
+        },
+        {
+          "step": "choose a topic to look at",
+          "here": "the home page shows seven buttons (Emissions, Energy, Ice, Maps, Ocean, Quantities, Temperature), and each one switches to its page",
+          "parts": [
+            "home-topics"
+          ]
+        },
+        {
+          "step": "narrow to a period of interest",
+          "here": "a year-range slider above each chart sets the x-axis range; on the temperature page, number boxes either side of the slider let the person type the bounds",
+          "parts": [
+            "year-range-control",
+            "emissions-trend-chart"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "dropdowns pick the chart, dataset, hemisphere, season or variable, and a multiselect chooses which countries to overlay",
+          "parts": [
+            "emissions-trend-chart",
+            "sea-ice-trend-chart"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "the chart overlays four temperature records, several countries or several policy pathways with their ranges; sector charts are split into one small panel per region",
+          "parts": [
+            "emissions-trend-chart",
+            "pathways-chart",
+            "temperature-records-chart"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "the app computes moving averages, seasonal means (leaving out seasons with missing months) and a linear trendline whose slope and p-value show on hover",
+          "parts": [
+            "sea-ice-trend-chart",
+            "data-loaders"
+          ]
+        },
+        {
+          "step": "see where on the globe it happens",
+          "here": "choropleths by country, and Mollweide contour maps of trend or projected change for a chosen period, with hatching where the trend is not significant or the models disagree",
+          "parts": [
+            "spatial-maps",
+            "country-choropleth"
+          ]
+        }
+      ],
+      "distinctive": [
+        "every remote source has a bundled backup file, so the charts still draw when a data provider is offline",
+        "the same quantity from several independent records is re-baselined to a common reference period, so the records can be overlaid",
+        "trendlines report their slope equation and a regression p-value in the hover text",
+        "maps hatch cells where the trend is not statistically significant or model agreement is low",
+        "past records run on into scenario pathways to 2100, each labelled with its projected end-of-century warming"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "home-topics",
+      "level": "view",
+      "parent": null,
+      "title": "Topic home page",
+      "summary": "A grid of topic buttons, each switching to the page of charts for that indicator group.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/Home.py",
+          "start": 7,
+          "end": 50,
+          "role": "markup",
+          "anchor": "d41a2ffd03a8",
+          "first": "st.set_page_config("
+        }
+      ]
+    },
+    {
+      "id": "data-loaders",
+      "level": "component",
+      "parent": null,
+      "title": "Cached loaders with fallback",
+      "summary": "Fetches each published record from its URL, falls back to a bundled file, and reshapes it into series with moving averages, seasonal means and common baselines.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/get_data.py",
+          "start": 94,
+          "end": 100,
+          "role": "logic",
+          "symbol": "read_csv_from_url",
+          "anchor": "b26c9706d16a",
+          "first": "def read_csv_from_url(csv_url, backup, timeout = 3, **kwargs):"
+        },
+        {
+          "file": "code/get_data.py",
+          "start": 102,
+          "end": 115,
+          "role": "logic",
+          "symbol": "get_season",
+          "anchor": "45678902030e",
+          "first": "def get_season(date):"
+        },
+        {
+          "file": "code/get_data.py",
+          "start": 311,
+          "end": 350,
+          "role": "logic",
+          "symbol": "get_sea_ice_data",
+          "anchor": "e69d047dd142",
+          "first": "def get_sea_ice_data():"
+        },
+        {
+          "file": "code/get_data.py",
+          "start": 406,
+          "end": 414,
+          "role": "logic",
+          "symbol": "get_hadcrut_global_data",
+          "anchor": "613121db6289",
+          "first": "def get_hadcrut_global_data():"
+        },
+        {
+          "file": "code/get_data.py",
+          "start": 417,
+          "end": 427,
+          "role": "logic",
+          "symbol": "get_noaa_global_data",
+          "anchor": "083c731b2e93",
+          "first": "def get_noaa_global_data():"
+        },
+        {
+          "file": "code/get_data.py",
+          "start": 396,
+          "end": 403,
+          "role": "logic",
+          "symbol": "get_gistemp_global_data",
+          "anchor": "188dd3902b2c",
+          "first": "def get_gistemp_global_data():"
+        },
+        {
+          "file": "code/data/HadCRUT.5.1.0.0.analysis.summary_series.global.annual.csv",
+          "start": 1,
+          "end": 177,
+          "role": "data",
+          "anchor": "a44b3151890a",
+          "first": "Time,Anomaly (deg C),Lower confidence limit (2.5%),Upper confidence limit (97.5%)"
+        }
+      ]
+    },
+    {
+      "id": "year-range-control",
+      "level": "component",
+      "parent": "temperature-records-chart",
+      "title": "Year range slider with typed bounds",
+      "summary": "A range slider with a number box on each side, kept in sync, that sets the time window of the chart below it.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "time slider"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/Temperature.py",
+          "start": 26,
+          "end": 95,
+          "role": "logic",
+          "symbol": "range_slider_with_inputs",
+          "anchor": "fb5374eb6932",
+          "first": "def range_slider_with_inputs(title, label, min_bound, max_bound, default_range):"
+        },
+        {
+          "file": "code/pages/Temperature.py",
+          "start": 41,
+          "end": 44,
+          "role": "logic",
+          "symbol": "update_slider_value",
+          "anchor": "11274e0d49df",
+          "first": "def update_slider_value():"
+        }
+      ]
+    },
+    {
+      "id": "temperature-records-chart",
+      "level": "view",
+      "parent": null,
+      "title": "Global temperature records",
+      "summary": "Shows global mean temperature with a five-year average and uncertainty band, or overlays four independent anomaly records, within the chosen year range.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "time slider",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/Temperature.py",
+          "start": 107,
+          "end": 225,
+          "role": "logic",
+          "symbol": "create_instrumental_temperature_section",
+          "anchor": "321b36c29e1a",
+          "first": "def create_instrumental_temperature_section():"
+        }
+      ]
+    },
+    {
+      "id": "emissions-trend-chart",
+      "level": "view",
+      "parent": null,
+      "title": "Emissions by substance, country or per capita",
+      "summary": "A chart chosen from a dropdown: stacked world emissions by gas, or lines for countries picked in a multiselect, clipped to a year range.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "time slider",
+        "toggle view",
+        "multi-select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/Emissions.py",
+          "start": 28,
+          "end": 132,
+          "role": "logic",
+          "anchor": "a5ff55986a8a",
+          "first": "df_historic_ghg = get_historic_ghg_data()"
+        },
+        {
+          "file": "code/get_data.py",
+          "start": 172,
+          "end": 174,
+          "role": "logic",
+          "symbol": "get_historic_ghg_data",
+          "anchor": "0280c00ee997",
+          "first": "def get_historic_ghg_data():"
+        },
+        {
+          "file": "code/get_data.py",
+          "start": 177,
+          "end": 179,
+          "role": "logic",
+          "symbol": "get_per_capita_ghg_data",
+          "anchor": "61c9fa01fb31",
+          "first": "def get_per_capita_ghg_data():"
+        }
+      ]
+    },
+    {
+      "id": "country-choropleth",
+      "level": "component",
+      "parent": "emissions-trend-chart",
+      "title": "Emissions by country map",
+      "summary": "A world choropleth of cumulative, single-year or per-capita emissions by country, chosen from a dropdown, with hover for country values.",
+      "views": [
+        "map"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/Emissions.py",
+          "start": 134,
+          "end": 191,
+          "role": "logic",
+          "anchor": "61ef5f05e19e",
+          "first": "############################################# Country 2023 GHG plot ####################################################"
+        }
+      ]
+    },
+    {
+      "id": "pathways-chart",
+      "level": "view",
+      "parent": null,
+      "title": "Scenario pathways to 2100",
+      "summary": "Draws the historical record on into policy scenario lines and shaded ranges to 2100, each labelled with its projected warming.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/Emissions.py",
+          "start": 257,
+          "end": 598,
+          "role": "logic",
+          "anchor": "36d17c7561d8",
+          "first": "############################################# Pathways GHG plot ########################################################"
+        },
+        {
+          "file": "code/get_data.py",
+          "start": 146,
+          "end": 153,
+          "role": "logic",
+          "symbol": "get_pathways_ghg_data",
+          "anchor": "c98ed8989832",
+          "first": "def get_pathways_ghg_data():"
+        },
+        {
+          "file": "code/get_data.py",
+          "start": 156,
+          "end": 163,
+          "role": "logic",
+          "symbol": "get_pathways_temp_data",
+          "anchor": "0e496573e086",
+          "first": "def get_pathways_temp_data():"
+        },
+        {
+          "file": "code/data/Climate Action Tracker - GMT time series.csv",
+          "start": 1,
+          "end": 9,
+          "role": "data",
+          "anchor": "fb3b8c890207",
+          "first": "Pathway,Limit,1990,2000,2010,2020,2023,2030,2040,2050,2060,2070,2080,2090,2100"
+        }
+      ]
+    },
+    {
+      "id": "sea-ice-trend-chart",
+      "level": "view",
+      "parent": null,
+      "title": "Sea ice with trendline",
+      "summary": "For a chosen hemisphere, season and variable, plots the series with a 12-month moving average and a fitted linear trend whose slope and p-value show on hover.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/Ice.py",
+          "start": 27,
+          "end": 149,
+          "role": "logic",
+          "anchor": "02dc0a4c7e79",
+          "first": "col1, col2 = st.columns(2)"
+        },
+        {
+          "file": "code/get_data.py",
+          "start": 72,
+          "end": 80,
+          "role": "logic",
+          "symbol": "get_reg_pvalue",
+          "anchor": "432d1e3dffbb",
+          "first": "def get_reg_pvalue(n, degree, c, V):"
+        }
+      ]
+    },
+    {
+      "id": "spatial-maps",
+      "level": "view",
+      "parent": null,
+      "title": "Gridded trend and projection maps",
+      "summary": "Mollweide contour maps of temperature trend, precipitation change, water storage and drought for a chosen period, hatched where the trend is not significant or the models disagree.",
+      "views": [
+        "map"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/Maps.py",
+          "start": 69,
+          "end": 96,
+          "role": "logic",
+          "symbol": "plot_map",
+          "anchor": "6a1bf0446ad0",
+          "first": "def plot_map(filePath, label, vmin, vmax, cmap, session_state_label, nlevels = 60, scaling = 1):"
+        },
+        {
+          "file": "code/pages/Maps.py",
+          "start": 182,
+          "end": 236,
+          "role": "logic",
+          "symbol": "plot_precip_hatched_map",
+          "anchor": "c46c23330667",
+          "first": "def plot_precip_hatched_map(mainFilePath, hatchFilePath, session_state_label):"
+        },
+        {
+          "file": "code/pages/Maps.py",
+          "start": 139,
+          "end": 179,
+          "role": "logic",
+          "symbol": "plot_hatched_map",
+          "anchor": "e10cc824f945",
+          "first": "def plot_hatched_map(mainFilePath, hatchFilePath, session_state_label):"
+        },
+        {
+          "file": "code/pages/Maps.py",
+          "start": 389,
+          "end": 400,
+          "role": "logic",
+          "symbol": "show_map",
+          "anchor": "429be95d3c4c",
+          "first": "def show_map(title, map_path, colorbar_path):"
+        },
+        {
+          "file": "code/pages/Maps.py",
+          "start": 244,
+          "end": 334,
+          "role": "markup",
+          "anchor": "cfe5b823ee61",
+          "first": "#################### Change in surface temperature #############################"
+        }
+      ]
+    }
+  ]
+}

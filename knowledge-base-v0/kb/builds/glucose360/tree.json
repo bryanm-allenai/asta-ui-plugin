@@ -1,0 +1,863 @@
+{
+ "interface": {
+  "title": "Glucose360 (web app)",
+  "field": "Clinical diabetes research / continuous glucose monitoring (CGM) analysis",
+  "stage_of_work": "Data cleaning, feature extraction, event analysis and reporting after CGM data collection",
+  "what_it_is_for": "Load CGM device exports for one or more subjects, resample and interpolate them, compute glycemic variability and time-in-range features, detect and annotate events, and view or export plots, AGP reports and feature tables."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "Most of the work used Dexcom_Example_Subject_A.csv, uploaded as Dexcom format with the defaults (5-min resampling, 45-min max gap). It appeared as patient 'SubjectA', covering 2023-07-02 12:55 to 2023-07-03 ~13:30 with 296 readings. The 05:05–05:30 gap was filled with straight-line interpolated points (screens/014.webp). The 410 mg/dL spike at 09:10:17 was kept, not removed as an outlier (screens/013.webp; feature Maximum = 410). The 'Low' flag at ~13:25 became 40 mg/dL (Minimum = 40). At the end I switched to 'Use Example Data', which loaded 3 CSVs, 3 sections and 3 subjects (Subject3 shown) with hyper-episode event types (screens/055.webp, screens/056.webp). Caution: the event annotations made in this session were left inconsistent (a hypo episode's description overwritten with 'Dinner', two duplicate 06:00 meals), so Meal-type summaries from this run are inflated; see t6, t12, t13, t14."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Turn raw continuous sensor exports into cleaned per-subject time series, summary metrics, annotated events and reports",
+  "specific": "Turn CGM device exports into per-patient glucose series, glycemic features, event metrics, and daily/weekly/spaghetti/AGP plots and reports",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Load and preprocess the data",
+    "specific": "Import Data: pick a device format preset or custom column names, set Resampling Interval (5 min) and Maximum Gap for Interpolation (45 min), upload a CSV/ZIP or use the example data, then check the gap-filled series on the Daily plot; Sample Data Formats shows the accepted layouts",
+    "children": [
+     {
+      "kind": "task",
+      "general": "See example layouts of the accepted file formats",
+      "specific": "Sample Data Formats tab: Dexcom CSV and Custom Columns CSV examples",
+      "screens": [
+       "screens/053.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Sample Data Formats tab",
+        "screens": [
+         "screens/053.webp"
+        ]
+       }
+      ],
+      "id": "t16",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Choose the input format and preprocessing options",
+      "specific": "Pick Data Format (Dexcom / FreeStyle Libre 2-3 / Libre Pro / Custom CSV) and the Advanced Parameters (resampling interval, max interpolation gap, custom ID extraction, segment-interval CSV)",
+      "screens": [
+       "screens/001.webp",
+       "screens/002.webp",
+       "screens/003.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "toggled 'Use custom ID extraction?' on (template field and help appeared)",
+        "screens": [
+         "screens/002.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "toggled 'Upload a CSV to segment data intervals?' on (interval CSV upload appeared)",
+        "screens": [
+         "screens/002.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Data Format 'Custom CSV Format' (Glucose and Timestamp column-name fields appeared)",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "set Data Format back to 'Dexcom' and switched both toggles off",
+        "screens": [
+         "screens/004.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Upload a data file and have it cleaned and resampled per subject",
+      "specific": "Upload a Dexcom CSV under 'Upload Your Own Data'",
+      "screens": [
+       "screens/004.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "uploaded Dexcom_Example_Subject_A.csv in 'Import CGM Data' (Upload complete)",
+        "screens": [
+         "screens/004.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Load the bundled multi-subject example dataset instead",
+      "specific": "Choose 'Use Example Data' (loads three example subject CSVs)",
+      "screens": [
+       "screens/055.webp",
+       "screens/056.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked radio 'Use Example Data'",
+        "screens": [
+         "screens/054.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Plots tab; notices said 3 .csv files found and imported, 3 sections found (patient box still greyed out on SubjectA)",
+        "screens": [
+         "screens/055.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "patient list then showed Subject3, with its Daily plot",
+        "screens": [
+         "screens/056.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check that gaps were interpolated and see how outliers and out-of-range flags were handled",
+      "specific": "Inspect the 05:05–05:30 gap, the 410 mg/dL spike and the 'Low' reading on the Daily plot",
+      "screens": [
+       "screens/012.webp",
+       "screens/013.webp",
+       "screens/014.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered the 09:10 spike (tooltip: Jul 3, 2023 09:10:17, 410)",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged a zoom box over 04:00–06:30 on Jul 3 (the gap is filled with straight-line points)",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "double-clicked the plot to reset the zoom",
+        "screens": [
+         "screens/015.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Mark discrete events on each subject's series",
+    "specific": "Automatically detected hypo/hyper episodes plus Import Events > Add Singular Event and Events > Edit Event; every event type created here appears in the shared Type selector that drives the Event Features table, the Daily-plot overlay and the events table",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Review the low- and high-value episodes the tool detected automatically",
+      "specific": "See detected episode types (e.g. 'hypo level 1 episode' for SubjectA, hyper-episode types for the example subjects) listed in the Type tables and Event Features without any manual annotation",
+      "screens": [
+       "screens/006.webp",
+       "screens/027.webp",
+       "screens/055.webp",
+       "screens/056.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Features after upload: Event Features already summarised 'hypo level 1 episode' though no event had been added",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "Type table on Plots listed the same detected 'hypo level 1 episode'",
+        "screens": [
+         "screens/027.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "after loading the example data, hyper-episode types were listed for Subject3",
+        "screens": [
+         "screens/055.webp",
+         "screens/056.webp"
+        ]
+       }
+      ],
+      "id": "n1"
+     },
+     {
+      "kind": "task",
+      "general": "Add a single annotated event to a subject",
+      "specific": "Add Singular Event: Date, Time, minutes before/after, Type 'Meal', Description 'Breakfast'",
+      "screens": [
+       "screens/039.webp",
+       "screens/043.webp"
+      ],
+      "branch": "repeat",
+      "note": "Session state left inconsistent: the first Add Event press, before the calendar date stuck, saved a stray event dated 2026-10-29 (fixed later in t13), and the repeated presses left two identical 2023-07-03 06:00 Breakfast meals, which inflate later Meal summaries (t6, t14, t15).",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed Time 06:00, Type Meal, Description Breakfast",
+        "screens": [
+         "screens/033.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 2023-07-03 in the calendar (zoomed out to months, back 3 years, July, 3)",
+        "screens": [
+         "screens/036.webp",
+         "screens/037.webp",
+         "screens/038.webp",
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Add Event' (3 times in all: the first, before the date was set, saved a 2026 event; the other two saved duplicate 06:00 meals)",
+        "screens": [
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Events tab; the 'Meal' type and its rows appeared",
+        "screens": [
+         "screens/043.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Correct an event's fields in the events table",
+      "specific": "Edit Event: Row to Edit, Column to Edit (Timestamp/Before/After/Type/Description), Value to Replace With",
+      "screens": [
+       "screens/031.webp",
+       "screens/045.webp"
+      ],
+      "branch": "repeat",
+      "note": "After each edit the panel redraws and resets Row to Edit to 1. The 'Dinner' description edit therefore landed on row 1 (the detected hypo episode), and row 2 kept 'Breakfast'. This was not undone, so later screens show a hypo row with a wrong description.",
+      "children": [
+       {
+        "kind": "action",
+        "label": "Row 1, Column After, value 120, pressed Edit Event (window widened, metrics recomputed)",
+        "screens": [
+         "screens/030.webp",
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "Row 2, Column Timestamp, value '2023-07-02 18:00:00', pressed Edit Event (stray 2026 row corrected)",
+        "screens": [
+         "screens/044.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "Column Description, value 'Dinner', pressed Edit Event; Row to Edit had reset to 1, so the hypo episode was overwritten instead of the meal",
+        "screens": [
+         "screens/045.webp",
+         "screens/046.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Compute and export summary statistics",
+    "specific": "Features tab: one row of ~60 glycemic features per patient, plus an Event Features table for whichever event type is selected in the Type list; each downloads as .csv",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Review per-subject variability and time-in-range metrics",
+      "specific": "Read the features table (ADRR, CV, GMI, MAGE, MODD, percent time in range 70-180, percent time in tight range, ... ~60 columns) for SubjectA",
+      "screens": [
+       "screens/006.webp",
+       "screens/007.webp",
+       "screens/008.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Features tab",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled the table sideways (Mean, Median, Minimum 40, Number of Readings 296)",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the end (Percent Time In Range 97.97, SD 21.8)",
+        "screens": [
+         "screens/008.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Review summary metrics for each detected or annotated event type",
+      "specific": "Read the Event Features table (mean duration, glucose, slopes, amplitude, iAUC, episodes per day) for the event type selected",
+      "screens": [
+       "screens/006.webp",
+       "screens/052.webp"
+      ],
+      "note": "The Meal summary in screens/052.webp counts the duplicate 06:00 meals from t12, so it is inflated; the replay with a single Meal got duration 270 and mean glucose 96.4.",
+      "children": [
+       {
+        "kind": "action",
+        "label": "read the detected hypo level 1 episode summary (duration 15, mean 69)",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "after selecting 'Meal' on Events, reopened Features (Mean Meal Duration 210, Mean Glucose During Meals 92.9; includes duplicate meals)",
+        "screens": [
+         "screens/052.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the metric tables for downstream analysis",
+      "specific": "Download Features and Event Features as .csv",
+      "screens": [
+       "screens/008.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 'Download Features as .csv file' (features.csv)",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Download Event Features as .csv file' (event_features.csv)",
+        "screens": [
+         "screens/008.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Visualize each subject's time series",
+    "specific": "Plots tab: Select Patient and Select Plot (Daily / Weekly / Spaghetti / AGP), Set Plot Height slider, Chunk Weekend/Weekday, event-type overlay from the Type table, and downloads of the displayed plot and the AGP report",
+    "children": [
+     {
+      "kind": "task",
+      "general": "View the series in different layouts",
+      "specific": "Pick a patient and switch Select Plot between Daily, Weekly, Spaghetti and AGP",
+      "screens": [
+       "screens/012.webp",
+       "screens/016.webp",
+       "screens/019.webp",
+       "screens/025.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "Select Plot = Daily (one panel per day)",
+        "screens": [
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "Select Plot = Weekly (Time-Series)",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "Select Plot = Spaghetti (days overlaid on a 24 h axis)",
+        "screens": [
+         "screens/019.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "Select Plot = AGP (5/25/50/75/95th percentile bands, 70/140/180 lines)",
+        "screens": [
+         "screens/024.webp",
+         "screens/025.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Adjust the display",
+      "specific": "Drag the Set Plot Height slider, turn on Chunk Weekend/Weekday, hide a day with the legend",
+      "screens": [
+       "screens/011.webp",
+       "screens/021.webp",
+       "screens/023.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged the plot height slider from 3000 to 750",
+        "screens": [
+         "screens/011.webp",
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "toggled 'Chunk Weekend/Weekday' on Spaghetti (Weekend and Weekday panels)",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked legend entry 2023-07-03 to hide that day",
+        "screens": [
+         "screens/023.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Overlay chosen event types on the time series",
+      "specific": "Select a row in the event Type table to draw event markers and a per-day event list on the Daily plot",
+      "screens": [
+       "screens/027.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 'hypo level 1 episode' in the Type table (dashed marker and Time/Description table)",
+        "screens": [
+         "screens/027.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the figure and a standard clinical summary report",
+      "specific": "Download the currently displayed plot and the AGP report for the patient",
+      "screens": [
+       "screens/026.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 'Download Currently Displayed Plot' with AGP shown (SubjectA_AGP.zip)",
+        "screens": [
+         "screens/025.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Download AGP Report for Patient' (SubjectA_AGP_Report.html; its TIR bars and mean glucose/GMI/CV summary were read from the downloaded file, not seen on a screen)",
+        "screens": [
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Measure and export individual events",
+    "specific": "Events tab: Event to Display gives per-event response metrics and an Event Plot; the Type list filters the events table, and a selected row is exported with 'Download Events in Table as .csv file'",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Inspect one event's local response metrics and plot",
+      "specific": "Pick Event to Display; read Baseline, Peak, Delta, AUC, iAUC, 0/60/120-min post-event values and deltas, plus the Event Plot",
+      "screens": [
+       "screens/029.webp",
+       "screens/046.webp",
+       "screens/051.webp"
+      ],
+      "branch": "repeat",
+      "note": "Event numbering under the Meal filter comes from the session with duplicate 06:00 meals (t12), so 'Event 2' is one of two identical meals.",
+      "children": [
+       {
+        "kind": "action",
+        "label": "Event to Display = 1 (detected hypo episode: baseline 69, peak 70, iAUC 7.5)",
+        "screens": [
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "displayed the 18:00 meal (baseline 94, peak 126, AUC 20630, iAUC 2810)",
+        "screens": [
+         "screens/046.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "with Meal filter, typed Event to Display 2 + Enter (06:00 meal: baseline 76, peak 99, iAUC 2720)",
+        "screens": [
+         "screens/051.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Filter events by type and export the table",
+      "specific": "Select a type in the Type list to filter the events table, also select a row in the events table, then 'Download Events in Table as .csv file' (filtering alone exports only 'No events selected.')",
+      "screens": [
+       "screens/049.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 'Meal' in the Type list (table shows only meals, including the duplicates)",
+        "screens": [
+         "screens/048.webp",
+         "screens/049.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Download Events in Table as .csv file' (events.csv; no table row selected, so the export likely held only 'No events selected.')",
+        "screens": [
+         "screens/051.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Upload with format preset and resample/gap-fill parameters",
+   "general": "Pick the instrument's export format (or map your own column names), set the regular sampling interval and the longest gap to fill, then upload one file or a ZIP of many and get one cleaned series per subject",
+   "specific": "Choose Data Format (Dexcom, Libre 2/3, Libre Pro, Custom CSV with glucose/timestamp column names), set Resampling Interval and Maximum Gap for Interpolation, optionally a custom ID template or a segment-interval CSV, then Browse a .csv/.zip",
+   "steps": [
+    "choose the format preset (custom shows column-name fields)",
+    "set resampling interval and max gap",
+    "optionally turn on ID-template extraction or interval segmentation",
+    "upload a CSV or ZIP",
+    "subjects appear in every patient dropdown"
+   ],
+   "serves_tasks": [
+    "Upload a data file and have it cleaned and resampled per subject",
+    "Choose the input format and preprocessing options",
+    "Load the bundled multi-subject example dataset instead"
+   ],
+   "screens": [
+    "screens/002.webp",
+    "screens/003.webp",
+    "screens/004.webp",
+    "screens/055.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Multi-layout time-series viewer with height control and export",
+   "general": "Pick a subject, switch one series between calendar-day panels, week rows and overlaid days, resize it, split weekends from weekdays, then export the current figure. Standard chart interactions (hover for exact time and value, box-zoom, double-click reset, legend click to hide a day) let you check gap filling and outliers.",
+   "specific": "Select Patient + Select Plot (Daily / Weekly / Spaghetti); Set Plot Height slider (range changes per plot type); Chunk Weekend/Weekday toggle for Spaghetti; Download Currently Displayed Plot (zip). Plotly tooltip, box zoom and legend toggle work on these plots.",
+   "steps": [
+    "select patient",
+    "select plot type",
+    "drag the height slider",
+    "optionally split weekend and weekday",
+    "hover or box-zoom to inspect points",
+    "download the displayed plot"
+   ],
+   "serves_tasks": [
+    "View the series in different layouts",
+    "Adjust the display",
+    "Check that gaps were interpolated and see how outliers and out-of-range flags were handled",
+    "Export the figure and a standard clinical summary report"
+   ],
+   "screens": [
+    "screens/011.webp",
+    "screens/013.webp",
+    "screens/014.webp",
+    "screens/016.webp",
+    "screens/019.webp",
+    "screens/021.webp",
+    "screens/023.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Automatic episode detection",
+   "general": "Low- and high-value episodes are found in each subject's series without any annotation and listed as event categories alongside user-added ones",
+   "specific": "Detected types such as 'hypo level 1 episode' (SubjectA) and hyper-episode types (example data) appear in the Type tables on Plots and Events and in Event Features right after upload",
+   "steps": [
+    "load data",
+    "open the Type list on Plots or Events, or Event Features",
+    "see the detected episode types",
+    "select one to overlay or summarise it"
+   ],
+   "serves_tasks": [
+    "Review the low- and high-value episodes the tool detected automatically"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/027.webp",
+    "screens/056.webp"
+   ],
+   "id": "nf1"
+  },
+  {
+   "name": "Event-type selector shared across views",
+   "general": "Pick one or more categories of annotated intervals from a list; the choice overlays them on the time-series plot, filters the event table and its export, and sets which category the event summary table describes and exports",
+   "specific": "Type table (e.g. 'hypo level 1 episode', 'Meal') on Plots and Events; selecting a row draws dashed markers plus a Time/Description table on the Daily plot, filters the events table, and drives the Event Features table (and event_features.csv) on Features. The events CSV export also needs a row selected in the events table.",
+   "steps": [
+    "click an event type in the Type list",
+    "see markers and an event list on the Daily plot",
+    "see the events table filtered and select a row in it",
+    "download the events CSV",
+    "open Features to read and download that type's Event Features summary"
+   ],
+   "serves_tasks": [
+    "Overlay chosen event types on the time series",
+    "Filter events by type and export the table",
+    "Review summary metrics for each detected or annotated event type",
+    "Export the metric tables for downstream analysis"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/027.webp",
+    "screens/049.webp",
+    "screens/052.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Single-event entry form",
+   "general": "Add a timestamped annotation with a window before and after, a category and a note to one subject's record",
+   "specific": "Add Singular Event: pick patient, Date (calendar picker; typed dates reset to today), Time, minutes before/after, Type, Description, then Add Event. A Bulk Import Events panel for a CSV/ZIP with Day/Time columns sits beside it but was not run.",
+   "steps": [
+    "choose the patient",
+    "pick the date in the calendar (month/year zoom-out)",
+    "type time, window lengths, type and description",
+    "press Add Event once",
+    "the new type appears in the Type lists"
+   ],
+   "serves_tasks": [
+    "Add a single annotated event to a subject"
+   ],
+   "screens": [
+    "screens/033.webp",
+    "screens/037.webp",
+    "screens/039.webp",
+    "screens/043.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Event table cell editor",
+   "general": "Fix one field of one row in a table by giving the row number, choosing the column and typing the new value; results that depend on it recompute",
+   "specific": "Edit Event: Row to Edit, Column to Edit (Timestamp/Before/After/Type/Description), Value to Replace With, Edit Event. Row to Edit resets to 1 after each edit, so re-enter it every time.",
+   "steps": [
+    "enter row number",
+    "choose column",
+    "type replacement value",
+    "press Edit Event",
+    "table, metrics and event plot update"
+   ],
+   "serves_tasks": [
+    "Correct an event's fields in the events table"
+   ],
+   "screens": [
+    "screens/030.webp",
+    "screens/031.webp",
+    "screens/044.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Per-event response metrics with windowed plot",
+   "general": "Choose one annotated event and get its local response summary (baseline, peak, change, area and incremental area, values and changes at set times after it) next to a plot of its window",
+   "specific": "Event to Display number gives a Baseline / Peak / Delta / AUC / iAUC / 0-, 60-, 120-min post-event / 60- and 120-min Delta / 120-min AUC table and an Event Plot with the event line",
+   "steps": [
+    "optionally filter by event type",
+    "set Event to Display",
+    "read the metrics table",
+    "inspect the event plot",
+    "widen the window via Edit Event and recompute"
+   ],
+   "serves_tasks": [
+    "Inspect one event's local response metrics and plot"
+   ],
+   "screens": [
+    "screens/029.webp",
+    "screens/031.webp",
+    "screens/046.webp",
+    "screens/051.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Per-subject feature table with CSV export",
+   "general": "One row per subject with dozens of standard summary metrics, scrollable sideways and downloadable as CSV",
+   "specific": "Features tab table (ADRR … Third Quartile, ~60 glycemic metrics including GMI, CV and percent time in range) with 'Download Features as .csv file'",
+   "steps": [
+    "load data",
+    "open Features",
+    "scroll across metrics",
+    "download features.csv"
+   ],
+   "serves_tasks": [
+    "Review per-subject variability and time-in-range metrics",
+    "Export the metric tables for downstream analysis"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/007.webp",
+    "screens/008.webp"
+   ],
+   "id": "f8",
+   "check": "replayed"
+  },
+  {
+   "name": "AGP percentile profile and HTML report",
+   "general": "Collapse many days onto one 24-hour axis as percentile bands with target-range lines, and export a standard one-page report",
+   "specific": "Select Plot = AGP (5/25/50/75/95th percentiles, 70/140/180 mg/dL lines); Download AGP Report for Patient gives an HTML file with a stacked TIR bar and an ID/dates/mean glucose/GMI/CV table",
+   "steps": [
+    "select patient",
+    "Select Plot = AGP",
+    "read the percentile bands",
+    "download the AGP report"
+   ],
+   "serves_tasks": [
+    "View the series in different layouts",
+    "Export the figure and a standard clinical summary report"
+   ],
+   "screens": [
+    "screens/024.webp",
+    "screens/025.webp",
+    "screens/026.webp"
+   ],
+   "id": "f9",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Bulk Import Events with a file: the only test file is a CGM export, not an events CSV, so bulk event import was not run",
+  "Upload of FreeStyle Libre 2/3 or Libre Pro files: no such test file, so I only saw the format option",
+  "Custom ID extraction and segment-interval results: the controls were shown but not run, because there was no suitable file or ID template",
+  "Features, Events and AGP for the three example-data subjects: I only reached the Daily plot for Subject3 (screens/056.webp) before stopping"
+ ],
+ "not_done": [
+  "Did not open the contents of SubjectA_AGP.zip (from 'Download Currently Displayed Plot'): the download reader only reports its size (1.4 MB), so I could not confirm whether it holds PDF and/or HTML",
+  "Could not tell apart the second events.csv (made with the Meal filter on): reading 'events.csv' returned the first one, 'No events selected.'. The replay showed the export needs a row selected in the events table as well as an event type",
+  "The 'Dinner' description edit went to the wrong row: after the previous Edit, the panel redrew and reset 'Row to Edit' to 1, so the edit probably landed on row 1 (the hypo episode). Row 2 kept 'Breakfast'. I did not go back to fix it",
+  "Typing a date into the Add Singular Event Date field did not stick (it reset to today, 2026-10-29), which created a stray event dated 2026. It was fixed through Edit Event. Two identical 2023-07-03 06:00 meals also remain from the repeated Add presses, and they inflate the Meal summaries in t6 and t14",
+  "Did not re-run the upload with a different resampling interval or max gap to compare results, because I ran out of my action budget",
+  "No outlier removal was seen: the 410 mg/dL spike stays in the series and features. I found no control that removes outliers"
+ ],
+ "applied": [
+  "Added task n1 (review automatically detected low/high episodes) citing 006, 027, 055, 056, and a matching detector feature nf1 (no check, since the replay did not test them as such)",
+  "Reordered phases by the work: Load, Annotate events, Summary statistics, Visualize, Per-event measurement; phase labels state that the shared Type selector links them",
+  "Folded the Sample Data Formats phase into Load as optional task t16",
+  "Replaced bare tab-name phase specific labels with descriptions of their controls",
+  "t15: specific label now says a row must be selected before download; download action notes the likely 'No events selected.' result",
+  "Flagged the corrupted session state with notes on t12 and t13, and marked the affected Meal metrics on t6 (052) and t14; added the Dinner edit as a t13 action showing it went to row 1",
+  "t3: split the citation so 055 backs the import notices and 056 backs Subject3; removed the zip name the UI never shows",
+  "t11: marked the AGP report contents as read from the downloaded file, not a screen",
+  "Removed the f2/f9 overlap: AGP view only in f9, plot download only in f2",
+  "Moved the Event Features table and its export from f8 to f4; f4 steps now include selecting a table row before the events export",
+  "Folded generic chart interactions (f3) into f2 as a note and dropped f3",
+  "Added a caution about inflated Meal summaries to the data note and noted the Row-to-Edit reset in f6"
+ ],
+ "open_fixes": [
+  "Bulk Import Events cannot be added as a task or feature: the run never imported an events file. A new run needs an events CSV/ZIP with day/time columns",
+  "The detector's settings (episode thresholds, severity levels, windows) were never seen. A new run should look for where they are set to complete nf1",
+  "Comparing several subjects (one features row per subject after a ZIP or the example data) was not reached. A new run should open Features, Events and AGP for the example subjects",
+  "Segmenting data with an interval CSV and extracting IDs with a template were only toggled on. A new run needs a suitable interval file and filename template to show their results",
+  "The filtered events export with a row selected was only done in the replay. A new run should capture a screen of that step so t15 can include it as an action"
+ ],
+ "screens_at": "pilot/public/runs/glucose360/20261029-092851/",
+ "screens_filed": {
+  "screens/053.webp": "screens/053.webp",
+  "screens/006.webp": "screens/006.webp",
+  "screens/012.webp": "screens/012.webp",
+  "screens/029.webp": "screens/029.webp"
+ }
+}

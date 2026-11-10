@@ -1,0 +1,533 @@
+{
+  "schema": "astaui.card/1",
+  "id": "assay-analyzer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:50:24Z"
+  },
+  "app": {
+    "title": "Assay Analyzer",
+    "summary": "The person first sets each assay's method in Settings: the calibration standard, wavelength, titrant strength, how much repeats may vary, and an optional reference sample or target range to compare against. On each assay's page they download a data-entry template, then upload a CSV or Excel file or type readings into an editable table. The app turns the readings into results by fitting a standard curve, applying a titration or weighing formula, or fitting a dose-response curve, and summarises the repeats with statistics. It shows warnings about data quality, comparison flags and charts, and every assay can be exported to one Excel report. A second path takes results that were already calculated and runs the same summaries and checks on them.",
+    "task": {
+      "text": "Turn raw bench readings from several laboratory assays into per-sample results with repeat statistics, quality warnings and reference checks, and export them as an auditable report.",
+      "verbs": [
+        "derive",
+        "summarize",
+        "compare",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Long-format tables of bench measurements, one row per reading: absorbances of standards, blanks and samples, titre volumes, weighed masses, or readings across a dilution series. Each sample is measured in repeats. Results that were already calculated can also be loaded as a table of value and unit.",
+      "item": "one bench reading (a cuvette absorbance, a titration or a weighing) of one repeat of one sample",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "calculating assay results from bench readings after the lab work, before writing up",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar switches between assay groups, a settings page, a page for already-calculated results and an overview. Each assay page runs in three numbered steps: what to measure, how to add readings, and the results. Readings uploaded or typed into the editable table are analysed straight away into summary metrics, a results table, colour-coded comparison flags, warnings and charts. The overview gathers every assay into one table and one Excel download.",
+      "views": [
+        "table view",
+        "form",
+        "summary stats",
+        "scatter plot",
+        "line chart",
+        "bar chart",
+        "small multiples"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "colorimetric, titrimetric and gravimetric bench assays with standard curves in food chemistry",
+      "disciplines": [
+        "food science"
+      ],
+      "terms": [
+        "standard curve",
+        "titration",
+        "antioxidant assays"
+      ]
+    },
+    "workflow": {
+      "name": "compute results from raw measurements by a fixed formula, check them, and report",
+      "steps": [
+        {
+          "step": "set the method parameters and comparison targets once",
+          "here": "Settings has a study tab (study name, SEM or SD, the CV limit for flagging repeats, the significance level) and a per-assay tab (calibration standard, equivalent label, wavelength, minimum R², titrant normality, IC50 method, and a reference sample or target range with its source). The settings are checked before saving",
+          "parts": [
+            "settings-page"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "each assay page lists the columns it needs and offers a template to download. Readings come in as a CSV or XLSX upload or are typed into an editable table and sent with 'Analyze these readings'. A sidebar switch loads synthetic or supplied example data instead",
+          "parts": [
+            "data-entry",
+            "sidebar-nav"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "it fits a linear standard curve after subtracting the blank, applies the titration or weighing formula, or fits IC50 three ways for a dilution series. It then gives mean ± SEM or SD per sample, with ANOVA/Tukey letters",
+          "parts": [
+            "assay-results"
+          ]
+        },
+        {
+          "step": "flag readings and samples that need attention",
+          "here": "it warns about a low standard-curve R², samples outside the standard range, repeats whose CV is above the limit (naming the repeat that deviates most), and readings below the detection limit, and counts the warnings in a metric",
+          "parts": [
+            "assay-results"
+          ]
+        },
+        {
+          "step": "compare each sample with a reference or a target range",
+          "here": "it compares sample means with a measured reference at the same dose or element, or with a target range in the same unit. Each sample gets a colour-coded flag (within target, below or above, no matching reference) and a suggested next step",
+          "parts": [
+            "comparison-checks"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "the Overview page counts assays, samples and warnings, and shows one 'Results at a glance' table across all assays, with the comparison checks of each assay",
+          "parts": [
+            "overview-report"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "it downloads an Excel workbook for one assay or for all of them. The workbook holds the calculation rows, the summaries, the warnings, the calibration and the settings used",
+          "parts": [
+            "assay-results",
+            "overview-report",
+            "calculated-results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "one registry of assays covers four kinds of calculation (standard curve, inhibition against a control, titration, gravimetric), and each assay group is a tab with the same three steps",
+        "readings below the detection limit are reported as ND, with the limit taken as 3 × SD of the blanks divided by the slope for each element, instead of as small invented numbers",
+        "a dilution series gives IC50 by logistic, interpolation and linear fits side by side, and IC50 is reported as a bound when 50% inhibition is never reached",
+        "a separate path accepts results that were already calculated and combines repeats only after the person confirms they are repeats, so no raw readings are invented",
+        "comparison flags are kept apart from significance tests, and a target range must carry the exact unit of the result and a recorded source"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar-nav",
+      "level": "view",
+      "parent": null,
+      "title": "Navigation and example-data switch",
+      "summary": "Moves between the overview, calculated results, each assay group and Settings, and switches between example data and the person's own readings.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 70,
+          "end": 80,
+          "role": "markup",
+          "anchor": "ff3d691b7681",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 83,
+          "end": 89,
+          "role": "logic",
+          "symbol": "load",
+          "anchor": "a98bd1d32a0b",
+          "first": "def load(key):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 431,
+          "end": 473,
+          "role": "logic",
+          "anchor": "dd5c1568c74c",
+          "first": "if page == \"Settings\":"
+        }
+      ]
+    },
+    {
+      "id": "settings-page",
+      "level": "view",
+      "parent": null,
+      "title": "Settings",
+      "summary": "Holds the study-wide reporting choices and, for each assay, the calibration, titration or fitting parameters and the reference or target-range comparison, checking them before they are saved.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 184,
+          "end": 271,
+          "role": "logic",
+          "symbol": "show_settings",
+          "anchor": "b327c0b08c18",
+          "first": "def show_settings():"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 28,
+          "end": 40,
+          "role": "data",
+          "symbol": "defaults",
+          "anchor": "daeb79d704ad",
+          "first": "def defaults(key):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 43,
+          "end": 47,
+          "role": "data",
+          "anchor": "f55feb05e747",
+          "first": "if \"preferences\" not in st.session_state:"
+        }
+      ]
+    },
+    {
+      "id": "assay-page",
+      "level": "view",
+      "parent": null,
+      "title": "Assay page",
+      "summary": "One tab per assay that explains the values to record and how to measure them, then takes readings and shows the results in three numbered steps.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 333,
+          "end": 384,
+          "role": "logic",
+          "symbol": "show_assay",
+          "anchor": "1965e522761f",
+          "first": "def show_assay(key):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 274,
+          "end": 284,
+          "role": "logic",
+          "symbol": "show_guidance",
+          "anchor": "a8fe54f0dc74",
+          "first": "def show_guidance(key):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 146,
+          "end": 181,
+          "role": "logic",
+          "symbol": "analyse",
+          "anchor": "b9721ca17b5d",
+          "first": "def analyse(key):"
+        },
+        {
+          "file": "code/src/assaykit/guidance.py",
+          "start": 114,
+          "end": 118,
+          "role": "data",
+          "symbol": "guide_for",
+          "anchor": "4b0c2fc158ba",
+          "first": "def guide_for(key: str) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "data-entry",
+      "level": "component",
+      "parent": "assay-page",
+      "title": "Add your readings",
+      "summary": "Offers a template for download, then takes a CSV or Excel upload or rows typed into an editable table, and lets the person clear an assay's readings.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 287,
+          "end": 313,
+          "role": "logic",
+          "symbol": "show_inputs",
+          "anchor": "71e34a86df16",
+          "first": "def show_inputs(key):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 50,
+          "end": 60,
+          "role": "logic",
+          "symbol": "store_upload",
+          "anchor": "e3262c4ec8e8",
+          "first": "def store_upload(key):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 63,
+          "end": 67,
+          "role": "logic",
+          "symbol": "remove_dataset",
+          "anchor": "f39642fe2f84",
+          "first": "def remove_dataset(key):"
+        },
+        {
+          "file": "code/src/assaykit/io.py",
+          "start": 11,
+          "end": 21,
+          "role": "logic",
+          "symbol": "read_table",
+          "anchor": "f55d381c2a16",
+          "first": "def read_table(source) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "assay-results",
+      "level": "component",
+      "parent": "assay-page",
+      "title": "Understand your results",
+      "summary": "Shows counts of samples, warnings and flags, the results table with its unit, the warnings, standard-curve and dose-response charts, the full calculation tables and a download of the assay's report.",
+      "views": [
+        "summary stats",
+        "table view",
+        "scatter plot",
+        "line chart",
+        "bar chart",
+        "small multiples"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 351,
+          "end": 384,
+          "role": "logic",
+          "anchor": "722ede864545",
+          "first": "st.subheader(\"3 · Understand your results\")"
+        },
+        {
+          "file": "code/src/assaykit/plots.py",
+          "start": 175,
+          "end": 220,
+          "role": "logic",
+          "symbol": "figures_for",
+          "anchor": "ea7f6f6fdf70",
+          "first": "def figures_for(res: AssayResult, err: str = \"sem\") -> dict[str, Figure]:"
+        },
+        {
+          "file": "code/src/assaykit/calibration.py",
+          "start": 118,
+          "end": 124,
+          "role": "logic",
+          "symbol": "analyze_curve_assay",
+          "anchor": "39d19e533aab",
+          "first": "def analyze_curve_assay("
+        },
+        {
+          "file": "code/src/assaykit/dpph.py",
+          "start": 39,
+          "end": 44,
+          "role": "logic",
+          "symbol": "analyze_dpph",
+          "anchor": "9985f067b2c5",
+          "first": "def analyze_dpph("
+        },
+        {
+          "file": "code/src/assaykit/report.py",
+          "start": 99,
+          "end": 164,
+          "role": "logic",
+          "symbol": "to_excel",
+          "anchor": "ab23a0c91425",
+          "first": "def to_excel(results: list[AssayResult], err: str = \"sem\") -> bytes:"
+        }
+      ]
+    },
+    {
+      "id": "comparison-checks",
+      "level": "component",
+      "parent": "assay-page",
+      "title": "Reference and target checks",
+      "summary": "Compares each sample's mean with a measured reference or a target range and shows colour-coded flags, each with a suggested next step.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 316,
+          "end": 330,
+          "role": "logic",
+          "symbol": "show_checks",
+          "anchor": "2873cff106bf",
+          "first": "def show_checks(result):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 326,
+          "end": 328,
+          "role": "style",
+          "symbol": "flag_style",
+          "anchor": "e124e7b75a73",
+          "first": "def flag_style(flag):"
+        },
+        {
+          "file": "code/src/assaykit/assessment.py",
+          "start": 9,
+          "end": 78,
+          "role": "logic",
+          "symbol": "assess_results",
+          "anchor": "24e5604c65f6",
+          "first": "def assess_results(result: AssayResult, config: dict) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "calculated-results",
+      "level": "view",
+      "parent": null,
+      "title": "Calculated results",
+      "summary": "Takes a table of results that were already calculated, combines confirmed repeats, and shows summaries, checks and source observations for each measurement, with a report download.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 387,
+          "end": 428,
+          "role": "logic",
+          "symbol": "show_calculated_page",
+          "anchor": "f5234b13bd83",
+          "first": "def show_calculated_page():"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 133,
+          "end": 143,
+          "role": "logic",
+          "symbol": "store_results_upload",
+          "anchor": "724372116f9e",
+          "first": "def store_results_upload():"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 99,
+          "end": 130,
+          "role": "logic",
+          "symbol": "_calculate_results",
+          "anchor": "8fec28c9ec9a",
+          "first": "def _calculate_results():"
+        },
+        {
+          "file": "code/src/assaykit/results_input.py",
+          "start": 12,
+          "end": 97,
+          "role": "logic",
+          "symbol": "analyze_result_table",
+          "anchor": "55410dd5b787",
+          "first": "def analyze_result_table(df: pd.DataFrame, combine_repeats: bool = False,"
+        }
+      ]
+    },
+    {
+      "id": "overview-report",
+      "level": "view",
+      "parent": null,
+      "title": "Overview & report",
+      "summary": "Gathers every assay that has results into headline counts, one combined results table and its comparison checks, and downloads them all as one Excel workbook.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 435,
+          "end": 466,
+          "role": "logic",
+          "anchor": "69936c5c5d85",
+          "first": "elif page == \"Overview & report\":"
+        },
+        {
+          "file": "code/src/assaykit/report.py",
+          "start": 28,
+          "end": 77,
+          "role": "logic",
+          "symbol": "overview",
+          "anchor": "e4358a6048d6",
+          "first": "def overview(results: list[AssayResult], err: str = \"sem\") -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/assaykit/report.py",
+          "start": 99,
+          "end": 164,
+          "role": "logic",
+          "symbol": "to_excel",
+          "anchor": "ab23a0c91425",
+          "first": "def to_excel(results: list[AssayResult], err: str = \"sem\") -> bytes:"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,819 @@
+{
+  "schema": "astaui.card/1",
+  "id": "storm-drainage-calc",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T03:24:10Z"
+  },
+  "app": {
+    "title": "Storm Drainage Calculation",
+    "summary": "A person brings in rainfall records in one of three ways: uploading or pasting a time series, fetching one from an online archive by coordinates, or pasting a ready table of annual maxima. They check that the records can be read and cover enough years, then take the annual maxima for each duration and fit an extreme-value distribution to get an intensity–duration–frequency table, which they adopt as the design table. Instead of raw records they can enter a published table or equation coefficients. They choose a time of concentration and a return period to read off a design intensity. They send that intensity into peak-flow, runoff-depth and design-storm calculators. A results dashboard sums up the key outputs, and the tables, charts and project are exported as CSV, PNG and a project file.",
+    "task": {
+      "text": "Derive a design rainfall intensity from rainfall records or published curves and carry it through standard runoff and peak-flow calculations for a preliminary drainage design.",
+      "verbs": [
+        "derive",
+        "summarize",
+        "clean"
+      ]
+    },
+    "data": {
+      "text": "Rainfall depth records over time, reduced to tables of annual maxima and intensity by duration and return period, plus lookup tables of reference coefficients and a library of named storm distributions.",
+      "item": "a rainfall reading at a timestamp, or a row of an intensity–duration–frequency table (one duration across return periods)",
+      "shapes": [
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "preliminary design calculations, from rainfall records to a design flow, before detailed sizing",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Pages in a side navigation follow the order of the calculation: a numbered wizard turns raw records into an adopted table, a design page reads a single design value off that table, and tabbed calculators take that value and plot and tabulate their own results. Each calculator writes a headline number to a results dashboard.",
+      "views": [
+        "form",
+        "table view",
+        "line chart",
+        "bar chart",
+        "list",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "filter",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "step by step wizard"
+      ]
+    },
+    "field": {
+      "text": "design-storm and peak-runoff calculations in stormwater engineering",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "stormwater hydrology",
+        "idf curves",
+        "rational method"
+      ]
+    },
+    "workflow": {
+      "name": "fit a frequency curve to records and carry a design value through a chain of calculations",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "upload or paste datetime,rain_mm rows or a Year×duration annual-max table, fetch hourly precipitation from Open-Meteo or NASA POWER by latitude/longitude and year range, or load a sample",
+          "parts": [
+            "raw-rainfall"
+          ]
+        },
+        {
+          "step": "check the data for problems before using it",
+          "here": "a quality check reports rows, years, maximum rainfall and a status; it warns when the record is short or when requested durations are shorter than the reading interval",
+          "parts": [
+            "raw-rainfall"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "rolling-window sums give each year's maximum depth per duration; a Gumbel frequency factor turns them into depths per return period, which are converted to mm/hr and adopted into the design table",
+          "parts": [
+            "annual-max-gumbel"
+          ]
+        },
+        {
+          "step": "read the design value off the fitted curve",
+          "here": "a table (intensity or depth converted to intensity) or Sherman/general a,b,c,d coefficients builds IDF curves on a log axis; I is interpolated at Tc for the chosen return period, snapping to the nearest return period in the table",
+          "parts": [
+            "idf-design"
+          ]
+        },
+        {
+          "step": "feed the value into the downstream calculations",
+          "here": "I is sent to the Rational Method (Q = C·I·A/360, in four flow units), alongside SCS curve-number runoff depth and a design-storm hyetograph built from a searchable pattern library",
+          "parts": [
+            "hydraulic-calcs",
+            "rational-method",
+            "cn-runoff",
+            "rainfall-designer"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "result cards show the maximum IDF intensity, the runoff depth, the number of hyetograph rows and the peak discharge, with a dash for anything not yet computed",
+          "parts": [
+            "results-dashboard"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "CSV for each module's table, PNG charts at a chosen resolution scale, and a saved project file that can be reopened",
+          "parts": [
+            "idf-design",
+            "hydraulic-calcs"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Durations shorter than the raw reading interval are dropped, with a warning that short durations can't be derived from coarser data",
+        "A published table can be entered as rainfall depth and is converted to intensity with I = depth × 60 / duration",
+        "Coefficients come from built-in reference tables (curve number by land use and soil group, runoff C by surface); a tag shows where each value came from, manual edits are marked, and a button resets the value to the table",
+        "A searchable library of about 90 named design-storm distributions, each with an explanation of its method and formulas",
+        "Right-to-left Arabic interface with English engineering variable names, and project metadata kept for report headers"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "raw-rainfall",
+      "level": "view",
+      "parent": null,
+      "title": "Raw rainfall data wizard",
+      "summary": "Numbered steps for location, source, data input and quality check that bring rainfall records in and confirm they can be read before any curve is fitted.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "step by step wizard"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 113,
+          "end": 220,
+          "role": "markup",
+          "symbol": "#rawRainfall",
+          "anchor": "fe900d1c6f5e",
+          "first": "<div class=\"page\" id=\"rawRainfall\">"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 118,
+          "end": 118,
+          "role": "style",
+          "symbol": ".rawProgress",
+          "anchor": "47c01c3f3b1b",
+          "first": ".rawProgress{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:12px 0 4px}"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 114,
+          "end": 114,
+          "role": "style",
+          "symbol": ".rawStepHeader",
+          "anchor": "d2e34374f2d8",
+          "first": ".rawStepHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 126,
+          "end": 126,
+          "role": "style",
+          "symbol": ".rawMiniStats",
+          "anchor": "6555286d4685",
+          "first": ".rawMiniStats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}.rawMiniStats .metric strong{font-"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 781,
+          "end": 786,
+          "role": "logic",
+          "symbol": "handleRawRainFile",
+          "anchor": "8e912afa9557",
+          "first": "function handleRawRainFile(event){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 814,
+          "end": 835,
+          "role": "logic",
+          "symbol": "fetchOnlineRainfallData",
+          "anchor": "1995fb025252",
+          "first": "async function fetchOnlineRainfallData(){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 804,
+          "end": 813,
+          "role": "logic",
+          "symbol": "buildRainfallSourceURL",
+          "anchor": "5b79f1150e97",
+          "first": "function buildRainfallSourceURL(){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 787,
+          "end": 803,
+          "role": "logic",
+          "symbol": "loadRawRainSample",
+          "anchor": "9f00f37f63f2",
+          "first": "function loadRawRainSample(){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 633,
+          "end": 664,
+          "role": "logic",
+          "symbol": "parseRawRainfallText",
+          "anchor": "5050619975ce",
+          "first": "function parseRawRainfallText(){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 669,
+          "end": 691,
+          "role": "logic",
+          "symbol": "validateRawRainfallUI",
+          "anchor": "5836c03684ec",
+          "first": "function validateRawRainfallUI(){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 545,
+          "end": 548,
+          "role": "logic",
+          "symbol": "updateRawWorkflowProgress",
+          "anchor": "846a5d85980b",
+          "first": "function updateRawWorkflowProgress(step=1){"
+        }
+      ]
+    },
+    {
+      "id": "annual-max-gumbel",
+      "level": "component",
+      "parent": "raw-rainfall",
+      "title": "Annual maxima and Gumbel IDF",
+      "summary": "Takes each year's maximum depth per duration, fits Gumbel depths per return period, shows both tables and adopts the result as the design intensity table.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 215,
+          "end": 218,
+          "role": "markup",
+          "anchor": "48cf81ecff8f",
+          "first": "<div class=\"grid col12\" style=\"grid-column:span 12\">"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 692,
+          "end": 715,
+          "role": "logic",
+          "symbol": "buildAnnualMaxFromTimeseries",
+          "anchor": "ec6d620e6b4a",
+          "first": "function buildAnnualMaxFromTimeseries(parsed){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 716,
+          "end": 724,
+          "role": "logic",
+          "symbol": "gumbelDepth",
+          "anchor": "1625672fe8b0",
+          "first": "function gumbelDepth(values,T){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 725,
+          "end": 737,
+          "role": "logic",
+          "symbol": "buildIDFFromAnnualMax",
+          "anchor": "a2b0a7defba6",
+          "first": "function buildIDFFromAnnualMax(annual){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 750,
+          "end": 765,
+          "role": "logic",
+          "symbol": "generateIDFFromRawRainfall",
+          "anchor": "0aaf9a98d08c",
+          "first": "function generateIDFFromRawRainfall(){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 766,
+          "end": 780,
+          "role": "logic",
+          "symbol": "adoptRawGeneratedIDF",
+          "anchor": "52c22695f2cd",
+          "first": "function adoptRawGeneratedIDF(){"
+        }
+      ]
+    },
+    {
+      "id": "idf-design",
+      "level": "view",
+      "parent": null,
+      "title": "IDF and design intensity",
+      "summary": "Builds IDF curves from a pasted table or equation coefficients and interpolates the design intensity at a chosen time of concentration and return period, then sends it on to the peak-flow calculation.",
+      "views": [
+        "form",
+        "line chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 221,
+          "end": 409,
+          "role": "markup",
+          "symbol": "#idfDesign",
+          "anchor": "171309316bc0",
+          "first": "<div class=\"page\" id=\"idfDesign\">"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 96,
+          "end": 96,
+          "role": "style",
+          "symbol": ".idfStatusBox",
+          "anchor": "c278ed3e6b74",
+          "first": ".idfStatusBox{margin-top:10px;padding:12px;border-radius:15px;background:var(--panel2);border:1px solid var(--line);colo"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 92,
+          "end": 92,
+          "role": "style",
+          "symbol": ".idfHelpGrid",
+          "anchor": "f754d9fc52ca",
+          "first": ".idfHelpGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 838,
+          "end": 844,
+          "role": "logic",
+          "symbol": "switchDesignMode",
+          "anchor": "6c9e8c76eb86",
+          "first": "function switchDesignMode(){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 850,
+          "end": 859,
+          "role": "logic",
+          "symbol": "handleDesignIDFFile",
+          "anchor": "ff243e266969",
+          "first": "function handleDesignIDFFile(event){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 867,
+          "end": 892,
+          "role": "logic",
+          "symbol": "parseDesignTable",
+          "anchor": "b55349a10272",
+          "first": "function parseDesignTable(silent=false){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 534,
+          "end": 542,
+          "role": "logic",
+          "symbol": "validateDesignTableUI",
+          "anchor": "1445028de48b",
+          "first": "function validateDesignTableUI(){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 893,
+          "end": 901,
+          "role": "logic",
+          "symbol": "parseDesignCoefficients",
+          "anchor": "6269764a5dae",
+          "first": "function parseDesignCoefficients(){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 938,
+          "end": 975,
+          "role": "logic",
+          "symbol": "calcDesignIDF",
+          "anchor": "9bfbd4f24cc8",
+          "first": "function calcDesignIDF(note=false){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 976,
+          "end": 983,
+          "role": "logic",
+          "symbol": "applyDesignIntensityToRunoff",
+          "anchor": "02e911160738",
+          "first": "function applyDesignIntensityToRunoff(){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 984,
+          "end": 991,
+          "role": "logic",
+          "symbol": "exportDesignIDFCSV",
+          "anchor": "639a6a910f30",
+          "first": "function exportDesignIDFCSV(){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 383,
+          "end": 396,
+          "role": "logic",
+          "symbol": "exportChartPNG",
+          "anchor": "ecf5d7f9bd67",
+          "first": "function exportChartPNG(canvasId,scaleSelectId,fileName){"
+        }
+      ]
+    },
+    {
+      "id": "hydraulic-calcs",
+      "level": "view",
+      "parent": null,
+      "title": "Hydraulic calculations",
+      "summary": "Tabs that switch between the method calculators. Each tab has its own inputs, chart, table and CSV export.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 410,
+          "end": 417,
+          "role": "markup",
+          "symbol": "#hydraulic",
+          "anchor": "0326e970c423",
+          "first": "<div class=\"page\" id=\"hydraulic\">"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 18,
+          "end": 18,
+          "role": "style",
+          "symbol": ".tabs",
+          "anchor": "9ee7e2bf1512",
+          "first": ".tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tabs button{padding:10px 13px;border-radius:999px;backgrou"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 3,
+          "end": 3,
+          "role": "data",
+          "symbol": "calcTabs",
+          "anchor": "a1216f16b2cb",
+          "first": "const calcTabs=[['idfPage','IDF'],['cnPage','CN'],['rainfallPage','Rainfall Designer'],['runoffPage','Rational Method']]"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 14,
+          "end": 14,
+          "role": "logic",
+          "symbol": "buildCalcTabs",
+          "anchor": "ef6e3531850a",
+          "first": "function buildCalcTabs(){const t=$('calcTabs');t.innerHTML='';calcTabs.forEach((x,i)=>{const b=document.createElement('b"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 16,
+          "end": 16,
+          "role": "logic",
+          "symbol": "showCalc",
+          "anchor": "ba55120640b4",
+          "first": "function showCalc(id){document.querySelectorAll('.calcPage').forEach(p=>p.classList.remove('active'));$(id).classList.ad"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 1026,
+          "end": 1026,
+          "role": "logic",
+          "symbol": "exportCSV",
+          "anchor": "66e0feccb0f6",
+          "first": "function exportCSV(type){let rows=[],heads=[];if(type==='idf'){heads=['Duration','Intensity','Depth'];rows=data.idf}else"
+        }
+      ]
+    },
+    {
+      "id": "rational-method",
+      "level": "component",
+      "parent": "hydraulic-calcs",
+      "title": "Rational Method peak discharge",
+      "summary": "Computes peak discharge from a runoff coefficient, the design intensity and the catchment area, with C taken from a surface-type table or entered by hand.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 416,
+          "end": 416,
+          "role": "markup",
+          "symbol": "#runoffPage",
+          "anchor": "0d052c2aa5a9",
+          "first": "<div class=\"calcPage\" id=\"runoffPage\"><div class=\"grid\"><div class=\"card col5\"><h3 data-i=\"runoffTitle\">Rational Method "
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 6,
+          "end": 6,
+          "role": "data",
+          "symbol": "runoffC",
+          "anchor": "57e2eda4e115",
+          "first": "const runoffC={'Concrete':.85,'Asphalt':.85,'Roof':.85,'Lawn (Sandy, Flat)':.08,'Lawn (Sandy, Steep)':.12,'Lawn (Clay, F"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 43,
+          "end": 43,
+          "role": "logic",
+          "symbol": "updateRunoffC",
+          "anchor": "f05da8d8d661",
+          "first": "function updateRunoffC(){let v=getRunoffTableValue(); if(v!=null){$('run_c').value=v; setValueSource('runCSource','من جد"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 44,
+          "end": 44,
+          "role": "logic",
+          "symbol": "resetRunoffCToTable",
+          "anchor": "904f7844b472",
+          "first": "function resetRunoffCToTable(){let v=getRunoffTableValue(); if(v!=null){updateRunoffC(); calcRunoff(); toast(lang==='ar'"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 229,
+          "end": 232,
+          "role": "logic",
+          "symbol": "markManual",
+          "anchor": "822ca8fcde14",
+          "first": "function markManual(inputId){"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 52,
+          "end": 52,
+          "role": "logic",
+          "symbol": "calcRunoff",
+          "anchor": "decede92a903",
+          "first": "function calcRunoff(){const c=val('run_c'),I=val('run_i'),A=val('run_a'),q=c*I*A/360;const d={c,I,A,qcms:q,qlps:q*1000,q"
+        }
+      ]
+    },
+    {
+      "id": "cn-runoff",
+      "level": "component",
+      "parent": "hydraulic-calcs",
+      "title": "SCS curve-number runoff",
+      "summary": "Estimates runoff depth from rainfall depth using a curve number looked up by land use and soil group, adjusted for antecedent moisture, and plots runoff against rainfall.",
+      "views": [
+        "form",
+        "line chart"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 414,
+          "end": 414,
+          "role": "markup",
+          "symbol": "#cnPage",
+          "anchor": "b00b3f98662a",
+          "first": "<div class=\"calcPage\" id=\"cnPage\"><div class=\"grid\"><div class=\"card col4\"><h3 data-i=\"cnTitle\">طريقة CN</h3><div class="
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 5,
+          "end": 5,
+          "role": "data",
+          "symbol": "cnData",
+          "anchor": "ad240f6f2070",
+          "first": "const cnData={'Residential (1/8 ac)':{A:77,B:85,C:90,D:92},'Residential (1/4 ac)':{A:61,B:75,C:83,D:87},'Residential (1/"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 40,
+          "end": 40,
+          "role": "logic",
+          "symbol": "updateCN",
+          "anchor": "fa12e141bda3",
+          "first": "function updateCN(){const v=getCNTableValue(); if(v!=null){$('cn_value').value=v; setValueSource('cnSource','من جدول SCS"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 41,
+          "end": 41,
+          "role": "logic",
+          "symbol": "resetCNToTable",
+          "anchor": "32d3f9fdec0e",
+          "first": "function resetCNToTable(){updateCN(); calcCN(); toast(lang==='ar'?'تمت إعادة CN لقيمة الجدول الافتراضي':'CN reset to tab"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 47,
+          "end": 47,
+          "role": "logic",
+          "symbol": "runoffCN",
+          "anchor": "c1635016d140",
+          "first": "function runoffCN(P,cn,amc,ratio){const adj=adjustCN(cn,amc),S=25400/adj-254,Ia=ratio*S;if(P<=Ia)return {q:0,S,Ia,net:0,"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 48,
+          "end": 48,
+          "role": "logic",
+          "symbol": "calcCN",
+          "anchor": "ff62c62526fd",
+          "first": "function calcCN(){const cn=val('cn_value'),P=val('cn_rain'),amc=$('cn_amc').value,ratio=val('cn_ia'),r=runoffCN(P,cn,amc"
+        }
+      ]
+    },
+    {
+      "id": "rainfall-designer",
+      "level": "component",
+      "parent": "hydraulic-calcs",
+      "title": "Rainfall designer",
+      "summary": "Spreads a total rainfall depth over a storm duration using a pattern picked from a searchable library, and shows the result as a mass curve, a cumulative depth, a hyetograph or both together.",
+      "views": [
+        "list",
+        "line chart",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "search",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 415,
+          "end": 415,
+          "role": "markup",
+          "symbol": "#rainfallPage",
+          "anchor": "20d8a980ab82",
+          "first": "<div class=\"calcPage\" id=\"rainfallPage\"><div class=\"grid\"><div class=\"card col4\"><h3>Rainfall Designer</h3><p class=\"mut"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 61,
+          "end": 61,
+          "role": "style",
+          "symbol": ".libraryBox",
+          "anchor": "74fd8c3a23a9",
+          "first": ".libraryBox{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:18px;background:var(--panel2);padd"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 54,
+          "end": 56,
+          "role": "data",
+          "symbol": "unitIntensityLibrary",
+          "anchor": "8ebdb602eef0",
+          "first": "const unitIntensityLibrary = ["
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 57,
+          "end": 57,
+          "role": "logic",
+          "symbol": "renderRainLibrary",
+          "anchor": "36c153cef34b",
+          "first": "function renderRainLibrary(q=''){const box=$('rainLibrary'); if(!box)return; q=(q||'').toLowerCase(); const items=unitIn"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 58,
+          "end": 58,
+          "role": "logic",
+          "symbol": "selectRainPattern",
+          "anchor": "12a934ae1482",
+          "first": "function selectRainPattern(name){$('rain_pattern').value=name; const d=durationFromName(name); if(d){$('rain_duration')."
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 117,
+          "end": 117,
+          "role": "logic",
+          "symbol": "calcRainfall",
+          "anchor": "80d091b11aab",
+          "first": "function calcRainfall(){if(!$('rainTable'))return; const P=val('rain_depth'),dur=val('rain_duration'),dtMin=val('rain_dt"
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 118,
+          "end": 122,
+          "role": "logic",
+          "symbol": "displayRainChart",
+          "anchor": "320660117ee9",
+          "first": "function displayRainChart(){if(!data.rain?.length||!$('rainChart'))return; const mode=$('rain_chart_mode').value,x=data."
+        },
+        {
+          "file": "code/assets/js/app.js",
+          "start": 112,
+          "end": 116,
+          "role": "logic",
+          "symbol": "updateRainMethodInfo",
+          "anchor": "1d411c5ac8c7",
+          "first": "function updateRainMethodInfo(pattern){"
+        }
+      ]
+    },
+    {
+      "id": "results-dashboard",
+      "level": "view",
+      "parent": null,
+      "title": "Results dashboard",
+      "summary": "Shows the headline output of each calculation on its own card, with what the value means and what it is used for, so the set can be checked before it is approved or printed.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 45,
+          "end": 92,
+          "role": "markup",
+          "symbol": "#dashboard",
+          "anchor": "db7aefb686d9",
+          "first": "<div class=\"page active\" id=\"dashboard\">"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 24,
+          "end": 24,
+          "role": "style",
+          "symbol": ".resultsGrid",
+          "anchor": "c6cc684ad20e",
+          "first": ".resultsGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 25,
+          "end": 25,
+          "role": "style",
+          "symbol": ".resultCard",
+          "anchor": "4b44fbee5d19",
+          "first": ".resultCard{position:relative;overflow:hidden;padding:20px;border-radius:var(--radius);background:linear-gradient(180deg"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 30,
+          "end": 30,
+          "role": "style",
+          "symbol": ".resultValue",
+          "anchor": "ee2c456fc4e6",
+          "first": ".resultValue{font-size:32px;font-weight:900;letter-spacing:.2px;margin:8px 0 12px;color:var(--text)}"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "patterns",
+      "term": "step by step wizard"
+    }
+  ]
+}

@@ -1,0 +1,441 @@
+{
+  "schema": "astaui.card/1",
+  "id": "primerchecklite",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:59:58Z"
+  },
+  "app": {
+    "title": "PrimerCheck Lite",
+    "summary": "A person sets the reaction chemistry, then pastes a forward and reverse primer and, if they have one, a template sequence. They set a minimum, a maximum, both or neither for each screening metric and run the analysis. They read headline melting temperatures and a warning count, a per-primer table that marks each metric as within range or needing review, a list of warnings, and an exact-match check for one product on the template. They then download the results as JSON or HTML, together with the limits they used.",
+    "task": {
+      "text": "Screen an existing primer pair against limits the person sets, so they know which sequence and thermodynamic values need a closer look before bench work.",
+      "verbs": [
+        "derive",
+        "review",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Two short DNA sequences (a primer pair), an optional longer template sequence, reaction-condition settings, and a set of editable acceptance ranges per metric; the output is a table of computed metrics with a status for each, plus warnings.",
+      "item": "a forward and reverse primer pair, written 5′ to 3′",
+      "shapes": [
+        "sequence",
+        "table",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "checking an existing primer pair before ordering or running PCR at the bench",
+      "terms": [
+        "review",
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar and form inputs (chemistry, sequences, per-metric ranges) feed one analyze action. Its result is split into headline metric cards and tabs for per-primer tables, review warnings, the template check and report downloads. Every metric is judged against the editable ranges.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view",
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "rubric"
+      ]
+    },
+    "field": {
+      "text": "in silico PCR and qRT-PCR primer screening in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "molecular biology",
+        "primer design",
+        "qpcr"
+      ]
+    },
+    "workflow": {
+      "name": "check a candidate against configurable acceptance limits and export a report",
+      "steps": [
+        {
+          "step": "set the conditions the computation depends on",
+          "here": "Sidebar number inputs for monovalent salt, magnesium, dNTP and primer concentration feed the Primer3 melting-temperature and structure estimates",
+          "parts": [
+            "assay-conditions"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "Paste the forward and reverse primers 5′ to 3′, and optionally a template in FASTA format; headers and spaces are stripped, U becomes T, and non-ACGT characters are rejected",
+          "parts": [
+            "primer-entry"
+          ]
+        },
+        {
+          "step": "set the acceptance criteria",
+          "here": "For every metric, tick 'Set minimum' and/or 'Set maximum' and type the limit, starting from teaching defaults; an error appears if the minimum is above the maximum",
+          "parts": [
+            "threshold-editor"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Analyze primer pair' computes length, GC %, Tm, hairpin, homodimer and heterodimer Tm, longest homopolymer, 3′-end GC count and the Tm difference",
+          "parts": [
+            "screening-results",
+            "primer-details"
+          ]
+        },
+        {
+          "step": "flag the values outside the limits",
+          "here": "Each metric is marked 'Within range' or 'Review'; a warnings tab lists every out-of-range value along with its configured range, and a card shows the warning count",
+          "parts": [
+            "primer-details",
+            "review-warnings",
+            "screening-results"
+          ]
+        },
+        {
+          "step": "check the pair against a reference",
+          "here": "Searches the template for the forward primer and the reverse complement of the reverse primer facing inward; reports a unique product with its coordinates and length, no product, or several (ambiguous)",
+          "parts": [
+            "template-check"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download a JSON report, a standalone HTML report, and the threshold settings as JSON",
+          "parts": [
+            "report-downloads"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Thermodynamic estimates depend on reaction chemistry the person enters, so the same primers can score differently under different buffers",
+        "Metrics are judged per primer and also for the pair (heterodimer Tm and Tm difference between the two primers)",
+        "Each limit can be a minimum, a maximum, both or neither, and a value out of range is presented as 'needs review', not as a failure",
+        "The template check uses exact matching in an inward-facing orientation and is explicitly not a genome-wide specificity search",
+        "The limits used are exported separately, so they can be recorded alongside the experiment"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "assay-conditions",
+      "level": "view",
+      "parent": null,
+      "title": "Assay conditions",
+      "summary": "A sidebar where the person enters the salt, magnesium, dNTP and primer concentrations that the melting-temperature estimates use.",
+      "views": [
+        "form"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 42,
+          "end": 53,
+          "role": "markup",
+          "anchor": "c2a4c635f678",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/src/primerchecklite/core.py",
+          "start": 64,
+          "end": 73,
+          "role": "logic",
+          "symbol": "_tm",
+          "anchor": "9cc7af88af1b",
+          "first": "def _tm(sequence: str, settings: dict[str, float]) -> float:"
+        },
+        {
+          "file": "code/src/primerchecklite/core.py",
+          "start": 103,
+          "end": 104,
+          "role": "data",
+          "symbol": "default_settings",
+          "anchor": "ef33dd725788",
+          "first": "def default_settings() -> dict[str, float]:"
+        }
+      ]
+    },
+    {
+      "id": "primer-entry",
+      "level": "view",
+      "parent": null,
+      "title": "Enter your primers",
+      "summary": "Side-by-side paste boxes for the forward and reverse primers, plus an optional expander for a template sequence, all cleaned of headers and spaces.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 55,
+          "end": 67,
+          "role": "markup",
+          "anchor": "a20f8bb6296b",
+          "first": "left, right = st.columns(2, gap=\"large\")"
+        },
+        {
+          "file": "code/src/primerchecklite/core.py",
+          "start": 39,
+          "end": 51,
+          "role": "logic",
+          "symbol": "normalize_sequence",
+          "anchor": "0de831437787",
+          "first": "def normalize_sequence(sequence: str) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "threshold-editor",
+      "level": "view",
+      "parent": null,
+      "title": "Acceptable ranges for every screening metric",
+      "summary": "A card for every metric, showing its description and unit, where the person turns a minimum and a maximum on or off and edits them.",
+      "views": [
+        "form"
+      ],
+      "interactions": [],
+      "patterns": [
+        "rubric"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 68,
+          "end": 97,
+          "role": "markup",
+          "anchor": "87b4567f89a4",
+          "first": "with st.expander(\"3. Set acceptable ranges for every screening metric\", expanded=True):"
+        },
+        {
+          "file": "code/src/primerchecklite/core.py",
+          "start": 19,
+          "end": 23,
+          "role": "data",
+          "symbol": "Threshold",
+          "anchor": "1e9169d06610",
+          "first": "class Threshold:"
+        },
+        {
+          "file": "code/src/primerchecklite/core.py",
+          "start": 26,
+          "end": 36,
+          "role": "data",
+          "anchor": "ba2361e85c1f",
+          "first": "DEFAULT_THRESHOLDS: dict[str, Threshold] = {"
+        }
+      ]
+    },
+    {
+      "id": "screening-results",
+      "level": "view",
+      "parent": null,
+      "title": "Screening results",
+      "summary": "Runs the analysis on the button press, then shows the forward Tm, reverse Tm, Tm difference and warning count as metric cards above the result tabs.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 99,
+          "end": 120,
+          "role": "logic",
+          "anchor": "58a2041bb4d0",
+          "first": "run = st.button(\"Analyze primer pair\", type=\"primary\", use_container_width=True)"
+        },
+        {
+          "file": "code/app.py",
+          "start": 153,
+          "end": 158,
+          "role": "markup",
+          "anchor": "fa6876a75146",
+          "first": "with st.expander(\"Read before using the results\"):"
+        },
+        {
+          "file": "code/src/primerchecklite/core.py",
+          "start": 158,
+          "end": 165,
+          "role": "logic",
+          "symbol": "analyze_pair",
+          "anchor": "8eb25e1cb486",
+          "first": "def analyze_pair("
+        },
+        {
+          "file": "code/src/primerchecklite/core.py",
+          "start": 76,
+          "end": 100,
+          "role": "logic",
+          "symbol": "analyze_primer",
+          "anchor": "ca06767ffc52",
+          "first": "def analyze_primer(sequence: str, settings: dict[str, float] | None = None) -> dict[str, Any]:"
+        }
+      ]
+    },
+    {
+      "id": "primer-details",
+      "level": "component",
+      "parent": "screening-results",
+      "title": "Primer details",
+      "summary": "For each primer, shows its sequence and a table of every metric with value, unit and a 'Within range' or 'Review' status.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "rubric"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 121,
+          "end": 133,
+          "role": "markup",
+          "anchor": "b2a569473771",
+          "first": "with tab1:"
+        },
+        {
+          "file": "code/src/primerchecklite/core.py",
+          "start": 120,
+          "end": 127,
+          "role": "logic",
+          "symbol": "_add_status",
+          "anchor": "fa8cdd626a26",
+          "first": "def _add_status(metrics: dict[str, Any], thresholds: dict[str, dict[str, Any]]) -> dict[str, Any]:"
+        },
+        {
+          "file": "code/src/primerchecklite/core.py",
+          "start": 111,
+          "end": 117,
+          "role": "logic",
+          "symbol": "evaluate_value",
+          "anchor": "ea1e99d7e6f9",
+          "first": "def evaluate_value(value: float, threshold: dict[str, Any]) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "review-warnings",
+      "level": "component",
+      "parent": "screening-results",
+      "title": "What needs review",
+      "summary": "Lists every value outside the configured range, together with its limits, or shows a cautious all-clear message, along with an explanation of why each parameter matters.",
+      "views": [
+        "list"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 134,
+          "end": 142,
+          "role": "markup",
+          "anchor": "bb57a1e7b79f",
+          "first": "with tab2:"
+        },
+        {
+          "file": "code/src/primerchecklite/core.py",
+          "start": 182,
+          "end": 191,
+          "role": "logic",
+          "anchor": "c5a2a14099b1",
+          "first": "warnings = []"
+        }
+      ]
+    },
+    {
+      "id": "template-check",
+      "level": "component",
+      "parent": "screening-results",
+      "title": "Template check",
+      "summary": "Reports whether the template has one exact inward-facing product, none, or several, with the product's coordinates and length.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 143,
+          "end": 148,
+          "role": "markup",
+          "anchor": "261bc81a67e4",
+          "first": "with tab3:"
+        },
+        {
+          "file": "code/src/primerchecklite/core.py",
+          "start": 130,
+          "end": 155,
+          "role": "logic",
+          "symbol": "find_amplicon",
+          "anchor": "5b5b96deaf07",
+          "first": "def find_amplicon(template: str, forward: str, reverse: str,"
+        }
+      ]
+    },
+    {
+      "id": "report-downloads",
+      "level": "component",
+      "parent": "screening-results",
+      "title": "Download reports",
+      "summary": "Saves the full result as JSON or a standalone HTML report, and saves the threshold settings as JSON for the experiment record.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 149,
+          "end": 152,
+          "role": "markup",
+          "anchor": "445da0cc37bd",
+          "first": "with tab4:"
+        },
+        {
+          "file": "code/src/primerchecklite/reporting.py",
+          "start": 10,
+          "end": 11,
+          "role": "logic",
+          "symbol": "to_json",
+          "anchor": "afbcc698db53",
+          "first": "def to_json(result: dict[str, Any]) -> str:"
+        },
+        {
+          "file": "code/src/primerchecklite/reporting.py",
+          "start": 18,
+          "end": 33,
+          "role": "logic",
+          "symbol": "to_html",
+          "anchor": "0d4d09ae1861",
+          "first": "def to_html(result: dict[str, Any]) -> str:"
+        }
+      ]
+    }
+  ]
+}

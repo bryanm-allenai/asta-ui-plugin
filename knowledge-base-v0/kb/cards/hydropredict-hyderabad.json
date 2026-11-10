@@ -1,0 +1,445 @@
+{
+  "schema": "astaui.card/1",
+  "id": "hydropredict-hyderabad",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T15:58:09Z"
+  },
+  "app": {
+    "title": "HydroPredict Hyderabad – station water-balance exploration and forecasting",
+    "summary": "A person picks a monitoring station from a network loaded from a workbook, then looks over every station on a map and in a summary table. For the chosen station they read its rainfall, evaporation and cumulative water balance over time. They choose a variable, a horizon, a context window and a forecast strategy, then run a forecast. Before the forecast is shown, the foundation model, a seasonal baseline and a persistence baseline are each scored on a recent holdout, and the person gets a forecast with an uncertainty band plus a table comparing the methods. A live 10-day weather forecast for the station's coordinates is shown alongside for short-range context.",
+    "task": {
+      "text": "Explore daily rainfall, evaporation and water-balance records across a network of stations, and forecast one station's variable ahead after checking candidate methods against a recent holdout.",
+      "verbs": [
+        "derive",
+        "explore",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Daily weather records (rainfall, evaporation, max and min temperature) for a small network of stations with coordinates, plus derived net and cumulative water balance and a fetched 10-day weather forecast.",
+      "item": "a station's daily record of one hydrological variable",
+      "shapes": [
+        "time series",
+        "geospatial",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "exploring station hydrology records and forecasting ahead from them",
+      "terms": [
+        "analyze",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls choose the station, variable and forecast settings, and every tab redraws for that choice: a map and table summarize the whole network, line charts show the station's history, and a button runs a holdout backtest and forecast whose method scores, ensemble weights and band are shown together. A separate tab fetches a live weather forecast for the same station's coordinates.",
+      "views": [
+        "map",
+        "line chart",
+        "bar chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail",
+        "toggle view",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "time-series forecasting of station water balance in hydrology",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "hydrology",
+        "water balance",
+        "time series forecasting"
+      ]
+    },
+    "workflow": {
+      "name": "forecast a series ahead after scoring candidate methods on a recent holdout",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A bundled workbook with one sheet per station is loaded at start, and net water balance (rainfall minus evaporation) and its running total are computed for each station.",
+          "parts": [
+            "network-overview"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A map plots every station, coloured and sized by its ending cumulative water balance, above a network table of totals and averages per station.",
+          "parts": [
+            "network-overview"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Selecting a station in the sidebar fills metric cards and draws 30-day rolling rainfall against evaporation, plus the cumulative water balance as a storage-trend proxy.",
+          "parts": [
+            "forecast-controls",
+            "station-history"
+          ]
+        },
+        {
+          "step": "choose what to compute and how",
+          "here": "Sliders set the prediction horizon and historical context window, and dropdowns choose the variable and the strategy: weighted ensemble, foundation model only, best recent MAE, seasonal or persistence.",
+          "parts": [
+            "forecast-controls"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run Forecast & Backtest holds out the most recent days, scores each candidate method on them, weights the ensemble by inverse MAE with bias correction, and plots the forecast with a 10th–90th percentile band and a table of values.",
+          "parts": [
+            "forecast-view"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "A backtest table sets the methods against each other on MAE, RMSE, bias and horizon-sum error, next to the best recent method and the ensemble weights.",
+          "parts": [
+            "backtest-comparison"
+          ]
+        },
+        {
+          "step": "set the result against outside context",
+          "here": "A live 10-day ECMWF forecast for the station's coordinates is shown as rain bars and temperature lines, with expected rainfall totals and a rule-based recharge outlook.",
+          "parts": [
+            "weather-context"
+          ]
+        }
+      ],
+      "distinctive": [
+        "A foundation model is used zero-shot and is always scored against seasonal-climatology and persistence baselines on a recent holdout before its forecast is trusted.",
+        "Error is reported as horizon-total error as well as daily error, because water balance accumulates, so a forecast can do well day by day and still get the total wrong.",
+        "Cumulative rainfall minus evaporation is used as a stand-in for groundwater storage, since the data has no measured water-table depth.",
+        "Forecasts are clipped at zero when the history is never negative, and bands for non-model strategies come from the holdout residuals."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "forecast-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Station and forecast settings sidebar",
+      "summary": "Chooses the station, the variable to forecast, the horizon, the context window and the forecast strategy that every tab uses.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 117,
+          "end": 187,
+          "role": "markup",
+          "anchor": "65ecdb61bcc9",
+          "first": "# ----------------- SIDEBAR -----------------"
+        },
+        {
+          "file": "code/data_loader.py",
+          "start": 9,
+          "end": 16,
+          "role": "data",
+          "anchor": "39e0e8917c72",
+          "first": "STATION_METADATA = {"
+        }
+      ]
+    },
+    {
+      "id": "network-overview",
+      "level": "view",
+      "parent": null,
+      "title": "Overview & geospatial map",
+      "summary": "Shows every station on a map coloured by ending water balance, with metric cards for the selected station and a network summary table.",
+      "views": [
+        "map",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 208,
+          "end": 296,
+          "role": "markup",
+          "anchor": "05f385cfb14d",
+          "first": "# ================= TAB 1: OVERVIEW & MAP ================="
+        },
+        {
+          "file": "code/app.py",
+          "start": 48,
+          "end": 91,
+          "role": "style",
+          "anchor": "feab23964093",
+          "first": "# Custom CSS for Premium Glassmorphism and Styling"
+        },
+        {
+          "file": "code/app.py",
+          "start": 105,
+          "end": 108,
+          "role": "logic",
+          "symbol": "get_dataset",
+          "anchor": "1cef895ff555",
+          "first": "def get_dataset():"
+        },
+        {
+          "file": "code/data_loader.py",
+          "start": 48,
+          "end": 61,
+          "role": "logic",
+          "symbol": "load_all_stations",
+          "anchor": "1a849ce57cbe",
+          "first": "def load_all_stations() -> dict:"
+        },
+        {
+          "file": "code/data_loader.py",
+          "start": 63,
+          "end": 83,
+          "role": "logic",
+          "symbol": "get_station_summary",
+          "anchor": "8a894b1d8b05",
+          "first": "def get_station_summary(all_data: dict) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "station-history",
+      "level": "view",
+      "parent": null,
+      "title": "Historical hydrology & storage",
+      "summary": "Plots the selected station's 30-day rolling rainfall against evaporation, and its cumulative net water balance as a storage-trend proxy.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 298,
+          "end": 347,
+          "role": "markup",
+          "anchor": "a131cf05d387",
+          "first": "# ================= TAB 2: HISTORICAL HYDROLOGY ================="
+        },
+        {
+          "file": "code/data_loader.py",
+          "start": 18,
+          "end": 46,
+          "role": "logic",
+          "symbol": "load_station_data",
+          "anchor": "7ee111c9516a",
+          "first": "def load_station_data(station_id: str) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "forecast-view",
+      "level": "view",
+      "parent": null,
+      "title": "Forecasting with recent validation",
+      "summary": "Runs the candidate forecasts with a holdout backtest on demand, then plots the chosen method's forecast with a percentile band after the history and lists the forecast values.",
+      "views": [
+        "line chart",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 349,
+          "end": 460,
+          "role": "markup",
+          "anchor": "f169e093083f",
+          "first": "# ================= TAB 3: TIMESFM FORECASTING ================="
+        },
+        {
+          "file": "code/app.py",
+          "start": 487,
+          "end": 502,
+          "role": "markup",
+          "anchor": "c3b0d1c56fa4",
+          "first": "st.markdown(\"<div class='section-title'>Forecast Data Table</div>\", unsafe_allow_html=True)"
+        },
+        {
+          "file": "code/app.py",
+          "start": 96,
+          "end": 101,
+          "role": "logic",
+          "symbol": "get_forecaster",
+          "anchor": "2e941a60e378",
+          "first": "def get_forecaster():"
+        },
+        {
+          "file": "code/forecast_engine.py",
+          "start": 61,
+          "end": 309,
+          "role": "logic",
+          "symbol": "TimesFMForecaster",
+          "anchor": "b928e209f510",
+          "first": "class TimesFMForecaster:"
+        },
+        {
+          "file": "code/forecast_engine.py",
+          "start": 185,
+          "end": 192,
+          "role": "logic",
+          "symbol": "forecast_with_validation",
+          "anchor": "a7ef3e7095c0",
+          "first": "def forecast_with_validation("
+        },
+        {
+          "file": "code/forecast_engine.py",
+          "start": 28,
+          "end": 32,
+          "role": "logic",
+          "symbol": "seasonal_climatology_forecast",
+          "anchor": "99404f47d185",
+          "first": "def seasonal_climatology_forecast("
+        },
+        {
+          "file": "code/forecast_engine.py",
+          "start": 22,
+          "end": 25,
+          "role": "logic",
+          "symbol": "persistence_forecast",
+          "anchor": "6738da9491f3",
+          "first": "def persistence_forecast(history: np.ndarray, horizon: int) -> np.ndarray:"
+        }
+      ]
+    },
+    {
+      "id": "backtest-comparison",
+      "level": "component",
+      "parent": "forecast-view",
+      "title": "Recent backtest comparison",
+      "summary": "Compares each candidate method on the holdout window by MAE, RMSE, bias and horizon-sum error, and shows the ensemble weights.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 404,
+          "end": 422,
+          "role": "markup",
+          "anchor": "64e6601c486f",
+          "first": "col_method, col_best, col_window = st.columns(3)"
+        },
+        {
+          "file": "code/app.py",
+          "start": 461,
+          "end": 485,
+          "role": "markup",
+          "anchor": "4f41cbfb9644",
+          "first": "if forecast_results.get('validation_metrics'):"
+        },
+        {
+          "file": "code/forecast_engine.py",
+          "start": 7,
+          "end": 19,
+          "role": "logic",
+          "symbol": "calculate_metrics",
+          "anchor": "41b570474604",
+          "first": "def calculate_metrics(actual: np.ndarray, predicted: np.ndarray) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "weather-context",
+      "level": "view",
+      "parent": null,
+      "title": "10-day weather forecast",
+      "summary": "Fetches a live 10-day precipitation and temperature forecast for the station's coordinates, with totals, a rule-based recharge outlook and a data table.",
+      "views": [
+        "bar chart",
+        "line chart",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 504,
+          "end": 638,
+          "role": "markup",
+          "anchor": "7c8a78c644f9",
+          "first": "# ================= TAB 4: ECMWF WEATHER FORECAST ================="
+        },
+        {
+          "file": "code/app.py",
+          "start": 14,
+          "end": 37,
+          "role": "logic",
+          "symbol": "fetch_weather_forecast",
+          "anchor": "074c98ab1064",
+          "first": "def fetch_weather_forecast(lat: float, lon: float):"
+        }
+      ]
+    },
+    {
+      "id": "hydrology-notes",
+      "level": "view",
+      "parent": null,
+      "title": "Hydrological insights",
+      "summary": "Gives a static written account of seasonal recharge and how the stations differ, to help read the charts.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 640,
+          "end": 660,
+          "role": "markup",
+          "anchor": "9c7734f267ee",
+          "first": "# ================= TAB 5: HYDROLOGICAL INSIGHTS ================="
+        }
+      ]
+    }
+  ]
+}

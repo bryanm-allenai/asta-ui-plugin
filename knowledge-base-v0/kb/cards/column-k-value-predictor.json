@@ -1,0 +1,529 @@
+{
+  "schema": "astaui.card/1",
+  "id": "column-k-value-predictor",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T16:56:13Z"
+  },
+  "app": {
+    "title": "K 值预测平台 (K-value prediction platform)",
+    "summary": "A person enters a compound structure as SMILES and the parts of a four-solvent mixture, and gets a predicted partition coefficient K, both raw and calibrated. For many compounds they upload a CSV or XLSX built from a downloadable template, get a prediction for every row with a count of rows that failed, and download the results. For one compound they can type or upload a few measured ratio–K points to correct the model, see the error before and after the correction, predict K at chosen ratios, and get a ranked list of solvent ratios close to a target K that leaves out ratios already tried or failed. The result is exported as a workbook. A separate tab shows how well the trained models perform.",
+    "task": {
+      "text": "Predict how a compound will partition across a four-solvent mixture, correct the prediction with a few measurements, and choose solvent ratios that give a target partition coefficient.",
+      "verbs": [
+        "derive",
+        "decide",
+        "plan",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "Tables of compounds given as SMILES strings, each paired with a four-part solvent ratio and, where it was measured, a partition coefficient K. Model outputs and evaluation tables are loaded from training artifacts.",
+      "item": "a compound at one solvent ratio, with its measured or predicted K",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "choosing a solvent system for a separation before running it, using a trained property model",
+      "terms": [
+        "plan",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "Tabs split the work. One gives an overview of the training data. Forms predict K for one compound or for an uploaded batch. A calibration tab combines an editable table of measured points with target and exclusion fields, then shows error metrics before and after correction plus tables of predictions and recommendations, all downloadable. An analysis tab compares the candidate models with bar, scatter, residual and partial-dependence charts.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view",
+        "bar chart",
+        "scatter plot",
+        "line chart"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "inline edit",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "machine-learning prediction of partition coefficients for choosing chromatography solvent systems in chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "chromatography",
+        "partition coefficient",
+        "cheminformatics"
+      ]
+    },
+    "workflow": {
+      "name": "predict a property under chosen conditions, correct it with a few measurements, and pick conditions that hit a target",
+      "steps": [
+        {
+          "step": "look over every item at a glance",
+          "here": "The data overview tab shows counts of samples, compounds and ratios, the current model, a histogram of K, a bar chart of ratio coverage, and a preview of the training table.",
+          "parts": [
+            "data-overview"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Enter a SMILES and the hexane, ethyl acetate, methanol and water parts. Predicting shows calibrated and raw K and log10(K), the prediction mode, and the full result as JSON.",
+          "parts": [
+            "single-prediction"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "Download a CSV template, then upload a CSV or XLSX of SMILES with ratios. Every row is predicted, the results appear in a table, and failed rows are counted.",
+          "parts": [
+            "batch-prediction"
+          ]
+        },
+        {
+          "step": "correct the computation with a few known measurements",
+          "here": "Type 1–5 measured ratio–K points for one compound into an editable table, or upload them, and list the ratios to query. Running the calibration shows base and calibrated RMSE and MAE, the fitted calibrator, the fit at each point, and the calibrated predictions at the queried ratios.",
+          "parts": [
+            "calibration-tab",
+            "calibration-points-editor"
+          ]
+        },
+        {
+          "step": "rank candidate conditions against a target",
+          "here": "Set a target K, how many ratios to return, and the ratios to exclude or already tried and failed. The calibration-first workflow returns a ranked list of recommended ratios with summary metrics.",
+          "parts": [
+            "calibration-priority-workflow"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download batch or calibrated predictions as CSV or XLSX, or a workbook with summary, calibration points, query and recommendation sheets.",
+          "parts": [
+            "batch-prediction",
+            "calibration-tab",
+            "calibration-priority-workflow"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "The model analysis tab compares candidate models and feature sets by error on new compounds. It shows true-versus-predicted and residual plots for the new-compound and known-compound protocols, feature importance, and partial dependence.",
+          "parts": [
+            "model-analysis"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The condition is a four-solvent mixture entered as parts (a:b:c:d) and normalized to fractions, so recommendations and calibration distances are worked out in ratio space.",
+        "The calibration method depends on how many measured points there are: an affine correction for 1–2 points, inverse-distance local residual correction for 3–5, and the measured value itself when a query matches a measured ratio. Error is reported before and after.",
+        "Recommendations leave out ratios that are excluded, already tested, or tried and failed, so the person is not offered a condition they have already run.",
+        "A prediction uses an exact match in measured or literature data first, then interpolation between ratios measured for the same compound, then the model, and the path taken is reported as the prediction mode.",
+        "Models are judged separately on new compounds (grouped by structure) and on known compounds, because predicting for an unseen compound is the hard case."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-overview",
+      "level": "view",
+      "parent": null,
+      "title": "Data overview",
+      "summary": "Shows how big the training set is and how it is spread across K values and solvent ratios.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 167,
+          "end": 180,
+          "role": "markup",
+          "anchor": "39d0fdf4a207",
+          "first": "tabs = st.tabs([\"数据概览\", \"单条预测\", \"批量预测\", \"单分子校准\", \"模型分析\"])"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 138,
+          "end": 145,
+          "role": "logic",
+          "symbol": "show_metric_cards",
+          "anchor": "0d1dabf15442",
+          "first": "def show_metric_cards(summary: dict, prepared_df: pd.DataFrame) -> None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 39,
+          "end": 42,
+          "role": "logic",
+          "symbol": "load_csv_if_exists",
+          "anchor": "ae93b76397b2",
+          "first": "def load_csv_if_exists(path: Path) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/k_value_predictor/reporting.py",
+          "start": 142,
+          "end": 149,
+          "role": "logic",
+          "symbol": "build_k_distribution_figure",
+          "anchor": "dd2dd622ad12",
+          "first": "def build_k_distribution_figure(prepared_df: pd.DataFrame) -> go.Figure:"
+        },
+        {
+          "file": "code/src/k_value_predictor/reporting.py",
+          "start": 152,
+          "end": 166,
+          "role": "logic",
+          "symbol": "build_ratio_coverage_figure",
+          "anchor": "1feff03c760e",
+          "first": "def build_ratio_coverage_figure(prepared_df: pd.DataFrame) -> go.Figure:"
+        },
+        {
+          "file": "code/artifacts/default/prepared/prepared_dataset.csv",
+          "start": 1,
+          "end": 30,
+          "role": "data",
+          "anchor": "912772cab2a9",
+          "first": "canonical_smiles,normalized_ratio,smiles,compound_name,solvent_system,ratio,k,k_std,replicate_count,source_row_index,hex"
+        }
+      ]
+    },
+    {
+      "id": "single-prediction",
+      "level": "view",
+      "parent": null,
+      "title": "Single prediction",
+      "summary": "Predicts calibrated and raw K for one SMILES at one four-solvent ratio.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 182,
+          "end": 212,
+          "role": "markup",
+          "anchor": "a13b104f821f",
+          "first": "with tabs[1]:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 54,
+          "end": 55,
+          "role": "logic",
+          "symbol": "load_model",
+          "anchor": "3d58e8649bda",
+          "first": "def load_model(path: Path):"
+        },
+        {
+          "file": "code/src/k_value_predictor/predictor.py",
+          "start": 750,
+          "end": 756,
+          "role": "logic",
+          "symbol": "predict_single",
+          "anchor": "75c7ae5fa768",
+          "first": "def predict_single("
+        }
+      ]
+    },
+    {
+      "id": "batch-prediction",
+      "level": "view",
+      "parent": null,
+      "title": "Batch prediction",
+      "summary": "Predicts every row of an uploaded table of compounds and ratios, counts errors, and offers the results for download.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 214,
+          "end": 246,
+          "role": "markup",
+          "anchor": "5ed41ff17a28",
+          "first": "with tabs[2]:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 58,
+          "end": 78,
+          "role": "data",
+          "symbol": "build_template_bytes",
+          "anchor": "47919f8834eb",
+          "first": "def build_template_bytes() -> bytes:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 81,
+          "end": 85,
+          "role": "logic",
+          "symbol": "build_excel_bytes",
+          "anchor": "c59c7476ca47",
+          "first": "def build_excel_bytes(df: pd.DataFrame) -> bytes:"
+        },
+        {
+          "file": "code/src/k_value_predictor/predictor.py",
+          "start": 1011,
+          "end": 1018,
+          "role": "logic",
+          "symbol": "predict_batch_dataframe",
+          "anchor": "28950b9ff0a3",
+          "first": "def predict_batch_dataframe("
+        }
+      ]
+    },
+    {
+      "id": "calibration-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Single-compound calibration",
+      "summary": "Corrects the model for one compound with its measured points, then reports error before and after along with calibrated predictions at the queried ratios.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 248,
+          "end": 253,
+          "role": "markup",
+          "anchor": "b669142744f4",
+          "first": "with tabs[3]:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 275,
+          "end": 325,
+          "role": "logic",
+          "anchor": "34429f0ef16c",
+          "first": "query_ratios_text = st.text_area("
+        },
+        {
+          "file": "code/src/k_value_predictor/predictor.py",
+          "start": 1109,
+          "end": 1117,
+          "role": "logic",
+          "symbol": "build_single_compound_calibration_payload",
+          "anchor": "a0c15718b176",
+          "first": "def build_single_compound_calibration_payload("
+        }
+      ]
+    },
+    {
+      "id": "calibration-points-editor",
+      "level": "component",
+      "parent": "calibration-tab",
+      "title": "Calibration points editor",
+      "summary": "An editable table of measured ratio–K points for the target compound, with rows that can be added, or an uploaded file that takes its place.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 254,
+          "end": 273,
+          "role": "markup",
+          "anchor": "42cb1bf0d29f",
+          "first": "smiles = st.text_area(\"目标化合物 SMILES\", height=120, value=\"CCO\", key=\"calibration_smiles\")"
+        }
+      ]
+    },
+    {
+      "id": "calibration-priority-workflow",
+      "level": "component",
+      "parent": "calibration-tab",
+      "title": "Calibration-first workflow",
+      "summary": "From the same calibration points it produces calibrated query predictions and a ranked list of ratios near a target K, excluding ratios already tried or failed, and exports everything as one workbook.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 280,
+          "end": 284,
+          "role": "markup",
+          "anchor": "4441450080a5",
+          "first": "workflow_col1, workflow_col2 = st.columns(2)"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 327,
+          "end": 389,
+          "role": "logic",
+          "anchor": "2b2c3c962293",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 109,
+          "end": 114,
+          "role": "logic",
+          "symbol": "build_workflow_summary_df",
+          "anchor": "16078ea14b4f",
+          "first": "def build_workflow_summary_df("
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 88,
+          "end": 93,
+          "role": "logic",
+          "symbol": "build_workbook_bytes",
+          "anchor": "b78f5627ad64",
+          "first": "def build_workbook_bytes(sheets: dict[str, pd.DataFrame]) -> bytes:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 96,
+          "end": 97,
+          "role": "logic",
+          "symbol": "parse_ratio_text",
+          "anchor": "0e2abb0754da",
+          "first": "def parse_ratio_text(raw: str) -> list[str]:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 100,
+          "end": 106,
+          "role": "logic",
+          "symbol": "ensure_single_compound_calibration_df",
+          "anchor": "b60315e08480",
+          "first": "def ensure_single_compound_calibration_df(calibration_df: pd.DataFrame, smiles: str) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/k_value_predictor/recommendation.py",
+          "start": 82,
+          "end": 92,
+          "role": "logic",
+          "symbol": "build_ratio_recommendations",
+          "anchor": "0f680894d7f0",
+          "first": "def build_ratio_recommendations("
+        }
+      ]
+    },
+    {
+      "id": "model-analysis",
+      "level": "view",
+      "parent": null,
+      "title": "Model analysis",
+      "summary": "Compares candidate models and shows how well the chosen one predicts new and known compounds, and which features drive it.",
+      "views": [
+        "bar chart",
+        "scatter plot",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 391,
+          "end": 423,
+          "role": "markup",
+          "anchor": "7fb46c27ca1b",
+          "first": "with tabs[4]:"
+        },
+        {
+          "file": "code/src/k_value_predictor/reporting.py",
+          "start": 96,
+          "end": 113,
+          "role": "logic",
+          "symbol": "build_candidate_summary_figure",
+          "anchor": "f21266853d23",
+          "first": "def build_candidate_summary_figure(comparison_df: pd.DataFrame) -> go.Figure:"
+        },
+        {
+          "file": "code/src/k_value_predictor/reporting.py",
+          "start": 116,
+          "end": 128,
+          "role": "logic",
+          "symbol": "build_scatter_figure",
+          "anchor": "514ca86c1bd2",
+          "first": "def build_scatter_figure(prediction_df: pd.DataFrame, protocol_name: str) -> go.Figure:"
+        },
+        {
+          "file": "code/src/k_value_predictor/reporting.py",
+          "start": 131,
+          "end": 139,
+          "role": "logic",
+          "symbol": "build_residual_figure",
+          "anchor": "186751258517",
+          "first": "def build_residual_figure(prediction_df: pd.DataFrame, protocol_name: str) -> go.Figure:"
+        },
+        {
+          "file": "code/src/k_value_predictor/reporting.py",
+          "start": 169,
+          "end": 179,
+          "role": "logic",
+          "symbol": "build_feature_importance_figure",
+          "anchor": "8f72198f5852",
+          "first": "def build_feature_importance_figure(importance_df: pd.DataFrame, top_n: int = 10) -> go.Figure:"
+        },
+        {
+          "file": "code/src/k_value_predictor/reporting.py",
+          "start": 182,
+          "end": 191,
+          "role": "logic",
+          "symbol": "build_partial_dependence_figure",
+          "anchor": "764c8fdbe6fc",
+          "first": "def build_partial_dependence_figure(partial_dependence_df: pd.DataFrame) -> go.Figure:"
+        },
+        {
+          "file": "code/artifacts/default/reports/model_comparison.csv",
+          "start": 1,
+          "end": 9,
+          "role": "data",
+          "anchor": "3564660e4688",
+          "first": "model_name,feature_set,feature_count,new_compound_r2_log10_k,new_compound_rmse_log10_k,new_compound_mae_log10_k,new_comp"
+        }
+      ]
+    }
+  ]
+}

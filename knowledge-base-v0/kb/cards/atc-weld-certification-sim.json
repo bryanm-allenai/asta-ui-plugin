@@ -1,0 +1,356 @@
+{
+  "schema": "astaui.card/1",
+  "id": "atc-weld-certification-sim",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T06:12:03Z"
+  },
+  "app": {
+    "title": "ATC Phase 4 — ASI-PLC Simulator",
+    "summary": "The person sets a random seed and how many scenarios of each kind to simulate: valid, non-compliant, and three injected faults (tampered message, replayed message, timeout). They run the simulation, which feeds every scenario through a safety interlock's decision steps. The results show counts of wrong outcomes and lock events, a histogram of valid-scenario latency, a bar chart of how often the controller ended in each state, a table of the first scenarios with the step that failed, and the full count for each state. The person ends up with a tally of the interlock's outcomes for that scenario mix, including whether it ever permitted an unsafe operation.",
+    "task": {
+      "text": "Check by Monte Carlo simulation that a safety interlock's state machine blocks every non-compliant or attacked operation and stays within its timing limit, for a chosen mix of scenarios.",
+      "verbs": [
+        "derive",
+        "summarize",
+        "identify",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "Synthetic scenarios generated from a seeded random draw. Each one is a message passed through a controller state machine and yields a latency, a final state, a relay on/off flag and any failed check steps.",
+      "item": "one simulated decision cycle: a scenario with its fault type, latency, resulting controller state and failure reasons",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "validating a control design by simulation, before hardware or field testing",
+      "terms": [
+        "confirm",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar form holds the seed and the count for each scenario type, and a run button sends them through the simulated state machine. The main area then fills with metric cards, two charts, a detail table and a state-count readout, all built from that one run.",
+      "views": [
+        "form",
+        "summary stats",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "set parameters and run"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "Monte Carlo fault-injection simulation of a safety PLC interlock in engineering",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "safety plc",
+        "fault injection",
+        "monte carlo simulation"
+      ]
+    },
+    "workflow": {
+      "name": "simulate a decision rule over a mix of scenarios and tally its wrong outcomes",
+      "steps": [
+        {
+          "step": "set up the scenario mix and seed",
+          "here": "Number inputs for random seed and for valid, non-compliant, MitM, replay and timeout scenario counts",
+          "parts": [
+            "simulation-controls"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Run simulation' builds a signed payload for each scenario and passes it through the heartbeat, nonce, HMAC and signature checks, resetting the locks between runs but keeping the nonce ledger",
+          "parts": [
+            "simulation-controls",
+            "results"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "Metric cards show total scenarios, false permits (relay on for a non-compliant weld), false negatives, valid results, soft-lock count and hard-lock events",
+          "parts": [
+            "outcome-metrics"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A histogram of valid-scenario latency and a bar chart of how many cycles ended in each PLC state",
+          "parts": [
+            "latency-histogram",
+            "state-distribution"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "A table of the first 30 scenarios with fault type, final state, relay flag, latency and the failed check steps, then the full state counts as JSON",
+          "parts": [
+            "scenario-table",
+            "state-counts"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Scenarios are generated with injected faults (tampered HMAC, replayed nonce, oracle timeout), not loaded as data",
+        "The key safety metric is 'false permits': cases where the relay was energised for a non-compliant or attacked operation",
+        "Each cycle passes through ordered checks, and the first one that fails is recorded as the reason (timeout → soft lock; nonce or signature failure → hard lock)",
+        "Lock state is reset before every run but the nonce ledger is kept for the session, so replayed messages can still be detected",
+        "A fixed seed makes every run reproducible, matching the published results"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "simulation-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Simulation controls",
+      "summary": "A sidebar for setting the seed and the count of each scenario type, with a button that runs the state-machine simulation.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "set parameters and run"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/Prototype_app.py",
+          "start": 320,
+          "end": 337,
+          "role": "markup",
+          "anchor": "2738eaa2adb0",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/Prototype_app.py",
+          "start": 213,
+          "end": 259,
+          "role": "logic",
+          "symbol": "run_simulation",
+          "anchor": "e0718f69a839",
+          "first": "def run_simulation(seed: int, scenario_plan: List[Tuple[int, FaultType, bool, str]]):"
+        },
+        {
+          "file": "code/Prototype_app.py",
+          "start": 69,
+          "end": 159,
+          "role": "logic",
+          "symbol": "ASI_PLC",
+          "anchor": "f09b7987ffd8",
+          "first": "class ASI_PLC:"
+        },
+        {
+          "file": "code/Prototype_app.py",
+          "start": 162,
+          "end": 210,
+          "role": "logic",
+          "symbol": "OracleGateway",
+          "anchor": "ccdf2723a6c3",
+          "first": "class OracleGateway:"
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "level": "view",
+      "parent": null,
+      "title": "Simulation results",
+      "summary": "After a run, the main area shows the outcome summary, charts and scenario details; before a run it shows a prompt to run.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/Prototype_app.py",
+          "start": 339,
+          "end": 345,
+          "role": "logic",
+          "anchor": "5ea55ac9b051",
+          "first": "if run_button:"
+        },
+        {
+          "file": "code/Prototype_app.py",
+          "start": 373,
+          "end": 374,
+          "role": "markup",
+          "anchor": "34b3f36d447f",
+          "first": "else:"
+        },
+        {
+          "file": "code/Prototype_app.py",
+          "start": 262,
+          "end": 292,
+          "role": "logic",
+          "symbol": "summarize_results",
+          "anchor": "67d52d08f118",
+          "first": "def summarize_results(results: List[PLCCycleResult]):"
+        }
+      ]
+    },
+    {
+      "id": "outcome-metrics",
+      "level": "component",
+      "parent": "results",
+      "title": "Outcome metric cards",
+      "summary": "Shows total scenarios, false permits, false negatives, valid results, soft locks and hard-lock events for the run.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/Prototype_app.py",
+          "start": 346,
+          "end": 352,
+          "role": "markup",
+          "anchor": "fe7e81594de7",
+          "first": "col1, col2 = st.columns(2)"
+        },
+        {
+          "file": "code/Prototype_app.py",
+          "start": 262,
+          "end": 292,
+          "role": "logic",
+          "symbol": "summarize_results",
+          "anchor": "67d52d08f118",
+          "first": "def summarize_results(results: List[PLCCycleResult]):"
+        }
+      ]
+    },
+    {
+      "id": "latency-histogram",
+      "level": "component",
+      "parent": "results",
+      "title": "Valid scenario latency distribution",
+      "summary": "A histogram of message latency across the valid scenarios, for checking it against the cycle limit.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/Prototype_app.py",
+          "start": 295,
+          "end": 301,
+          "role": "logic",
+          "symbol": "plot_latency_histogram",
+          "anchor": "aad58e3220c4",
+          "first": "def plot_latency_histogram(latencies):"
+        },
+        {
+          "file": "code/Prototype_app.py",
+          "start": 354,
+          "end": 354,
+          "role": "markup",
+          "anchor": "becb3c6b7124",
+          "first": "st.pyplot(plot_latency_histogram(summary['valid_latencies']))"
+        }
+      ]
+    },
+    {
+      "id": "state-distribution",
+      "level": "component",
+      "parent": "results",
+      "title": "PLC state distribution",
+      "summary": "A bar chart counting how many cycles ended in each controller state.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/Prototype_app.py",
+          "start": 304,
+          "end": 312,
+          "role": "logic",
+          "symbol": "plot_state_distribution",
+          "anchor": "3aaf31c695ee",
+          "first": "def plot_state_distribution(state_counts):"
+        },
+        {
+          "file": "code/Prototype_app.py",
+          "start": 355,
+          "end": 355,
+          "role": "markup",
+          "anchor": "a529ec6e15e3",
+          "first": "st.pyplot(plot_state_distribution(summary['state_counts']))"
+        }
+      ]
+    },
+    {
+      "id": "scenario-table",
+      "level": "component",
+      "parent": "results",
+      "title": "Scenario details",
+      "summary": "A table of the first 30 scenarios showing fault type, final state, relay flag, latency and which check steps failed.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/Prototype_app.py",
+          "start": 357,
+          "end": 369,
+          "role": "markup",
+          "anchor": "b3fef781490f",
+          "first": "st.subheader('Scenario details')"
+        }
+      ]
+    },
+    {
+      "id": "state-counts",
+      "level": "component",
+      "parent": "results",
+      "title": "Full state counts",
+      "summary": "Shows the count for every controller state as JSON.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/Prototype_app.py",
+          "start": 371,
+          "end": 372,
+          "role": "markup",
+          "anchor": "d16738cdde9a",
+          "first": "st.subheader('Full state counts')"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "interactions",
+      "term": "set parameters and run"
+    }
+  ]
+}

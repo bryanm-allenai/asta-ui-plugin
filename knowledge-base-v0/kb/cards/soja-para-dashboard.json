@@ -1,0 +1,619 @@
+{
+  "schema": "astaui.card/1",
+  "id": "soja-para-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T18:01:50Z"
+  },
+  "app": {
+    "title": "AgroInteligência — Previsão e Viabilidade de Safra (Soja no Pará)",
+    "summary": "A person picks a municipality from a sidebar list or by clicking its circle on a map, and picks a target season up to three years ahead. One screen gives the model's projected yield next to its validation scores, and sliders let the person try a different rainfall and evapotranspiration scenario. A second screen shows the yield and planted-area history with a dashed projection, compared against a second municipality, and offers CSV exports. A third screen takes editable price, cost and yield values and returns revenue and operating margin per hectare, each with an error band. It also gives a plain-language viability verdict, an estimated local market price, how reliable the official records are, and a ranking of all municipalities.",
+    "task": {
+      "text": "Project a municipality's crop yield for a coming season and judge whether growing the crop there pays at a given price and cost.",
+      "verbs": [
+        "derive",
+        "decide",
+        "compare",
+        "explore",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A table of municipality-season records: official yield and planted area with satellite vegetation indices and climate totals, plus municipality locations and a state outline, market price series and a reference cost survey.",
+      "item": "one municipality in one crop season, with its yield, area and environmental predictors",
+      "shapes": [
+        "table",
+        "time series",
+        "geospatial"
+      ]
+    },
+    "stage": {
+      "text": "projecting next season's yield and margin for one place from modelled records, to decide whether the crop pays",
+      "terms": [
+        "analyze",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar holds the global choices: municipality, comparison municipality, target season, unit and the farm's own normal yield. All three screens redraw from these choices, and clicking a circle on the map changes the selected municipality. The viability screen turns the projected yield and editable price and cost into margin cards with bands taken from the model's validation error. It also flags when the sign of the margin is uncertain.",
+      "views": [
+        "sidebar list",
+        "map",
+        "line chart",
+        "summary stats",
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail",
+        "toggle view",
+        "inline edit",
+        "brush",
+        "zoom and pan",
+        "sort",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "linked views",
+        "overview and detail",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "crop yield forecasting from remote sensing and climate, with farm budget analysis, in agronomy",
+      "disciplines": [
+        "agriculture"
+      ],
+      "terms": [
+        "crop yield forecasting",
+        "agronomy",
+        "farm economics"
+      ]
+    },
+    "workflow": {
+      "name": "forecast an outcome for one place and check whether it is economically viable",
+      "steps": [
+        {
+          "step": "choose the place and horizon to work on",
+          "here": "The sidebar sets the municipality, an optional comparison municipality, a target season one to three years past the last record, sc/ha or kg/ha, and the farm's own normal yield. A click on a map circle also selects the municipality.",
+          "parts": [
+            "sidebar-controls",
+            "productivity-map"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A large card shows the projected yield as trend plus a learned climate correction. Leave-one-year-out RMSE, rRMSE, model R² and trend-only R² sit beside it. An expander's sliders for rainfall and evapotranspiration, limited to the observed range, recompute the projection.",
+          "parts": [
+            "yield-projection"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "The yield history, with season climate-phase bands and a dashed three-season projection, and the planted-area history are drawn for the chosen municipality and the comparison municipality. Dragging over the chart zooms to a period.",
+          "parts": [
+            "history-charts",
+            "productivity-map"
+          ]
+        },
+        {
+          "step": "compute whether the result pays",
+          "here": "Price per sack, cost per hectare and yield are editable, starting from a reference cost survey and the model's estimate. Revenue, cost and operating margin cards carry error bands. A verdict reads high viability, stress, critical risk or inconclusive. A warning appears when the cost split could flip the margin's sign or when the survey is old.",
+          "parts": [
+            "margin-simulator"
+          ]
+        },
+        {
+          "step": "check the inputs against outside references",
+          "here": "An estimated local price is shown as the exchange futures price plus the monthly local basis. Monthly and daily charts back it up. Metrics show how often this municipality's official record repeats the previous season, compared with the state average.",
+          "parts": [
+            "market-price",
+            "ranking-and-reliability"
+          ]
+        },
+        {
+          "step": "summarize every place in a ranked table",
+          "here": "Every municipality gets a row with its recent mean yield, estimated gross revenue at the chosen price, current area, repetition rate and number of seasons, sorted by revenue.",
+          "parts": [
+            "ranking-and-reliability"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Buttons download the selected municipality's history or the full dataset as CSV.",
+          "parts": [
+            "history-charts"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The projection card says how much the model added beyond the historical trend, and the validation cards set model R² next to trend-only R², so the person can see whether the model beats the baseline.",
+        "Margin bands come from the model's validation error converted into money. The margin is flagged inconclusive when its sign changes within that band or under the other way of splitting the cost survey.",
+        "The age of the reference price and cost survey is worked out on every load, and the page warns when the survey is older than the agency's publishing cadence.",
+        "Official yield records are checked for repeated values from season to season, both per municipality and against the state average, as a sign of imputed records.",
+        "The farmer's own normal yield replaces the official average as the baseline, while the projected technology trend still applies on top of it."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Global parameters sidebar",
+      "summary": "Holds the screen switch, the municipality and comparison pickers, the target season, the unit and the farm's normal yield, and every screen redraws from them.",
+      "views": [
+        "sidebar list",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "toggle view",
+        "inline edit"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1081,
+          "end": 1170,
+          "role": "logic",
+          "anchor": "017e535f09c7",
+          "first": "municipios = sorted(df.municipio.unique())"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1099,
+          "end": 1102,
+          "role": "logic",
+          "symbol": "on_dropdown_change",
+          "anchor": "a9f4f5c07aae",
+          "first": "def on_dropdown_change():"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1156,
+          "end": 1168,
+          "role": "logic",
+          "symbol": "ajustar_r",
+          "anchor": "0ff06d798b15",
+          "first": "def ajustar_r(r_dict):"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 568,
+          "end": 578,
+          "role": "style",
+          "anchor": "0cf399cb60d2",
+          "first": "/* ── BARRA LATERAL ───────────────────────────────────────────────── */"
+        }
+      ]
+    },
+    {
+      "id": "yield-projection",
+      "level": "view",
+      "parent": null,
+      "title": "Yield projection and model quality",
+      "summary": "Shows the climate phase of the target season, the model's leave-one-year-out validation scores, the projected yield card with the model's contribution, and a climate what-if with sliders.",
+      "views": [
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1176,
+          "end": 1314,
+          "role": "markup",
+          "anchor": "87eadde76733",
+          "first": "if tela_atual == \"📍 Inteligência Territorial\":"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 211,
+          "end": 227,
+          "role": "logic",
+          "symbol": "fase_enso",
+          "anchor": "cf9e25ce4b4f",
+          "first": "def fase_enso(ano: int) -> str:"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 789,
+          "end": 803,
+          "role": "logic",
+          "symbol": "preparar",
+          "anchor": "bba80e9998d0",
+          "first": "def preparar(cache_buster='v3'):"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 436,
+          "end": 523,
+          "role": "style",
+          "anchor": "b8c2e09a9cfc",
+          "first": ".kpi-grid {"
+        },
+        {
+          "file": "code/software/dashboard_web/model.py",
+          "start": 218,
+          "end": 238,
+          "role": "logic",
+          "symbol": "sensibilidade_climatica",
+          "anchor": "80b08b3dd4dc",
+          "first": "def sensibilidade_climatica(df: pd.DataFrame, variavel: str = \"precip_total\") -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "productivity-map",
+      "level": "view",
+      "parent": null,
+      "title": "Geospatial overview map",
+      "summary": "Draws each municipality as a circle sized by planted area and coloured by recent mean yield on the state outline with rivers, outlines the main and comparison municipalities, and selects a municipality on click.",
+      "views": [
+        "map"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 839,
+          "end": 932,
+          "role": "logic",
+          "symbol": "construir_mapa",
+          "anchor": "7ce7ef67b8cf",
+          "first": "def construir_mapa(sel_interno: str, comp_interno: str | None = None, is_dark: bool = True):"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 826,
+          "end": 833,
+          "role": "logic",
+          "symbol": "_soja_por_municipio",
+          "anchor": "e768e3cc8e42",
+          "first": "def _soja_por_municipio():"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1083,
+          "end": 1097,
+          "role": "logic",
+          "anchor": "1f89008b6108",
+          "first": "if \"mun_sel\" not in st.session_state:"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1315,
+          "end": 1349,
+          "role": "markup",
+          "anchor": "4a541d28964c",
+          "first": "with dir_:"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 182,
+          "end": 186,
+          "role": "data",
+          "symbol": "carregar_geo",
+          "anchor": "18918df99e27",
+          "first": "def carregar_geo():"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 190,
+          "end": 194,
+          "role": "data",
+          "symbol": "carregar_rios",
+          "anchor": "b3c1fa9b740e",
+          "first": "def carregar_rios():"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 198,
+          "end": 207,
+          "role": "data",
+          "symbol": "carregar_municipios",
+          "anchor": "321a8018d796",
+          "first": "def carregar_municipios():"
+        }
+      ]
+    },
+    {
+      "id": "history-charts",
+      "level": "view",
+      "parent": null,
+      "title": "Historical yield and area",
+      "summary": "Plots the yield series with climate-phase bands, marks repeated values, draws a dashed three-season projection with its margin and the planted-area history for one or two municipalities, and offers CSV exports.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "brush",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1354,
+          "end": 1436,
+          "role": "markup",
+          "anchor": "f6afad0efd65",
+          "first": "if tela_atual == \"📈 Análise Histórica\":"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1379,
+          "end": 1400,
+          "role": "logic",
+          "symbol": "_projecao",
+          "anchor": "c44651733845",
+          "first": "def _projecao(municipios):"
+        },
+        {
+          "file": "code/software/dashboard_web/ui/charts.py",
+          "start": 5,
+          "end": 150,
+          "role": "logic",
+          "symbol": "plot_produtividade",
+          "anchor": "1fc3f8836a8f",
+          "first": "def plot_produtividade(serie_plot: pd.DataFrame, is_dark: bool = True,"
+        },
+        {
+          "file": "code/software/dashboard_web/ui/charts.py",
+          "start": 152,
+          "end": 189,
+          "role": "logic",
+          "symbol": "plot_area",
+          "anchor": "27a9e49a4fd0",
+          "first": "def plot_area(serie_plot: pd.DataFrame, is_dark: bool = True):"
+        }
+      ]
+    },
+    {
+      "id": "viability-screen",
+      "level": "view",
+      "parent": null,
+      "title": "Financial viability screen",
+      "summary": "Gathers the margin simulator, the local price estimate, the record-reliability check and the municipality ranking on one page.",
+      "views": [
+        "summary stats",
+        "form",
+        "table view",
+        "line chart"
+      ],
+      "interactions": [
+        "inline edit",
+        "sort"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1441,
+          "end": 1451,
+          "role": "markup",
+          "anchor": "ad029c8804cb",
+          "first": "if tela_atual == \"💰 Viabilidade Financeira\":"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1696,
+          "end": 1697,
+          "role": "markup",
+          "anchor": "34fa843da4b8",
+          "first": "st.divider()"
+        }
+      ]
+    },
+    {
+      "id": "margin-simulator",
+      "level": "component",
+      "parent": "viability-screen",
+      "title": "Margin simulator",
+      "summary": "Takes editable price, cost and yield, computes revenue and operating margin per hectare with error bands, writes a viability verdict, and warns when the survey is stale or when the sign of the margin depends on how cost is split.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1452,
+          "end": 1695,
+          "role": "logic",
+          "anchor": "af80403d3d5c",
+          "first": "col_eco1, col_eco2 = st.columns(2)"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 971,
+          "end": 1001,
+          "role": "logic",
+          "symbol": "resultado_por_hectare",
+          "anchor": "287e0b14033b",
+          "first": "def resultado_por_hectare(sacas_ha: float, preco: float,"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 163,
+          "end": 177,
+          "role": "logic",
+          "symbol": "aviso_de_defasagem",
+          "anchor": "991316aa01f4",
+          "first": "def aviso_de_defasagem(hoje: date | None = None) -> str | None:"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1041,
+          "end": 1051,
+          "role": "logic",
+          "symbol": "buscar_cotacao_fisica",
+          "anchor": "bbfd749d5958",
+          "first": "def buscar_cotacao_fisica() -> dict | None:"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 98,
+          "end": 115,
+          "role": "data",
+          "symbol": "_carregar_levantamento_conab",
+          "anchor": "63eaccddf435",
+          "first": "def _carregar_levantamento_conab() -> dict:"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 58,
+          "end": 95,
+          "role": "data",
+          "anchor": "016dda3c01e6",
+          "first": "LEVANTAMENTO_CONAB_RESERVA = {"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 442,
+          "end": 537,
+          "role": "style",
+          "anchor": "9b455e67e3d6",
+          "first": ".eco-grid {"
+        }
+      ]
+    },
+    {
+      "id": "market-price",
+      "level": "component",
+      "parent": "viability-screen",
+      "title": "Local price estimate",
+      "summary": "Estimates today's local price as the exchange futures price in local currency plus the month's local basis, shown as metrics and as monthly and daily line charts.",
+      "views": [
+        "summary stats",
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1703,
+          "end": 1742,
+          "role": "markup",
+          "symbol": "secao_preco_para",
+          "anchor": "329ef14c14ae",
+          "first": "def secao_preco_para():"
+        },
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1058,
+          "end": 1073,
+          "role": "logic",
+          "symbol": "buscar_preco_para",
+          "anchor": "4236a194099b",
+          "first": "def buscar_preco_para():"
+        },
+        {
+          "file": "code/software/dashboard_web/ui/charts.py",
+          "start": 218,
+          "end": 236,
+          "role": "logic",
+          "symbol": "plot_para_mensal",
+          "anchor": "8139f89ead88",
+          "first": "def plot_para_mensal(meses: list[dict], is_dark: bool = True):"
+        },
+        {
+          "file": "code/software/dashboard_web/ui/charts.py",
+          "start": 239,
+          "end": 257,
+          "role": "logic",
+          "symbol": "plot_para_diario",
+          "anchor": "b2b84f7e911f",
+          "first": "def plot_para_diario(velas: list[dict], is_dark: bool = True):"
+        }
+      ]
+    },
+    {
+      "id": "ranking-and-reliability",
+      "level": "component",
+      "parent": "viability-screen",
+      "title": "Record reliability and municipality ranking",
+      "summary": "Shows how often the selected municipality's official yield repeats season to season against the state average, then ranks every municipality by estimated gross revenue with mean yield, area, repetition rate and season count.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "sort"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/software/dashboard_web/app.py",
+          "start": 1757,
+          "end": 1853,
+          "role": "markup",
+          "anchor": "605f4dcb94d5",
+          "first": "st.subheader(\"Confiabilidade dos registros oficiais\")"
+        },
+        {
+          "file": "code/software/dashboard_web/model.py",
+          "start": 241,
+          "end": 262,
+          "role": "logic",
+          "symbol": "diagnostico_pam",
+          "anchor": "ae1bd79c7576",
+          "first": "def diagnostico_pam(df: pd.DataFrame, municipio: str) -> dict:"
+        },
+        {
+          "file": "code/software/dashboard_web/model.py",
+          "start": 265,
+          "end": 273,
+          "role": "logic",
+          "symbol": "taxa_repeticao_estadual",
+          "anchor": "66143f11969b",
+          "first": "def taxa_repeticao_estadual(df: pd.DataFrame) -> float:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "field",
+      "list": "disciplines",
+      "term": "agriculture"
+    }
+  ]
+}

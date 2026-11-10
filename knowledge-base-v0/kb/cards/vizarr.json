@@ -1,0 +1,501 @@
+{
+  "schema": "astaui.card/1",
+  "id": "vizarr",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:33:42Z"
+  },
+  "app": {
+    "title": "vizarr: multiscale OME-Zarr image viewer",
+    "summary": "A person opens an image by putting the address of a Zarr, OME-Zarr, OME-TIFF or reference store in the page URL, or by adding a store from a Python notebook. The image appears in a pan-and-zoom canvas that loads only the resolution level and tiles in view, and a floating layer panel lets them set layer opacity, step through the time and z planes, and add, remove, recolour and set contrast for each channel in a blended composite. Segmentation label layers can be switched on and faded. A plate or well opens as a grid of fields that can be filtered by acquisition, and clicking a field opens that image in a new window. The current zoom and position are written back into the URL, so a view can be shared or picked up again.",
+    "task": {
+      "text": "Look closely at large, multi-channel, multi-dimensional microscopy images by blending chosen channels and stepping through planes, at any zoom.",
+      "verbs": [
+        "explore",
+        "locate",
+        "compare",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "Multiscale n-dimensional image arrays (time, channel, z, y, x) stored as chunked pyramids, with rendering metadata for each channel, optional segmentation label images, and plate or well collections of fields.",
+      "item": "one multiscale image, or one field in a well on a plate",
+      "shapes": [
+        "image",
+        "image collection",
+        "field",
+        "per element"
+      ]
+    },
+    "stage": {
+      "text": "looking over acquired microscopy images before analysis",
+      "terms": [
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A GPU canvas draws the image tile by tile at the resolution level the zoom needs, blending each selected channel in its own colour and contrast window. A collapsible layer panel holds an accordion per image whose sliders and popovers rewrite that layer's channel selections, contrast limits, colours, label opacity and axis indices, and the canvas redraws at once. Plates are drawn as a grid of fields, where a click opens one field on its own, and the view state is kept in sync with the URL.",
+      "views": [
+        "image viewer",
+        "fixed-layout grid",
+        "list"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "toggle view",
+        "select",
+        "filter",
+        "import",
+        "time slider"
+      ],
+      "patterns": [
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "multiscale, multiplexed bioimage visualization in microscopy",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "bioimaging",
+        "ome zarr",
+        "high content screening"
+      ]
+    },
+    "workflow": {
+      "name": "open a large layered image and adjust how each layer is shown",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A store address goes in the ?source URL parameter (ome-tiff:// and ref:// prefixes pick other store types), or a notebook calls add_image with a zarr array, group or store, which is streamed through the widget.",
+          "parts": [
+            "image-canvas"
+          ]
+        },
+        {
+          "step": "move around the image at any scale",
+          "here": "Pan and zoom on an orthographic canvas that fetches only the visible tiles from the right pyramid level. The view state is saved into the URL as you go.",
+          "parts": [
+            "image-canvas"
+          ]
+        },
+        {
+          "step": "choose which channels to blend, with colour and contrast for each",
+          "here": "The + button adds a channel from the named list (up to a maximum). For each channel, a ring toggles it, a range slider sets the contrast window, and the ⋯ popover changes which channel it shows, the slider bounds, the colour from a palette, or removes it.",
+          "parts": [
+            "channel-controls",
+            "layer-panel"
+          ]
+        },
+        {
+          "step": "step through the other dimensions",
+          "here": "Each non-spatial axis (T, Z and others) has a slider showing index/max, plus a ⋯ box for typing an exact index. It applies to every channel at once.",
+          "parts": [
+            "axis-sliders"
+          ]
+        },
+        {
+          "step": "overlay annotations and set how strongly they show",
+          "here": "Segmentation label layers are listed under 'labels:', each with an on/off ring and an opacity slider. The image layer has its own opacity slider and an eye toggle.",
+          "parts": [
+            "label-controls",
+            "layer-panel"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A plate or well is drawn as a grid of field images with their names. A dropdown filters it to one acquisition.",
+          "parts": [
+            "plate-grid"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Clicking a field in the plate grid opens that well image as its own source in a new window.",
+          "parts": [
+            "plate-grid"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Pyramidal multiscale images are streamed chunk by chunk from remote or notebook-backed stores, so images far larger than memory can be viewed entirely in the browser.",
+        "Channel composites are blended additively on the GPU, with a colour and a contrast window for each channel, and contrast is estimated from the lowest resolution level when the metadata gives none.",
+        "n-dimensional arrays are reduced to a 2D slice by one index per extra axis (time, z), shared across all channels.",
+        "It reads the community OME-NGFF metadata (multiscales, omero, plate, well, labels, coordinate transformations) across spec versions.",
+        "The view state is kept in the URL, so a view can be shared."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "image-canvas",
+      "level": "view",
+      "parent": null,
+      "title": "Multiscale image canvas",
+      "summary": "Draws every image layer tile by tile at the right resolution level, and lets the person pan and zoom freely, starting from a view fitted to the image.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/components/Viewer.tsx",
+          "start": 12,
+          "end": 44,
+          "role": "logic",
+          "symbol": "Viewer",
+          "anchor": "d7983cfd30c4",
+          "first": "export default function Viewer() {"
+        },
+        {
+          "file": "code/src/components/Viewer.tsx",
+          "start": 46,
+          "end": 46,
+          "role": "logic",
+          "symbol": "getLayerSize",
+          "anchor": "046492837497",
+          "first": "function getLayerSize({ props }: VizarrLayer) {"
+        },
+        {
+          "file": "code/src/ZarrPixelSource.ts",
+          "start": 19,
+          "end": 147,
+          "role": "logic",
+          "symbol": "ZarrPixelSource",
+          "anchor": "680272a1b6f6",
+          "first": "export class ZarrPixelSource implements viv.PixelSource<Array<string>> {"
+        },
+        {
+          "file": "code/src/layers/viv-layers.ts",
+          "start": 30,
+          "end": 40,
+          "role": "logic",
+          "symbol": "MultiscaleImageLayer",
+          "anchor": "8614439083d8",
+          "first": "export class MultiscaleImageLayer"
+        },
+        {
+          "file": "code/src/io.ts",
+          "start": 110,
+          "end": 173,
+          "role": "logic",
+          "symbol": "createSourceData",
+          "anchor": "abd18de7aa70",
+          "first": "export async function createSourceData(config: ImageLayerConfig): Promise<SourceData> {"
+        },
+        {
+          "file": "code/main.ts",
+          "start": 4,
+          "end": 50,
+          "role": "logic",
+          "symbol": "main",
+          "anchor": "2efe0e2703d6",
+          "first": "async function main() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 15,
+          "end": 15,
+          "role": "markup",
+          "symbol": "#root",
+          "anchor": "494902d916af",
+          "first": "<div id=\"root\"></div>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 19,
+          "end": 21,
+          "role": "style",
+          "symbol": "html",
+          "anchor": "4aa90a5647b5",
+          "first": "html {"
+        }
+      ]
+    },
+    {
+      "id": "layer-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Layer panel",
+      "summary": "A collapsible overlay with an accordion for each loaded image, holding its visibility toggle, name, opacity slider, axis sliders, channels and labels.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/components/Menu.tsx",
+          "start": 33,
+          "end": 33,
+          "role": "logic",
+          "symbol": "Menu",
+          "anchor": "0acde66091c1",
+          "first": "function Menu(props: { open?: boolean }) {"
+        },
+        {
+          "file": "code/src/components/LayerController/index.tsx",
+          "start": 31,
+          "end": 42,
+          "role": "logic",
+          "symbol": "LayerController",
+          "anchor": "a6e04dc5987f",
+          "first": "function LayerController() {"
+        },
+        {
+          "file": "code/src/components/LayerController/Header.tsx",
+          "start": 31,
+          "end": 31,
+          "role": "logic",
+          "symbol": "Header",
+          "anchor": "6c2624b6a927",
+          "first": "function Header({ name }: { name: string }) {"
+        },
+        {
+          "file": "code/src/components/LayerController/Content.tsx",
+          "start": 23,
+          "end": 71,
+          "role": "logic",
+          "symbol": "Content",
+          "anchor": "87a43a1ef945",
+          "first": "function Content() {"
+        },
+        {
+          "file": "code/src/components/LayerController/LayerVisibilityButton.tsx",
+          "start": 7,
+          "end": 30,
+          "role": "logic",
+          "symbol": "LayerVisibilityButton",
+          "anchor": "081ea50ab7af",
+          "first": "function LayerVisibilityButton() {"
+        },
+        {
+          "file": "code/src/components/LayerController/OpacitySlider.tsx",
+          "start": 18,
+          "end": 25,
+          "role": "logic",
+          "symbol": "OpacitySlider",
+          "anchor": "08842008df6f",
+          "first": "function OpacitySlider() {"
+        }
+      ]
+    },
+    {
+      "id": "channel-controls",
+      "level": "component",
+      "parent": "layer-panel",
+      "title": "Channel controls",
+      "summary": "For each blended channel: a visibility ring, a contrast range slider, and a popover to change which channel it shows, set the contrast bounds, pick a colour or remove the channel, plus a button to add channels.",
+      "views": [],
+      "interactions": [
+        "toggle view",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/components/LayerController/ChannelController.tsx",
+          "start": 8,
+          "end": 8,
+          "role": "logic",
+          "symbol": "ChannelController",
+          "anchor": "abb251021ec0",
+          "first": "function ChannelController({ channelIndex }: { channelIndex: number }) {"
+        },
+        {
+          "file": "code/src/components/LayerController/ChannelOptions.tsx",
+          "start": 20,
+          "end": 20,
+          "role": "logic",
+          "symbol": "ChannelOptions",
+          "anchor": "c1739e33f6db",
+          "first": "function ChannelOptions({ channelIndex }: Props) {"
+        },
+        {
+          "file": "code/src/components/LayerController/ColorPalette.tsx",
+          "start": 25,
+          "end": 25,
+          "role": "logic",
+          "symbol": "ColorPalette",
+          "anchor": "01544a107aea",
+          "first": "function ColorPalette({ handleChange }: { handleChange: (c: [number, number, number]) => void }) {"
+        },
+        {
+          "file": "code/src/components/LayerController/AddChannelButton.tsx",
+          "start": 9,
+          "end": 120,
+          "role": "logic",
+          "symbol": "AddChannelButton",
+          "anchor": "e7131f50e889",
+          "first": "function AddChannelButton() {"
+        },
+        {
+          "file": "code/src/utils.ts",
+          "start": 302,
+          "end": 319,
+          "role": "logic",
+          "symbol": "calcDataRange",
+          "anchor": "04e1dafcbe9a",
+          "first": "export async function calcDataRange("
+        },
+        {
+          "file": "code/src/utils.ts",
+          "start": 13,
+          "end": 21,
+          "role": "data",
+          "symbol": "COLORS",
+          "anchor": "daf5e7cd6a68",
+          "first": "export const COLORS = {"
+        }
+      ]
+    },
+    {
+      "id": "axis-sliders",
+      "level": "component",
+      "parent": "layer-panel",
+      "title": "Axis sliders",
+      "summary": "One slider per non-spatial axis (such as T or Z), with an exact index box, that picks which plane is shown for every channel.",
+      "views": [],
+      "interactions": [
+        "time slider"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/components/LayerController/AxisSliders.tsx",
+          "start": 6,
+          "end": 27,
+          "role": "logic",
+          "symbol": "AxisSliders",
+          "anchor": "268837d8df3b",
+          "first": "function AxisSliders() {"
+        },
+        {
+          "file": "code/src/components/LayerController/AxisSlider.tsx",
+          "start": 25,
+          "end": 25,
+          "role": "logic",
+          "symbol": "AxisSlider",
+          "anchor": "c0c235ac3b59",
+          "first": "function AxisSlider({ axisIndex, max }: Props) {"
+        },
+        {
+          "file": "code/src/components/LayerController/AxisOptions.tsx",
+          "start": 20,
+          "end": 20,
+          "role": "logic",
+          "symbol": "AxisOptions",
+          "anchor": "5832757c82c5",
+          "first": "function AxisOptions({ axisIndex, max }: Props) {"
+        }
+      ]
+    },
+    {
+      "id": "label-controls",
+      "level": "component",
+      "parent": "layer-panel",
+      "title": "Label layer controls",
+      "summary": "Lists the segmentation label images attached to an image, each with an on/off toggle and an opacity slider.",
+      "views": [],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/components/LayerController/Labels.tsx",
+          "start": 8,
+          "end": 8,
+          "role": "logic",
+          "symbol": "Labels",
+          "anchor": "43bab8298f2d",
+          "first": "export default function Labels({ labelIndex }: { labelIndex: number }) {"
+        },
+        {
+          "file": "code/src/layers/label-layer.ts",
+          "start": 44,
+          "end": 137,
+          "role": "logic",
+          "symbol": "LabelLayer",
+          "anchor": "ab51a47cc16d",
+          "first": "export class LabelLayer extends TileLayer<LabelPixelData, LabelLayerProps> {"
+        },
+        {
+          "file": "code/src/ome.ts",
+          "start": 321,
+          "end": 338,
+          "role": "logic",
+          "symbol": "loadOmeImageLabel",
+          "anchor": "4cc90ae52391",
+          "first": "async function loadOmeImageLabel(root: zarr.Location<zarr.Readable>, name: string): Promise<ImageLabels[number]> {"
+        }
+      ]
+    },
+    {
+      "id": "plate-grid",
+      "level": "component",
+      "parent": "image-canvas",
+      "title": "Plate and well grid",
+      "summary": "Draws a plate or well as a labelled grid of field images that can be filtered by acquisition, where clicking a field opens that image on its own.",
+      "views": [
+        "fixed-layout grid"
+      ],
+      "interactions": [
+        "select",
+        "filter"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/layers/grid-layer.ts",
+          "start": 79,
+          "end": 212,
+          "role": "logic",
+          "symbol": "GridLayer",
+          "anchor": "cd5ad1c030e7",
+          "first": "class GridLayer extends CompositeLayer<CompositeLayerProps & GridLayerProps> {"
+        },
+        {
+          "file": "code/src/ome.ts",
+          "start": 133,
+          "end": 278,
+          "role": "logic",
+          "symbol": "loadPlate",
+          "anchor": "3f42f94dbfe8",
+          "first": "export async function loadPlate("
+        },
+        {
+          "file": "code/src/ome.ts",
+          "start": 9,
+          "end": 131,
+          "role": "logic",
+          "symbol": "loadWell",
+          "anchor": "d7fc6ae6ed61",
+          "first": "export async function loadWell("
+        },
+        {
+          "file": "code/src/components/LayerController/AcquisitionController.tsx",
+          "start": 6,
+          "end": 44,
+          "role": "logic",
+          "symbol": "AcquisitionController",
+          "anchor": "ff2e49ecb1bc",
+          "first": "function AcquisitionController() {"
+        }
+      ]
+    }
+  ]
+}

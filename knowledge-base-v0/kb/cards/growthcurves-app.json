@@ -1,0 +1,694 @@
+{
+  "schema": "astaui.card/1",
+  "id": "growthcurves-app",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T04:53:57Z"
+  },
+  "app": {
+    "title": "MicroGrowth: microbial growth curves from plate reader runs",
+    "summary": "A person uploads a plate reader time series and a plate map that names each well, matches wells to sample names, and sets up preprocessing: time unit, optical pathlength, an analysis time window, wells to exclude, outlier removal and which blank wells are subtracted from which samples. They choose a growth model or a non-parametric method, phase-boundary cutoffs and no-growth thresholds, and analyse the plate to get growth statistics for every well. They check the fits across the whole plate, then step through wells one at a time to fix the bad ones: move phase boundaries, cap the maximum OD, lasso a subset of points to refit, mark a well as no growth, or delete it. Finally they plot growth statistics and mean or replicate curves by sample and condition, and export a ZIP of corrected data, per-well and per-sample statistics, the parameters used and plots.",
+    "task": {
+      "text": "Fit growth curves to every well of a microplate run, correct the fits that went wrong, and export growth statistics per well and per sample.",
+      "verbs": [
+        "derive",
+        "clean",
+        "review",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Optical density time series from a plate reader with one column per well, plus a plate map that gives each well a sample name, with replicates sharing a name and blank wells marked.",
+      "item": "a well on a 96-well plate, with its OD time series and fitted growth statistics",
+      "shapes": [
+        "grid of series",
+        "time series",
+        "per element",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "fitting and correcting growth curves after a plate reader run, before comparing samples and reporting",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A stepped upload page loads the plate, builds the blank-subtraction groups on a clickable plate grid and runs the fit. A plate-layout overview outlines each well's fit by quality and leads into a one-well-at-a-time editor, where sliders, lasso selection and buttons refit the well and update the shared statistics that the plotting and export pages read.",
+      "views": [
+        "fixed-layout grid",
+        "small multiples",
+        "line chart",
+        "scatter plot",
+        "bar chart",
+        "detail panel",
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "brush",
+        "exclude and refit",
+        "keyboard shortcuts",
+        "toggle view",
+        "filter",
+        "drag to arrange",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "small multiples",
+        "review queue",
+        "category palette"
+      ]
+    },
+    "field": {
+      "text": "growth curve fitting of plate reader OD data in microbiology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "microbiology",
+        "growth curves",
+        "plate reader"
+      ]
+    },
+    "workflow": {
+      "name": "fit a model to every series in a batch, correct the bad fits, and export the parameters",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a plate reader Excel file (Time plus well columns) and an optional wide- or long-format plate map, then click 'Match samples with names'.",
+          "parts": [
+            "upload-analyse"
+          ]
+        },
+        {
+          "step": "set up corrections before computing",
+          "here": "Pick the time unit and pathlength, drag the analysis window, multiselect wells to exclude, turn on MAD-based outlier removal, and paint blank groups onto the plate grid so each blank is subtracted only from samples in its colour group.",
+          "parts": [
+            "upload-analyse",
+            "blank-group-grid"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Choose a model family and method (sliding window, spline, logistic, Gompertz, Richards, Baranyi), phase-boundary cutoffs as a fraction of μmax and no-growth thresholds, then 'Update parameters and analyse selected plate'.",
+          "parts": [
+            "upload-analyse"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Replicate curves grouped by sample, blank baselines by group, and a plate-layout grid of per-well fits outlined green, red or grey by fit quality.",
+          "parts": [
+            "plate-overviews"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "A plate and well selector with Left/Right arrow shortcuts opens each well's annotated OD curve, its dOD/dt and μ plots, and popovers with its statistics and parameters.",
+          "parts": [
+            "well-fit-editor"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Lasso points on the curve to refit μmax from them, slide the phase boundaries and max OD, re-analyse with edited thresholds, mark the well no-growth, or delete it.",
+          "parts": [
+            "well-fit-editor"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Select samples, group the x axis and legend by strain, condition or name, reorder the groups, and make one plot per growth statistic plus mean and replicate curve plots over a chosen time range.",
+          "parts": [
+            "visualizations"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Tick tables (baseline-corrected series, per-well and per-sample statistics, analysis parameters) and plots (global and per-well with chosen annotations, filtered by plate and well), then download one ZIP.",
+          "parts": [
+            "export-zip"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Blanks are subtracted per group: the person paints blank and sample wells on a plate grid in colour groups, and blanks in the same group are averaged before subtraction.",
+        "Growth phases are split by thresholds relative to the maximum specific growth rate, and the lag-end and exponential-end boundaries can be moved by hand for each well.",
+        "Wells can be marked no-growth automatically, from minimum OD increase, growth rate, signal-to-noise and point-count thresholds, or by hand. A no-growth well keeps a reason and is left out of the statistics.",
+        "Wells that share a name in the plate map are treated as replicates and averaged into per-sample statistics, and the first underscore splits the name into strain and condition for plotting.",
+        "Each well gets three linked readouts: OD (linear or log), the first derivative and the specific growth rate μ over time."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "upload-analyse",
+      "level": "view",
+      "parent": null,
+      "title": "Upload & Analyse",
+      "summary": "Six numbered steps load the plate data and plate map, match wells to sample names, set preprocessing and the fitting method and thresholds, and run the analysis on the selected plate.",
+      "views": [
+        "form",
+        "fixed-layout grid"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "time slider",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/MicroGrowth/src/pages/upload_and_analyse.py",
+          "start": 1,
+          "end": 17,
+          "role": "markup",
+          "anchor": "e746a45018c9",
+          "first": "\"\"\"Upload inputs, configure analysis parameters, and run plate analysis.\"\"\""
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/uploads_ui.py",
+          "start": 249,
+          "end": 417,
+          "role": "logic",
+          "symbol": "ui_upload_files",
+          "anchor": "2e8a8035f808",
+          "first": "def ui_upload_files(ss):"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/uploads_ui.py",
+          "start": 421,
+          "end": 673,
+          "role": "logic",
+          "symbol": "ui_preprocessing_params",
+          "anchor": "fa6cb3f6a868",
+          "first": "def ui_preprocessing_params(ss):"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/uploads_ui.py",
+          "start": 694,
+          "end": 786,
+          "role": "logic",
+          "symbol": "_ui_model_selection",
+          "anchor": "192880323dd7",
+          "first": "def _ui_model_selection(params0: dict):"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/uploads_ui.py",
+          "start": 871,
+          "end": 906,
+          "role": "logic",
+          "symbol": "ui_phase_boundaries",
+          "anchor": "d869ef021b91",
+          "first": "def ui_phase_boundaries(params0: dict):"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/uploads_ui.py",
+          "start": 828,
+          "end": 868,
+          "role": "logic",
+          "symbol": "ui_qc_filters",
+          "anchor": "d3eee776b15e",
+          "first": "def ui_qc_filters(params0: dict):"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/uploads_ui.py",
+          "start": 975,
+          "end": 1108,
+          "role": "logic",
+          "symbol": "ui_analysis_params",
+          "anchor": "2419989759c5",
+          "first": "def ui_analysis_params(ss):"
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/upload_functions.py",
+          "start": 22,
+          "end": 66,
+          "role": "logic",
+          "symbol": "validate_data_file",
+          "anchor": "dada6dac8852",
+          "first": "def validate_data_file(file_bytes):"
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/upload_functions.py",
+          "start": 69,
+          "end": 121,
+          "role": "logic",
+          "symbol": "validate_plate_map_file",
+          "anchor": "186235bcee00",
+          "first": "def validate_plate_map_file(file_bytes):"
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/data_processing.py",
+          "start": 160,
+          "end": 287,
+          "role": "logic",
+          "symbol": "analyse_plate",
+          "anchor": "6303c03c4438",
+          "first": "def analyse_plate(record: dict):"
+        }
+      ]
+    },
+    {
+      "id": "blank-group-grid",
+      "level": "component",
+      "parent": "upload-analyse",
+      "title": "Blank group assigner",
+      "summary": "A 96-well grid where the person adds coloured blank groups and fills rectangles of wells by clicking two corners, so each blank is subtracted only from samples in its group.",
+      "views": [
+        "fixed-layout grid"
+      ],
+      "interactions": [
+        "apply label",
+        "multi-select"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/MicroGrowth/src/ui_functions/blank_grouping_ui.py",
+          "start": 18,
+          "end": 31,
+          "role": "data",
+          "anchor": "287618ad29bf",
+          "first": "DEFAULT_GROUP = \"Group 1\""
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/blank_grouping_ui.py",
+          "start": 300,
+          "end": 313,
+          "role": "logic",
+          "symbol": "ui_blank_group_assigner",
+          "anchor": "5867428b2140",
+          "first": "def ui_blank_group_assigner("
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/blank_grouping_ui.py",
+          "start": 143,
+          "end": 149,
+          "role": "logic",
+          "symbol": "build_cells",
+          "anchor": "bb11a7faba44",
+          "first": "def build_cells("
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/blank_grouping_ui.py",
+          "start": 70,
+          "end": 71,
+          "role": "logic",
+          "symbol": "fill_rect",
+          "anchor": "e2ca6f9d864d",
+          "first": "def fill_rect("
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/blank_grouping_ui.py",
+          "start": 232,
+          "end": 254,
+          "role": "logic",
+          "symbol": "_init_state",
+          "anchor": "0222b5313b38",
+          "first": "def _init_state(prefix: str, initial_group_map: dict[str, str] | None):"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/blank_grouping_ui.py",
+          "start": 105,
+          "end": 110,
+          "role": "logic",
+          "symbol": "assignments_to_map",
+          "anchor": "9371797df524",
+          "first": "def assignments_to_map(assignments: list[list[str]]) -> dict[str, str]:"
+        }
+      ]
+    },
+    {
+      "id": "plate-overviews",
+      "level": "view",
+      "parent": null,
+      "title": "Plate Overviews",
+      "summary": "Shows replicate curves grouped by sample, the blank baselines by group, and every well's fit in plate layout, outlined by fit quality, so the person can spot wells that need correcting.",
+      "views": [
+        "small multiples",
+        "fixed-layout grid",
+        "line chart"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "small multiples",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/MicroGrowth/src/pages/plate_overviews.py",
+          "start": 34,
+          "end": 40,
+          "role": "markup",
+          "anchor": "210ffd6108b6",
+          "first": "plates = require_plates()"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/plate_overviews_ui.py",
+          "start": 12,
+          "end": 16,
+          "role": "logic",
+          "symbol": "ui_replicates",
+          "anchor": "8849cf2d01f5",
+          "first": "def ui_replicates(plates: dict):"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/plate_overviews_ui.py",
+          "start": 26,
+          "end": 77,
+          "role": "logic",
+          "symbol": "ui_window_fits_plate_overview",
+          "anchor": "f9f5c91b986a",
+          "first": "def ui_window_fits_plate_overview(plates: dict):"
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/plotting_functions.py",
+          "start": 844,
+          "end": 992,
+          "role": "logic",
+          "symbol": "plot_window_plate",
+          "anchor": "4e5f4cf7703b",
+          "first": "def plot_window_plate(plate: dict, time_unit: str = \"hours\"):"
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/plotting_functions.py",
+          "start": 45,
+          "end": 66,
+          "role": "logic",
+          "symbol": "fit_quality_color",
+          "anchor": "6965dabc749f",
+          "first": "def fit_quality_color(gs: dict | None) -> str:"
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/plotting_functions.py",
+          "start": 458,
+          "end": 562,
+          "role": "logic",
+          "symbol": "plot_replicates_by_sample",
+          "anchor": "a59359065383",
+          "first": "def plot_replicates_by_sample(plates: dict, time_unit: str = \"hours\"):"
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/plotting_functions.py",
+          "start": 227,
+          "end": 231,
+          "role": "logic",
+          "symbol": "plot_baseline_by_group",
+          "anchor": "5523530b7fcc",
+          "first": "def plot_baseline_by_group("
+        }
+      ]
+    },
+    {
+      "id": "well-fit-editor",
+      "level": "view",
+      "parent": null,
+      "title": "Check Growth Fits",
+      "summary": "Steps through wells with arrow keys. For each it shows the annotated OD curve with its derivative and μ plots, and lets the person lasso points to refit, adjust phase boundaries and max OD, re-analyse, mark no growth or delete the well.",
+      "views": [
+        "line chart",
+        "scatter plot",
+        "detail panel"
+      ],
+      "interactions": [
+        "brush",
+        "exclude and refit",
+        "keyboard shortcuts",
+        "toggle view",
+        "accept or reject",
+        "select"
+      ],
+      "patterns": [
+        "review queue",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/MicroGrowth/src/pages/check_growth_fits.py",
+          "start": 34,
+          "end": 36,
+          "role": "markup",
+          "anchor": "0fc5d4483884",
+          "first": "plates = require_plates()"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/check_growth_fits_ui.py",
+          "start": 528,
+          "end": 814,
+          "role": "logic",
+          "symbol": "ui_window_fits_well_editor",
+          "anchor": "516f9330115b",
+          "first": "def ui_window_fits_well_editor(plates: dict):"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/check_growth_fits_ui.py",
+          "start": 155,
+          "end": 524,
+          "role": "logic",
+          "symbol": "_phase_controls",
+          "anchor": "9a12d9552292",
+          "first": "def _phase_controls(plate: dict, well: str, *, key: str):"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/check_growth_fits_ui.py",
+          "start": 22,
+          "end": 79,
+          "role": "logic",
+          "symbol": "_format_growth_stats_table",
+          "anchor": "2044b41699a8",
+          "first": "def _format_growth_stats_table(gs: dict) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/check_growth_fits.py",
+          "start": 195,
+          "end": 196,
+          "role": "logic",
+          "symbol": "update_growth_stats_from_lasso",
+          "anchor": "176f4f4da711",
+          "first": "def update_growth_stats_from_lasso("
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/check_growth_fits.py",
+          "start": 292,
+          "end": 321,
+          "role": "logic",
+          "symbol": "analyse_well",
+          "anchor": "133b4330308e",
+          "first": "def analyse_well(plate: dict, well: str, params_override: dict | None = None) -> dict:"
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/check_growth_fits.py",
+          "start": 94,
+          "end": 103,
+          "role": "logic",
+          "symbol": "_add_lasso_selected_points",
+          "anchor": "4d66b62b5778",
+          "first": "def _add_lasso_selected_points("
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/plotting_functions.py",
+          "start": 1008,
+          "end": 1015,
+          "role": "logic",
+          "symbol": "plot_derivative_metric",
+          "anchor": "69734dd78083",
+          "first": "def plot_derivative_metric("
+        }
+      ]
+    },
+    {
+      "id": "visualizations",
+      "level": "view",
+      "parent": null,
+      "title": "Create Visualizations",
+      "summary": "Selects samples, groups and orders them by strain, condition or name, and draws one plot per growth statistic plus mean and replicate curve plots over a chosen time range.",
+      "views": [
+        "bar chart",
+        "strip plot",
+        "line chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "filter",
+        "drag to arrange",
+        "time slider",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/MicroGrowth/src/pages/create_visualizations.py",
+          "start": 49,
+          "end": 145,
+          "role": "markup",
+          "anchor": "980d8ec55630",
+          "first": "plates = require_plates()"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/create_visualizations_ui.py",
+          "start": 44,
+          "end": 126,
+          "role": "logic",
+          "symbol": "ui_growth_selection_container",
+          "anchor": "9638c9f40c76",
+          "first": "def ui_growth_selection_container(plates: dict) -> dict:"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/create_visualizations_ui.py",
+          "start": 130,
+          "end": 176,
+          "role": "logic",
+          "symbol": "ui_growth_stats_controls_container",
+          "anchor": "d652cb32189f",
+          "first": "def ui_growth_stats_controls_container(has_split: bool, sel_opt: pd.DataFrame) -> dict:"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/create_visualizations_ui.py",
+          "start": 180,
+          "end": 181,
+          "role": "logic",
+          "symbol": "ui_growth_curves_controls_container",
+          "anchor": "185eaffe135d",
+          "first": "def ui_growth_curves_controls_container("
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/plotting_functions.py",
+          "start": 601,
+          "end": 607,
+          "role": "logic",
+          "symbol": "plot_single_growth_stat",
+          "anchor": "a4984e22ddcd",
+          "first": "def plot_single_growth_stat("
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/plotting_functions.py",
+          "start": 385,
+          "end": 390,
+          "role": "logic",
+          "symbol": "plot_mean_growth",
+          "anchor": "6f95dc6aa14f",
+          "first": "def plot_mean_growth("
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/plotting_functions.py",
+          "start": 343,
+          "end": 348,
+          "role": "logic",
+          "symbol": "plot_replicates_scatter",
+          "anchor": "296e900a13e0",
+          "first": "def plot_replicates_scatter("
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/visualization_functions.py",
+          "start": 88,
+          "end": 139,
+          "role": "logic",
+          "symbol": "_build_growth_curves_long_df",
+          "anchor": "54392831d8de",
+          "first": "def _build_growth_curves_long_df(plates: dict, sample_names: list[str]) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "export-zip",
+      "level": "view",
+      "parent": null,
+      "title": "Download Analyzed Data",
+      "summary": "Checkboxes choose which tables, global plots and per-well annotated plots (filtered by plate and well) go into a single ZIP export.",
+      "views": [
+        "form",
+        "fixed-layout grid"
+      ],
+      "interactions": [
+        "export",
+        "filter",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/MicroGrowth/src/pages/download_analyzed_data.py",
+          "start": 40,
+          "end": 121,
+          "role": "markup",
+          "anchor": "c6ee6d887872",
+          "first": "plates = require_plates()"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/download_analyzed_data_ui.py",
+          "start": 6,
+          "end": 39,
+          "role": "logic",
+          "symbol": "_render_tabulated_data_container",
+          "anchor": "543a7ba7b944",
+          "first": "def _render_tabulated_data_container():"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/download_analyzed_data_ui.py",
+          "start": 233,
+          "end": 276,
+          "role": "logic",
+          "symbol": "_render_global_plots_container",
+          "anchor": "3f00779a4fe0",
+          "first": "def _render_global_plots_container():"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/download_analyzed_data_ui.py",
+          "start": 42,
+          "end": 230,
+          "role": "logic",
+          "symbol": "_render_well_level_plots_container",
+          "anchor": "f7a8411e22fc",
+          "first": "def _render_well_level_plots_container(plates: dict, plate_ids: list[str]):"
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/download_analyzed_data_ui.py",
+          "start": 281,
+          "end": 304,
+          "role": "logic",
+          "symbol": "get_export_zip",
+          "anchor": "a284a7dd1dc0",
+          "first": "def get_export_zip("
+        },
+        {
+          "file": "code/MicroGrowth/src/functions/export_functions.py",
+          "start": 143,
+          "end": 172,
+          "role": "logic",
+          "symbol": "build_export_zip",
+          "anchor": "46c3b9ee4bc6",
+          "first": "def build_export_zip("
+        },
+        {
+          "file": "code/MicroGrowth/src/ui_functions/blank_grouping_ui.py",
+          "start": 561,
+          "end": 567,
+          "role": "logic",
+          "symbol": "ui_well_selector",
+          "anchor": "9776bceed400",
+          "first": "def ui_well_selector("
+        }
+      ]
+    }
+  ]
+}

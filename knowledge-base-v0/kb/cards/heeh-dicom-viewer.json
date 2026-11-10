@@ -1,0 +1,533 @@
+{
+  "schema": "astaui.card/1",
+  "id": "heeh-dicom-viewer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T03:55:17Z"
+  },
+  "app": {
+    "title": "HEEH-V1™ DICOM Viewer",
+    "summary": "A person loads a study by choosing a folder, uploading files or ZIPs, or giving a TCIA manifest. Earlier exports are recognised, and their measurements come back with them. They move through images and slices, set the display window, and point at the image to read calibrated pixel values. They click points to draw labelled distance and angle measurements, click a spot to inspect a region of interest, and turn on intensity, quality, radiomics and CT metric calculations shown in result tabs. They can browse by series and set a second image beside the first, then export de-identified DICOM, a structured report, measurement CSV/JSON, radiomics tables, an annotated PNG and an HTML research report in one validated package.",
+    "task": {
+      "text": "Take calibrated measurements and quantitative features from medical images and export them, de-identified and with provenance, for research.",
+      "verbs": [
+        "derive",
+        "lookup",
+        "explore",
+        "annotate",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "Medical image studies (DICOM, NIfTI, NRRD, MetaImage or raster) as single images, multi-frame volumes or series, with header metadata such as pixel spacing and rescale values",
+      "item": "one image or slice of a medical image series",
+      "shapes": [
+        "image collection",
+        "image",
+        "field",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "measuring and computing features on acquired scans, before reporting them",
+      "terms": [
+        "analyze",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar picks the input, display window and which analyses to run. A large canvas shows the selected slice at native scale, reports the calibrated value under the pointer, and takes clicks for distance, angle and ROI measurements, which are drawn as coloured rulers and listed in a panel next to it. Computed results appear in tabs under the image, a collapsible area holds series selection and a side-by-side comparison, and a single export dialog packages everything with a manifest.",
+      "views": [
+        "image viewer",
+        "detail panel",
+        "list",
+        "summary stats",
+        "side-by-side panes",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "hover for detail",
+        "select",
+        "zoom and pan",
+        "toggle view",
+        "undo",
+        "export",
+        "inline edit"
+      ],
+      "patterns": [
+        "overview and detail",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "calibrated image measurement and radiomics on CT and MR in medical imaging research",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "medical imaging",
+        "radiomics",
+        "dicom"
+      ]
+    },
+    "workflow": {
+      "name": "measure features on images and export the measurements",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Local directory path or direct upload of DICOM, NIfTI, NRRD, MHA, raster or ZIP files, or a TCIA manifest. Slices are put in physical order and earlier exports have their measurements restored.",
+          "parts": [
+            "input-panel"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "Previous/Next buttons, an image-index slider and a slice-position slider for volumes, plus a series selector.",
+          "parts": [
+            "navigation",
+            "series-compare"
+          ]
+        },
+        {
+          "step": "adjust how each item is displayed",
+          "here": "CT window presets (lung, bone, brain, and so on) with center and width sliders in HU, plus 1:1, 2x or 4x magnification. These change only the display and leave the source pixels alone.",
+          "parts": [
+            "display-settings",
+            "pixel-viewer"
+          ]
+        },
+        {
+          "step": "mark points on an item to measure it",
+          "here": "In Distance mode, two clicks; in Angle mode, three clicks with the vertex first. Values are in mm, cm, px or deg from DICOM PixelSpacing or a manual mm/pixel factor. Each measurement gets a label, a colour and a line-intensity profile, and can be deleted, undone or cleared.",
+          "parts": [
+            "pixel-viewer",
+            "measurements-panel"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Checkboxes for tissue classification, edge maps, image quality and radiomics (with an optional IBSI ROI mask). Results show in Intensity, Quality, Radiomics, Volume and CT Metrics tabs.",
+          "parts": [
+            "display-settings",
+            "analysis-results"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "A 'Compare side-by-side' selector puts another image next to the current one, using the same window settings.",
+          "parts": [
+            "series-compare"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "An Export dialog offers de-identified DICOM, DICOM SR, measurement CSV/JSON, annotated PNG, radiomics CSV/XLSX, cohort CSV, an HTML report, or a ZIP of everything with a SHA-256 manifest.",
+          "parts": [
+            "export-dialog"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Measurements are stored in source-pixel coordinates and converted to physical units with per-axis DICOM pixel spacing. Display windowing never changes the values that get measured.",
+        "Exports are de-identified, with pseudonymous filenames and remapped UIDs, and a manifest of hashes is checked before download.",
+        "Earlier exports (JSON, PNG metadata, DICOM SR) can be loaded again, and their measurements come back onto the matching image.",
+        "The tools on offer depend on the detected modality and SOP class. For example, CT windowing and HU metrics appear only for CT."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "input-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Input source",
+      "summary": "Loads a study from a local folder or uploaded files and restores any measurements found in earlier exports.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 4965,
+          "end": 5080,
+          "role": "logic",
+          "anchor": "897e72046e71",
+          "first": "st.subheader(_I(\"SIDEBAR_TITLE\"))"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1101,
+          "end": 1143,
+          "role": "logic",
+          "symbol": "_persist_uploaded_files",
+          "anchor": "6cee5d734242",
+          "first": "def _persist_uploaded_files(uploaded_files) -> list[str]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 596,
+          "end": 597,
+          "role": "logic",
+          "symbol": "_discover_input_files_cached",
+          "anchor": "bb3489b105dc",
+          "first": "def _discover_input_files_cached("
+        },
+        {
+          "file": "code/app.py",
+          "start": 4611,
+          "end": 4943,
+          "role": "logic",
+          "symbol": "_run_tcia_manifest_flow",
+          "anchor": "9a713eef0cb1",
+          "first": "def _run_tcia_manifest_flow(self, manifest_target, cache_root):"
+        }
+      ]
+    },
+    {
+      "id": "display-settings",
+      "level": "component",
+      "parent": "input-panel",
+      "title": "Display settings and analysis suite",
+      "summary": "Sets magnification and CT window presets or center/width, and turns on tissue, edge, quality and radiomics calculations.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 5505,
+          "end": 5760,
+          "role": "logic",
+          "anchor": "3124841fdfdf",
+          "first": "# --- Floating sidebar: display settings ---"
+        },
+        {
+          "file": "code/app.py",
+          "start": 7896,
+          "end": 7954,
+          "role": "logic",
+          "symbol": "_apply_windowing",
+          "anchor": "30444194fb59",
+          "first": "def _apply_windowing(hu: np.ndarray, center: int = 40, width: int = 400, preset: Optional[str] = None) -> np.ndarray:"
+        }
+      ]
+    },
+    {
+      "id": "pixel-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "Primary image viewer",
+      "summary": "Shows the selected slice at native or magnified scale, reads out the calibrated value under the pointer, and takes clicks for distance, angle and ROI measurements, drawn as coloured rulers with a legend.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 137,
+          "end": 520,
+          "role": "logic",
+          "anchor": "a26d097a38b1",
+          "first": "_PIXEL_HOVER_VIEWER = components_v2.component("
+        },
+        {
+          "file": "code/app.py",
+          "start": 7784,
+          "end": 7794,
+          "role": "logic",
+          "symbol": "_render_pixel_hover_viewer",
+          "anchor": "4796e0322369",
+          "first": "def _render_pixel_hover_viewer("
+        },
+        {
+          "file": "code/app.py",
+          "start": 6407,
+          "end": 6513,
+          "role": "logic",
+          "anchor": "56c7fc56b0b0",
+          "first": "# Split the display matrix (visual matrix)"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3499,
+          "end": 3504,
+          "role": "logic",
+          "symbol": "_add_measurement",
+          "anchor": "096225928b5f",
+          "first": "def _add_measurement("
+        },
+        {
+          "file": "code/core/theme.css",
+          "start": 186,
+          "end": 197,
+          "role": "style",
+          "symbol": ".viewer-context",
+          "anchor": "d7e656da3e83",
+          "first": ".viewer-context {"
+        },
+        {
+          "file": "code/core/theme.css",
+          "start": 170,
+          "end": 177,
+          "role": "style",
+          "symbol": ".viewer-title",
+          "anchor": "80b406ff75db",
+          "first": ".viewer-title {"
+        }
+      ]
+    },
+    {
+      "id": "navigation",
+      "level": "component",
+      "parent": "pixel-viewer",
+      "title": "Navigation",
+      "summary": "Moves between images and slices with Previous/Next buttons and index sliders.",
+      "views": [],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 6515,
+          "end": 6585,
+          "role": "logic",
+          "anchor": "ae28aa25d937",
+          "first": "with st.container(border=True):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 567,
+          "end": 592,
+          "role": "logic",
+          "symbol": "_run_auto_reader_tick",
+          "anchor": "4528af252439",
+          "first": "def _run_auto_reader_tick(total: int) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "measurements-panel",
+      "level": "component",
+      "parent": "pixel-viewer",
+      "title": "Measurements",
+      "summary": "Picks the measurement mode, unit, precision, label and calibration, and lists each measurement with its value and line profile, with delete, undo and clear.",
+      "views": [
+        "list",
+        "form"
+      ],
+      "interactions": [
+        "undo",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 6587,
+          "end": 6800,
+          "role": "logic",
+          "anchor": "f87443b846cc",
+          "first": "if not is_color:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3342,
+          "end": 3375,
+          "role": "logic",
+          "symbol": "_measurement_display",
+          "anchor": "17ab18add805",
+          "first": "def _measurement_display(item: dict) -> str:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3323,
+          "end": 3339,
+          "role": "logic",
+          "symbol": "_effective_pixel_spacing_mm",
+          "anchor": "71a73beedb5f",
+          "first": "def _effective_pixel_spacing_mm(dicom_spacing_mm) -> tuple[list | None, str]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3194,
+          "end": 3199,
+          "role": "logic",
+          "symbol": "_measure_distance",
+          "anchor": "303a3ae25a7e",
+          "first": "def _measure_distance("
+        },
+        {
+          "file": "code/app.py",
+          "start": 3225,
+          "end": 3232,
+          "role": "logic",
+          "symbol": "_measure_angle",
+          "anchor": "c037787dcfc4",
+          "first": "def _measure_angle("
+        }
+      ]
+    },
+    {
+      "id": "series-compare",
+      "level": "view",
+      "parent": null,
+      "title": "Series browser, comparison and visualizations",
+      "summary": "Jumps to a series, sets another image beside the current one, and shows edge, tissue-composition and ROI crop maps.",
+      "views": [
+        "side-by-side panes",
+        "image viewer"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 6802,
+          "end": 6953,
+          "role": "logic",
+          "anchor": "34b1d6d73767",
+          "first": "# --- Series / study browser + side-by-side comparison + cohort CSV ---"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3416,
+          "end": 3445,
+          "role": "logic",
+          "symbol": "_build_series_index",
+          "anchor": "a8ab0e270b4f",
+          "first": "def _build_series_index(self, files_list: list, *, limit: int = 250) -> list[dict]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3744,
+          "end": 3754,
+          "role": "logic",
+          "symbol": "_render_comparison_pair",
+          "anchor": "c1a3f3071949",
+          "first": "def _render_comparison_pair("
+        }
+      ]
+    },
+    {
+      "id": "analysis-results",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis results",
+      "summary": "Shows intensity statistics, quality proxies, radiomics features, volume previews and CT metrics for the selected image, in tabs.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 6955,
+          "end": 7210,
+          "role": "logic",
+          "anchor": "a262319f68f0",
+          "first": "if (native_stats or quality_report or radiomics_report"
+        },
+        {
+          "file": "code/core/theme.css",
+          "start": 244,
+          "end": 251,
+          "role": "style",
+          "symbol": ".analysis-results-heading",
+          "anchor": "4bc8fdbedfba",
+          "first": ".analysis-results-heading {"
+        }
+      ]
+    },
+    {
+      "id": "export-dialog",
+      "level": "component",
+      "parent": "input-panel",
+      "title": "Export",
+      "summary": "Packages de-identified DICOM, a structured report, measurements, radiomics tables, an annotated image and an HTML report, with a validated provenance manifest.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 7226,
+          "end": 7249,
+          "role": "logic",
+          "anchor": "a74ea4f5c0c1",
+          "first": "if st.sidebar.button("
+        },
+        {
+          "file": "code/app.py",
+          "start": 7252,
+          "end": 7264,
+          "role": "logic",
+          "symbol": "_export_dialog",
+          "anchor": "58d0b1dc4e7d",
+          "first": "def _export_dialog("
+        },
+        {
+          "file": "code/app.py",
+          "start": 837,
+          "end": 863,
+          "role": "logic",
+          "symbol": "_build_export_zip",
+          "anchor": "ed3b4e20977f",
+          "first": "def _build_export_zip(products: list[dict], *, zip_name: str = \"export\") -> bytes:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1795,
+          "end": 1802,
+          "role": "logic",
+          "symbol": "_build_dicom_sr_report",
+          "anchor": "fcc7232e8a71",
+          "first": "def _build_dicom_sr_report("
+        },
+        {
+          "file": "code/app.py",
+          "start": 3448,
+          "end": 3465,
+          "role": "logic",
+          "symbol": "_deidentified_dicom_bytes",
+          "anchor": "a46dce4975fe",
+          "first": "def _deidentified_dicom_bytes(target) -> bytes | None:"
+        }
+      ]
+    }
+  ]
+}

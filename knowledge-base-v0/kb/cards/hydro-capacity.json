@@ -1,0 +1,576 @@
+{
+  "schema": "astaui.card/1",
+  "id": "hydro-capacity",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T23:18:24Z"
+  },
+  "app": {
+    "title": "River and reservoir pollutant receiving-capacity calculator (API)",
+    "summary": "The person downloads a sample workbook and fills it in. For each water functional zone they give the target concentration, decay coefficient, non-uniformity coefficient, velocity–flow coefficients and reach length, plus the tributaries that join it. They add one daily-flow sheet per scheme and, if needed, reservoir parameters and daily storage. They upload the workbook to the compute endpoint. It splits each main channel at the tributary inflow points, works out each zone's daily receiving capacity and carries the outflow concentration downstream, then averages to months and to a typical year. They get the results back as a multi-sheet Excel file or as JSON. The JSON has a preview of the parsed zones and branches, run counts and the result tables.",
+    "task": {
+      "text": "Compute how much pollutant each water functional zone of a river or reservoir can take each year under one or more flow scenarios, from zone parameters and daily flow or storage records.",
+      "verbs": [
+        "derive",
+        "summarize",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "A workbook of model parameters for each functional zone, including where its tributaries join, plus daily flow series for each scenario and optional reservoir parameters with daily storage volumes",
+      "item": "a water functional zone (a river reach with its tributaries, or a reservoir) with its parameters and daily flow or storage",
+      "shapes": [
+        "table",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "computing receiving capacity per functional zone from prepared parameters and flow records, before reporting",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A web API, driven through its auto-generated docs page, takes one uploaded workbook and runs the whole calculation in a single request. A format field picks the output: an Excel download, or JSON with a parameter preview, run counts and every result table.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "toggle view"
+      ],
+      "patterns": []
+    },
+    "field": {
+      "text": "water environmental capacity calculation for functional zones in water resources engineering",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "water environmental capacity",
+        "water quality modelling",
+        "water functional zones"
+      ]
+    },
+    "workflow": {
+      "name": "compute a model quantity per unit from a parameter workbook and export result tables",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "download the sample workbook, fill in the vertical zone-input sheet, one daily-flow sheet per scheme and optional reservoir sheets, then upload it to the compute endpoint",
+          "parts": [
+            "sample-download",
+            "input-parser"
+          ]
+        },
+        {
+          "step": "check the parsed parameters",
+          "here": "JSON output echoes a table of zones with Cs, K, b, a, β, length and C0, a table of branches with length, join position and C0, and the first rows of flow",
+          "parts": [
+            "input-preview"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "for each day and zone, velocity u = a·Q^β; the main channel is split at tributary join points, inflows are flow-weighted at mixing points, and the capacity formula is summed over main-channel segments, with outflow concentration passed to the next zone",
+          "parts": [
+            "river-segment-calc"
+          ]
+        },
+        {
+          "step": "summarize to periods and per unit",
+          "here": "daily capacity is averaged to months, then to a multi-year month-by-zone table with an annual total; process and result tables give average Q, C0, outflow concentration and W per segment",
+          "parts": [
+            "scheme-aggregation"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "if reservoir sheets exist, daily storage is averaged to months by hydrological year (April–March) and W = 31.536·K·V·Cs·b gives monthly capacity per reservoir",
+          "parts": [
+            "reservoir-calc"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "the format field returns an xlsx with one sheet per result per scheme, or JSON with the results, counts, elapsed time and the xlsx as base64",
+          "parts": [
+            "result-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "main channel split into segments at tributary inflow points, with flow-weighted concentration mixing at each junction",
+        "a zone with no initial concentration takes the outflow concentration of the zone upstream, chaining zones along the river",
+        "several flow scenarios (方案N sheets) computed in one run, each with its own set of result sheets",
+        "reservoir capacity uses a storage-volume formula averaged over hydrological years running April to March",
+        "parameters come in a fixed vertical sheet layout, one column per zone and five rows per tributary"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "api-docs",
+      "level": "view",
+      "parent": null,
+      "title": "Auto-generated API page",
+      "summary": "The page the person works through: health and meta endpoints, plus forms to try each endpoint.",
+      "views": [
+        "form"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 51,
+          "end": 58,
+          "role": "logic",
+          "anchor": "94a4a94c23ae",
+          "first": "app = FastAPI(title=\"hydro-capacity-api\", version=\"1.0.0\")"
+        },
+        {
+          "file": "code/api.py",
+          "start": 62,
+          "end": 63,
+          "role": "logic",
+          "symbol": "health",
+          "anchor": "7c3e49dc2551",
+          "first": "def health() -> dict[str, str]:"
+        },
+        {
+          "file": "code/api.py",
+          "start": 67,
+          "end": 74,
+          "role": "logic",
+          "symbol": "meta_info",
+          "anchor": "10a3cb41c6f4",
+          "first": "def meta_info() -> dict:"
+        },
+        {
+          "file": "code/hydro_api_helpers.py",
+          "start": 18,
+          "end": 23,
+          "role": "logic",
+          "symbol": "cors_origins",
+          "anchor": "4553142122ab",
+          "first": "def cors_origins(name: str, port: int) -> list[str]:"
+        }
+      ]
+    },
+    {
+      "id": "sample-download",
+      "level": "component",
+      "parent": "api-docs",
+      "title": "Sample input workbook",
+      "summary": "Returns a ready-filled example input workbook to use as a template.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 250,
+          "end": 258,
+          "role": "logic",
+          "symbol": "sample_xlsx",
+          "anchor": "a3af25653670",
+          "first": "def sample_xlsx() -> Response:"
+        },
+        {
+          "file": "code/src/capacity/xlsx_bridge.py",
+          "start": 82,
+          "end": 140,
+          "role": "data",
+          "symbol": "create_example_xlsx",
+          "anchor": "4495625ab1ec",
+          "first": "def create_example_xlsx(xlsx_path: Path):"
+        }
+      ]
+    },
+    {
+      "id": "input-parser",
+      "level": "component",
+      "parent": "api-docs",
+      "title": "Workbook upload and parsing",
+      "summary": "Reads the uploaded workbook's vertical zone sheet, the daily-flow sheet for each scheme and the optional reservoir sheets into zones, branches and flow tables.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/capacity/xlsx_parser.py",
+          "start": 180,
+          "end": 208,
+          "role": "logic",
+          "symbol": "read_input_sheet_raw",
+          "anchor": "311512bd6cec",
+          "first": "def read_input_sheet_raw(xlsx_file) -> list:"
+        },
+        {
+          "file": "code/src/capacity/xlsx_parser.py",
+          "start": 27,
+          "end": 107,
+          "role": "logic",
+          "symbol": "parse_input_sheet",
+          "anchor": "558a5d1b61a2",
+          "first": "def parse_input_sheet(ws_data: list) -> Tuple[List[Zone], int]:"
+        },
+        {
+          "file": "code/src/capacity/xlsx_parser.py",
+          "start": 110,
+          "end": 128,
+          "role": "logic",
+          "symbol": "parse_flow_sheets",
+          "anchor": "f05722be1246",
+          "first": "def parse_flow_sheets(xlsx: pd.ExcelFile, scheme_count: int) -> Dict[int, pd.DataFrame]:"
+        },
+        {
+          "file": "code/src/capacity/xlsx_parser.py",
+          "start": 131,
+          "end": 160,
+          "role": "logic",
+          "symbol": "parse_reservoir_input",
+          "anchor": "743138e6e139",
+          "first": "def parse_reservoir_input(xlsx: pd.ExcelFile) -> Tuple[List[ReservoirZone], Optional[pd.DataFrame]]:"
+        },
+        {
+          "file": "code/src/capacity/xlsx_parser.py",
+          "start": 163,
+          "end": 177,
+          "role": "logic",
+          "symbol": "get_flow_column_map",
+          "anchor": "1f2b465e54cf",
+          "first": "def get_flow_column_map(zones: List[Zone], flow_columns: list) -> Dict[str, Dict[str, str]]:"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 63,
+          "end": 76,
+          "role": "data",
+          "symbol": "Zone",
+          "anchor": "fcbe177b47b3",
+          "first": "class Zone:"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 41,
+          "end": 46,
+          "role": "data",
+          "symbol": "Branch",
+          "anchor": "2565bfcc9517",
+          "first": "class Branch:"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 80,
+          "end": 87,
+          "role": "data",
+          "symbol": "ReservoirZone",
+          "anchor": "585844a8cfbc",
+          "first": "class ReservoirZone:"
+        }
+      ]
+    },
+    {
+      "id": "input-preview",
+      "level": "component",
+      "parent": "api-docs",
+      "title": "Parsed parameter preview",
+      "summary": "Echoes the parsed zone and tributary parameters and the first rows of flow, so the person can check the input was read correctly.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 89,
+          "end": 105,
+          "role": "logic",
+          "symbol": "_zones_preview",
+          "anchor": "57cd795fb7db",
+          "first": "def _zones_preview(zones: list) -> dict:"
+        },
+        {
+          "file": "code/api.py",
+          "start": 108,
+          "end": 121,
+          "role": "logic",
+          "symbol": "_branches_preview",
+          "anchor": "9e84baeb5048",
+          "first": "def _branches_preview(zones: list) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "river-segment-calc",
+      "level": "component",
+      "parent": "api-docs",
+      "title": "Segmented river capacity calculation",
+      "summary": "For each day and zone, computes velocity, splits the main channel at tributary inflows, mixes concentrations and sums capacity over main-channel segments, passing outflow concentration downstream.",
+      "views": [],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 453,
+          "end": 517,
+          "role": "logic",
+          "symbol": "calc_daily_capacity_with_segments",
+          "anchor": "c12db3ed1d3b",
+          "first": "def calc_daily_capacity_with_segments(daily_flow: pd.DataFrame, zones: List[Zone],"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 244,
+          "end": 374,
+          "role": "logic",
+          "symbol": "calc_zone_segments",
+          "anchor": "83ee7f99165d",
+          "first": "def calc_zone_segments(zone: Zone, main_Q: float,"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 193,
+          "end": 231,
+          "role": "logic",
+          "symbol": "calc_capacity_value",
+          "anchor": "46bdb85dcf36",
+          "first": "def calc_capacity_value(Cs: float, C0: float, Q: float, u: float,"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 173,
+          "end": 177,
+          "role": "logic",
+          "symbol": "calc_velocity",
+          "anchor": "feb20cb99266",
+          "first": "def calc_velocity(Q: float, a: float, beta: float) -> float:"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 234,
+          "end": 241,
+          "role": "logic",
+          "symbol": "calc_outflow_concentration",
+          "anchor": "a1e792df75a4",
+          "first": "def calc_outflow_concentration(C0: float, K: float, L: float, u: float) -> float:"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 50,
+          "end": 59,
+          "role": "data",
+          "symbol": "SegmentResult",
+          "anchor": "64d3d7f1746a",
+          "first": "class SegmentResult:"
+        }
+      ]
+    },
+    {
+      "id": "scheme-aggregation",
+      "level": "component",
+      "parent": "api-docs",
+      "title": "Scheme-by-scheme aggregation",
+      "summary": "Runs each flow scheme, then averages daily capacity to monthly and multi-year month-by-zone tables with annual totals, and builds per-segment process and result tables.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 124,
+          "end": 179,
+          "role": "logic",
+          "symbol": "_compute_capacity",
+          "anchor": "7b6183a83b73",
+          "first": "def _compute_capacity(xlsx_bytes: bytes) -> tuple[dict[str, pd.DataFrame], list, int, bool, pd.DataFrame]:"
+        },
+        {
+          "file": "code/api.py",
+          "start": 77,
+          "end": 86,
+          "role": "logic",
+          "symbol": "_add_unit",
+          "anchor": "a3f56d1684a5",
+          "first": "def _add_unit(df: pd.DataFrame, unit: str, col_names: list | None = None) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 163,
+          "end": 170,
+          "role": "logic",
+          "symbol": "calc_monthly_flow",
+          "anchor": "ba2a7d7c96ca",
+          "first": "def calc_monthly_flow(daily_flow: pd.DataFrame, flow_columns: List[str]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 568,
+          "end": 588,
+          "role": "logic",
+          "symbol": "calc_zone_monthly_avg",
+          "anchor": "e8f94887b894",
+          "first": "def calc_zone_monthly_avg(df: pd.DataFrame, zone_ids: List[str], is_capacity: bool = False) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 520,
+          "end": 540,
+          "role": "logic",
+          "symbol": "build_process_table",
+          "anchor": "fa2a14edb5d2",
+          "first": "def build_process_table(seg_accum: Dict, zones: List[Zone]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 543,
+          "end": 565,
+          "role": "logic",
+          "symbol": "build_result_table",
+          "anchor": "2e08d3d0782d",
+          "first": "def build_result_table(seg_accum: Dict, zones: List[Zone]) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "reservoir-calc",
+      "level": "component",
+      "parent": "api-docs",
+      "title": "Reservoir capacity by hydrological year",
+      "summary": "Averages daily reservoir storage to months by hydrological year and computes monthly and month-averaged receiving capacity per reservoir zone.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 594,
+          "end": 599,
+          "role": "logic",
+          "symbol": "get_hydro_year",
+          "anchor": "4a47ef40b568",
+          "first": "def get_hydro_year(date) -> int:"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 602,
+          "end": 608,
+          "role": "logic",
+          "symbol": "calc_reservoir_monthly_volume",
+          "anchor": "e951a14f8857",
+          "first": "def calc_reservoir_monthly_volume(daily_volume: pd.DataFrame, zone_ids: List[str]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 611,
+          "end": 628,
+          "role": "logic",
+          "symbol": "calc_reservoir_capacity_value",
+          "anchor": "43d75e21bb11",
+          "first": "def calc_reservoir_capacity_value(K: float, Cs: float, V: float, b: float) -> float:"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 631,
+          "end": 644,
+          "role": "logic",
+          "symbol": "calc_reservoir_monthly_capacity",
+          "anchor": "d222366e6fcf",
+          "first": "def calc_reservoir_monthly_capacity(monthly_volume: pd.DataFrame,"
+        },
+        {
+          "file": "code/src/capacity/calc_core.py",
+          "start": 647,
+          "end": 662,
+          "role": "logic",
+          "symbol": "calc_reservoir_zone_monthly_avg",
+          "anchor": "d7777bd3b0c1",
+          "first": "def calc_reservoir_zone_monthly_avg(df: pd.DataFrame, zone_ids: List[str]) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "result-export",
+      "level": "component",
+      "parent": "api-docs",
+      "title": "Result export (xlsx or JSON)",
+      "summary": "Returns every result table as a multi-sheet Excel file, or as JSON with the preview, zone and scheme counts, elapsed time and the workbook in base64.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "export",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 194,
+          "end": 196,
+          "role": "logic",
+          "symbol": "compute",
+          "anchor": "0d1f4ae9f90f",
+          "first": "async def compute("
+        },
+        {
+          "file": "code/api.py",
+          "start": 198,
+          "end": 246,
+          "role": "logic",
+          "anchor": "92a9bc2229a2",
+          "first": "content = await file.read()"
+        },
+        {
+          "file": "code/api.py",
+          "start": 182,
+          "end": 187,
+          "role": "logic",
+          "symbol": "_write_xlsx",
+          "anchor": "6ba382646ab3",
+          "first": "def _write_xlsx(all_scheme_results: dict[str, pd.DataFrame]) -> bytes:"
+        },
+        {
+          "file": "code/hydro_api_helpers.py",
+          "start": 43,
+          "end": 49,
+          "role": "logic",
+          "symbol": "df_to_json_safe",
+          "anchor": "4b91689b9b14",
+          "first": "def df_to_json_safe(df: pd.DataFrame, limit: int | None = None) -> dict:"
+        },
+        {
+          "file": "code/hydro_api_helpers.py",
+          "start": 52,
+          "end": 53,
+          "role": "logic",
+          "symbol": "build_json_response",
+          "anchor": "58787936e6c2",
+          "first": "def build_json_response("
+        }
+      ]
+    }
+  ]
+}

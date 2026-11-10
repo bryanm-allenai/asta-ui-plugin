@@ -1,0 +1,385 @@
+{
+  "schema": "astaui.card/1",
+  "id": "flow-panel-picker",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T08:12:09Z"
+  },
+  "app": {
+    "title": "Spectral Panel Picker",
+    "summary": "The person lists the markers in their experiment, picks the dyes they have on hand for each one, and ticks the markers that matter most. The app searches every combination of one dye per marker with no dye used twice. It ranks the panels so that the most similar pair of dyes is as different as possible, considering key markers first, then the whole panel, then a complexity index. The person opens any ranked panel to see its pairwise similarity matrix, its most similar pairs and its dye signatures, and downloads the ranked table. A second tab runs the same check on a panel the person already has.",
+    "task": {
+      "text": "Choose one dye per marker for a spectral flow cytometry panel so that the dyes stay as easy to unmix as possible, and check an existing panel for pairs that are too close.",
+      "verbs": [
+        "decide",
+        "derive",
+        "compare",
+        "identify",
+        "plan"
+      ]
+    },
+    "data": {
+      "text": "Reference spectral signatures, one row per dye and one column per detector, either simulated from public excitation and emission spectra or uploaded from single-stain controls. The person adds a list of markers, each with the dyes available for it.",
+      "item": "a candidate panel assigning one dye to each marker",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "planning a cytometry panel before staining and acquisition",
+      "terms": [
+        "plan",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "A form of marker rows with dye multi-selects and key checkboxes feeds a combinatorial search. The search fills a ranked table of panels, and choosing a panel from that table draws its similarity heatmap, its worst-pairs list, its complexity metric and a line chart of its signatures. A check tab sends a hand-picked dye set to the same detail view.",
+      "views": [
+        "form",
+        "table view",
+        "heatmap",
+        "line chart",
+        "summary stats",
+        "sidebar list"
+      ],
+      "interactions": [
+        "multi-select",
+        "select",
+        "import",
+        "export",
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail",
+        "master-detail"
+      ]
+    },
+    "field": {
+      "text": "fluorochrome panel design for spectral flow cytometry in immunology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "flow cytometry",
+        "spectral unmixing",
+        "panel design"
+      ]
+    },
+    "workflow": {
+      "name": "choose one option per slot from candidate lists to minimise the worst conflict",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Built-in signatures are simulated from public dye spectra for the instrument's lasers. A sidebar uploader can replace them with a CSV of the person's own reference signatures, normalised per dye.",
+          "parts": [
+            "spectra-sidebar"
+          ]
+        },
+        {
+          "step": "list the slots and the candidates available for each, marking which slots matter most",
+          "here": "A number input sets how many markers there are. Each marker row has a name, a multi-select of the dyes on hand and a 'key' checkbox, and the rows are seeded with an example panel.",
+          "parts": [
+            "marker-form"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Find panels' runs a pruned depth-first search over one-dye-per-marker combinations with no dye reused. Panels are scored by the worst cosine similarity among key-marker pairs, then among all pairs, then by the condition number. The button warns when a marker has no dyes and when the search stops early.",
+          "parts": [
+            "marker-form",
+            "panel-results"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A 'Best panels' table shows the top 10 ranked panels with key pairs max, all pairs max, complexity and the dye chosen for each marker.",
+          "parts": [
+            "panel-results"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "'Look at panel' selects a ranked panel and shows a similarity heatmap, the complexity index, the five most similar pairs coloured by hard-to-unmix thresholds, and a line chart of each dye's signature across detectors.",
+          "parts": [
+            "panel-detail"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Download table' saves the ranked panels as panels.csv.",
+          "parts": [
+            "panel-results"
+          ]
+        },
+        {
+          "step": "check an existing selection for conflicts",
+          "here": "The 'Check a panel' tab takes any set of dyes picked by hand and sends it to the same heatmap, worst-pairs and signature view.",
+          "parts": [
+            "check-panel",
+            "panel-detail"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each candidate is ranked by its single worst pair (a minimax objective) rather than by an average, and pairs involving priority slots are ranked first.",
+        "A conditioning measure (the condition number of the signature matrix) breaks ties as an overall index of unmixing difficulty.",
+        "Fixed similarity thresholds (0.98 and 0.90) colour pairs as very hard to unmix or as needing care.",
+        "The search is pruned and has a step limit, and the person is told when it stopped early and the result may not be optimal.",
+        "Reference signatures are simulated from excitation times binned emission for each instrument laser, and the person can swap in measured single-stain controls."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "spectra-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Spectra source sidebar",
+      "summary": "Chooses between built-in simulated dye signatures and an uploaded CSV of measured ones, and shows the colour guide for similarity thresholds.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 64,
+          "end": 85,
+          "role": "markup",
+          "anchor": "33cb86347b7c",
+          "first": "# ---------------- sidebar ----------------"
+        },
+        {
+          "file": "code/app.py",
+          "start": 13,
+          "end": 15,
+          "role": "logic",
+          "symbol": "load_builtin",
+          "anchor": "00ab99d50d56",
+          "first": "def load_builtin():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 19,
+          "end": 22,
+          "role": "logic",
+          "symbol": "load_uploaded",
+          "anchor": "d9c0e768de30",
+          "first": "def load_uploaded(file):"
+        },
+        {
+          "file": "code/panel.py",
+          "start": 29,
+          "end": 53,
+          "role": "logic",
+          "symbol": "signatures_from_spectra",
+          "anchor": "1971e7fc95b3",
+          "first": "def signatures_from_spectra(spectra):"
+        },
+        {
+          "file": "code/panel.py",
+          "start": 56,
+          "end": 60,
+          "role": "logic",
+          "symbol": "similarity_matrix",
+          "anchor": "a61a1a70effc",
+          "first": "def similarity_matrix(signatures):"
+        },
+        {
+          "file": "code/fetch_spectra.py",
+          "start": 1,
+          "end": 81,
+          "role": "data",
+          "anchor": "f1dddf28b156",
+          "first": "# Download excitation and emission spectra from FPbase (https://www.fpbase.org)"
+        }
+      ]
+    },
+    {
+      "id": "marker-form",
+      "level": "component",
+      "parent": "pick-tab",
+      "title": "Marker and dye form",
+      "summary": "Lets the person set the number of markers, name each one, choose the dyes available for it, tick the key markers and start the search.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 93,
+          "end": 133,
+          "role": "markup",
+          "anchor": "b8bdca3aa54f",
+          "first": "tab_pick, tab_check = st.tabs([\"Pick a panel\", \"Check a panel\"])"
+        },
+        {
+          "file": "code/panel.py",
+          "start": 75,
+          "end": 133,
+          "role": "logic",
+          "symbol": "find_panels",
+          "anchor": "c4bc8506849f",
+          "first": "def find_panels(options, key_markers, sim, top=10, max_steps=2_000_000):"
+        }
+      ]
+    },
+    {
+      "id": "pick-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Pick a panel",
+      "summary": "The tab where the person enters markers and dyes, runs the search and reviews the ranked panels.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 87,
+          "end": 158,
+          "role": "markup",
+          "anchor": "33405665f6b7",
+          "first": "# ---------------- main ----------------"
+        }
+      ]
+    },
+    {
+      "id": "panel-results",
+      "level": "component",
+      "parent": "pick-tab",
+      "title": "Best panels table",
+      "summary": "Shows the top ranked panels with their worst key-pair similarity, worst overall similarity, complexity and dye per marker, and offers them as a CSV download.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 134,
+          "end": 157,
+          "role": "logic",
+          "anchor": "b63bd82efc6b",
+          "first": "table = []"
+        },
+        {
+          "file": "code/panel.py",
+          "start": 63,
+          "end": 65,
+          "role": "logic",
+          "symbol": "complexity_index",
+          "anchor": "4f9a0e786b84",
+          "first": "def complexity_index(signatures, fluors):"
+        }
+      ]
+    },
+    {
+      "id": "panel-detail",
+      "level": "component",
+      "parent": "pick-tab",
+      "title": "Panel detail",
+      "summary": "For one set of dyes, draws the pairwise similarity heatmap, the complexity index, the most similar pairs coloured by threshold, and each dye's signature across detectors.",
+      "views": [
+        "heatmap",
+        "line chart",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 33,
+          "end": 61,
+          "role": "logic",
+          "symbol": "show_panel",
+          "anchor": "e1a65dbbc40b",
+          "first": "def show_panel(fluors, labels, sig, sim):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 25,
+          "end": 30,
+          "role": "style",
+          "symbol": "color_similarity",
+          "anchor": "d1541bace493",
+          "first": "def color_similarity(v):"
+        },
+        {
+          "file": "code/panel.py",
+          "start": 68,
+          "end": 72,
+          "role": "logic",
+          "symbol": "worst_pairs",
+          "anchor": "f325a1c3787a",
+          "first": "def worst_pairs(sim, fluors, n=5):"
+        },
+        {
+          "file": "code/panel.py",
+          "start": 63,
+          "end": 65,
+          "role": "logic",
+          "symbol": "complexity_index",
+          "anchor": "4f9a0e786b84",
+          "first": "def complexity_index(signatures, fluors):"
+        }
+      ]
+    },
+    {
+      "id": "check-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Check a panel",
+      "summary": "Lets the person pick the dyes of an existing panel and see which pairs are too close, using the panel detail view.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 160,
+          "end": 165,
+          "role": "markup",
+          "anchor": "4d3e4005665e",
+          "first": "with tab_check:"
+        }
+      ]
+    }
+  ]
+}

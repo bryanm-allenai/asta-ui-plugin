@@ -1,0 +1,505 @@
+{
+  "schema": "astaui.card/1",
+  "id": "multiomics-cancer-subtype-demo",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:40:26Z"
+  },
+  "app": {
+    "title": "MLOmics — Cancer Subtype Classifier (Latent-Fusion Multi-Omics Classifier)",
+    "summary": "The person picks a cohort and one of three trained classifiers, then uploads a table of samples with several omics measurements each. The interface aligns the table to the features the model expects, scales it with the preprocessing fitted at training time, and shows each sample's predicted class with its confidence. The predictions can be exported as a CSV. For one chosen sample it shows the probability of every class and the features that pushed the prediction, and it can draft a plain-language summary. A second tab sets the models against each other on their cross-validation metrics, and a third tab converts per-modality lab files into the single-row input the classifier needs.",
+    "task": {
+      "text": "Assign each new sample a molecular subtype with a trained multi-omics classifier, see which features drove the call, and judge how the competing models compare.",
+      "verbs": [
+        "identify",
+        "derive",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A feature table of samples. Each row joins thousands of measurements from four omics modalities (gene expression, microRNA, DNA methylation, copy number). There are also precomputed cross-validation metrics, embeddings and pathway enrichment results for the trained models.",
+      "item": "one tumour sample, a row of concatenated omics features",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "applying trained subtype classifiers to new samples and comparing the models, after training",
+      "terms": [
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar radios set the cohort and the model, and these drive every tab. In the prediction tab, an upload fills a sequence of sections: prediction cards, a class-probability chart and an attribution chart for the sample chosen in a dropdown, then a generated summary. The comparison tab is a dashboard of metric cards, a filterable table, bar, ROC and radar charts and latent-space scatter plots, and the converter tab is a stepped form that produces a file to upload in the prediction tab.",
+      "views": [
+        "sidebar list",
+        "summary stats",
+        "bar chart",
+        "table view",
+        "line chart",
+        "scatter plot",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "toggle view",
+        "filter",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "dashboard",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "multi-omics subtype classification with machine learning in cancer genomics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "multi omics integration",
+        "cancer subtyping",
+        "explainable machine learning"
+      ]
+    },
+    "workflow": {
+      "name": "classify new samples with a trained model and explain each prediction",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "pick a cohort and a model in the sidebar, then upload a samples-by-features CSV (a sample CSV can be downloaded as a template). Per-modality lab files can first be converted into this format in the Data Converter tab.",
+          "parts": [
+            "sidebar-controls",
+            "prediction-tab",
+            "data-converter"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "the upload is reoriented, checked for missing features, imputed and scaled per modality with the training-time preprocessing, then run through XGBoost, intermediate fusion or pathway-aware fusion. Each sample gets a card with its predicted subtype and confidence.",
+          "parts": [
+            "prediction-tab"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "a dropdown picks one sample. Its probability for every subtype is drawn as bars, and its top features are shown as a SHAP waterfall (trees) or an Integrated Gradients bar chart (deep models), with counts of top features per modality.",
+          "parts": [
+            "confidence-chart",
+            "feature-attribution"
+          ]
+        },
+        {
+          "step": "write up the result",
+          "here": "if an API key is set, a language model drafts a three-paragraph research summary from the predicted class, the probabilities, the top features and the enriched pathways.",
+          "parts": [
+            "research-summary"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "the Model Comparison tab filters by cohort and shows the best model, metric cards, a highlighted metrics table, grouped bars for a chosen metric, ROC curves, a radar profile, calibration, confusion matrices, pathway enrichment and ablations.",
+          "parts": [
+            "model-comparison",
+            "latent-space"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "the per-sample predictions (sample, predicted subtype, confidence) download as a CSV.",
+          "parts": [
+            "prediction-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each sample joins four omics modalities, so features are split into blocks per modality for preprocessing, fusion encoders and attribution summaries.",
+        "The explanation method follows the model: TreeSHAP for the tree baseline, Integrated Gradients (precomputed, or computed live as a fallback) for the neural fusion models.",
+        "One model groups genes by biological pathway, and its pathway attention weights are shown next to the per-feature attributions.",
+        "A converter normalizes single-patient lab files from raw counts, log2 or beta values to z-scores and reports how many features in each modality matched what the model expects.",
+        "Models are compared on cross-validation metrics as well as calibration and on how performance changes when modalities are removed or missing."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Cohort and model selector",
+      "summary": "Radio buttons choose the cancer cohort and which trained classifier to use, and these drive every tab.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 2109,
+          "end": 2137,
+          "role": "markup",
+          "anchor": "9468acb52b91",
+          "first": "st.markdown(\"---\")"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 191,
+          "end": 198,
+          "role": "data",
+          "symbol": "load_config_json",
+          "anchor": "d84ce14dca3b",
+          "first": "def load_config_json(cancer_type: str = \"GS-BRCA\"):"
+        }
+      ]
+    },
+    {
+      "id": "prediction-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Prediction",
+      "summary": "Takes an uploaded sample table, preprocesses it as at training time, shows a subtype-and-confidence card per sample and exports the predictions as CSV.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 2269,
+          "end": 2416,
+          "role": "markup",
+          "anchor": "0bbc16582c43",
+          "first": "with tab_predict:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 368,
+          "end": 407,
+          "role": "logic",
+          "symbol": "normalize_uploaded_dataframe",
+          "anchor": "94ef845853c8",
+          "first": "def normalize_uploaded_dataframe(uploaded_file, expected_features: list[str]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 410,
+          "end": 469,
+          "role": "logic",
+          "symbol": "preprocess_uploaded_csv",
+          "anchor": "dfdcebfe5181",
+          "first": "def preprocess_uploaded_csv(df_raw: pd.DataFrame, cfg: dict, cancer_type: str) -> np.ndarray:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 489,
+          "end": 493,
+          "role": "logic",
+          "symbol": "predict_xgboost",
+          "anchor": "8a5d788a0893",
+          "first": "def predict_xgboost(model, X_scaled: np.ndarray):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 496,
+          "end": 505,
+          "role": "logic",
+          "symbol": "predict_fusion",
+          "anchor": "f97b8a5e047b",
+          "first": "def predict_fusion(model, X_scaled: np.ndarray, cfg: dict):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 831,
+          "end": 855,
+          "role": "markup",
+          "symbol": "render_prediction_card",
+          "anchor": "3ebb0d0085a2",
+          "first": "def render_prediction_card(sample_id: str, class_name: str, confidence: float):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 293,
+          "end": 300,
+          "role": "data",
+          "symbol": "load_sample_csv_bytes",
+          "anchor": "7b495f930755",
+          "first": "def load_sample_csv_bytes(cancer_type: str = \"GS-BRCA\"):"
+        }
+      ]
+    },
+    {
+      "id": "confidence-chart",
+      "level": "component",
+      "parent": "prediction-tab",
+      "title": "Class probability chart",
+      "summary": "For the sample picked in a dropdown, draws its probability for every subtype as bars.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 2418,
+          "end": 2431,
+          "role": "markup",
+          "anchor": "af3566bfaa59",
+          "first": "# --- Confidence chart ---"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 858,
+          "end": 859,
+          "role": "logic",
+          "symbol": "render_confidence_chart",
+          "anchor": "3e54bb57c649",
+          "first": "def render_confidence_chart("
+        }
+      ]
+    },
+    {
+      "id": "feature-attribution",
+      "level": "component",
+      "parent": "prediction-tab",
+      "title": "Feature importance",
+      "summary": "Shows which features pushed the selected sample's prediction: a SHAP waterfall for the tree model, or an Integrated Gradients bar chart with per-modality counts and pathway attention weights for the fusion models.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 2433,
+          "end": 2656,
+          "role": "markup",
+          "anchor": "156ffd17054b",
+          "first": "# --- Feature Importance (SHAP / IG) ---"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 899,
+          "end": 904,
+          "role": "logic",
+          "symbol": "render_shap_waterfall",
+          "anchor": "27feb3dc2ab7",
+          "first": "def render_shap_waterfall("
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 508,
+          "end": 533,
+          "role": "logic",
+          "symbol": "compute_shap_explanation",
+          "anchor": "66e4e9770e49",
+          "first": "def compute_shap_explanation(model, X_scaled: np.ndarray, sample_idx: int = 0):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 536,
+          "end": 541,
+          "role": "logic",
+          "symbol": "compute_ig_attribution_live",
+          "anchor": "f5c87269dca6",
+          "first": "def compute_ig_attribution_live("
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 315,
+          "end": 334,
+          "role": "data",
+          "symbol": "load_fusion_attributions",
+          "anchor": "497cbda4410b",
+          "first": "def load_fusion_attributions(cancer_type: str = \"GS-BRCA\", model_type: str = \"intermediate\"):"
+        }
+      ]
+    },
+    {
+      "id": "research-summary",
+      "level": "component",
+      "parent": "prediction-tab",
+      "title": "Research summary",
+      "summary": "Drafts a plain-language three-paragraph summary of the selected sample's prediction, top features and enriched pathways with a language model.",
+      "views": [],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 2658,
+          "end": 2724,
+          "role": "markup",
+          "anchor": "61b97bbb39dd",
+          "first": "# --- LLM Research Summary ---"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 659,
+          "end": 666,
+          "role": "logic",
+          "symbol": "generate_research_summary",
+          "anchor": "3737d2446d3b",
+          "first": "def generate_research_summary("
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 622,
+          "end": 627,
+          "role": "logic",
+          "symbol": "_call_groq_chat_completion",
+          "anchor": "8b2d94a71887",
+          "first": "def _call_groq_chat_completion("
+        }
+      ]
+    },
+    {
+      "id": "model-comparison",
+      "level": "view",
+      "parent": null,
+      "title": "Model Comparison",
+      "summary": "A dashboard that sets the trained models against each other on cross-validation metrics: best-model banner, metric cards, highlighted table, chosen-metric bars, ROC curves, radar profile, calibration, confusion matrices, pathway enrichment and ablations.",
+      "views": [
+        "summary stats",
+        "table view",
+        "bar chart",
+        "line chart"
+      ],
+      "interactions": [
+        "filter",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 2737,
+          "end": 3163,
+          "role": "markup",
+          "anchor": "bbcabc42dc14",
+          "first": "with tab_compare:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 3272,
+          "end": 3573,
+          "role": "markup",
+          "anchor": "c0d1fcc22434",
+          "first": "# ============================================================="
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 284,
+          "end": 289,
+          "role": "data",
+          "symbol": "load_model_comparison",
+          "anchor": "2be8ce696d65",
+          "first": "def load_model_comparison():"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 338,
+          "end": 360,
+          "role": "data",
+          "symbol": "load_enrichment_results",
+          "anchor": "e9fa6fa8cebf",
+          "first": "def load_enrichment_results():"
+        }
+      ]
+    },
+    {
+      "id": "latent-space",
+      "level": "component",
+      "parent": "model-comparison",
+      "title": "Latent space visualization",
+      "summary": "Two t-SNE scatter plots of the fusion model's embeddings side by side, one coloured by true subtype and one by correct versus misclassified.",
+      "views": [
+        "scatter plot",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 3165,
+          "end": 3270,
+          "role": "markup",
+          "anchor": "43495f44aaad",
+          "first": "# ============================================================="
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 304,
+          "end": 311,
+          "role": "data",
+          "symbol": "load_latent_space_data",
+          "anchor": "49f2211bc65a",
+          "first": "def load_latent_space_data(cancer_type: str = \"GS-BRCA\"):"
+        }
+      ]
+    },
+    {
+      "id": "data-converter",
+      "level": "view",
+      "parent": null,
+      "title": "Lab Data Converter",
+      "summary": "A four-step form: set the sample ID, cohort and data format, upload a file for each modality, convert, then check per-modality feature coverage and download a CSV ready for prediction.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 3578,
+          "end": 3851,
+          "role": "markup",
+          "anchor": "22dd2a74abe4",
+          "first": "with tab_convert:"
+        }
+      ]
+    }
+  ]
+}

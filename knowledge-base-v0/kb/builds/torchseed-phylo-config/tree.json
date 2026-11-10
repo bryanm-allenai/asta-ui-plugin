@@ -1,0 +1,806 @@
+{
+ "interface": {
+  "title": "torchseed — graphical configuration builder for torchtree",
+  "field": "Phylogenetics / molecular evolution (Bayesian phylodynamics, molecular-clock time trees)",
+  "stage_of_work": "Analysis setup: preparing the data and specifying the model before running inference offline",
+  "what_it_is_for": "A step-by-step wizard that loads an alignment, tip dates and a starting tree, checks how clock-like the data are, and turns the chosen substitution, clock, tree-prior, prior and variational-inference (ADVI) settings into a torchtree JSON config file to download."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "I uploaded alignment.fasta (DNA, 10 taxa × 48 sites; taxon9 is all N), dates.csv (taxon9_2021.90 has no date, so it gives 9 of 10 dated) and tree.nwk. The app has no built-in example. The alignment viewer loads msa.js from a CDN, and it did render here."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Specify a complete Bayesian model of how sequences evolved over time, check it against the data, and export it as a file that an inference engine runs elsewhere",
+  "specific": "Build a torchtree JSON config (GTR + Weibull + invariant sites, strict clock, Skygrid coalescent tree prior with GMRF, ADVI) from a FASTA alignment, tip dates and a Newick tree, then download samples.json. Caveat: in this run the exported samples.json was generated while the dates came from dates.csv, so only 9/10 taxa were dated and taxon9 has no date attribute; the dates were reset to 10/10 only after export and the file was not regenerated",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Load and check the input data",
+    "specific": "Tabs 1–3: Alignment, Dates, Tree",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Import a sequence dataset and confirm how many samples and positions it has",
+      "specific": "Upload the FASTA alignment, pick the DNA data type in the Import Options dialog, and read the Taxa/Sites counts in the alignment table",
+      "screens": [
+       "screens/011.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Upload on Tab 1 and gave alignment.fasta",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Data type dropdown (DNA / Protein), chose DNA",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Import",
+        "screens": [
+         "screens/011.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Look at the raw sequences to spot bad samples",
+      "specific": "Open the alignment viewer (eye button) to see the colour-coded MSA; taxon9 is all N",
+      "branch": "optional",
+      "screens": [
+       "screens/013.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed the eye (view) button in the alignment row",
+        "screens": [
+         "screens/012.webp",
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "closed the Alignment viewer with ×",
+        "screens": [
+         "screens/014.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Attach a collection time to every sample so the analysis can be calibrated in real time",
+      "specific": "Tick 'Use tip dates', set the time direction, then get the dates either from the taxon names with a regex or from a CSV. Watch the 'Dates loaded for N/M taxa' banner: it is the only place a missing date is flagged, since the Output tab still reports 'Configuration ready.' when a sample is undated",
+      "screens": [
+       "screens/017.webp",
+       "screens/020.webp",
+       "screens/078.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "ticked 'Use tip dates (for time trees)'",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Time direction 'Since some time in the past'",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "task",
+        "general": "Pull dates out of the sample names with a pattern",
+        "specific": "Date source 'From taxon names (regex)' with the default _(\\d{4}(?:\\.\\d+)?)$; result: 10/10 taxa, range 2019.500–2022.150, with an Age/Height column. Age/Height depends on Time direction: under 'Since some time in the past' (used here) it is the age relative to the newest sample, while the replay under 'Before present' saw it equal the raw date",
+        "branch": "one-of",
+        "screens": [
+         "screens/017.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "pressed 'Parse dates from taxon names'",
+          "screens": [
+           "screens/017.webp"
+          ]
+         }
+        ],
+        "id": "t4",
+        "check": "replayed"
+       },
+       {
+        "kind": "task",
+        "general": "Load dates from a separate table",
+        "specific": "Date source 'From CSV file' with dates.csv ('strain' and 'date' columns); result: 9/10 taxa, and taxon9 is left out of the date table. This is the state the regression (t9) and the export (t15) were run in",
+        "branch": "one-of",
+        "screens": [
+         "screens/020.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "chose radio 'From CSV file'",
+          "screens": [
+           "screens/018.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "pressed Upload and gave dates.csv",
+          "screens": [
+           "screens/019.webp",
+           "screens/020.webp"
+          ]
+         }
+        ],
+        "id": "t5",
+        "check": "replayed"
+       },
+       {
+        "kind": "task",
+        "general": "Check how the sampling times are spread",
+        "specific": "Open the Date histogram and drag the 'Number of bins' slider",
+        "branch": "optional",
+        "screens": [
+         "screens/022.webp",
+         "screens/023.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "expanded 'Date histogram'",
+          "screens": [
+           "screens/022.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "dragged Number of bins slider from 5 to 8",
+          "screens": [
+           "screens/023.webp"
+          ]
+         }
+        ],
+        "id": "t6",
+        "check": "replayed"
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Load a starting tree and look at it",
+      "specific": "Upload tree.nwk (Newick or NEXUS) and open the Tree viewer",
+      "screens": [
+       "screens/026.webp",
+       "screens/028.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Upload on Tab 3 and gave tree.nwk",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed '👁 View tree'",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Layout 'Circular'",
+        "screens": [
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed '－ Zoom' and 'Spacing ↕＋'",
+        "screens": [
+         "screens/030.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check that genetic divergence grows steadily with sampling time before assuming a clock",
+      "specific": "Root-to-tip regression: pick an optimisation criterion and press Compute. It searches every edge for the best root and reports Rate (slope), TMRCA (x-intercept), r² and n tips, with a scatter plot and fitted line. Run here with CSV dates, so only 9 tips were used (undated samples are silently dropped); the replay with all 10 dated got rate 0.01168 and r² 0.9345",
+      "screens": [
+       "screens/034.webp",
+       "screens/035.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded 'Root-to-tip regression'",
+        "screens": [
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose criterion 'r² (maximise coefficient of determination)'",
+        "screens": [
+         "screens/032.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Compute → rate 0.01111, TMRCA 2017, r² 0.9184, 9 tips",
+        "screens": [
+         "screens/034.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered a point → tooltip taxon6_2020.80, date 2020.8, r2t 0.043446",
+        "screens": [
+         "screens/035.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'SSR (minimise sum of squared residuals)' and pressed Compute → same rooting and values",
+        "screens": [
+         "screens/036.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Choose the model",
+    "specific": "Tabs 4–6: Site Model, Clock Model, Priors",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Choose how characters change along the tree and how rates vary between positions",
+      "specific": "Pick GTR from JC69/HKY/GTR/K80/Custom, then add discretised Weibull rate categories and a proportion of invariant sites (+I)",
+      "screens": [
+       "screens/039.webp",
+       "screens/047.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Model dropdown and chose GTR (frequencies and rates fields with Est. ticks, symbolic Q matrix)",
+        "screens": [
+         "screens/038.webp",
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "ticked 'Discretised Weibull rate categories' (4 categories, sitemodel.shape)",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "expanded 'Show Weibull distribution' and pressed + on shape to reach 1.2",
+        "screens": [
+         "screens/043.webp",
+         "screens/045.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "ticked 'Proportion of invariant sites (+I)' (sitemodel.pinv 0.05)",
+        "screens": [
+         "screens/047.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Choose how evolutionary rate varies across lineages and give it a starting value",
+      "specific": "Clock model: compare 'Strict clock' with 'One rate per branch' (branchmodel.rates dim=18), keep strict, and type 0.0111 as the starting rate (the slope of the 9-tip regression in t9; with all 10 tips dated the slope is 0.01168)",
+      "screens": [
+       "screens/050.webp",
+       "screens/052.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose 'One rate per branch'",
+        "screens": [
+         "screens/050.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'Strict clock — one rate for all branches'",
+        "screens": [
+         "screens/051.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 0.0111 into branchmodel.rate and pressed Enter",
+        "screens": [
+         "screens/052.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Choose a population model as the prior on the tree",
+      "specific": "Coalescent model dropdown (None / Constant / Exponential / Skyglide / Skygrid / Skyride); I chose Skygrid, which shows epochs=10, cutoff=10 and coalescent.theta dim=10",
+      "screens": [
+       "screens/054.webp",
+       "screens/056.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Coalescent model dropdown",
+        "screens": [
+         "screens/054.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'Skygrid (piecewise-constant, fixed grid)'",
+        "screens": [
+         "screens/056.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Set prior distributions on every estimated parameter, including priors on the priors' own settings",
+      "specific": "Parameter priors: Dirichlet on GTR rates/frequencies, Exponential on shape, Beta on pinv, CTMCScale on clock rate, and GMRF plus Gamma precision added by Skygrid; promote the shape prior's 'rate' to its own parameter and give it a Gamma prior",
+      "screens": [
+       "screens/057.webp",
+       "screens/061.webp",
+       "screens/065.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled through the auto-filled prior cards",
+        "screens": [
+         "screens/057.webp",
+         "screens/058.webp",
+         "screens/061.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed '➕ add prior on rate' under sitemodel.shape → linked to sitemodel.shape.exponential.rate, with an Unlink button",
+        "screens": [
+         "screens/060.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "in the new sitemodel.shape.exponential.rate card, changed Distribution from Exponential to Gamma",
+        "screens": [
+         "screens/063.webp",
+         "screens/065.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Review the inference settings, export the analysis file, then correct the dates",
+    "specific": "Tabs 7–8: Algorithm, Output; afterwards back to Tab 2 (Dates)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Review the settings of the approximate-inference method",
+      "specific": "Algorithm tab, viewed only (no values edited): node-height reparameterisation (Proportions; root-height offset 2.65), a variational loc/scale per parameter with its transform, Adam optimiser (lr 0.1, 100000 iterations), Stan ELBO convergence (100 samples, every 100 iterations, tolerance 0.01), output stem 'samples', 1000 posterior samples",
+      "screens": [
+       "screens/066.webp",
+       "screens/067.webp",
+       "screens/079.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened 7 · Algorithm and scrolled",
+        "screens": [
+         "screens/066.webp",
+         "screens/067.webp",
+         "screens/079.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Generate the analysis file, check it, and save it",
+      "specific": "Press Generate / Refresh JSON, read the collapsible JSON preview and the Component summary (id/type), then press 'Download samples.json'. Caveat: the Output tab said 'Configuration ready.' and exported taxon9 without a date even though only 9/10 taxa were dated; it gives no warning, so check the N/M banner on the Dates tab before exporting",
+      "screens": [
+       "screens/070.webp",
+       "screens/073.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened 8 · Output before loading data → 'Load an alignment (Tab 1) and a tree (Tab 3) first.'",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Generate / Refresh JSON' → 'Configuration ready.'",
+        "screens": [
+         "screens/070.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Download samples.json' (21 KB; StrictClockModel rate 0.0111, GTR, WeibullSiteModel, PiecewiseConstantCoalescentGridModel, GMRF; taxon9 had no date attribute)",
+        "screens": [
+         "screens/070.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "expanded 'Component summary'",
+        "screens": [
+         "screens/073.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Redo the date assignment so that every sample is dated",
+      "specific": "After export, back on Tab 2: switch the date source to regex and parse again, which takes the count from 9/10 back to 10/10. The JSON was not regenerated afterwards, so the downloaded samples.json still reflects 9/10",
+      "branch": "repeat",
+      "screens": [
+       "screens/078.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose radio 'From taxon names (regex)'",
+        "screens": [
+         "screens/075.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Parse dates from taxon names' (twice; the first press landed during a page refresh)",
+        "screens": [
+         "screens/077.webp",
+         "screens/078.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Sequence alignment import with type dialog and colour viewer",
+   "general": "Upload a sequence file, say what kind of sequences it holds, see a one-line summary of samples × positions, and open a colour-coded grid of the whole alignment to spot bad samples",
+   "specific": "FASTA upload → Import Options dialog (DNA/Protein) → table row (Name, File, Taxa, Sites, Type) with view and delete buttons → Alignment viewer modal (msa.js)",
+   "steps": [
+    "Upload the FASTA file",
+    "Choose DNA or Protein in the Import Options dialog and press Import",
+    "Read the Taxa and Sites counts in the row",
+    "Press the eye button to open the colour-coded alignment viewer",
+    "Close it, or remove the alignment with the bin button"
+   ],
+   "serves_tasks": [
+    "Import a sequence dataset and confirm how many samples and positions it has",
+    "Look at the raw sequences to spot bad samples"
+   ],
+   "screens": [
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/011.webp",
+    "screens/013.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Sample-date extraction from names or a table, with coverage check and histogram",
+   "general": "Give every sample a decimal date, either by matching a pattern in its name or by joining a table, then see how many samples got a date, the date range, a per-sample age/height column whose meaning depends on the chosen time direction (age relative to the newest sample when counting forward from a past origin; the raw date was shown under 'before present'), and a histogram whose bin count you can change. The coverage count is the only warning that a sample is undated",
+   "specific": "Dates tab: Use tip dates checkbox, Time direction, Date source radio (regex / CSV), 'Parse dates from taxon names', the 'Dates loaded for N/M taxa · range' banner, the Date table (Taxon, Date, Age/Height; CSV download), and a Date histogram with a bins slider",
+   "steps": [
+    "Tick 'Use tip dates'",
+    "Choose a time direction",
+    "Choose regex or CSV as the date source",
+    "Parse with the regex or upload the CSV",
+    "Read the N/M coverage banner and the date table",
+    "Open the histogram and drag the bins slider"
+   ],
+   "serves_tasks": [
+    "Attach a collection time to every sample so the analysis can be calibrated in real time",
+    "Check how the sampling times are spread",
+    "Redo the date assignment so that every sample is dated"
+   ],
+   "screens": [
+    "screens/017.webp",
+    "screens/020.webp",
+    "screens/022.webp",
+    "screens/023.webp",
+    "screens/078.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Interactive tree viewer with layout switching",
+   "general": "Draw a loaded tree in a pop-up window and change its layout, zoom and spacing to inspect its shape and labels",
+   "specific": "'👁 View tree' modal with ＋/－ Zoom, Spacing ↕＋/↕−, a Layout select (Rectangular, Diagonal, Hierarchical, Radial, Circular) and Reset",
+   "steps": [
+    "Upload a Newick or NEXUS tree",
+    "Press View tree",
+    "Switch the layout, e.g. to Circular",
+    "Zoom or change the spacing",
+    "Reset or close"
+   ],
+   "serves_tasks": [
+    "Load a starting tree and look at it"
+   ],
+   "screens": [
+    "screens/028.webp",
+    "screens/029.webp",
+    "screens/030.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Root-to-tip regression with best-root search",
+   "general": "Test whether divergence grows linearly with sampling time: search for the root that best fits by a chosen criterion, then show the slope (rate), the x-intercept (origin date), r² and point count, with a scatter plot, fitted line and hover labels. Only dated samples are used, so check the point count against the number of samples",
+   "specific": "Tree tab expander: 'Optimisation criterion' (r² or SSR) + Compute → metrics Rate (slope), TMRCA (x-intercept), r², n tips, and a Plotly plot of root-to-tip distance vs date",
+   "steps": [
+    "Load a tree and assign dates",
+    "Open the Root-to-tip regression expander",
+    "Choose r² or SSR",
+    "Press Compute",
+    "Read the rate, TMRCA, r² and n tips",
+    "Hover points to identify outlying samples"
+   ],
+   "serves_tasks": [
+    "Check that genetic divergence grows steadily with sampling time before assuming a clock",
+    "Choose how evolutionary rate varies across lineages and give it a starting value"
+   ],
+   "screens": [
+    "screens/031.webp",
+    "screens/034.webp",
+    "screens/035.webp",
+    "screens/036.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Model picker with parameter table, estimate toggles and formula preview",
+   "general": "Pick a model from a list and get its free parameters, each with a starting value and a fix-or-estimate switch, plus the model's formula drawn as maths",
+   "specific": "Substitution model dropdown (JC69/HKY/GTR/K80/Custom) → rows like 'substmodel.frequencies' and 'substmodel.rates', each with a starting value and an Est. checkbox, and a rendered Q matrix and P(t)=e^{Qt}",
+   "steps": [
+    "Open the Model dropdown",
+    "Choose a model",
+    "Edit the parameters' starting values",
+    "Tick or untick Est. for each parameter",
+    "Read the rendered Q matrix"
+   ],
+   "serves_tasks": [
+    "Choose how characters change along the tree and how rates vary between positions"
+   ],
+   "screens": [
+    "screens/038.webp",
+    "screens/039.webp",
+    "screens/040.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Discretised rate-heterogeneity preview",
+   "general": "Turn on rate variation across positions, set its shape and the number of categories, and see the density curve with category cut lines and a table of category probabilities, quantiles and rates that updates live; optionally add a share of invariant positions",
+   "specific": "'Discretised Weibull rate categories' checkbox → Number of categories and sitemodel.shape (with Est.) → 'Show Weibull distribution' expander (density plot plus Prob/Quantile/Rate table); '+I' checkbox → sitemodel.pinv",
+   "steps": [
+    "Tick the Weibull checkbox",
+    "Set the number of categories",
+    "Change the shape with +/−",
+    "Open 'Show Weibull distribution' and watch the curve and rates table update",
+    "Tick +I and set pinv"
+   ],
+   "serves_tasks": [
+    "Choose how characters change along the tree and how rates vary between positions"
+   ],
+   "screens": [
+    "screens/041.webp",
+    "screens/043.webp",
+    "screens/045.webp",
+    "screens/046.webp",
+    "screens/047.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Hierarchical prior editor with hyperparameter promotion",
+   "general": "Each estimated parameter gets a card where you choose a prior distribution and its settings. Any setting can be promoted to a parameter of its own, which adds a new card for its prior; you can unlink it again or remove a prior",
+   "specific": "Priors tab 'Parameter priors' cards (e.g. sitemodel.shape — [0,∞)): Distribution dropdown (Exponential, LogNormal, Normal, Gamma, Beta, Dirichlet, Laplace, …), '➕ add prior on <hyperparameter>' → 'linked to sitemodel.shape.exponential.rate' plus Unlink, a new card for that hyperparameter, and 🗑 Remove",
+   "steps": [
+    "Open a parameter's prior card",
+    "Choose a distribution and set its values",
+    "Press '➕ add prior on rate' to promote the hyperparameter",
+    "Edit the new card for the hyperparameter (e.g. switch it to Gamma)",
+    "Unlink or Remove if needed"
+   ],
+   "serves_tasks": [
+    "Set prior distributions on every estimated parameter, including priors on the priors' own settings"
+   ],
+   "screens": [
+    "screens/058.webp",
+    "screens/059.webp",
+    "screens/060.webp",
+    "screens/062.webp",
+    "screens/063.webp",
+    "screens/065.webp"
+   ],
+   "id": "f7",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Tree-prior selector that adds the priors it needs",
+   "general": "Choose a population-history model for the tree; the form shows that model's settings and adds the smoothing prior and hyperprior it requires",
+   "specific": "Coalescent model dropdown (None / Constant / Exponential / Skyglide / Skygrid / Skyride); Skygrid shows Number of epochs and Cutoff time, sets coalescent.theta dim=10, and adds a GMRF prior on coalescent.theta.log with a Gamma prior on gmrf.precision",
+   "steps": [
+    "Open the Coalescent model dropdown",
+    "Choose a model (e.g. Skygrid)",
+    "Set epochs and cutoff",
+    "Check the added GMRF and precision prior cards"
+   ],
+   "serves_tasks": [
+    "Choose a population model as the prior on the tree"
+   ],
+   "screens": [
+    "screens/054.webp",
+    "screens/056.webp",
+    "screens/061.webp"
+   ],
+   "id": "f8",
+   "check": "replayed"
+  },
+  {
+   "name": "Config generation with preview, summary and download",
+   "general": "Build the final machine-readable analysis file from everything set in the earlier steps, browse it as a collapsible tree, list its components, and download it. It checks only that the required inputs are loaded, not that every sample is dated",
+   "specific": "Output tab: refuses until an alignment and tree are loaded; then Generate / Refresh JSON → 'Configuration ready.' (shown even with undated taxa), a JSON preview expander, a Component summary (id, type) and 'Download samples.json' (file name taken from the output stem on the Algorithm tab)",
+   "steps": [
+    "Load the required inputs (otherwise a notice appears)",
+    "Press Generate / Refresh JSON",
+    "Browse the JSON preview",
+    "Open the Component summary",
+    "Press Download"
+   ],
+   "serves_tasks": [
+    "Generate the analysis file, check it, and save it"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/070.webp",
+    "screens/073.webp"
+   ],
+   "id": "f9",
+   "check": "replayed"
+  },
+  {
+   "name": "Variational-inference settings panel with per-parameter approximations",
+   "general": "Lay out an approximate-inference run: how the tree's node heights are reparameterised, a variational location and scale for each estimated parameter together with the transform that maps it to its support, the optimiser with its learning rate and iteration count, the convergence test, and the output name and number of posterior samples",
+   "specific": "Algorithm tab: node-height reparameterisation (Proportions, root-height offset), per-parameter variational loc/scale rows with their transforms, Adam optimiser (lr, iterations), Stan ELBO convergence (samples, frequency, tolerance), output stem and posterior sample count. Seen only; no value was edited in this run",
+   "steps": [
+    "Open the Algorithm tab",
+    "Read the node-height reparameterisation and root-height offset",
+    "Read each parameter's transform and variational loc/scale",
+    "Read the optimiser, learning rate and iterations",
+    "Read the ELBO convergence settings, output stem and number of samples"
+   ],
+   "serves_tasks": [
+    "Review the settings of the approximate-inference method"
+   ],
+   "screens": [
+    "screens/066.webp",
+    "screens/067.webp",
+    "screens/079.webp"
+   ],
+   "id": "f10",
+   "check": "not_confirmed"
+  }
+ ],
+ "screens_never_reached": [
+  "The 'Custom' substitution model and the HKY/K80 parameter forms: listed in the dropdown but not opened",
+  "Exponential, Skyglide, Skyride and None coalescent forms: listed but not opened",
+  "The Protein data-type import path and any protein substitution models: no protein test file",
+  "The undated analysis with 'Use tip dates' left off: not tried",
+  "The Diagonal, Hierarchical and Radial tree layouts, and the Reset button: listed but not tried",
+  "The other reparameterisation choices and the optimiser dropdown on the Algorithm tab: seen but not opened"
+ ],
+ "not_done": [
+  "Did not regenerate or download the JSON after switching back to regex dates (10/10). The only downloaded samples.json came from the CSV state, where taxon9 has no date attribute.",
+  "The missing-date check: with dates.csv only 9/10 taxa are dated, yet the Output tab still said 'Configuration ready.' and exported taxon9 without a date. The only signs were the 9/10 count on the Dates tab and 'n tips 9' in the regression. I did not confirm whether torchtree accepts or rejects this file.",
+  "Did not rerun the root-to-tip regression with all 10 dated tips (the replay did: rate 0.01168, r² 0.9345), so the 0.0111 starting clock rate comes from the 9-tip fit.",
+  "Did not edit any variational loc/scale values or optimiser settings; I only viewed them.",
+  "Did not untick any Est. box to fix a parameter.",
+  "Did not run the undated (unrooted) path or load protein data.",
+  "Did not run torchtree itself; the app only writes the config.",
+  "Did not try the Date table's CSV download/search toolbar or the Plotly toolbar (zoom/pan/snapshot) on the regression plot."
+ ],
+ "applied": [
+  "Moved t7 (redo dates) out of phase 1 to after the export in phase 3, labelled as done after export with the JSON not regenerated",
+  "Stated in the goal's specific label that the exported samples.json came from the CSV state (9/10 dated, taxon9 undated)",
+  "Noted in t9 that the regression used 9 tips and gave the replay's 10-tip result (0.01168, r² 0.9345); noted in t5 that t9 and t15 ran in the CSV state",
+  "Noted in t11 that the 0.0111 starting rate came from the 9-tip regression",
+  "Added visible caveats in t3, t15, f4 and f9 that 'Configuration ready.' appears even with undated samples and the N/M banner is the only warning",
+  "Explained in t4 and f2 that the meaning of Age/Height depends on the time direction setting",
+  "Relabelled t14 and phase 3 to make clear the inference settings were only reviewed, not edited",
+  "Added feature f10 for the Algorithm-tab variational-inference settings panel (from screens 066, 067 and 079; check not_confirmed because the replay never opened the tab)",
+  "Added the undated path, protein models and Est. toggling to screens_never_reached / not_done"
+ ],
+ "open_fixes": [
+  "Add a one-of branch for the undated analysis (tip dates off, unrooted tree, Exponential branch-length prior, no clock or coalescent): the run never left 'Use tip dates' unticked, so no screen shows that state.",
+  "Add a protein alternative (Protein import with LG/WAG models): no protein file was loaded and the protein model list was never opened.",
+  "Turn t14 into actually configuring the inference (edit loc/scale, optimiser, learning rate, iterations, convergence): the run only viewed the Algorithm tab, so a new run must edit those values and regenerate the JSON.",
+  "Add a task for fixing versus estimating parameters (the Est. ticks): no Est. box was ever unticked.",
+  "Regenerate and download samples.json with all 10 taxa dated, and rerun the regression with 10 tips to set the starting clock rate: neither was done in this run."
+ ],
+ "screens_at": "pilot/public/runs/torchseed-phylo-config/20261101-230235/",
+ "screens_filed": {
+  "screens/011.webp": "screens/011.webp",
+  "screens/039.webp": "screens/039.webp",
+  "screens/066.webp": "screens/066.webp"
+ }
+}

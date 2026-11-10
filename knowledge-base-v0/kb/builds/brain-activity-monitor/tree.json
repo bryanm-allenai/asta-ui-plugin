@@ -1,0 +1,529 @@
+{
+ "interface": {
+  "title": "Brain Activity Monitor (Streamlit dashboard)",
+  "field": "Neuroscience / consumer EEG (Muse headband), cognitive-state monitoring",
+  "stage_of_work": "Online application of an offline-calibrated, rule-based classifier: replaying recordings or monitoring a live stream",
+  "what_it_is_for": "Replay a Muse EEG CSV recording (or connect to a live LSL stream) as a live 4-channel trace. A threshold engine labels each 4-second window Concentrating, Neutral or Relaxed with a confidence score, and the dashboard shows signal quality, connection status and statistics."
+ },
+ "data": {
+  "source": "synthetic",
+  "note": "The Recording dropdown lists three CSVs in data/raw/: subjecta-concentrating-1.csv, subjecta-neutral-1.csv and subjecta-relaxed-1.csv. These are not recordings shipped with the tool. The run harness generated them as synthetic signals about 0.4 s long, each tuned toward one state, and they loop during replay. There is no upload widget. LSL mode had no hardware, so it only reached its timeout error."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Watch a recorded or live brain-signal stream get classified into mental states, window by window, and judge whether to trust the result",
+  "specific": "Replay a Muse EEG CSV and watch the threshold engine label 4 s windows Concentrating/Neutral/Relaxed, with confidence, electrode quality and statistics",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Set up the data source",
+    "specific": "Stream source sidebar",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Replay a stored recording as if it were live",
+      "specific": "Mode = csv, choose a recording, keep 'Loop recording' on",
+      "screens": [
+       "screens/003.webp",
+       "screens/006.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the page (mode csv and subjecta-concentrating-1.csv are the defaults)",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the Mode help icon (tooltip: 'csv' replays a recording; 'lsl' connects to a real Muse headset)",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "task",
+        "general": "Option: replay a short recording once, without looping",
+        "specific": "Untick 'Loop recording'. The stream restarts, Windows resets to 0, status turns ⚪ stopped, and no window ever completes because the 0.4 s file is shorter than one 4 s window. The trace looked empty in the first run, but the replay still showed about 0.4 s of residual trace",
+        "branch": "optional",
+        "screens": [
+         "screens/028.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "unticked Loop recording",
+          "screens": [
+           "screens/028.webp"
+          ]
+         }
+        ],
+        "id": "t2",
+        "check": "replayed"
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Connect to a live acquisition device instead of a file",
+      "specific": "Mode = lsl (shows a 'muselsl stream' hint), set Discovery timeout, then Restart stream (changing the option also restarts). With no Muse present, Source reads LSL and the status turns to 🔴 error with 'No LSL stream of type=EEG found within N s'",
+      "branch": "one-of",
+      "screens": [
+       "screens/037.webp",
+       "screens/043.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose 'lsl' in the Mode dropdown",
+        "screens": [
+         "screens/032.webp",
+         "screens/033.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "waited for the 10 s discovery timeout: 'No LSL stream of type=EEG found within 10.0s'",
+        "screens": [
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Discovery timeout to 2.00",
+        "screens": [
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Restart stream",
+        "screens": [
+         "screens/041.webp",
+         "screens/043.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Check the signal before trusting results",
+    "specific": "Connection and Electrode Quality panels",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Confirm the source is connected and each sensor gives usable signal",
+      "specific": "Connection shows Source CSV, 🟢 streaming, Device 'CSV source' (cut off as 'CSV sou…'), Battery n/a. Electrode Quality goes from n/a to 'good' for TP9/AF7/AF8/TP10 once samples arrive, and back to n/a whenever the stream restarts",
+      "screens": [
+       "screens/004.webp",
+       "screens/013.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "waited for the first samples after starting the stream",
+        "screens": [
+         "screens/004.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Watch the classification",
+    "specific": "Cognitive State, Statistics, EEG Signal and Recent Decisions panels",
+    "children": [
+     {
+      "kind": "task",
+      "general": "See the predicted state and its confidence for the latest window, and check how many windows were rejected",
+      "specific": "The Cognitive State panel showed 'Relaxed', Confidence 47%, Last updated, after about 4 s of concentrating-1 playback. Statistics showed Windows 1 and Rejected 0. A nonzero Rejected count is a reason to distrust the labels. Decision age is cut off on screen ('453 …'), has no hover tooltip, and depends on timing (the replay read 71 ms)",
+      "screens": [
+       "screens/007.webp",
+       "screens/009.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "waited about 4 s with auto-refresh on",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed R to pull more windows (Windows 9, still Relaxed 47%)",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "task",
+        "general": "Option: control how often the display updates",
+        "specific": "Auto-refresh checkbox and Refresh interval slider (0.5–5 s), with manual rerun by R or ⋮ → Rerun. In this run auto-refresh did not keep polling, because each script run ended on the decision-log ImportError. New windows appeared only after a manual rerun",
+        "branch": "optional",
+        "screens": [
+         "screens/020.webp",
+         "screens/047.webp",
+         "screens/048.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "unticked Auto-refresh",
+          "screens": [
+           "screens/020.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "clicked the right end of the Refresh interval slider (5.00)",
+          "screens": [
+           "screens/047.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "pressed R to rerun (Windows went 3 → 6)",
+          "screens": [
+           "screens/048.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "opened the ⋮ app menu, which offers Rerun (also Settings, Print, Record a screencast, About, Clear cache)",
+          "screens": [
+           "screens/049.webp"
+          ]
+         }
+        ],
+        "id": "t4",
+        "check": "replayed"
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Inspect the raw multichannel trace",
+      "specific": "EEG Signal Plotly chart with stacked, offset TP9/AF7/AF8/TP10 traces against elapsed time (s). The looped 0.4 s buffer adds a straight line from each trace's end back to its start",
+      "screens": [
+       "screens/006.webp",
+       "screens/021.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to the EEG Signal panel",
+        "screens": [
+         "screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Review the recent per-window decisions to audit the classification history",
+      "specific": "Blocked. The 🗒️ Recent Decisions table (window, time, prediction, confidence, artifact ratio) never rendered. As soon as one decision exists, st.dataframe raises 'ImportError: pyarrow requires NumPy 2.0 or newer, found 1.26.4' (decision_log.py line 35). This is an environment problem (NumPy 1.26 installed alongside a pyarrow that needs NumPy 2), not a limitation of the app",
+      "branch": "blocked",
+      "screens": [
+       "screens/006.webp",
+       "screens/008.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled below the EEG Signal panel after the first window and found the ImportError in place of the table",
+        "screens": [
+         "screens/006.webp",
+         "screens/008.webp"
+        ]
+       }
+      ],
+      "id": "n1"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Compare recordings with known labels",
+    "specific": "Switch the Recording dropdown between the concentrating, neutral and relaxed files",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Repeat the classification for each labelled recording and compare the outputs",
+      "specific": "concentrating-1 → Relaxed 47%; relaxed-1 → Relaxed 81%; neutral-1 → Relaxed 96%. Switching recordings resets Windows to 0. The three inputs are 0.4 s synthetic seed files made by the run harness, so this result says nothing either way about how well the method separates states on real EEG",
+      "branch": "repeat",
+      "screens": [
+       "screens/009.webp",
+       "screens/015.webp",
+       "screens/019.webp",
+       "screens/046.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Recording dropdown",
+        "screens": [
+         "screens/011.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose subjecta-relaxed-1.csv (stream reset, Windows 0)",
+        "screens": [
+         "screens/012.webp",
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "waited for the first window: Relaxed 81%",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose subjecta-neutral-1.csv",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "waited for the first window: Relaxed 96%",
+        "screens": [
+         "screens/019.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "switched back to subjecta-concentrating-1.csv: Relaxed 47% again",
+        "screens": [
+         "screens/044.webp",
+         "screens/046.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Stream source selector with replay/live modes",
+   "general": "Pick where a signal stream comes from (a stored file replayed in real time or a live device), set options for that source, and restart the stream",
+   "specific": "Sidebar Mode csv|lsl. In csv mode: Recording dropdown and Loop recording. In lsl mode: a hint about running 'muselsl stream' and a Discovery timeout slider (2–30 s). Changing any option rebuilds the pipeline, and the Connection panel shows the result. The Restart stream button appears only before the first window or in error/stopped states. Once a window renders it disappears, because the script stops on the decision-log ImportError",
+   "steps": [
+    "Choose a mode in the Mode dropdown",
+    "In csv mode pick a recording and choose whether to loop it; in lsl mode set the discovery timeout",
+    "Change any option to restart, or press Restart stream where it is shown",
+    "Read Source, Status (streaming, stopped or error) and any error message in the Connection panel"
+   ],
+   "serves_tasks": [
+    "Replay a stored recording as if it were live",
+    "Connect to a live acquisition device instead of a file",
+    "Option: replay a short recording once, without looping"
+   ],
+   "screens": [
+    "screens/003.webp",
+    "screens/028.webp",
+    "screens/032.webp",
+    "screens/037.webp",
+    "screens/040.webp",
+    "screens/043.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Connection status card",
+   "general": "Show which data source is active, whether it is streaming, device identity and battery, and explain any connection failure",
+   "specific": "🔌 Connection panel: Source (CSV/LSL), Status pill (🟢 streaming / 🔴 error), Device, Battery, and a red error box with the timeout message. Its 🔍 Search Muse button is a stub that only reports 'Muse device discovery is not implemented yet'",
+   "steps": [
+    "Start a stream from the sidebar",
+    "Read the status pill and device fields",
+    "On error, read the explanation box"
+   ],
+   "serves_tasks": [
+    "Confirm the source is connected and each sensor gives usable signal",
+    "Connect to a live acquisition device instead of a file"
+   ],
+   "screens": [
+    "screens/004.webp",
+    "screens/037.webp",
+    "screens/039.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Per-channel signal quality badges",
+   "general": "Estimate from the raw signal whether each sensor channel is usable and show it as a coloured badge per channel",
+   "specific": "🎚️ Electrode Quality grid for TP9, AF7, AF8 and TP10. Badges show n/a before data, then good/… from saturation, amplitude and variance checks (src.dashboard.signal_quality). They reset to n/a when the stream restarts",
+   "steps": [
+    "Start streaming",
+    "Wait for the first samples (badges go n/a → good)",
+    "Check every channel before trusting a classification"
+   ],
+   "serves_tasks": [
+    "Confirm the source is connected and each sensor gives usable signal"
+   ],
+   "screens": [
+    "screens/003.webp",
+    "screens/004.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Live state readout with confidence bar and stream statistics",
+   "general": "Show the latest predicted class for a sliding window, its confidence as a bar, and counters for processed and rejected windows and how old the decision is",
+   "specific": "🎯 Cognitive State (Prediction pill such as 'Relaxed', Confidence Score bar such as 47%, Last updated time) with 📊 Statistics (Windows, Rejected, Decision age). Decision age is cut off on screen and has no tooltip; the full value is only in the page's accessibility tree. In this run Windows rose only on manual rerun",
+   "steps": [
+    "Start a stream and wait about 4 s for the first window",
+    "Read the predicted state and confidence",
+    "Rerun to pull new windows and watch Windows rise",
+    "Check that Rejected stays at 0 before trusting the label"
+   ],
+   "serves_tasks": [
+    "See the predicted state and its confidence for the latest window, and check how many windows were rejected",
+    "Repeat the classification for each labelled recording and compare the outputs"
+   ],
+   "screens": [
+    "screens/007.webp",
+    "screens/010.webp",
+    "screens/015.webp",
+    "screens/019.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Stacked multichannel trace viewer",
+   "general": "Plot several time-series channels stacked with vertical offsets, with legend toggles to hide or isolate channels, box-zoom, hover readout, reset and PNG export",
+   "specific": "📈 EEG Signal Plotly chart of TP9/AF7/AF8/TP10 against elapsed time (s), offset for readability. Click a legend item to hide it, double-click to isolate one, drag to zoom, hover for (t, µV), double-click to zoom out, camera icon saves newplot.png",
+   "steps": [
+    "Click a channel in the legend to hide it",
+    "Double-click a channel to isolate it",
+    "Drag across the plot to zoom into a time span",
+    "Hover a point to read time and value",
+    "Double-click to reset, and download a PNG with the camera icon"
+   ],
+   "serves_tasks": [
+    "Inspect the raw multichannel trace"
+   ],
+   "screens": [
+    "screens/021.webp",
+    "screens/023.webp",
+    "screens/024.webp",
+    "screens/025.webp",
+    "screens/026.webp",
+    "screens/027.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Refresh-rate control for a live dashboard",
+   "general": "Turn periodic re-polling of a live display on or off and set its interval, with manual rerun as a fallback",
+   "specific": "Auto-refresh checkbox and Refresh interval slider (0.50–5.00 s). Press R or use ⋮ → Rerun to pull new windows by hand. Periodic refresh stalled here because every run ended on the decision-log ImportError. Pressing R while a sidebar selectbox has focus types 'r' into it instead of rerunning",
+   "steps": [
+    "Tick or untick Auto-refresh",
+    "Set the interval on the slider",
+    "Click outside the sidebar controls, then press R (or ⋮ → Rerun) to pick up new windows"
+   ],
+   "serves_tasks": [
+    "Option: control how often the display updates"
+   ],
+   "screens": [
+    "screens/020.webp",
+    "screens/047.webp",
+    "screens/048.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Per-window decision log",
+   "general": "Keep a bounded table of recent window decisions (time, predicted class, confidence, artifact ratio) so a run can be audited after the fact",
+   "specific": "🗒️ Recent Decisions table (decision_log.py, st.dataframe) with window, time, prediction, confidence and artifact ratio columns. It shows no per-feature contributions. Not rendered in this run: 'ImportError: pyarrow requires NumPy 2.0 or newer, found 1.26.4' replaces it as soon as one decision exists. This is an environment version clash, not an app limitation",
+   "steps": [
+    "Start a stream and wait for the first decision",
+    "Scroll below the EEG Signal panel to the Recent Decisions table",
+    "Read prediction, confidence and artifact ratio for recent windows"
+   ],
+   "serves_tasks": [
+    "Review the recent per-window decisions to audit the classification history"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/008.webp"
+   ],
+   "id": "n2"
+  }
+ ],
+ "screens_never_reached": [
+  "🗒️ Recent Decisions table (bounded log of window, time, prediction, confidence and artifact ratio). As soon as one decision exists, rendering it with st.dataframe raises 'ImportError: pyarrow requires NumPy 2.0 or newer, found 1.26.4' (decision_log.py line 35). This is an environment issue (NumPy 1.26 vs pyarrow), not an app limitation. The script stops there, so the log never appears and auto-refresh stops after the first decision (screens/006.webp, screens/008.webp).",
+  "🎵 Focus Music panel while decisions exist: it sits below the crashing log. With no decisions it renders, and the Relaxation button only reports 'No .mp3 file found in src/music/relaxation/' (screens/030.webp).",
+  "LSL streaming state with live Muse data: no hardware or LSL stream was available, so only the 🔴 error state was reached (screens/037.webp, screens/043.webp).",
+  "Muse device discovery results: the Search Muse button says discovery is not implemented yet (screens/039.webp)."
+ ],
+ "not_done": [
+  "Inspecting which band-power features drove a classification and by how much: the dashboard has no view for this at all. The Recent Decisions log shows only window, time, prediction, confidence and artifact ratio, and the Statistics panel shows only counts. This goal cannot be reached by design, apart from the crash.",
+  "Reviewing the per-window decision history and artifact ratios: the Recent Decisions table crashes with the pyarrow/NumPy ImportError (an environment issue) as soon as one decision exists (screens/006.webp, screens/008.webp).",
+  "Judging whether the classifier separates the labelled states: all three seed recordings came out 'Relaxed' (concentrating 47%, relaxed 81%, neutral 96%). They are 0.4 s synthetic files generated by the run harness, not real EEG. The result is therefore not evidence about the method's separation of states either way.",
+  "Continuous hands-free auto-refresh: because the decision-log crash ends every script run, auto-refresh stops after the first decision. New windows only appeared after pressing R (screens/010.webp, screens/048.webp).",
+  "Searching for Muse devices: the 🔍 Search Muse button only reports 'Muse device discovery is not implemented yet' (screens/039.webp).",
+  "Streaming live data from a real Muse over LSL: no device was present.",
+  "Playing focus music: no .mp3 files are shipped (screens/030.webp). The panel plays music by hand per state and is not tied to predictions, so it was left out of the tree on purpose as auxiliary.",
+  "Uploading my own EEG CSV: the interface has no upload widget and only lists files already in data/raw/.",
+  "Display oddity: the looped 0.4 s buffer draws a straight line back across each channel in the trace (screens/024.webp), which looks like a wrap-around artifact. I did not investigate it further."
+ ],
+ "applied": [
+  "set data.source to synthetic and described the CSVs as 0.4 s harness-generated signals tuned toward each state",
+  "qualified the all-Relaxed comparison in t8 and not_done as coming from synthetic seed files",
+  "corrected the decision-log description (window/time/prediction/confidence/artifact ratio, no per-feature contributions) and marked feature-level explanation as unreachable by design",
+  "added blocked task n1 'Review recent per-window decisions' and decision-log feature n2, citing screens/006 and 008 and marking the ImportError as an environment issue",
+  "removed the 'hovered Decision age' action from t6 and the hover step from f4; noted there is no tooltip and the value depends on timing",
+  "reconciled t2: residual ~0.4 s trace in replay, status ⚪ stopped, no window completes",
+  "folded t2 into t1 and t4 into t6 as optional nested tasks, keeping their ids and checks",
+  "added the Rejected count as a trust check in t6 and f4",
+  "moved the Search Muse stub click out of t3 into not_done and dropped it as a step of f2",
+  "noted in f1 that Restart stream disappears once a window renders, and that changing options also restarts",
+  "noted in t4/f6 that auto-refresh stalls because of the crash, plus the R-key focus pitfall",
+  "added the wrap-around line to t7 and the badge reset on restart to t5/f3",
+  "left the Focus Music panel out of the tree on purpose (auxiliary, dead end without mp3s) and said so in not_done"
+ ],
+ "open_fixes": [
+  "Re-run with a NumPy ≥ 2 (or a pyarrow compatible with NumPy 1.26) so the Recent Decisions table renders: this would confirm its columns, show artifact ratios, and give n1/n2 a real replay check",
+  "Once the crash is fixed, check whether Auto-refresh polls continuously at the set interval and whether Restart stream stays visible during streaming",
+  "Repeat the labelled-recording comparison on real Muse recordings (not the synthetic seeds) to judge whether the classifier separates states",
+  "Test LSL mode with a real Muse or a simulated LSL EEG stream to reach the 🟢 streaming state over LSL",
+  "Try the Focus Music panel with .mp3 files present, if it is to be documented as an optional task"
+ ],
+ "screens_at": "pilot/public/runs/brain-activity-monitor/20261101-094117/",
+ "screens_filed": {
+  "screens/003.webp": "screens/003.webp",
+  "screens/004.webp": "screens/004.webp",
+  "screens/007.webp": "screens/007.webp",
+  "screens/009.webp": "screens/009.webp"
+ }
+}

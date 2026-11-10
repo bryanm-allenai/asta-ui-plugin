@@ -1,0 +1,688 @@
+{
+  "schema": "astaui.card/1",
+  "id": "asteroid-hunter",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T00:04:29Z"
+  },
+  "app": {
+    "title": "Asteroid Hunter",
+    "summary": "A person uploads three to ten telescope frames of the same patch of sky, and a pipeline aligns them, finds sources that move in a straight line, filters out artifacts and checks each mover against a catalog of known objects. The results page lists every candidate with its sky rate, and a blink viewer flips through the frames with each candidate circled. Clicking a named candidate opens a card with its orbit and an impact-hazard verdict, and from there a 3D orbit view. Alternatively, the person hunts the raw frames by ear without seeing the pipeline's answers: they mark a candidate with the keyboard, confirm it frame by frame, and get a spoken review that checks each mark against the catalog.",
+    "task": {
+      "text": "Find objects that move between repeated images of the same field and confirm each one against a catalog of known objects, by eye or by ear.",
+      "verbs": [
+        "identify",
+        "locate",
+        "confirm",
+        "derive",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "A short time sequence of aligned FITS images of one sky field, with candidate moving sources detected in them and cross-matched to an ephemeris catalog.",
+      "item": "a candidate moving source, tracked by its position in each frame across the image set",
+      "shapes": [
+        "image collection",
+        "table",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "searching fresh survey frames for moving objects and confirming them against a catalog, before follow-up observation",
+      "terms": [
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "An upload runs a detection pipeline that returns a candidate list and per-frame positions. A blink viewer cycles the frames with clickable candidate markers that open a detail card and an orbit view. A separate sonified view turns a live shift-and-stack score at the keyboard cursor into pitch and pulse, and the marks made there are confirmed frame by frame, then matched against the catalog on a review page that has its own blink comparator.",
+      "views": [
+        "image viewer",
+        "list",
+        "detail panel",
+        "summary stats",
+        "canvas"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "select",
+        "hover for detail",
+        "keyboard shortcuts",
+        "accept or reject",
+        "toggle view",
+        "time slider"
+      ],
+      "patterns": [
+        "overview and detail",
+        "review queue",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "moving-object detection and astrometry in survey images, in astronomy",
+      "disciplines": [
+        "astronomy"
+      ],
+      "terms": [
+        "asteroid detection",
+        "shift and stack",
+        "blink comparator"
+      ]
+    },
+    "workflow": {
+      "name": "detect moving objects across a sequence of images and confirm them against a catalog",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Choose 3–10 FITS frames, or a zip of them, and press Detect or 'Hunt by ear'. The server aligns the frames, finds sources, links straight-line movers, filters artifacts and cross-matches each mover with SkyBoT.",
+          "parts": [
+            "frame-upload"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A results heading gives the count of moving objects. Each candidate is listed with its rate in arcsec/day, its position, a concentration score, and either its catalog name and separation or 'not in catalog'.",
+          "parts": [
+            "candidate-list"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Play blinks the aligned frames at an adjustable speed, with Prev/Next to step, and zoom, pan and fullscreen. A circle on each candidate follows its position in every frame, so real movers jump while stars hold still.",
+          "parts": [
+            "blink-viewer"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "With the blink paused, clicking a named candidate opens a card with its orbital elements, estimated size, class and minimum orbit intersection distance, plus a hazard verdict that uses the Sentry impact probability when there is one. View orbit opens a 3D Sun–Earth–asteroid animation with time, speed and zoom sliders.",
+          "parts": [
+            "asteroid-card",
+            "orbit-viewer"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "In hunt-by-ear, the person moves the cursor with the arrow keys and hears a live shift-and-stack score as pitch and pulse, in roam mode or in tune mode (with [ ] ; ' for speed and direction). Space marks a candidate if its score is above the noise floor, then steps through every frame with the cursor placed at the predicted position, recording the signal in each.",
+          "parts": [
+            "hunt-stage"
+          ]
+        },
+        {
+          "step": "decide keep or drop for each item, with a reason",
+          "here": "Enter sends every confirmed mark to the server, which matches it against the catalog by distance and speed. The review page bands each mark as matched, candidate, maybe or noise and explains why, reads the summary aloud, and blinks the clean frames with each candidate's marks drawn in its own colour.",
+          "parts": [
+            "hunt-review"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Motion is validated physically: pixel displacement becomes a sky rate in arcsec/day, and a mark only counts as a catalog match when both position and speed agree.",
+        "The whole search can be done non-visually: a sonified shift-and-stack score, keyboard-only marking and spoken results, built for blind users first.",
+        "The pipeline's answers stay hidden during the by-ear hunt and are only consulted after the person commits their marks, so the hunt is unaided.",
+        "Score thresholds measured from empty sky split each mark into noise, low-confidence or candidate, and marks below the floor are refused.",
+        "Matched objects get an impact-hazard verdict from their minimum orbit intersection distance with Earth and NASA Sentry data, and a 3D orbit view."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "frame-upload",
+      "level": "view",
+      "parent": null,
+      "title": "Upload your frames",
+      "summary": "Takes a set of FITS frames or a zip, checks there are enough of them, and runs the detection pipeline, either to show results or to go straight into the by-ear hunt.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/templates/detect.html",
+          "start": 54,
+          "end": 78,
+          "role": "markup",
+          "anchor": "626fd5d55929",
+          "first": "<main class=\"wrap detect\">"
+        },
+        {
+          "file": "code/web/static/style.css",
+          "start": 19,
+          "end": 19,
+          "role": "style",
+          "symbol": ".uploader",
+          "anchor": "a3550c39fa51",
+          "first": ".uploader { display:flex; flex-direction:column; gap:1rem; align-items:center; margin-top:1rem; }"
+        },
+        {
+          "file": "code/web/templates/detect.html",
+          "start": 581,
+          "end": 584,
+          "role": "logic",
+          "symbol": "showLoading",
+          "anchor": "483e5a054d74",
+          "first": "function showLoading() {"
+        },
+        {
+          "file": "code/web/app.py",
+          "start": 46,
+          "end": 156,
+          "role": "logic",
+          "symbol": "detect",
+          "anchor": "519e7d13ef91",
+          "first": "def detect():"
+        }
+      ]
+    },
+    {
+      "id": "candidate-list",
+      "level": "component",
+      "parent": "frame-upload",
+      "title": "Detected candidates",
+      "summary": "Lists each moving candidate with its sky rate, position, concentration and catalog name or 'not in catalog', with a link to its orbit.",
+      "views": [
+        "list",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/web/templates/detect.html",
+          "start": 80,
+          "end": 95,
+          "role": "markup",
+          "anchor": "c99e361f86c4",
+          "first": "{% if result_image %}"
+        },
+        {
+          "file": "code/web/static/style.css",
+          "start": 26,
+          "end": 27,
+          "role": "style",
+          "symbol": ".candidates",
+          "anchor": "602664e5ea36",
+          "first": ".candidates { list-style:none; padding:0; margin:1rem auto; max-width:560px; text-align:left;"
+        },
+        {
+          "file": "code/web/static/style.css",
+          "start": 59,
+          "end": 59,
+          "role": "style",
+          "symbol": ".candidates li.cand",
+          "anchor": "15f6b9c92bce",
+          "first": ".candidates li.cand { display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; }"
+        },
+        {
+          "file": "code/web/static/style.css",
+          "start": 62,
+          "end": 63,
+          "role": "style",
+          "symbol": ".orbit-btn",
+          "anchor": "1158691dea10",
+          "first": ".orbit-btn { background:var(--accent); color:#fff; text-decoration:none; padding:.35rem .7rem;"
+        }
+      ]
+    },
+    {
+      "id": "blink-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "Inspect & blink the frames",
+      "summary": "Flips through the aligned frames at a chosen speed, with zoom and pan, and keeps a clickable circle on each candidate's position in every frame.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "time slider",
+        "select"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/web/templates/detect.html",
+          "start": 100,
+          "end": 136,
+          "role": "markup",
+          "anchor": "f96259628795",
+          "first": "<!-- ============ INTERACTIVE VIEWER (zoom + blink) ============ -->"
+        },
+        {
+          "file": "code/web/static/style.css",
+          "start": 38,
+          "end": 42,
+          "role": "style",
+          "symbol": ".viewer",
+          "anchor": "83db2e7d2a8f",
+          "first": ".viewer {"
+        },
+        {
+          "file": "code/web/static/style.css",
+          "start": 113,
+          "end": 115,
+          "role": "style",
+          "symbol": ".hotspot",
+          "anchor": "afe1472ae13c",
+          "first": ".hotspot{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;"
+        },
+        {
+          "file": "code/web/static/style.css",
+          "start": 49,
+          "end": 49,
+          "role": "style",
+          "symbol": ".controls",
+          "anchor": "3c89d5aa0cda",
+          "first": ".controls { display:flex; flex-wrap:wrap; gap:.5rem; justify-content:center; margin:.9rem 0; align-items:center; }"
+        },
+        {
+          "file": "code/web/templates/detect.html",
+          "start": 167,
+          "end": 186,
+          "role": "logic",
+          "symbol": "buildHotspots",
+          "anchor": "dbfdd9c100ce",
+          "first": "function buildHotspots() {"
+        },
+        {
+          "file": "code/web/templates/detect.html",
+          "start": 195,
+          "end": 202,
+          "role": "logic",
+          "symbol": "placeHotspots",
+          "anchor": "a5cecb19d8fb",
+          "first": "function placeHotspots() {"
+        },
+        {
+          "file": "code/web/templates/detect.html",
+          "start": 159,
+          "end": 164,
+          "role": "logic",
+          "symbol": "show",
+          "anchor": "26d9e92af9b2",
+          "first": "function show(i) {"
+        },
+        {
+          "file": "code/web/templates/detect.html",
+          "start": 205,
+          "end": 210,
+          "role": "logic",
+          "symbol": "play",
+          "anchor": "1157ac5a48a5",
+          "first": "function play() {"
+        },
+        {
+          "file": "code/web/templates/detect.html",
+          "start": 228,
+          "end": 235,
+          "role": "logic",
+          "symbol": "zoomAt",
+          "anchor": "bb713765aff7",
+          "first": "function zoomAt(localX, localY, newScale) {"
+        },
+        {
+          "file": "code/web/templates/detect.html",
+          "start": 216,
+          "end": 263,
+          "role": "logic",
+          "anchor": "a972a8cd4dd3",
+          "first": "buildHotspots();"
+        }
+      ]
+    },
+    {
+      "id": "asteroid-card",
+      "level": "component",
+      "parent": "blink-viewer",
+      "title": "Asteroid flash card",
+      "summary": "For a catalogued candidate, shows its orbital elements, estimated size, class, minimum orbit intersection distance and a plain-language impact-hazard verdict.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/web/static/style.css",
+          "start": 75,
+          "end": 80,
+          "role": "style",
+          "symbol": ".ac-card",
+          "anchor": "8fb8d0a315d3",
+          "first": ".ac-card{position:relative;width:min(380px,92vw);height:100%;"
+        },
+        {
+          "file": "code/web/static/style.css",
+          "start": 120,
+          "end": 121,
+          "role": "style",
+          "symbol": ".ac-hazard",
+          "anchor": "cca80587107f",
+          "first": ".ac-hazard{border-radius:12px;padding:.85rem .95rem;margin:0 0 1.1rem;text-align:left;"
+        },
+        {
+          "file": "code/web/static/asteroid_card.js",
+          "start": 266,
+          "end": 275,
+          "role": "logic",
+          "symbol": "show",
+          "anchor": "bd396324e8eb",
+          "first": "function show(name, extra) {"
+        },
+        {
+          "file": "code/web/static/asteroid_card.js",
+          "start": 192,
+          "end": 259,
+          "role": "logic",
+          "symbol": "render",
+          "anchor": "5d69bd85ab23",
+          "first": "function render(specs, extra) {"
+        },
+        {
+          "file": "code/web/app.py",
+          "start": 426,
+          "end": 433,
+          "role": "logic",
+          "symbol": "api_asteroid",
+          "anchor": "93bd6981c782",
+          "first": "def api_asteroid():"
+        },
+        {
+          "file": "code/web/app.py",
+          "start": 382,
+          "end": 422,
+          "role": "logic",
+          "symbol": "_fetch_specs",
+          "anchor": "5f675d96b1f3",
+          "first": "def _fetch_specs(name):"
+        }
+      ]
+    },
+    {
+      "id": "orbit-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "3D orbit viewer",
+      "summary": "Animates the object's catalog orbit around the Sun next to Earth's, with play, time, speed and zoom controls, and shows where to point a telescope when that information is passed in.",
+      "views": [
+        "canvas"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "time slider"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/templates/orbit.html",
+          "start": 77,
+          "end": 86,
+          "role": "markup",
+          "symbol": "#ui",
+          "anchor": "cb895bf40fd5",
+          "first": "<div id=\"ui\">"
+        },
+        {
+          "file": "code/web/templates/orbit.html",
+          "start": 4,
+          "end": 4,
+          "role": "style",
+          "symbol": "#ui",
+          "anchor": "ad79ea88929e",
+          "first": "#ui{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:10;display:flex;gap:16px;align-items:cente"
+        },
+        {
+          "file": "code/web/templates/orbit.html",
+          "start": 125,
+          "end": 131,
+          "role": "logic",
+          "symbol": "positionAt",
+          "anchor": "65b2340de81c",
+          "first": "function positionAt(el,days){"
+        },
+        {
+          "file": "code/web/templates/orbit.html",
+          "start": 220,
+          "end": 221,
+          "role": "logic",
+          "symbol": "drawOrbit",
+          "anchor": "72c60414b06e",
+          "first": "function drawOrbit(el,color){const pts=orbitPath(el).map(toScene);"
+        },
+        {
+          "file": "code/web/templates/orbit.html",
+          "start": 358,
+          "end": 362,
+          "role": "logic",
+          "symbol": "place",
+          "anchor": "fbe05aa004cf",
+          "first": "function place(){const e=toScene(positionAt(EARTH,day));"
+        },
+        {
+          "file": "code/web/app.py",
+          "start": 437,
+          "end": 469,
+          "role": "logic",
+          "symbol": "orbit",
+          "anchor": "afeb64baae7d",
+          "first": "def orbit():"
+        }
+      ]
+    },
+    {
+      "id": "hunt-stage",
+      "level": "view",
+      "parent": null,
+      "title": "Hunt by ear",
+      "summary": "Turns a live shift-and-stack score at the keyboard cursor into tone and pulse, lets the person mark candidates above the noise floor and confirm each one frame by frame at predicted positions, and then sends the marks for review.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "keyboard shortcuts",
+        "toggle view",
+        "accept or reject"
+      ],
+      "patterns": [
+        "review queue"
+      ],
+      "spans": [
+        {
+          "file": "code/web/templates/hunt.html",
+          "start": 50,
+          "end": 84,
+          "role": "markup",
+          "anchor": "2dc9097e214b",
+          "first": "<div class=\"hunt-bar\">"
+        },
+        {
+          "file": "code/web/templates/hunt.html",
+          "start": 13,
+          "end": 13,
+          "role": "style",
+          "symbol": "#huntStage",
+          "anchor": "c4a2d4cd2549",
+          "first": "#huntStage { position: relative; margin: 0 auto; width: fit-content; outline: none; }"
+        },
+        {
+          "file": "code/web/templates/hunt.html",
+          "start": 17,
+          "end": 17,
+          "role": "style",
+          "symbol": ".hunt-bar",
+          "anchor": "2b8e1d09beb6",
+          "first": ".hunt-bar { display: flex; gap: 10px; justify-content: center; margin: 14px 0; flex-wrap: wrap; }"
+        },
+        {
+          "file": "code/web/static/hunt.js",
+          "start": 411,
+          "end": 435,
+          "role": "logic",
+          "symbol": "evaluate",
+          "anchor": "0e23e767467b",
+          "first": "function evaluate() {"
+        },
+        {
+          "file": "code/web/static/hunt.js",
+          "start": 657,
+          "end": 673,
+          "role": "logic",
+          "symbol": "audioLoop",
+          "anchor": "934686b1144e",
+          "first": "function audioLoop() {"
+        },
+        {
+          "file": "code/web/static/hunt.js",
+          "start": 489,
+          "end": 563,
+          "role": "logic",
+          "anchor": "7b4f37cacc80",
+          "first": "stage.addEventListener('keydown', e => {"
+        },
+        {
+          "file": "code/web/static/hunt.js",
+          "start": 568,
+          "end": 601,
+          "role": "logic",
+          "symbol": "markCandidate",
+          "anchor": "df4ba103bba8",
+          "first": "function markCandidate() {"
+        },
+        {
+          "file": "code/web/static/hunt.js",
+          "start": 606,
+          "end": 626,
+          "role": "logic",
+          "symbol": "confirmFrameStep",
+          "anchor": "7150360b2823",
+          "first": "function confirmFrameStep() {"
+        },
+        {
+          "file": "code/web/static/hunt.js",
+          "start": 632,
+          "end": 644,
+          "role": "logic",
+          "symbol": "finishHunting",
+          "anchor": "3d179d58f24b",
+          "first": "function finishHunting() {"
+        }
+      ]
+    },
+    {
+      "id": "hunt-review",
+      "level": "view",
+      "parent": null,
+      "title": "Your results",
+      "summary": "Matches each confirmed mark against the catalog by position and speed, bands it as matched, candidate, maybe or noise with an explanation, reads the summary aloud, and blinks the frames with every candidate's marks in its own colour.",
+      "views": [
+        "list",
+        "image viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "time slider"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/web/templates/review.html",
+          "start": 26,
+          "end": 101,
+          "role": "markup",
+          "anchor": "1c657a89ef10",
+          "first": "<main class=\"wrap\">"
+        },
+        {
+          "file": "code/web/templates/review.html",
+          "start": 12,
+          "end": 13,
+          "role": "style",
+          "symbol": ".review-item",
+          "anchor": "e648576263b8",
+          "first": ".review-item { border-left: 4px solid #444; padding: .8rem 1rem; margin: 0 0 1rem 0;"
+        },
+        {
+          "file": "code/web/templates/review.html",
+          "start": 21,
+          "end": 21,
+          "role": "style",
+          "symbol": ".blink-controls",
+          "anchor": "bfd3cfa9a8af",
+          "first": ".blink-controls { text-align: center; margin: .5rem 0; }"
+        },
+        {
+          "file": "code/web/templates/review.html",
+          "start": 118,
+          "end": 148,
+          "role": "logic",
+          "anchor": "71407251c5c9",
+          "first": "// Spoken-first summary on load - this page is built for a blind user first,"
+        },
+        {
+          "file": "code/web/templates/review.html",
+          "start": 167,
+          "end": 173,
+          "role": "logic",
+          "symbol": "updateBlink",
+          "anchor": "e3e0eab92027",
+          "first": "function updateBlink() {"
+        },
+        {
+          "file": "code/web/templates/review.html",
+          "start": 175,
+          "end": 194,
+          "role": "logic",
+          "symbol": "drawAll",
+          "anchor": "3fdbdb8dd433",
+          "first": "function drawAll() {"
+        },
+        {
+          "file": "code/web/templates/review.html",
+          "start": 196,
+          "end": 224,
+          "role": "logic",
+          "anchor": "5b5cae258e02",
+          "first": "var prevBtn = document.getElementById('blinkPrev'), nextBtn = document.getElementById('blinkNext');"
+        },
+        {
+          "file": "code/web/app.py",
+          "start": 185,
+          "end": 259,
+          "role": "logic",
+          "symbol": "hunt_review",
+          "anchor": "cba30f193e48",
+          "first": "def hunt_review(sid):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "task",
+      "list": "verbs",
+      "term": "confirm"
+    }
+  ]
+}

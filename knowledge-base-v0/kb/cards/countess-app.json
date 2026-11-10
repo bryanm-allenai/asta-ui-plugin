@@ -1,0 +1,396 @@
+{
+  "schema": "astaui.card/1",
+  "id": "countess-app",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T09:17:37Z"
+  },
+  "app": {
+    "title": "Countess",
+    "summary": "The person chooses a folder of microscope slide images. The app works through the images one at a time in name order. For each image it finds the slide's counting frame, picks out candidate objects by thresholding and by size and shape, and keeps only the ones a trained classifier calls eggs. It shows each image with the kept objects outlined, the count drawn on it and a progress bar. When every image is done it says so, and the person downloads a CSV with one count per image.",
+    "task": {
+      "text": "Automatically count the eggs in every image of a batch of counting-slide images and export a table of counts, one per image.",
+      "verbs": [
+        "derive",
+        "identify",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A folder of microscope images of counting slides. The output is a table of image names and object counts.",
+      "item": "one microscope image of a counting slide",
+      "shapes": [
+        "image collection",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "counting eggs in slide images after imaging, before statistical analysis of the assay",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A multi-file picker loads the images in the browser and sends them to the server one at a time. Each time the server finishes an image it updates a hidden signal, which tells the browser to send the next one. Meanwhile an annotated preview and a progress bar show the image just counted, and a download button exports the running table of counts.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "batch processing"
+      ]
+    },
+    "field": {
+      "text": "automated egg counting from microscope images in plant nematology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "nematology",
+        "image analysis",
+        "plant phenotyping"
+      ]
+    },
+    "workflow": {
+      "name": "count objects in every image of a batch and export the counts",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "a multi-file picker takes a folder of .jpg, .jpeg, .png or .bmp slide images, keeps only those types and sorts them in natural name order",
+          "parts": [
+            "image-picker"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "for each image it finds the counting frame, thresholds the image, keeps candidates within area and aspect-ratio limits, classifies each as egg or not egg with a neural network, and counts the eggs",
+          "parts": [
+            "counting-pipeline"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "a hidden counter changes after each image, a browser observer sees the change and sends the next file, and a progress bar shows 'Processing image i of n'",
+          "parts": [
+            "counting-pipeline"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "the latest image is shown scaled down, titled with its file name, with the frame drawn as a box, the eggs outlined and the count printed on it",
+          "parts": [
+            "annotated-preview"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "after the last image a 'Processing Complete!' panel appears",
+          "parts": [
+            "completion-message"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Download .csv of counts' saves counts.csv with columns image_name and count; images that failed get 'error' as their count",
+          "parts": [
+            "download-counts"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Counting is a two-stage method: classical thresholding with size and shape filters proposes candidates, and a convolutional classifier decides egg or not egg.",
+        "Only objects inside the slide's counting frame are counted. The frame is found from intensity profile peaks, with fixed fallback borders when the detected size is implausible.",
+        "Only one image is in memory at a time, and the browser feeds the next file only after the server signals it is done, so a folder of any size can be processed. A keep-alive stops the session timing out.",
+        "Files over 12 MB are swapped for a blank image, and an image that fails is recorded as 'error' instead of stopping the batch."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "count-eggs-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Count Eggs tab",
+      "summary": "Holds the whole counting job: the image picker, the annotated preview, the completion notice and the download button.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "batch processing"
+      ],
+      "spans": [
+        {
+          "file": "code/tabs/count_eggs.py",
+          "start": 12,
+          "end": 41,
+          "role": "markup",
+          "symbol": "get_ui",
+          "anchor": "0f4fb89591da",
+          "first": "def get_ui():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 5,
+          "end": 11,
+          "role": "markup",
+          "anchor": "1cb0f1582f13",
+          "first": "app_ui = ui.page_fluid("
+        },
+        {
+          "file": "code/app.py",
+          "start": 13,
+          "end": 44,
+          "role": "logic",
+          "symbol": "server",
+          "anchor": "874278447312",
+          "first": "def server(input, output, session):"
+        },
+        {
+          "file": "code/tabs/count_eggs.py",
+          "start": 43,
+          "end": 188,
+          "role": "logic",
+          "symbol": "register_server",
+          "anchor": "26529738f178",
+          "first": "def register_server(input, output, session, counts, processed_image, processing_done_counter):"
+        }
+      ]
+    },
+    {
+      "id": "image-picker",
+      "level": "component",
+      "parent": "count-eggs-tab",
+      "title": "Image folder picker",
+      "summary": "Lets the person choose many slide images at once, keeps only image types, sorts them in natural name order and starts sending them to the server one by one.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/tabs/count_eggs.py",
+          "start": 28,
+          "end": 35,
+          "role": "markup",
+          "anchor": "38fa07fef826",
+          "first": "ui.tags.script(utils.fileIterator),"
+        },
+        {
+          "file": "code/utils.py",
+          "start": 1,
+          "end": 63,
+          "role": "logic",
+          "anchor": "ffd6d2a4ed5a",
+          "first": "fileIterator = \"\"\""
+        }
+      ]
+    },
+    {
+      "id": "counting-pipeline",
+      "level": "component",
+      "parent": "count-eggs-tab",
+      "title": "Per-image counting with auto-advance",
+      "summary": "Counts the eggs in each image and adds a row to the counts table while a progress bar runs, then signals the browser to send the next image.",
+      "views": [],
+      "interactions": [],
+      "patterns": [
+        "batch processing"
+      ],
+      "spans": [
+        {
+          "file": "code/tabs/count_eggs.py",
+          "start": 63,
+          "end": 120,
+          "role": "logic",
+          "symbol": "process_current_image",
+          "anchor": "1bc610e1069b",
+          "first": "async def process_current_image():"
+        },
+        {
+          "file": "code/tabs/count_eggs.py",
+          "start": 161,
+          "end": 173,
+          "role": "logic",
+          "symbol": "processing_done",
+          "anchor": "5133703edd6d",
+          "first": "def processing_done():"
+        },
+        {
+          "file": "code/tabs/count_eggs.py",
+          "start": 39,
+          "end": 39,
+          "role": "markup",
+          "anchor": "72d77ea98ed1",
+          "first": "ui.output_ui(\"processing_done\"),  # Hidden output for JS signaling"
+        },
+        {
+          "file": "code/utils.py",
+          "start": 65,
+          "end": 101,
+          "role": "logic",
+          "anchor": "6e685b70b92a",
+          "first": "function nextImage() {"
+        },
+        {
+          "file": "code/egg_counter.py",
+          "start": 184,
+          "end": 247,
+          "role": "logic",
+          "symbol": "countImage",
+          "anchor": "e4fbd40e1355",
+          "first": "def countImage(img):"
+        },
+        {
+          "file": "code/egg_counter.py",
+          "start": 181,
+          "end": 182,
+          "role": "data",
+          "anchor": "38fb075352e6",
+          "first": "modelDirectory = \"saved_model\""
+        },
+        {
+          "file": "code/app.py",
+          "start": 32,
+          "end": 41,
+          "role": "logic",
+          "symbol": "keep_alive",
+          "anchor": "c5692250d9a5",
+          "first": "def keep_alive():"
+        }
+      ]
+    },
+    {
+      "id": "annotated-preview",
+      "level": "component",
+      "parent": "count-eggs-tab",
+      "title": "Annotated image preview",
+      "summary": "Shows the image just counted, titled with its file name, with the counting frame, the egg outlines and the count drawn on it, so the person can check the detection.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/tabs/count_eggs.py",
+          "start": 37,
+          "end": 37,
+          "role": "markup",
+          "anchor": "a80007f34e4b",
+          "first": "ui.output_ui(\"image_display\"),"
+        },
+        {
+          "file": "code/tabs/count_eggs.py",
+          "start": 124,
+          "end": 136,
+          "role": "logic",
+          "symbol": "image_display",
+          "anchor": "783dae9fc986",
+          "first": "def image_display():"
+        }
+      ]
+    },
+    {
+      "id": "completion-message",
+      "level": "component",
+      "parent": "count-eggs-tab",
+      "title": "Completion notice",
+      "summary": "Tells the person that every image in the batch has been processed.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/tabs/count_eggs.py",
+          "start": 38,
+          "end": 38,
+          "role": "markup",
+          "anchor": "a5c143d82f28",
+          "first": "ui.output_ui(\"completion_message\"),"
+        },
+        {
+          "file": "code/tabs/count_eggs.py",
+          "start": 140,
+          "end": 157,
+          "role": "logic",
+          "symbol": "completion_message",
+          "anchor": "9cfab0ef3062",
+          "first": "def completion_message():"
+        }
+      ]
+    },
+    {
+      "id": "download-counts",
+      "level": "component",
+      "parent": "count-eggs-tab",
+      "title": "Download .csv of counts",
+      "summary": "Exports the table of image names and egg counts as counts.csv.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/tabs/count_eggs.py",
+          "start": 40,
+          "end": 40,
+          "role": "markup",
+          "anchor": "664f95c1fe76",
+          "first": "ui.download_button(\"downloadResults\", \"Download .csv of counts\")"
+        },
+        {
+          "file": "code/tabs/count_eggs.py",
+          "start": 176,
+          "end": 188,
+          "role": "logic",
+          "symbol": "downloadResults",
+          "anchor": "061d70a696ba",
+          "first": "async def downloadResults():"
+        }
+      ]
+    },
+    {
+      "id": "about-tab",
+      "level": "view",
+      "parent": null,
+      "title": "About tab",
+      "summary": "Explains what the app counts and how to use it, from choosing a folder to downloading the CSV.",
+      "views": [],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/tabs/about.py",
+          "start": 3,
+          "end": 19,
+          "role": "markup",
+          "symbol": "get_ui",
+          "anchor": "5e85a7bd34de",
+          "first": "def get_ui():"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "patterns",
+      "term": "batch processing"
+    }
+  ]
+}

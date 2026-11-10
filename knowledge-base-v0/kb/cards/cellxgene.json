@@ -1,0 +1,681 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cellxgene",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:40:58Z"
+  },
+  "app": {
+    "title": "cellxgene (CELL×GENE | Annotate) v1.3.0",
+    "summary": "A person launches the explorer on a processed single-cell dataset and sees every cell as a point on a chosen embedding, coloured by a metadata category or by a gene's expression. They narrow the cells by ticking category labels, brushing histograms of continuous metadata and genes, or brushing and lassoing on the embedding, and can subset the view to the selection. They create their own categories and labels and assign the selected cells to a label, and they can store two selections as cell sets and compute the genes most differentially expressed between them, which arrive as two new gene sets. The labels and gene sets they make are saved automatically to a named folder of user data.",
+    "task": {
+      "text": "Explore a single-cell dataset on its embedding, select groups of cells by metadata, expression or position, label them with one's own categories, and find the genes that set two groups apart.",
+      "verbs": [
+        "explore",
+        "annotate",
+        "identify",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A cell-by-gene expression matrix with per-cell metadata (categorical and continuous), one or more 2D embeddings, and optional gene sets, loaded from an AnnData (.h5ad) file.",
+      "item": "a single cell, with its position in each embedding, its metadata values and its gene expression",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "annotating cells by type in a processed single-cell dataset, after clustering and embedding",
+      "terms": [
+        "annotate",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "An embedding scatter plot, category lists with counts and histograms of continuous values and genes all share one crossfilter: ticking labels, brushing a histogram or lassoing points narrows the same selection everywhere, and that selection is what gets labelled, subset or stored as a cell set for differential expression.",
+      "views": [
+        "scatter plot",
+        "bar chart",
+        "sidebar list",
+        "summary stats"
+      ],
+      "interactions": [
+        "brush",
+        "select",
+        "multi-select",
+        "filter",
+        "search",
+        "zoom and pan",
+        "apply label",
+        "inline edit",
+        "undo",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views",
+        "category palette",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "cell type annotation and differential expression in single-cell transcriptomics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "single cell transcriptomics",
+        "cell type annotation",
+        "differential expression"
+      ]
+    },
+    "workflow": {
+      "name": "select groups of items on a map, label them, and find what sets two groups apart",
+      "steps": [
+        {
+          "step": "look over every item at a glance",
+          "here": "every cell is a WebGL point on an embedding picked from the layout menu (with cell counts per embedding), coloured by a category or a gene; centroid labels can be drawn for the coloured category",
+          "parts": [
+            "embedding-graph",
+            "view-tools"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "tick or untick category labels, brush histograms of continuous metadata, genes or gene-set means, and brush or lasso on the embedding; all combine in one crossfilter, and Subset narrows the whole view to the selected cells (with undo, redo and percentile clipping)",
+          "parts": [
+            "category-panel",
+            "metric-histograms",
+            "embedding-graph",
+            "view-tools"
+          ]
+        },
+        {
+          "step": "select a stretch and label it with a category",
+          "here": "create a new category (blank or duplicated from an existing one), add labels to it, and re-label the currently selected cells as a label; labels can be renamed or deleted, sending their cells back to 'unassigned'",
+          "parts": [
+            "label-editor",
+            "category-panel"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "store the current selection as cell set 1 and cell set 2, then compute the top differentially expressed genes; the up- and down-regulated genes arrive as two dated gene sets",
+          "parts": [
+            "diffexp-buttons",
+            "gene-panel"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "search a gene or build gene sets, then colour cells by a gene, see its expression histogram, or plot two genes against each other in a scatterplot",
+          "parts": [
+            "gene-panel",
+            "metric-histograms"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "user categories and gene sets are autosaved to a named user-data directory on the server, with a status message showing whether changes are saved",
+          "parts": [
+            "autosave"
+          ]
+        }
+      ],
+      "distinctive": [
+        "the same crossfilter selection, built from labels, histograms and a lasso on the embedding, is what gets labelled, subset or stored as a comparison group",
+        "the label scheme is the person's own and grows as they go: categories can be created, duplicated from existing metadata, and their labels added, renamed or deleted",
+        "differential expression between two stored cell sets is capped at a maximum cell count, and its result becomes editable gene sets",
+        "continuous values can be clipped to a percentile range before colouring and histograms",
+        "built to stay interactive with a million or more cells, through WebGL drawing and lazily loaded columns"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "embedding-graph",
+      "level": "view",
+      "parent": null,
+      "title": "Embedding plot",
+      "summary": "Draws every cell on the chosen embedding, coloured by the current colour choice, and lets the person brush or lasso cells or pan and zoom.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "brush",
+        "zoom and pan",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/client/src/components/graph/graph.js",
+          "start": 827,
+          "end": 935,
+          "role": "markup",
+          "anchor": "c02edf39cc96",
+          "first": "render() {"
+        },
+        {
+          "file": "code/client/src/components/graph/graph.js",
+          "start": 324,
+          "end": 436,
+          "role": "logic",
+          "anchor": "b80c6475ac60",
+          "first": "handleBrushDragAction() {"
+        },
+        {
+          "file": "code/client/src/components/graph/graph.js",
+          "start": 595,
+          "end": 673,
+          "role": "logic",
+          "anchor": "0a1061b4b98c",
+          "first": "brushToolUpdate(tool, container) {"
+        },
+        {
+          "file": "code/client/src/components/graph/setupSVGandBrush.js",
+          "start": 1,
+          "end": 54,
+          "role": "logic",
+          "anchor": "bfbcc26b6137",
+          "first": "import * as d3 from \"d3\";"
+        },
+        {
+          "file": "code/client/src/components/graph/setupLasso.js",
+          "start": 4,
+          "end": 163,
+          "role": "logic",
+          "symbol": "Lasso",
+          "anchor": "20a82f73a081",
+          "first": "const Lasso = () => {"
+        },
+        {
+          "file": "code/client/src/components/graph/drawPointsRegl.js",
+          "start": 3,
+          "end": 81,
+          "role": "logic",
+          "symbol": "drawPointsRegl",
+          "anchor": "201b4a52d868",
+          "first": "export default function drawPointsRegl(regl) {"
+        },
+        {
+          "file": "code/client/src/components/embedding/index.js",
+          "start": 23,
+          "end": 135,
+          "role": "markup",
+          "anchor": "984836985e35",
+          "first": "class Embedding extends React.PureComponent {"
+        }
+      ]
+    },
+    {
+      "id": "view-tools",
+      "level": "component",
+      "parent": "embedding-graph",
+      "title": "View toolbar",
+      "summary": "Switches between selecting and pan-zoom, shows centroid labels, subsets to or resets from the selection, clips values to percentiles, and undoes or redoes.",
+      "views": [],
+      "interactions": [
+        "toggle view",
+        "filter",
+        "undo"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/client/src/components/menubar/index.js",
+          "start": 194,
+          "end": 318,
+          "role": "markup",
+          "anchor": "f9827e052b28",
+          "first": "render() {"
+        },
+        {
+          "file": "code/client/src/components/menubar/index.js",
+          "start": 104,
+          "end": 193,
+          "role": "logic",
+          "anchor": "29c6b0831561",
+          "first": "handleClipOnKeyPress = (e) => {"
+        },
+        {
+          "file": "code/client/src/components/menubar/subset.js",
+          "start": 1,
+          "end": 46,
+          "role": "markup",
+          "anchor": "b1b11a99ff5c",
+          "first": "import React from \"react\";"
+        },
+        {
+          "file": "code/client/src/components/menubar/clip.js",
+          "start": 1,
+          "end": 138,
+          "role": "markup",
+          "anchor": "5ea64ffc0138",
+          "first": "import React from \"react\";"
+        },
+        {
+          "file": "code/client/src/components/menubar/undoRedo.js",
+          "start": 1,
+          "end": 51,
+          "role": "markup",
+          "anchor": "04355bd27474",
+          "first": "import React from \"react\";"
+        },
+        {
+          "file": "code/client/src/actions/viewStack.js",
+          "start": 21,
+          "end": 74,
+          "role": "logic",
+          "anchor": "ceac604e0f9f",
+          "first": "export const clipAction = (min, max) => (dispatch, getState) => {"
+        }
+      ]
+    },
+    {
+      "id": "category-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Category lists",
+      "summary": "Lists each categorical field with its labels, cell counts and colour swatches, where ticking labels filters the cells and a button colours the plot by the category.",
+      "views": [
+        "sidebar list",
+        "summary stats"
+      ],
+      "interactions": [
+        "multi-select",
+        "filter",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/client/src/components/categorical/category/index.js",
+          "start": 214,
+          "end": 286,
+          "role": "markup",
+          "anchor": "3ee6772fd64a",
+          "first": "render() {"
+        },
+        {
+          "file": "code/client/src/components/categorical/category/index.js",
+          "start": 357,
+          "end": 473,
+          "role": "markup",
+          "anchor": "a5264720798f",
+          "first": "const CategoryHeader = React.memo("
+        },
+        {
+          "file": "code/client/src/components/categorical/category/index.js",
+          "start": 568,
+          "end": 625,
+          "role": "markup",
+          "anchor": "202807046772",
+          "first": "const CategoryValueList = React.memo("
+        },
+        {
+          "file": "code/client/src/components/categorical/category/index.js",
+          "start": 85,
+          "end": 212,
+          "role": "logic",
+          "anchor": "7c27c21d3c75",
+          "first": "handleColorChange = () => {"
+        },
+        {
+          "file": "code/client/src/components/categorical/value/index.js",
+          "start": 540,
+          "end": 675,
+          "role": "markup",
+          "anchor": "ce40f1429a37",
+          "first": "marginBottom: \"2px\","
+        },
+        {
+          "file": "code/client/src/components/categorical/value/index.js",
+          "start": 150,
+          "end": 249,
+          "role": "logic",
+          "anchor": "9fe890bef135",
+          "first": "toggleOff = () => {"
+        },
+        {
+          "file": "code/client/src/actions/selection.js",
+          "start": 28,
+          "end": 98,
+          "role": "logic",
+          "anchor": "87f797bb58e3",
+          "first": "export const selectCategoricalMetadataAction ="
+        }
+      ]
+    },
+    {
+      "id": "label-editor",
+      "level": "component",
+      "parent": "category-panel",
+      "title": "Category and label editor",
+      "summary": "Creates user categories, adds, renames and deletes their labels, and assigns the currently selected cells to a label.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "apply label",
+        "inline edit"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/client/src/components/categorical/index.js",
+          "start": 116,
+          "end": 222,
+          "role": "markup",
+          "anchor": "e256414183ee",
+          "first": "render() {"
+        },
+        {
+          "file": "code/client/src/components/categorical/category/annoMenuCategory.js",
+          "start": 22,
+          "end": 118,
+          "role": "markup",
+          "symbol": "AnnoMenuCategory",
+          "anchor": "a0d29e535f6f",
+          "first": "class AnnoMenuCategory extends React.PureComponent {"
+        },
+        {
+          "file": "code/client/src/components/categorical/category/annoDialogAddLabel.js",
+          "start": 13,
+          "end": 111,
+          "role": "markup",
+          "symbol": "Category",
+          "anchor": "5f778cb0d59d",
+          "first": "class Category extends React.PureComponent {"
+        },
+        {
+          "file": "code/client/src/components/categorical/value/index.js",
+          "start": 676,
+          "end": 756,
+          "role": "markup",
+          "anchor": "d82b960af92a",
+          "first": "{isUserAnno ? ("
+        },
+        {
+          "file": "code/client/src/components/categorical/value/index.js",
+          "start": 87,
+          "end": 148,
+          "role": "logic",
+          "anchor": "60a2fdc94e01",
+          "first": "handleDeleteValue = () => {"
+        },
+        {
+          "file": "code/client/src/actions/annotation.js",
+          "start": 11,
+          "end": 257,
+          "role": "logic",
+          "anchor": "ab9513f89dc1",
+          "first": "export const annotationCreateCategoryAction ="
+        }
+      ]
+    },
+    {
+      "id": "metric-histograms",
+      "level": "view",
+      "parent": null,
+      "title": "Brushable histograms",
+      "summary": "Shows the distribution of each continuous metadata field, gene or gene-set mean, where brushing a range filters the cells and buttons colour by it or plot it on a scatterplot axis.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "brush",
+        "filter",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/client/src/components/brushableHistogram/index.js",
+          "start": 331,
+          "end": 437,
+          "role": "markup",
+          "anchor": "ad09961c4fb9",
+          "first": "render() {"
+        },
+        {
+          "file": "code/client/src/components/brushableHistogram/index.js",
+          "start": 52,
+          "end": 156,
+          "role": "logic",
+          "anchor": "c5eb15ab9520",
+          "first": "handleColorAction = memoize((dispatch) => (field, isObs) => {"
+        },
+        {
+          "file": "code/client/src/components/brushableHistogram/histogram.js",
+          "start": 1,
+          "end": 191,
+          "role": "logic",
+          "anchor": "4a5013c735c4",
+          "first": "import React, { useEffect, useRef, useState } from \"react\";"
+        },
+        {
+          "file": "code/client/src/components/brushableHistogram/header.js",
+          "start": 1,
+          "end": 100,
+          "role": "markup",
+          "anchor": "a9e41f180210",
+          "first": "import React, { useCallback } from \"react\";"
+        },
+        {
+          "file": "code/client/src/actions/selection.js",
+          "start": 4,
+          "end": 26,
+          "role": "logic",
+          "anchor": "674780fa6452",
+          "first": "export const selectContinuousMetadataAction ="
+        }
+      ]
+    },
+    {
+      "id": "gene-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Genes and gene sets",
+      "summary": "Searches genes, builds and edits gene sets, and lets the person colour cells by a gene, see its histogram, or put it on a scatterplot axis.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "search",
+        "toggle view",
+        "inline edit"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/client/src/components/geneExpression/index.js",
+          "start": 49,
+          "end": 96,
+          "role": "markup",
+          "anchor": "44374f45b380",
+          "first": "render() {"
+        },
+        {
+          "file": "code/client/src/components/geneExpression/quickGene.js",
+          "start": 21,
+          "end": 166,
+          "role": "logic",
+          "symbol": "QuickGene",
+          "anchor": "594dc893f102",
+          "first": "function QuickGene() {"
+        },
+        {
+          "file": "code/client/src/components/geneExpression/geneSet.js",
+          "start": 45,
+          "end": 133,
+          "role": "markup",
+          "anchor": "20cefc19ca12",
+          "first": "render() {"
+        },
+        {
+          "file": "code/client/src/components/geneExpression/gene.js",
+          "start": 29,
+          "end": 192,
+          "role": "markup",
+          "anchor": "ea6b43665efa",
+          "first": "onColorChangeClick = () => {"
+        },
+        {
+          "file": "code/client/src/components/geneExpression/menus/createGenesetDialogue.js",
+          "start": 17,
+          "end": 216,
+          "role": "markup",
+          "symbol": "CreateGenesetDialogue",
+          "anchor": "2c575257c8c7",
+          "first": "class CreateGenesetDialogue extends React.PureComponent {"
+        },
+        {
+          "file": "code/client/src/components/geneExpression/menus/addGenes.js",
+          "start": 57,
+          "end": 321,
+          "role": "logic",
+          "symbol": "AddGenes",
+          "anchor": "dfef4edad6a8",
+          "first": "class AddGenes extends React.Component {"
+        },
+        {
+          "file": "code/client/src/actions/geneset.js",
+          "start": 43,
+          "end": 95,
+          "role": "logic",
+          "anchor": "5cada017d148",
+          "first": "export const genesetAddGenes ="
+        }
+      ]
+    },
+    {
+      "id": "diffexp-buttons",
+      "level": "component",
+      "parent": "embedding-graph",
+      "title": "Differential expression",
+      "summary": "Stores the current selection as cell set 1 or 2 and computes the top differentially expressed genes between them, adding the results as two gene sets.",
+      "views": [],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/client/src/components/menubar/diffexpButtons.js",
+          "start": 15,
+          "end": 73,
+          "role": "markup",
+          "anchor": "46bfb25ae826",
+          "first": "computeDiffExp = () => {"
+        },
+        {
+          "file": "code/client/src/components/menubar/cellSetButtons.js",
+          "start": 10,
+          "end": 46,
+          "role": "markup",
+          "symbol": "CellSetButton",
+          "anchor": "e3b248e9d775",
+          "first": "class CellSetButton extends React.PureComponent {"
+        },
+        {
+          "file": "code/client/src/actions/selection.js",
+          "start": 184,
+          "end": 192,
+          "role": "logic",
+          "symbol": "setCellSetFromSelection",
+          "anchor": "5c7cfbdef9aa",
+          "first": "export const setCellSetFromSelection = (cellSetId) => (dispatch, getState) => {"
+        },
+        {
+          "file": "code/client/src/actions/index.js",
+          "start": 163,
+          "end": 230,
+          "role": "logic",
+          "anchor": "e8c47efe026d",
+          "first": "const requestDifferentialExpression ="
+        },
+        {
+          "file": "code/client/src/reducers/genesets.js",
+          "start": 364,
+          "end": 400,
+          "role": "logic",
+          "anchor": "4390ae7cdd08",
+          "first": "case \"request differential expression success\": {"
+        }
+      ]
+    },
+    {
+      "id": "autosave",
+      "level": "component",
+      "parent": null,
+      "title": "Autosave and data directory",
+      "summary": "Names the user-data directory and saves user categories and gene sets to the server whenever they change, showing the save status.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/client/src/components/autosave/index.js",
+          "start": 21,
+          "end": 120,
+          "role": "logic",
+          "symbol": "Autosave",
+          "anchor": "d9d9701b06f5",
+          "first": "class Autosave extends React.Component {"
+        },
+        {
+          "file": "code/client/src/components/autosave/filenameDialog.js",
+          "start": 22,
+          "end": 184,
+          "role": "markup",
+          "symbol": "FilenameDialog",
+          "anchor": "ddbfaa2619cb",
+          "first": "class FilenameDialog extends React.Component {"
+        },
+        {
+          "file": "code/client/src/actions/annotation.js",
+          "start": 293,
+          "end": 361,
+          "role": "logic",
+          "symbol": "saveObsAnnotationsAction",
+          "anchor": "0bcf0e36b21d",
+          "first": "export const saveObsAnnotationsAction = () => async (dispatch, getState) => {"
+        },
+        {
+          "file": "code/client/src/actions/annotation.js",
+          "start": 363,
+          "end": 455,
+          "role": "logic",
+          "symbol": "saveGenesetsAction",
+          "anchor": "47d9c2c7559f",
+          "first": "export const saveGenesetsAction = () => async (dispatch, getState) => {"
+        }
+      ]
+    }
+  ]
+}

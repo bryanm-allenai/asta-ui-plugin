@@ -1,0 +1,881 @@
+{
+  "schema": "astaui.card/1",
+  "id": "wildlife-monitor-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T09:52:50Z"
+  },
+  "app": {
+    "title": "Wildlife Monitor (Raspberry Pi camera-trap dashboard)",
+    "summary": "A camera trap records short clips when motion is sensed or on a schedule, and each clip is classified and boxed automatically before it reaches the interface. The person checks the deployment's status and today's counts on a dashboard, and can trigger a test clip to check the camera's framing. They browse every clip as thumbnails, filtered by trigger, animal class and date range, and open one to watch it with its label, sound label and annotated key frames. On each clip they can re-run classification, star it as a highlight, or delete it; they can also select many clips and delete them together. Charts of daily detection counts and the split by animal class summarise the period, and daily timelapses can be watched as a recap.",
+    "task": {
+      "text": "Review automatically classified camera-trap clips, keep the good ones, delete the empty ones, and track how many detections of each animal class arrive over time.",
+      "verbs": [
+        "monitor",
+        "triage",
+        "summarize",
+        "curate",
+        "identify",
+        "clean"
+      ]
+    },
+    "data": {
+      "text": "Short video clips from a motion- and schedule-triggered camera trap, each stored as a database record with its trigger type, machine label and confidence, optional sound label, bounding boxes on key frames, and a highlight flag; also daily counts per class and daily timelapse videos.",
+      "item": "a short video clip captured by a camera trap, with its automatic species label",
+      "shapes": [
+        "media",
+        "image collection",
+        "table",
+        "events",
+        "judgements",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "monitoring a running camera-trap deployment while clips are collected, and curating them before analysis",
+      "terms": [
+        "collect",
+        "clean",
+        "maintain"
+      ]
+    },
+    "mechanism": {
+      "text": "The thumbnail gallery is filtered by trigger, class and date and opens each clip in a detail page, where the person can watch the video, see annotated frames, re-classify, highlight or delete it. Highlights are gathered on their own page, and a dashboard and a statistics page reduce the collection to counts and charts that refresh on their own.",
+      "views": [
+        "thumbnail grid",
+        "detail panel",
+        "summary stats",
+        "bar chart",
+        "list",
+        "table view"
+      ],
+      "interactions": [
+        "filter",
+        "select",
+        "multi-select",
+        "accept or reject",
+        "toggle view"
+      ],
+      "patterns": [
+        "master-detail",
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "camera-trap monitoring with automatic species classification in wildlife ecology",
+      "disciplines": [
+        "ecology"
+      ],
+      "terms": [
+        "camera trapping",
+        "wildlife monitoring",
+        "bioacoustics"
+      ]
+    },
+    "workflow": {
+      "name": "review an automatically labelled stream of captures and keep the ones worth keeping",
+      "steps": [
+        {
+          "step": "track progress toward a target or a total",
+          "here": "The dashboard shows system status, today's total and per-animal counts, and the most recent detections, refreshed every 30 seconds; a Test Capture button records a clip and opens its result.",
+          "parts": [
+            "dashboard"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The gallery shows every detection as a thumbnail card with its trigger badge, animal label with confidence, sound badge and star, and loads more as the person scrolls.",
+          "parts": [
+            "gallery",
+            "gallery-filters"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Dropdowns for trigger type (motion, scheduled, manual) and animal class, and From/To dates, reload the grid.",
+          "parts": [
+            "gallery-filters"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "A card opens the detection page with the video player, a details table (trigger, analyzed, animal, sound) and a gallery of key frames annotated with bounding boxes.",
+          "parts": [
+            "detection-detail"
+          ]
+        },
+        {
+          "step": "decide keep or drop for each item, with a reason",
+          "here": "On the detail page the person can star the clip as a highlight, re-classify it to replace the labels, or delete it with its video after a confirm dialog; in the gallery, checkboxes and Select All feed a bulk Delete Selected.",
+          "parts": [
+            "detection-detail",
+            "gallery",
+            "highlights"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The statistics page shows the total detections, the most common animal and the motion-to-scheduled ratio, a bar chart of daily detections, and a doughnut chart of animals, each over the last 7, 14 or 30 days.",
+          "parts": [
+            "statistics"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every capture records why it was taken (motion, scheduled or manual), so motion-triggered clips can be compared with scheduled background samples.",
+        "Two automatic labels sit on each clip, a visual class from frame classification and object detection and a sound class from the audio, and the person can re-run both on demand.",
+        "Clips with no animal found are deleted automatically after a set age, so the person reviews a collection that has already been thinned out.",
+        "A test-capture button lets the person check camera angle and lighting by recording and analysing a clip on the spot.",
+        "A daily timelapse stitches one frame from each of the day's detections into a recap video, shown with that day's animal counts."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "dashboard",
+      "level": "view",
+      "parent": null,
+      "title": "Dashboard",
+      "summary": "Shows the system's status, today's detection total and animal counts, the recent detections, and a button that records and analyses a test clip.",
+      "views": [
+        "summary stats",
+        "list"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/web/templates/index.html",
+          "start": 13,
+          "end": 18,
+          "role": "markup",
+          "symbol": "#status-card",
+          "anchor": "84c2f2a547af",
+          "first": "<div class=\"card-body\" id=\"status-card\">"
+        },
+        {
+          "file": "code/src/web/templates/index.html",
+          "start": 26,
+          "end": 31,
+          "role": "markup",
+          "symbol": "#summary-card",
+          "anchor": "2e792c7fecc0",
+          "first": "<div class=\"card-body\" id=\"summary-card\">"
+        },
+        {
+          "file": "code/src/web/templates/index.html",
+          "start": 39,
+          "end": 44,
+          "role": "markup",
+          "symbol": "#animals-card",
+          "anchor": "458526f57332",
+          "first": "<div class=\"card-body\" id=\"animals-card\">"
+        },
+        {
+          "file": "code/src/web/templates/index.html",
+          "start": 56,
+          "end": 58,
+          "role": "markup",
+          "symbol": "#testCaptureBtn",
+          "anchor": "e48a2ce96672",
+          "first": "<button id=\"testCaptureBtn\" class=\"btn btn-primary ms-3 text-nowrap\" onclick=\"triggerTestCapture()\">"
+        },
+        {
+          "file": "code/src/web/templates/index.html",
+          "start": 67,
+          "end": 72,
+          "role": "markup",
+          "symbol": "#recent-card",
+          "anchor": "a1fa2a74f471",
+          "first": "<div class=\"card-body\" id=\"recent-card\">"
+        },
+        {
+          "file": "code/src/web/templates/index.html",
+          "start": 80,
+          "end": 102,
+          "role": "logic",
+          "symbol": "loadStatus",
+          "anchor": "c912e58a08d8",
+          "first": "async function loadStatus() {"
+        },
+        {
+          "file": "code/src/web/templates/index.html",
+          "start": 104,
+          "end": 181,
+          "role": "logic",
+          "symbol": "loadSummary",
+          "anchor": "bcf31f2d97b9",
+          "first": "async function loadSummary() {"
+        },
+        {
+          "file": "code/src/web/templates/index.html",
+          "start": 183,
+          "end": 203,
+          "role": "logic",
+          "symbol": "triggerTestCapture",
+          "anchor": "fc79653098c4",
+          "first": "async function triggerTestCapture() {"
+        },
+        {
+          "file": "code/src/web/templates/index.html",
+          "start": 205,
+          "end": 207,
+          "role": "logic",
+          "symbol": "refreshData",
+          "anchor": "d0afba2815c8",
+          "first": "async function refreshData() {"
+        },
+        {
+          "file": "code/src/web/static/js/app.js",
+          "start": 276,
+          "end": 323,
+          "role": "logic",
+          "symbol": "AutoRefresh",
+          "anchor": "0e1bff7b8736",
+          "first": "const AutoRefresh = {"
+        },
+        {
+          "file": "code/src/web/api.py",
+          "start": 422,
+          "end": 483,
+          "role": "data",
+          "symbol": "get_summary",
+          "anchor": "60ed26c81ad1",
+          "first": "def get_summary():"
+        },
+        {
+          "file": "code/src/web/api.py",
+          "start": 712,
+          "end": 747,
+          "role": "data",
+          "symbol": "test_capture",
+          "anchor": "ea5bcb461831",
+          "first": "def test_capture():"
+        }
+      ]
+    },
+    {
+      "id": "gallery",
+      "level": "view",
+      "parent": null,
+      "title": "Detection gallery",
+      "summary": "Shows every detection as a thumbnail card with its trigger, label, sound and highlight badges, loads more on scroll, and lets the person select cards to delete together.",
+      "views": [
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "accept or reject"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 46,
+          "end": 47,
+          "role": "markup",
+          "symbol": "#detectionGrid",
+          "anchor": "2358a53c4b36",
+          "first": "<div id=\"detectionGrid\" class=\"row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4\">"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 8,
+          "end": 11,
+          "role": "markup",
+          "symbol": "#bulkActions",
+          "anchor": "560a617440c5",
+          "first": "<div id=\"bulkActions\" class=\"d-none\">"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 40,
+          "end": 40,
+          "role": "markup",
+          "symbol": "#selectAll",
+          "anchor": "a6dd1d27251e",
+          "first": "<input class=\"form-check-input\" type=\"checkbox\" id=\"selectAll\" onchange=\"toggleSelectAll()\">"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 59,
+          "end": 59,
+          "role": "markup",
+          "symbol": "#scrollSentinel",
+          "anchor": "bda06deefa5f",
+          "first": "<div id=\"scrollSentinel\" class=\"text-center my-4\"></div>"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 86,
+          "end": 133,
+          "role": "logic",
+          "symbol": "createDetectionCard",
+          "anchor": "d8191e7dfa13",
+          "first": "function createDetectionCard(detection) {"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 135,
+          "end": 185,
+          "role": "logic",
+          "symbol": "loadDetections",
+          "anchor": "4bb72fa589bc",
+          "first": "async function loadDetections(reset = false) {"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 214,
+          "end": 220,
+          "role": "logic",
+          "anchor": "8a573bf0bfb9",
+          "first": "// Infinite scroll"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 227,
+          "end": 238,
+          "role": "logic",
+          "symbol": "updateBulkActions",
+          "anchor": "aa2dbbd7d124",
+          "first": "function updateBulkActions() {"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 240,
+          "end": 246,
+          "role": "logic",
+          "symbol": "toggleSelectAll",
+          "anchor": "afd0298a6ad4",
+          "first": "function toggleSelectAll() {"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 248,
+          "end": 275,
+          "role": "logic",
+          "symbol": "bulkDelete",
+          "anchor": "015f78e1a490",
+          "first": "async function bulkDelete() {"
+        },
+        {
+          "file": "code/src/web/static/css/style.css",
+          "start": 269,
+          "end": 273,
+          "role": "style",
+          "symbol": ".gallery-grid",
+          "anchor": "10d5ee3ba503",
+          "first": ".gallery-grid {"
+        },
+        {
+          "file": "code/src/web/api.py",
+          "start": 83,
+          "end": 156,
+          "role": "data",
+          "symbol": "list_detections",
+          "anchor": "a54a1d2d36d3",
+          "first": "def list_detections():"
+        },
+        {
+          "file": "code/src/web/api.py",
+          "start": 523,
+          "end": 565,
+          "role": "data",
+          "symbol": "bulk_delete_detections",
+          "anchor": "4c812002ad00",
+          "first": "def bulk_delete_detections():"
+        }
+      ]
+    },
+    {
+      "id": "gallery-filters",
+      "level": "component",
+      "parent": "gallery",
+      "title": "Gallery filters",
+      "summary": "Narrows the gallery by trigger type, animal class and a from-to date range, and reloads the grid when any of them changes.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 17,
+          "end": 22,
+          "role": "markup",
+          "symbol": "#triggerFilter",
+          "anchor": "e25b617bed4a",
+          "first": "<select id=\"triggerFilter\" class=\"form-select\">"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 26,
+          "end": 28,
+          "role": "markup",
+          "symbol": "#animalFilter",
+          "anchor": "e933b349abdc",
+          "first": "<select id=\"animalFilter\" class=\"form-select\">"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 32,
+          "end": 32,
+          "role": "markup",
+          "symbol": "#startDate",
+          "anchor": "44748d567ead",
+          "first": "<input type=\"date\" id=\"startDate\" class=\"form-control\">"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 36,
+          "end": 36,
+          "role": "markup",
+          "symbol": "#endDate",
+          "anchor": "bd90d005e851",
+          "first": "<input type=\"date\" id=\"endDate\" class=\"form-control\">"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 187,
+          "end": 207,
+          "role": "logic",
+          "symbol": "loadAnimalClasses",
+          "anchor": "52d7970c6ea8",
+          "first": "async function loadAnimalClasses() {"
+        },
+        {
+          "file": "code/src/web/templates/gallery.html",
+          "start": 209,
+          "end": 212,
+          "role": "logic",
+          "anchor": "30492786c368",
+          "first": "triggerFilter.addEventListener('change', () => loadDetections(true));"
+        },
+        {
+          "file": "code/src/web/static/css/style.css",
+          "start": 275,
+          "end": 280,
+          "role": "style",
+          "symbol": ".gallery-filters",
+          "anchor": "fc545dba5198",
+          "first": ".gallery-filters {"
+        }
+      ]
+    },
+    {
+      "id": "detection-detail",
+      "level": "view",
+      "parent": null,
+      "title": "Detection detail",
+      "summary": "Plays one clip next to its details and annotated key frames, and lets the person re-classify it, star it as a highlight, or delete it.",
+      "views": [
+        "detail panel",
+        "table view",
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "accept or reject",
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/web/templates/detection.html",
+          "start": 20,
+          "end": 93,
+          "role": "markup",
+          "symbol": "#detectionContent",
+          "anchor": "9fb2b25dd521",
+          "first": "<div id=\"detectionContent\" class=\"d-none\">"
+        },
+        {
+          "file": "code/src/web/templates/detection.html",
+          "start": 95,
+          "end": 111,
+          "role": "markup",
+          "symbol": "#deleteModal",
+          "anchor": "7802a62e50ab",
+          "first": "<div class=\"modal fade\" id=\"deleteModal\" tabindex=\"-1\">"
+        },
+        {
+          "file": "code/src/web/templates/detection.html",
+          "start": 131,
+          "end": 191,
+          "role": "logic",
+          "symbol": "loadDetection",
+          "anchor": "1cccf98685e5",
+          "first": "async function loadDetection() {"
+        },
+        {
+          "file": "code/src/web/templates/detection.html",
+          "start": 270,
+          "end": 310,
+          "role": "logic",
+          "symbol": "loadAnnotatedFrames",
+          "anchor": "f939404facd1",
+          "first": "async function loadAnnotatedFrames() {"
+        },
+        {
+          "file": "code/src/web/templates/detection.html",
+          "start": 204,
+          "end": 219,
+          "role": "logic",
+          "symbol": "toggleHighlight",
+          "anchor": "0c7f07d30d13",
+          "first": "async function toggleHighlight() {"
+        },
+        {
+          "file": "code/src/web/templates/detection.html",
+          "start": 193,
+          "end": 202,
+          "role": "logic",
+          "symbol": "updateHighlightButton",
+          "anchor": "9b885c80c3f1",
+          "first": "function updateHighlightButton(highlighted) {"
+        },
+        {
+          "file": "code/src/web/templates/detection.html",
+          "start": 221,
+          "end": 244,
+          "role": "logic",
+          "symbol": "reclassifyDetection",
+          "anchor": "c63356bcb2fc",
+          "first": "async function reclassifyDetection() {"
+        },
+        {
+          "file": "code/src/web/templates/detection.html",
+          "start": 246,
+          "end": 268,
+          "role": "logic",
+          "symbol": "deleteDetection",
+          "anchor": "6c2059671811",
+          "first": "function deleteDetection() {"
+        },
+        {
+          "file": "code/src/web/static/css/style.css",
+          "start": 40,
+          "end": 45,
+          "role": "style",
+          "symbol": ".video-container",
+          "anchor": "c1d2b8feb908",
+          "first": ".video-container {"
+        },
+        {
+          "file": "code/src/web/api.py",
+          "start": 160,
+          "end": 192,
+          "role": "data",
+          "symbol": "get_detection",
+          "anchor": "f28b71aa7e41",
+          "first": "def get_detection(detection_id: int):"
+        },
+        {
+          "file": "code/src/web/api.py",
+          "start": 256,
+          "end": 286,
+          "role": "data",
+          "symbol": "get_detection_objects",
+          "anchor": "f617da4e0ab9",
+          "first": "def get_detection_objects(detection_id: int):"
+        },
+        {
+          "file": "code/src/web/api.py",
+          "start": 196,
+          "end": 214,
+          "role": "data",
+          "symbol": "toggle_highlight",
+          "anchor": "a707f619e655",
+          "first": "def toggle_highlight(detection_id: int):"
+        },
+        {
+          "file": "code/src/web/api.py",
+          "start": 569,
+          "end": 708,
+          "role": "data",
+          "symbol": "reclassify_detection",
+          "anchor": "5640786f9956",
+          "first": "def reclassify_detection(detection_id: int):"
+        },
+        {
+          "file": "code/src/web/api.py",
+          "start": 487,
+          "end": 519,
+          "role": "data",
+          "symbol": "delete_detection",
+          "anchor": "c56b677a7fa1",
+          "first": "def delete_detection(detection_id: int):"
+        }
+      ]
+    },
+    {
+      "id": "highlights",
+      "level": "view",
+      "parent": null,
+      "title": "Highlights",
+      "summary": "Gathers the starred detections in a thumbnail grid, where the person can unstar them or select several to delete.",
+      "views": [
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "multi-select",
+        "accept or reject"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/web/templates/highlights.html",
+          "start": 14,
+          "end": 15,
+          "role": "markup",
+          "symbol": "#highlightGrid",
+          "anchor": "6d66e1740010",
+          "first": "<div id=\"highlightGrid\" class=\"row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4\">"
+        },
+        {
+          "file": "code/src/web/templates/highlights.html",
+          "start": 8,
+          "end": 11,
+          "role": "markup",
+          "symbol": "#bulkActions",
+          "anchor": "560a617440c5",
+          "first": "<div id=\"bulkActions\" class=\"d-none\">"
+        },
+        {
+          "file": "code/src/web/templates/highlights.html",
+          "start": 50,
+          "end": 89,
+          "role": "logic",
+          "symbol": "createHighlightCard",
+          "anchor": "05057cb5b597",
+          "first": "function createHighlightCard(detection) {"
+        },
+        {
+          "file": "code/src/web/templates/highlights.html",
+          "start": 91,
+          "end": 124,
+          "role": "logic",
+          "symbol": "loadHighlights",
+          "anchor": "30db38f9fd51",
+          "first": "async function loadHighlights(reset = false) {"
+        },
+        {
+          "file": "code/src/web/templates/highlights.html",
+          "start": 126,
+          "end": 137,
+          "role": "logic",
+          "symbol": "removeHighlight",
+          "anchor": "c2eecae9449e",
+          "first": "async function removeHighlight(id) {"
+        },
+        {
+          "file": "code/src/web/templates/highlights.html",
+          "start": 165,
+          "end": 191,
+          "role": "logic",
+          "symbol": "bulkDelete",
+          "anchor": "171ca343fb8e",
+          "first": "async function bulkDelete() {"
+        },
+        {
+          "file": "code/src/web/api.py",
+          "start": 218,
+          "end": 252,
+          "role": "data",
+          "symbol": "list_highlights",
+          "anchor": "a0208fa6e25a",
+          "first": "def list_highlights():"
+        }
+      ]
+    },
+    {
+      "id": "statistics",
+      "level": "view",
+      "parent": null,
+      "title": "Detection statistics",
+      "summary": "Shows the total detections, the most common animal and the motion-to-scheduled ratio, with a bar chart of daily detections and a doughnut chart of animals, each over a chosen number of days.",
+      "views": [
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [
+        "filter",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/web/templates/statistics.html",
+          "start": 12,
+          "end": 71,
+          "role": "markup",
+          "anchor": "43553ca78076",
+          "first": "<div class=\"row mb-4\">"
+        },
+        {
+          "file": "code/src/web/templates/statistics.html",
+          "start": 106,
+          "end": 167,
+          "role": "logic",
+          "symbol": "updateDailyChart",
+          "anchor": "afdbd8146204",
+          "first": "function updateDailyChart(data) {"
+        },
+        {
+          "file": "code/src/web/templates/statistics.html",
+          "start": 169,
+          "end": 204,
+          "role": "logic",
+          "symbol": "updateAnimalChart",
+          "anchor": "19453a7af6c6",
+          "first": "function updateAnimalChart(data) {"
+        },
+        {
+          "file": "code/src/web/templates/statistics.html",
+          "start": 206,
+          "end": 212,
+          "role": "logic",
+          "symbol": "loadDailyStats",
+          "anchor": "a899a8f571cd",
+          "first": "async function loadDailyStats() {"
+        },
+        {
+          "file": "code/src/web/templates/statistics.html",
+          "start": 214,
+          "end": 224,
+          "role": "logic",
+          "symbol": "loadAnimalStats",
+          "anchor": "eaba98b3c38e",
+          "first": "async function loadAnimalStats() {"
+        },
+        {
+          "file": "code/src/web/static/css/style.css",
+          "start": 232,
+          "end": 236,
+          "role": "style",
+          "symbol": ".stat-card",
+          "anchor": "89d5a70442c6",
+          "first": ".stat-card {"
+        },
+        {
+          "file": "code/src/web/api.py",
+          "start": 331,
+          "end": 370,
+          "role": "data",
+          "symbol": "get_daily_stats",
+          "anchor": "5a265dab6291",
+          "first": "def get_daily_stats():"
+        },
+        {
+          "file": "code/src/web/api.py",
+          "start": 374,
+          "end": 418,
+          "role": "data",
+          "symbol": "get_animal_stats",
+          "anchor": "c21d6659a42b",
+          "first": "def get_animal_stats():"
+        }
+      ]
+    },
+    {
+      "id": "timelapses",
+      "level": "view",
+      "parent": null,
+      "title": "Daily timelapses",
+      "summary": "Lists one recap video per day as cards; opening one plays it next to that day's detection count and animal breakdown, with a delete button.",
+      "views": [
+        "thumbnail grid",
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/web/templates/timelapses.html",
+          "start": 8,
+          "end": 9,
+          "role": "markup",
+          "symbol": "#timelapseGrid",
+          "anchor": "eefe56004f57",
+          "first": "<div id=\"timelapseGrid\" class=\"row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4\">"
+        },
+        {
+          "file": "code/src/web/templates/timelapses.html",
+          "start": 44,
+          "end": 74,
+          "role": "logic",
+          "symbol": "createTimelapseCard",
+          "anchor": "76f01a1f81bb",
+          "first": "function createTimelapseCard(tl) {"
+        },
+        {
+          "file": "code/src/web/templates/timelapses.html",
+          "start": 76,
+          "end": 111,
+          "role": "logic",
+          "symbol": "loadTimelapses",
+          "anchor": "1b585d6b9ec7",
+          "first": "async function loadTimelapses(reset = false) {"
+        },
+        {
+          "file": "code/src/web/templates/timelapse.html",
+          "start": 20,
+          "end": 70,
+          "role": "markup",
+          "symbol": "#timelapseContent",
+          "anchor": "1ecc48a55650",
+          "first": "<div id=\"timelapseContent\" class=\"d-none\">"
+        },
+        {
+          "file": "code/src/web/templates/timelapse.html",
+          "start": 101,
+          "end": 138,
+          "role": "logic",
+          "symbol": "loadTimelapse",
+          "anchor": "8aba40e8624f",
+          "first": "async function loadTimelapse() {"
+        },
+        {
+          "file": "code/src/web/templates/timelapse.html",
+          "start": 140,
+          "end": 158,
+          "role": "logic",
+          "symbol": "deleteTimelapse",
+          "anchor": "331564467786",
+          "first": "function deleteTimelapse() {"
+        },
+        {
+          "file": "code/src/storage/timelapse.py",
+          "start": 23,
+          "end": 28,
+          "role": "data",
+          "symbol": "generate_timelapse",
+          "anchor": "863040e5420a",
+          "first": "def generate_timelapse("
+        }
+      ]
+    }
+  ]
+}

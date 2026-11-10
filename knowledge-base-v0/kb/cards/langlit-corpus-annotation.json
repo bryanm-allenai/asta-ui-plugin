@@ -1,0 +1,537 @@
+{
+  "schema": "astaui.card/1",
+  "id": "langlit-corpus-annotation",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T10:50:45Z"
+  },
+  "app": {
+    "title": "Morphological Annotation Workbench for Interlinear Glossed Text",
+    "summary": "A person picks a corpus and steps through its utterances one at a time. They can jump straight to the next one that is not yet fully confirmed. Each utterance is shown as interlinear glossed text: surface tokens, morpheme breakdowns and glosses, with every token coloured by whether its analysis is confirmed, suggested or missing. The person highlights a stretch of the utterance or clicks a span. They then rerun the finite-state analyzer on it or add a manual analysis, can ask a language model to propose a reading for every span, and mark one interpretation per span as gold. Along the way they can link the utterance to a linguistic claim as supporting or contradicting evidence, follow gold coverage and gold-versus-candidate agreement in the sidebar, download the glossed utterance as text or LaTeX, and save the corpus.",
+    "task": {
+      "text": "Settle on the correct morphological analysis for every span of every utterance in a corpus, choosing among parser-proposed and model-suggested readings, so the corpus becomes fully glossed.",
+      "verbs": [
+        "annotate",
+        "decide",
+        "reconcile",
+        "derive",
+        "summarize",
+        "curate"
+      ]
+    },
+    "data": {
+      "text": "A corpus of utterances, each with a surface form and a free translation. Every utterance carries candidate morphological analyses over its token spans, each with several interpretations (morpheme breakdown and gloss) that hold gold or candidate labels, along with tags, notes and links to claims.",
+      "item": "an utterance with its token spans and their alternative morphological interpretations",
+      "shapes": [
+        "text corpus",
+        "spans",
+        "judgements",
+        "categories",
+        "notes"
+      ]
+    },
+    "stage": {
+      "text": "glossing a parsed corpus utterance by utterance, after automatic analysis and before claims are drawn from it",
+      "terms": [
+        "annotate",
+        "review"
+      ]
+    },
+    "mechanism": {
+      "text": "A navigator moves through utterances, and the interlinear display, the highlightable surface text and the span pills are linked. Selecting a stretch in any of them opens that span's analysis panel, where the person stars a gold interpretation or adds a manual one, while LLM suggestions, reanalysis previews and claim linking open as toggled panels below an action bar.",
+      "views": [
+        "document reader",
+        "detail panel",
+        "summary stats",
+        "form",
+        "list"
+      ],
+      "interactions": [
+        "select text span",
+        "select",
+        "apply label",
+        "accept or reject",
+        "keyboard shortcuts",
+        "inline edit",
+        "write notes",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "review queue",
+        "linked views",
+        "overview and detail",
+        "agreement summary"
+      ]
+    },
+    "field": {
+      "text": "morphological glossing of interlinear text with a finite-state analyzer, in linguistics",
+      "disciplines": [
+        "linguistics"
+      ],
+      "terms": [
+        "interlinear glossed text",
+        "morphological analysis",
+        "finite state morphology"
+      ]
+    },
+    "workflow": {
+      "name": "choose the right reading for each segment of every item from machine-proposed options",
+      "steps": [
+        {
+          "step": "step through items one at a time",
+          "here": "Prev/next buttons, an utterance number box and a 'Next incomplete' button (arrow keys, H/L and N) move through the selected corpus, with a header showing position, status and a gold/analyzed progress bar.",
+          "parts": [
+            "utterance-navigator"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The utterance card shows the surface line, the interlinear morpheme and gloss rows coloured by gold, candidate or unanalyzed status, and the free translation and notes.",
+          "parts": [
+            "igt-utterance-view"
+          ]
+        },
+        {
+          "step": "select a stretch and label it with a category",
+          "here": "Highlighting text or clicking an IGT cell or span pill selects an analysis or a gap. 🔄 Analyze reruns the FST on the selection for a commit-or-discard preview, and ➕ Manual creates a hand-made analysis, offering to delete the analyses it overlaps.",
+          "parts": [
+            "igt-utterance-view",
+            "action-bar",
+            "span-analysis-panel"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The 🤖 Suggest panel asks an LLM, at a chosen reasoning effort, to pick one interpretation per span using the translation. Single-option spans are picked automatically, and the results are shown with justifications before 'Apply as candidates'.",
+          "parts": [
+            "llm-suggest-panel"
+          ]
+        },
+        {
+          "step": "decide keep or drop for each item, with a reason",
+          "here": "In the span panel each interpretation card has a gold star and a candidate toggle plus a note. The person confirms one reading per span as gold, which records who confirmed it and when.",
+          "parts": [
+            "span-analysis-panel"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "The sidebar Metrics show utterances that are fully gold or candidate, analyses with no label, analyses the LLM declined, and the gold-versus-candidate agreement rate, flagging disagreements for reconciliation.",
+          "parts": [
+            "sidebar-metrics-sync"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Per-utterance IGT downloads as plain text or LaTeX (gb4e), utterances link to claims as evidence, and the corpus is saved to SQLite with a backup or synced to Drive.",
+          "parts": [
+            "action-bar",
+            "claim-link-panel",
+            "sidebar-metrics-sync"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Candidate analyses come from a finite-state morphological analyzer. Spans with no analysis show as red gap pills, which the person can fill by reanalyzing or entering a manual analysis.",
+        "Labels come in two tiers: an LLM-applied 'candidate' and a human-confirmed 'gold', and the agreement rate between them is tracked across the corpus.",
+        "Each utterance can be attached as supporting, contradicting or neutral evidence to a linguistic claim, with a required note.",
+        "Editing is locked behind a password, and every gold or candidate label records the annotator and a timestamp.",
+        "Glossed examples export in LaTeX gb4e format, ready to paste into a paper."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "utterance-navigator",
+      "level": "view",
+      "parent": null,
+      "title": "Corpus selector and utterance navigator",
+      "summary": "Picks the corpus and moves through its utterances, including a jump to the next one not fully confirmed, with a status line and progress bar.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "keyboard shortcuts"
+      ],
+      "patterns": [
+        "review queue"
+      ],
+      "spans": [
+        {
+          "file": "code/app/Discovery.py",
+          "start": 673,
+          "end": 768,
+          "role": "markup",
+          "anchor": "e6e633f13574",
+          "first": "# ── Corpus selector bar ──"
+        },
+        {
+          "file": "code/app/Discovery.py",
+          "start": 780,
+          "end": 920,
+          "role": "logic",
+          "anchor": "77159b163e84",
+          "first": "# --- Navigation setup (callbacks defined before widgets) ---"
+        },
+        {
+          "file": "code/app/Discovery.py",
+          "start": 831,
+          "end": 840,
+          "role": "logic",
+          "symbol": "go_next_incomplete",
+          "anchor": "f7da892bd344",
+          "first": "def go_next_incomplete():"
+        },
+        {
+          "file": "code/app/Discovery.py",
+          "start": 677,
+          "end": 681,
+          "role": "logic",
+          "symbol": "_on_corpus_change",
+          "anchor": "488bb22532a6",
+          "first": "def _on_corpus_change():"
+        },
+        {
+          "file": "code/app/static/discovery.js",
+          "start": 130,
+          "end": 169,
+          "role": "logic",
+          "anchor": "f40e2917c3ea",
+          "first": "/* ── 4. Keyboard shortcuts ───────────────────────────────── */"
+        },
+        {
+          "file": "code/app/style/style_discovery.css",
+          "start": 53,
+          "end": 62,
+          "role": "style",
+          "symbol": ".nav-info",
+          "anchor": "8bc8709bd811",
+          "first": ".nav-info {"
+        },
+        {
+          "file": "code/app/style/style_discovery.css",
+          "start": 304,
+          "end": 311,
+          "role": "style",
+          "symbol": ".nav-progress",
+          "anchor": "be55bdee9c2e",
+          "first": ".nav-progress {"
+        }
+      ]
+    },
+    {
+      "id": "igt-utterance-view",
+      "level": "view",
+      "parent": null,
+      "title": "Utterance with interlinear gloss",
+      "summary": "Shows the utterance's surface text for highlighting, plus clickable interlinear rows of tokens, morphemes and glosses coloured by annotation status.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [
+        "select text span",
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app/Discovery.py",
+          "start": 974,
+          "end": 1044,
+          "role": "markup",
+          "anchor": "766514e961b9",
+          "first": "# ── Utterance card: surface + IGT + gloss ──"
+        },
+        {
+          "file": "code/app/ui/igt.py",
+          "start": 54,
+          "end": 63,
+          "role": "logic",
+          "symbol": "build_igt_html",
+          "anchor": "1ad7496cdaed",
+          "first": "def build_igt_html("
+        },
+        {
+          "file": "code/app/style/style_discovery.css",
+          "start": 68,
+          "end": 74,
+          "role": "style",
+          "symbol": ".utt-card",
+          "anchor": "7527bf7b8b5f",
+          "first": ".utt-card {"
+        },
+        {
+          "file": "code/app/style/style_discovery.css",
+          "start": 94,
+          "end": 104,
+          "role": "style",
+          "symbol": ".utt-gloss",
+          "anchor": "91a8a7c5aea5",
+          "first": ".utt-gloss {"
+        },
+        {
+          "file": "code/app/style/style_igt.css",
+          "start": 4,
+          "end": 15,
+          "role": "style",
+          "symbol": ".igt-unified",
+          "anchor": "ebe4fc4300c6",
+          "first": ".igt-unified {"
+        }
+      ]
+    },
+    {
+      "id": "action-bar",
+      "level": "component",
+      "parent": "igt-utterance-view",
+      "title": "Action bar",
+      "summary": "Buttons to edit the utterance, show tags, link a claim, probe in the Analyzer, ask for LLM suggestions, rerun the analyzer or add a manual analysis on the selection, and download the IGT as text or LaTeX.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "toggle view",
+        "export",
+        "write notes"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/Discovery.py",
+          "start": 1082,
+          "end": 1305,
+          "role": "markup",
+          "anchor": "098bb5f66374",
+          "first": "# ── Action bar (compact) — grouped by purpose ──"
+        },
+        {
+          "file": "code/app/Discovery.py",
+          "start": 1322,
+          "end": 1580,
+          "role": "logic",
+          "anchor": "68b88498dae4",
+          "first": "# Handle re-analyze action"
+        },
+        {
+          "file": "code/app/Discovery.py",
+          "start": 1089,
+          "end": 1094,
+          "role": "logic",
+          "symbol": "_action_slot",
+          "anchor": "a44356151bae",
+          "first": "def _action_slot(render_control, label: str):"
+        }
+      ]
+    },
+    {
+      "id": "span-analysis-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Span analysis panel",
+      "summary": "Lists every span as a pill and opens the selected span's interpretation cards, where the person stars one as gold, toggles a candidate, adds notes or interpretations, or deletes the analysis.",
+      "views": [
+        "detail panel",
+        "list"
+      ],
+      "interactions": [
+        "select",
+        "apply label",
+        "accept or reject",
+        "write notes"
+      ],
+      "patterns": [
+        "master-detail",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app/Discovery.py",
+          "start": 1784,
+          "end": 2016,
+          "role": "logic",
+          "symbol": "_analysis_fragment",
+          "anchor": "6f1c4fd7c8a6",
+          "first": "def _analysis_fragment():"
+        },
+        {
+          "file": "code/app/Discovery.py",
+          "start": 1592,
+          "end": 1614,
+          "role": "logic",
+          "symbol": "_add_interpretation",
+          "anchor": "82a3aaaa80db",
+          "first": "def _add_interpretation(analysis_obj, morphologics: str, meaning: str):"
+        },
+        {
+          "file": "code/app/Discovery.py",
+          "start": 215,
+          "end": 229,
+          "role": "logic",
+          "symbol": "set_annotation",
+          "anchor": "c14b7b6104e1",
+          "first": "def set_annotation(annotation, label=None, input_annot=None, gold=False, candidate=False):"
+        },
+        {
+          "file": "code/app/Discovery.py",
+          "start": 232,
+          "end": 242,
+          "role": "logic",
+          "symbol": "remove_annotation",
+          "anchor": "47d4a61b4de6",
+          "first": "def remove_annotation(annotation):"
+        },
+        {
+          "file": "code/app/ui/interp_cards.py",
+          "start": 45,
+          "end": 52,
+          "role": "logic",
+          "symbol": "render_interp_cards",
+          "anchor": "3ec3fd83c641",
+          "first": "def render_interp_cards("
+        },
+        {
+          "file": "code/app/style/style_discovery.css",
+          "start": 330,
+          "end": 342,
+          "role": "style",
+          "symbol": ".span-pill",
+          "anchor": "202e07bc2b95",
+          "first": ".span-pill {"
+        },
+        {
+          "file": "code/app/style/style_discovery.css",
+          "start": 127,
+          "end": 136,
+          "role": "style",
+          "symbol": ".analysis-bar",
+          "anchor": "b4b3edd971a0",
+          "first": ".analysis-bar {"
+        }
+      ]
+    },
+    {
+      "id": "llm-suggest-panel",
+      "level": "component",
+      "parent": "span-analysis-panel",
+      "title": "LLM suggestions",
+      "summary": "Asks a language model to choose an interpretation for every span of the utterance, shows each choice with its justification, and applies them as candidate labels.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "accept or reject",
+        "apply label"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/Discovery.py",
+          "start": 1644,
+          "end": 1780,
+          "role": "logic",
+          "anchor": "a356b98905d5",
+          "first": "if st.session_state.get(_ai_key, False):"
+        }
+      ]
+    },
+    {
+      "id": "claim-link-panel",
+      "level": "component",
+      "parent": "igt-utterance-view",
+      "title": "Link to claim",
+      "summary": "Attaches the current utterance to an existing linguistic claim as supporting, contradicting or neutral evidence, with a required note.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "write notes"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/Discovery.py",
+          "start": 91,
+          "end": 163,
+          "role": "logic",
+          "symbol": "_render_link_to_claim_ui",
+          "anchor": "0f258bc94fe8",
+          "first": "def _render_link_to_claim_ui(utterance_id: int, surface: str, gloss: str):"
+        },
+        {
+          "file": "code/app/Discovery.py",
+          "start": 1634,
+          "end": 1638,
+          "role": "markup",
+          "anchor": "d86f8859bd46",
+          "first": "# Claims panel"
+        }
+      ]
+    },
+    {
+      "id": "sidebar-metrics-sync",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar: metrics, account and sync",
+      "summary": "Shows corpus coverage, gold and candidate completion, and gold-versus-candidate agreement, and holds the login and edit lock and the save, reload and Drive sync controls.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "export",
+        "import"
+      ],
+      "patterns": [
+        "agreement summary",
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/Discovery.py",
+          "start": 376,
+          "end": 485,
+          "role": "logic",
+          "symbol": "_sidebar_corpus_info",
+          "anchor": "e667ec765cee",
+          "first": "def _sidebar_corpus_info(corpus):"
+        },
+        {
+          "file": "code/app/Discovery.py",
+          "start": 576,
+          "end": 639,
+          "role": "logic",
+          "symbol": "render_app_menu",
+          "anchor": "97d6e39677c1",
+          "first": "def render_app_menu():"
+        },
+        {
+          "file": "code/app/Discovery.py",
+          "start": 562,
+          "end": 573,
+          "role": "logic",
+          "symbol": "save_corpus_now",
+          "anchor": "5a0f85a4e27c",
+          "first": "def save_corpus_now(corpus):"
+        },
+        {
+          "file": "code/app/Discovery.py",
+          "start": 652,
+          "end": 660,
+          "role": "logic",
+          "anchor": "c159f53ee7e8",
+          "first": "# --- Compute annotation progress metrics ---"
+        }
+      ]
+    }
+  ]
+}

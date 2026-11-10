@@ -1,0 +1,340 @@
+{
+  "schema": "astaui.card/1",
+  "id": "ezancestry-streamlit",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:54:56Z"
+  },
+  "app": {
+    "title": "Genetic Ancestry Visualization (ezancestry Streamlit app)",
+    "summary": "The person picks a published panel of ancestry-informative markers and a population resolution (continental or regional). Then they upload one person's raw genotype file. The app reduces the genotypes to the panel's markers and projects them into the same principal-component space as a labelled reference cohort. A 3D scatter plot shows the new sample as a large black point among the reference samples, which are coloured by population. Below the plot are the population a nearest-neighbour classifier predicts and its probability for each population. The marker genotypes of the uploaded sample and of the reference cohort can also be shown as tables.",
+    "task": {
+      "text": "Place one individual's genotypes among a labelled reference cohort and predict which population they most resemble, with a probability for each population.",
+      "verbs": [
+        "identify",
+        "compare",
+        "derive",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A reference cohort of individuals genotyped at a fixed panel of marker SNPs and labelled by population and superpopulation, plus one uploaded raw genotype file (consumer genotyping export or VCF) reduced to the same markers.",
+      "item": "an individual's genotypes at the panel's marker SNPs",
+      "shapes": [
+        "table",
+        "sequence",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "inferring an individual's ancestry from raw genotype data against a reference panel",
+      "terms": [
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar radios choose the marker panel and population resolution, and a file uploader brings in one sample. Each change re-runs a one-hot, PCA and k-nearest-neighbour pipeline. The 3D scatter of the first three components places the sample among the reference cohort, coloured by population. A text line gives the predicted label and a one-row table gives the class probabilities. Checkboxes reveal the raw genotype tables.",
+      "views": [
+        "scatter plot",
+        "sidebar list",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "PCA projection and nearest-neighbour ancestry inference from marker SNPs in population genetics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "population genetics",
+        "ancestry inference",
+        "ancestry informative markers"
+      ]
+    },
+    "workflow": {
+      "name": "classify a new sample against a labelled reference set",
+      "steps": [
+        {
+          "step": "choose the reference scheme and the level of detail",
+          "here": "Sidebar radios pick the 55-marker or 128-marker published panel and continental (superpopulation) or regional (population) resolution; the reference cohort is drawn at once.",
+          "parts": [
+            "settings-sidebar",
+            "pca-scatter"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "A file uploader takes a raw genotype file. The snps library parses it, and it is merged onto the panel's marker list, so any marker missing from the file stays empty.",
+          "parts": [
+            "genotype-upload"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A pretrained pipeline (one-hot encoding, PCA, distance-weighted kNN) runs on both the reference cohort and the new sample, giving three PCA coordinates and class probabilities for each.",
+          "parts": [
+            "pca-scatter",
+            "ancestry-prediction"
+          ]
+        },
+        {
+          "step": "compare the new item against the reference groups",
+          "here": "A rotatable 3D scatter of PC1–PC3 colours and shapes the reference samples by population and shows the uploaded sample as a large black point.",
+          "parts": [
+            "pca-scatter"
+          ]
+        },
+        {
+          "step": "read the predicted class and its confidence",
+          "here": "A text line names the predicted population, and a one-row table lists the probability for each population at the chosen resolution.",
+          "parts": [
+            "ancestry-prediction"
+          ]
+        },
+        {
+          "step": "open the underlying values",
+          "here": "Checkboxes show the uploaded sample's genotypes at the panel markers and the full reference genotype table.",
+          "parts": [
+            "genotype-tables"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The person can switch between two published marker panels of different sizes, and each panel has its own pretrained model.",
+        "The person can switch between two population resolutions (continental or regional), and the plot's colours and the probability columns follow the choice.",
+        "The new sample is projected into a space fitted on the reference cohort, so it is judged by where it sits among the labelled groups.",
+        "Raw consumer genotype exports are read directly, and markers the file lacks are left missing rather than refused."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "settings-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Visualization Settings",
+      "summary": "Sidebar radios that choose the marker panel and the population resolution used by every other view.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit/app.py",
+          "start": 33,
+          "end": 56,
+          "role": "markup",
+          "anchor": "44800e663323",
+          "first": "# Once we have the dependencies, add a selector for the app mode on the sidebar."
+        },
+        {
+          "file": "code/data/aisnps/kidd.aisnp.txt",
+          "start": 1,
+          "end": 56,
+          "role": "data",
+          "anchor": "5109f39b1490",
+          "first": "rsid\tchromosome\tposition"
+        },
+        {
+          "file": "code/data/aisnps/seldin.aisnp.txt",
+          "start": 1,
+          "end": 128,
+          "role": "data",
+          "anchor": "295b3151c5f7",
+          "first": "rsid\tchromosome\tposition"
+        }
+      ]
+    },
+    {
+      "id": "genotype-upload",
+      "level": "component",
+      "parent": "settings-sidebar",
+      "title": "Upload your genotypes",
+      "summary": "Reads a raw genotype file and reduces it to the chosen panel's markers, reporting an error if the file cannot be parsed.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit/app.py",
+          "start": 58,
+          "end": 70,
+          "role": "markup",
+          "anchor": "63d5ff624ba1",
+          "first": "# upload the user genotypes file"
+        },
+        {
+          "file": "code/ezancestry/process.py",
+          "start": 14,
+          "end": 111,
+          "role": "logic",
+          "symbol": "process_user_input",
+          "anchor": "56a1a6476f4d",
+          "first": "def process_user_input(input_data, aisnps_directory=None, aisnps_set=None):"
+        },
+        {
+          "file": "code/ezancestry/process.py",
+          "start": 114,
+          "end": 163,
+          "role": "logic",
+          "symbol": "_input_to_dataframe",
+          "anchor": "c313ddbdea9d",
+          "first": "def _input_to_dataframe(input_data, aisnpsdf):"
+        }
+      ]
+    },
+    {
+      "id": "pca-scatter",
+      "level": "view",
+      "parent": null,
+      "title": "3D PCA scatter",
+      "summary": "Plots the reference cohort and the uploaded sample on the first three principal components, coloured by population, with the sample enlarged in black.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/streamlit/app.py",
+          "start": 72,
+          "end": 85,
+          "role": "logic",
+          "anchor": "431cf0181f96",
+          "first": "# predict the population for the user sample"
+        },
+        {
+          "file": "code/streamlit/app.py",
+          "start": 115,
+          "end": 121,
+          "role": "logic",
+          "anchor": "052550f01bec",
+          "first": "else:"
+        },
+        {
+          "file": "code/streamlit/app.py",
+          "start": 152,
+          "end": 195,
+          "role": "logic",
+          "symbol": "plot_3d",
+          "anchor": "86c0a029c645",
+          "first": "def plot_3d(X_reduced, dfsamples, pop):"
+        },
+        {
+          "file": "code/streamlit/app.py",
+          "start": 21,
+          "end": 27,
+          "role": "style",
+          "anchor": "873615fcf4dc",
+          "first": "import matplotlib.cm as cm"
+        },
+        {
+          "file": "code/ezancestry/commands.py",
+          "start": 158,
+          "end": 184,
+          "role": "logic",
+          "symbol": "predict",
+          "anchor": "f974e8fa62ea",
+          "first": "def predict("
+        },
+        {
+          "file": "code/ezancestry/model.py",
+          "start": 18,
+          "end": 22,
+          "role": "logic",
+          "anchor": "72590011b9fe",
+          "first": "DEFAULT_PIPELINE = make_pipeline("
+        }
+      ]
+    },
+    {
+      "id": "ancestry-prediction",
+      "level": "view",
+      "parent": null,
+      "title": "Your predicted population and probabilities",
+      "summary": "States the kNN-predicted population and shows a one-row table of probabilities for each population at the chosen resolution.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit/app.py",
+          "start": 93,
+          "end": 107,
+          "role": "markup",
+          "anchor": "71a62fc92f2f",
+          "first": "# predict the population for the user sample"
+        },
+        {
+          "file": "code/ezancestry/model.py",
+          "start": 105,
+          "end": 129,
+          "role": "logic",
+          "symbol": "predict_ancestry",
+          "anchor": "e975f98715bf",
+          "first": "def predict_ancestry(df, trained_model):"
+        }
+      ]
+    },
+    {
+      "id": "genotype-tables",
+      "level": "view",
+      "parent": null,
+      "title": "Genotype tables",
+      "summary": "Checkboxes reveal the uploaded sample's marker genotypes and the full reference cohort's genotype table.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit/app.py",
+          "start": 109,
+          "end": 113,
+          "role": "markup",
+          "anchor": "b644fa347c55",
+          "first": "show_user_gts = st.sidebar.checkbox(\"Show Your Genotypes\")"
+        },
+        {
+          "file": "code/streamlit/app.py",
+          "start": 123,
+          "end": 131,
+          "role": "markup",
+          "anchor": "18953a724b03",
+          "first": "# Collapsable 1000 Genomes sample table"
+        }
+      ]
+    }
+  ]
+}

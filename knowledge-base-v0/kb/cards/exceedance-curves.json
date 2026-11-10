@@ -1,0 +1,549 @@
+{
+  "schema": "astaui.card/1",
+  "id": "exceedance-curves",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T11:23:08Z"
+  },
+  "app": {
+    "title": "Exceedance curves (Кривые обеспеченности)",
+    "summary": "A person loads a spreadsheet of observations, picks the value column, can group rows by a column such as year and reduce each group to its maximum, minimum, mean or sum, and can drop single points from the series. They pick a curve mode: ordinary, truncated to a row range or value band, or compound, where the series is split into two parts that are fitted separately. They then fit one or more theoretical probability distributions to the empirical exceedance points, read goodness-of-fit metrics and design quantiles at standard exceedance probabilities, and can add their own probability or return period to the table. Finally they download a Word report with the series, the empirical table, the curve plot and the tables.",
+    "task": {
+      "text": "Fit probability distributions to a series of extremes and read off design values at chosen exceedance probabilities or return periods.",
+      "verbs": [
+        "derive",
+        "compare",
+        "decide",
+        "clean"
+      ]
+    },
+    "data": {
+      "text": "A spreadsheet of observations with a numeric value column and optional grouping columns. It is reduced to one value per group, such as an annual maximum, and ranked into an empirical exceedance series.",
+      "item": "one value in the series, such as the maximum for one year",
+      "shapes": [
+        "table",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "frequency analysis of a prepared observation series, before writing up design values",
+      "terms": [
+        "analyze",
+        "compare",
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "Four tabs run in order: load, prepare, process and results. Each tab waits until the one before it has produced something. In the process tab, the chosen curve mode and distributions redraw an exceedance-probability chart over the empirical points, and the colour-coded fit metrics and quantile tables update with it, with linked inputs for probability and return period.",
+      "views": [
+        "line chart",
+        "scatter plot",
+        "table view",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "multi-select",
+        "exclude and refit",
+        "toggle view",
+        "filter",
+        "inline edit",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "flood frequency analysis of hydrometeorological series in hydrology",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "hydrology",
+        "frequency analysis",
+        "extreme value distributions"
+      ]
+    },
+    "workflow": {
+      "name": "fit candidate distributions to a series and read off design quantiles",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload an Excel workbook or press the button that loads the bundled sample file. A collapsed preview shows the first rows.",
+          "parts": [
+            "load-tab"
+          ]
+        },
+        {
+          "step": "reduce the raw table to one series",
+          "here": "Pick the numeric values column and an optional grouping column with an aggregate (max, min, mean or sum). Rows with empty values are listed and dropped, and a line chart shows the resulting series.",
+          "parts": [
+            "prep-tab"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "A multiselect of 'group – value' labels removes single points before ranking. A truncated mode keeps only a row range or a value band.",
+          "parts": [
+            "prep-tab",
+            "process-tab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Values are ranked into empirical exceedance probabilities m/(n+1). Selected distributions (Gumbel, Pearson III, GEV, Krytsky–Menkel; fitted by MLE, moments or L-moments) are fitted and drawn on a probability axis with a return-period scale.",
+          "parts": [
+            "fit-chart",
+            "compound-curve"
+          ]
+        },
+        {
+          "step": "compare candidate fits",
+          "here": "A metrics table gives mean, Cv, Cs, R², MAE, maxE and Anderson–Darling for each distribution against the empirical series, coloured green to red by how good each fit is.",
+          "parts": [
+            "fit-metrics"
+          ]
+        },
+        {
+          "step": "read values at chosen probabilities",
+          "here": "A quantile table gives each distribution's value at standard exceedance percentages and their return periods. Linked P% and T-years inputs give an extra value, which can be added to the table.",
+          "parts": [
+            "quantile-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The results tab gathers the empirical table, the series chart, the curve image, the metrics and the quantiles, and offers a Word document download.",
+          "parts": [
+            "results-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Exceedance probability and return period are kept linked (T = 100/P), so either one can be typed and the other follows.",
+        "A compound mode splits the series into two parts (from a row, by a criterion column, by a value threshold or by hand), fits one distribution to each and combines them into one curve.",
+        "Fit metrics are coloured by the direction that is better for each: closeness to the empirical moments, a higher R², a lower error.",
+        "Distributions include the Krytsky–Menkel distribution and L-moment fits, as used in Russian hydrological practice.",
+        "Rounding follows the decimal precision of the source data, so quantiles are reported no more precisely than they were measured."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "load-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Load data",
+      "summary": "Upload an Excel workbook or load the bundled sample, then preview the first rows.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 532,
+          "end": 583,
+          "role": "markup",
+          "anchor": "a93bf2c6216e",
+          "first": "with tab_load:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 78,
+          "end": 82,
+          "role": "logic",
+          "symbol": "load_sample_file",
+          "anchor": "e61e4b8a2e22",
+          "first": "def load_sample_file():"
+        },
+        {
+          "file": "code/excel_io.py",
+          "start": 13,
+          "end": 19,
+          "role": "logic",
+          "symbol": "read_excel",
+          "anchor": "2ad9f52b7b7b",
+          "first": "def read_excel(uploaded_file):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 475,
+          "end": 507,
+          "role": "style",
+          "anchor": "bbc7ac2c9c31",
+          "first": "st.markdown("
+        }
+      ]
+    },
+    {
+      "id": "prep-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Prepare series",
+      "summary": "Choose the value column, group and aggregate it, drop empty or chosen points, view the series over time, and rank it into empirical exceedance probabilities.",
+      "views": [
+        "form",
+        "line chart"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "exclude and refit",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 585,
+          "end": 745,
+          "role": "logic",
+          "anchor": "934bb8fe95f4",
+          "first": "with tab_prep:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 295,
+          "end": 317,
+          "role": "logic",
+          "symbol": "detect_decimal_precision",
+          "anchor": "8c645f4d12dd",
+          "first": "def detect_decimal_precision(series, max_reasonable=6):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 70,
+          "end": 75,
+          "role": "logic",
+          "symbol": "option_index",
+          "anchor": "74c1bc5859a4",
+          "first": "def option_index(options, preferred):"
+        }
+      ]
+    },
+    {
+      "id": "process-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Process: curve mode",
+      "summary": "Switch between ordinary, truncated and compound curves; set the row range or value band to keep, or the rule that splits the series into two parts, with a coloured preview of the split.",
+      "views": [
+        "form",
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "filter",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 746,
+          "end": 1015,
+          "role": "logic",
+          "anchor": "cbfc7b2df6bf",
+          "first": "with tab_process:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 111,
+          "end": 130,
+          "role": "logic",
+          "symbol": "series_row_labels",
+          "anchor": "c8aab7df7e5b",
+          "first": "def series_row_labels(series_df, values_col, index_col, precision):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 133,
+          "end": 150,
+          "role": "logic",
+          "symbol": "criterion_for_series",
+          "anchor": "1669c1ec4fb3",
+          "first": "def criterion_for_series(series_df, source_df, values_col, index_col, criterion_col, agg_key):"
+        },
+        {
+          "file": "code/curve_analysis.py",
+          "start": 63,
+          "end": 80,
+          "role": "logic",
+          "symbol": "build_empirical",
+          "anchor": "54493cacea66",
+          "first": "def build_empirical(series_df, values_col, index_col):"
+        }
+      ]
+    },
+    {
+      "id": "fit-chart",
+      "level": "component",
+      "parent": "process-tab",
+      "title": "Exceedance curve with fitted distributions",
+      "summary": "Draws the empirical points on an exceedance-probability axis with a return-period scale and overlays a curve for each selected distribution.",
+      "views": [
+        "scatter plot",
+        "line chart"
+      ],
+      "interactions": [
+        "multi-select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1017,
+          "end": 1110,
+          "role": "logic",
+          "anchor": "2a8085ba2640",
+          "first": "# ========== ORDINARY / TRUNCATED path =========="
+        },
+        {
+          "file": "code/distributions.py",
+          "start": 409,
+          "end": 432,
+          "role": "logic",
+          "symbol": "build_distributions",
+          "anchor": "29695e17925d",
+          "first": "def build_distributions(data_min=None, data_max=None):"
+        },
+        {
+          "file": "code/curve_analysis.py",
+          "start": 168,
+          "end": 192,
+          "role": "logic",
+          "symbol": "apply_exceedance_axes",
+          "anchor": "0fd69691bba1",
+          "first": "def apply_exceedance_axes(ax, values_col, title=None):"
+        },
+        {
+          "file": "code/curve_analysis.py",
+          "start": 50,
+          "end": 56,
+          "role": "logic",
+          "symbol": "teor_x_grid",
+          "anchor": "f3981daa0592",
+          "first": "def teor_x_grid():"
+        },
+        {
+          "file": "code/curve_analysis.py",
+          "start": 141,
+          "end": 155,
+          "role": "logic",
+          "symbol": "fit_quality",
+          "anchor": "21a2e66f95ad",
+          "first": "def fit_quality(data, values_col, selected_dist, params):"
+        }
+      ]
+    },
+    {
+      "id": "fit-metrics",
+      "level": "component",
+      "parent": "process-tab",
+      "title": "Goodness-of-fit table",
+      "summary": "Sets the moments and error metrics of each fitted distribution against the empirical series, coloured green to red by how good each one is.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1111,
+          "end": 1127,
+          "role": "markup",
+          "anchor": "382cf85f0647",
+          "first": "parameters_df_view = localize_parameters_view("
+        },
+        {
+          "file": "code/app.py",
+          "start": 418,
+          "end": 472,
+          "role": "logic",
+          "symbol": "style_dataframe_html",
+          "anchor": "ae4759458940",
+          "first": "def style_dataframe_html(df, data_precision=None):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 153,
+          "end": 181,
+          "role": "logic",
+          "symbol": "localize_parameters_view",
+          "anchor": "41c34111e93f",
+          "first": "def localize_parameters_view(parameters_df_view):"
+        },
+        {
+          "file": "code/curve_analysis.py",
+          "start": 104,
+          "end": 138,
+          "role": "logic",
+          "symbol": "distribution_moments",
+          "anchor": "fdd2e79f40d8",
+          "first": "def distribution_moments(selected_dist, params, distribution_name):"
+        }
+      ]
+    },
+    {
+      "id": "quantile-table",
+      "level": "component",
+      "parent": "process-tab",
+      "title": "Quantiles by exceedance and return period",
+      "summary": "Lists each distribution's value at standard exceedance percentages and their return periods. Linked P% and T inputs compute an extra value that can be added to the table.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1129,
+          "end": 1183,
+          "role": "logic",
+          "anchor": "645958de12e1",
+          "first": "with st.expander(t(\"quantiles_expander\"), expanded=False):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 225,
+          "end": 279,
+          "role": "logic",
+          "symbol": "linked_exceedance_inputs",
+          "anchor": "2301399564ab",
+          "first": "def linked_exceedance_inputs(key_prefix, default_p=20.0):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 212,
+          "end": 222,
+          "role": "logic",
+          "symbol": "with_return_period_row",
+          "anchor": "247094d4c7e2",
+          "first": "def with_return_period_row(df_1):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 184,
+          "end": 209,
+          "role": "logic",
+          "symbol": "localize_quantiles_view",
+          "anchor": "96b6092a315b",
+          "first": "def localize_quantiles_view(quantiles_df_view):"
+        }
+      ]
+    },
+    {
+      "id": "compound-curve",
+      "level": "component",
+      "parent": "process-tab",
+      "title": "Compound curve",
+      "summary": "Fits one chosen distribution to each part of the series, shows each fit, and combines them into one curve weighted by the size of each part, with its own metrics and quantiles.",
+      "views": [
+        "small multiples",
+        "scatter plot",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1185,
+          "end": 1496,
+          "role": "logic",
+          "anchor": "e0df5de166c5",
+          "first": "# ========== COMPOUND path =========="
+        },
+        {
+          "file": "code/curve_analysis.py",
+          "start": 219,
+          "end": 247,
+          "role": "logic",
+          "symbol": "compound_ppf",
+          "anchor": "5979df74ec91",
+          "first": "def compound_ppf(p_pct, cdf_funcs, ns, x_lo, x_hi):"
+        },
+        {
+          "file": "code/curve_analysis.py",
+          "start": 83,
+          "end": 101,
+          "role": "logic",
+          "symbol": "make_cdf_func",
+          "anchor": "b49f38c445fe",
+          "first": "def make_cdf_func(selected_dist, params, distribution_name):"
+        }
+      ]
+    },
+    {
+      "id": "results-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Results and Word export",
+      "summary": "Gathers the empirical table, the series chart, the curve image, the metrics and the quantiles, and downloads them as a Word report.",
+      "views": [
+        "table view",
+        "line chart"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1501,
+          "end": 1597,
+          "role": "markup",
+          "anchor": "3c868f3c5bad",
+          "first": "with tab_results:"
+        },
+        {
+          "file": "code/report_io.py",
+          "start": 128,
+          "end": 138,
+          "role": "logic",
+          "symbol": "build_results_docx",
+          "anchor": "7cee4f0cba8d",
+          "first": "def build_results_docx("
+        },
+        {
+          "file": "code/curve_analysis.py",
+          "start": 195,
+          "end": 200,
+          "role": "logic",
+          "symbol": "fig_to_png_bytes",
+          "anchor": "8b1ad4d1a4cd",
+          "first": "def fig_to_png_bytes(fig):"
+        }
+      ]
+    }
+  ]
+}

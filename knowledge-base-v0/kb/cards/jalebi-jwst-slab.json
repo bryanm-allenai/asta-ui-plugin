@@ -1,0 +1,723 @@
+{
+  "schema": "astaui.card/1",
+  "id": "jalebi-jwst-slab",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T03:03:15Z"
+  },
+  "app": {
+    "title": "JALEBI — JWST Analysis of Line Emission with Bayesian Inference",
+    "summary": "A person loads a spectrum, fits and subtracts its continuum, and masks lines that the model should not fit. They build a model from a list of components, setting each one's parameters with sliders against the data and residuals. Automatic detection can propose which components to include, and a grid map can locate good starting values. They then run a staged fit (grid, optimiser, MCMC) and read the parameter medians, corner plots, correlations and traces. Finally they export the parameter summary and the configuration, or run the same setup over a whole batch of targets.",
+    "task": {
+      "text": "Fit a physical model with several components to a spectrum all at once and get posterior estimates of every component's parameters, with their uncertainties and degeneracies.",
+      "verbs": [
+        "derive",
+        "identify",
+        "clean",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "One-dimensional spectra split into instrument sub-bands, with flux and errors against wavelength, plus line lists of molecular transitions and, optionally, spectral cubes from which spectra are extracted.",
+      "item": "a target's spectrum, fitted as a sum of model components",
+      "shapes": [
+        "time series",
+        "table",
+        "categories",
+        "field"
+      ]
+    },
+    "stage": {
+      "text": "fitting continuum-subtracted spectra to derive physical parameters, after data reduction and before writing up",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "Workspace tabs follow the pipeline (Data, Continuum, Model, Fit, Results, Batch). In each one, a wide spectrum chart sits beside a sticky inspector of controls, and editing a control redraws the chart along with its linked residual or continuum-subtracted plot. Long fits run in the background with a progress bar and fill a results page of tables and diagnostic figures.",
+      "views": [
+        "line chart",
+        "form",
+        "table view",
+        "heatmap",
+        "scatter plot",
+        "summary stats",
+        "image viewer"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "select",
+        "hover for detail",
+        "zoom and pan",
+        "toggle view",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "status pipeline",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "LTE slab-model fitting of molecular line emission in mid-infrared spectra, in astronomy",
+      "disciplines": [
+        "astronomy"
+      ],
+      "terms": [
+        "astronomy",
+        "infrared spectroscopy",
+        "protoplanetary disks"
+      ]
+    },
+    "workflow": {
+      "name": "fit a model with several components to a spectrum and estimate parameter posteriors",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Choose a target from a scanned data root or upload a CSV or FITS file, and set its distance and radial velocity. Spectra can also be extracted from a cube by tapping the median image to place the aperture. The spectrum is drawn coloured by sub-band, with optional line-ID markers.",
+          "parts": [
+            "data-tab"
+          ]
+        },
+        {
+          "step": "clean the data before analysis",
+          "here": "Pick one of several continuum methods and tune its settings, or tap the plot to place spline anchors. Mask H I, H₂ and OH prompt lines or any extra ranges. The continuum-subtracted spectrum and the noise for each sub-band update live.",
+          "parts": [
+            "continuum-tab"
+          ]
+        },
+        {
+          "step": "identify which components are present",
+          "here": "\"Detect molecules\" fits templates of every candidate at once and keeps those that pass a ΔBIC threshold. They can be applied as the component list or added as missing components only.",
+          "parts": [
+            "detect-molecules"
+          ]
+        },
+        {
+          "step": "build the model and compare it with the data",
+          "here": "Add component cards by molecule and line list. Set log N, T, log R, velocity and width with sliders, and tie, group or fix parameters. The model overlay, the residual in σ and χ² redraw. \"Auto areas (NNLS)\" solves the emitting areas, and a (log N, T) Δχ² grid map pushes its best point to the sliders.",
+          "parts": [
+            "component-cards",
+            "model-tab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Choose stages (grid, optimise, MCMC) and settings for the sampler and optimiser, then press \"Run fit\" and follow the progress bar. \"Quick errors (Laplace)\" gives approximate uncertainties at the optimum.",
+          "parts": [
+            "fit-tab"
+          ]
+        },
+        {
+          "step": "check the result and its uncertainties",
+          "here": "A parameter table shows medians and 16/84 % intervals. Below it are the best fit across the full spectrum and in the fit windows, the posterior predictive, a corner plot for the chosen components, the correlation matrix and the walker traces.",
+          "parts": [
+            "results-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download the summary CSV of parameters and export the configuration as YAML, or reuse that configuration in the Batch tab to fit every scanned target.",
+          "parts": [
+            "results-tab",
+            "sidebar-config",
+            "batch-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "All components are fitted to one spectrum at once, so overlapping bands compete for the same flux. Opacity groups and isotopologue ties link the parameters of different components.",
+        "Emitting areas are linear parameters solved exactly by non-negative least squares at every step, so only column density and temperature are searched.",
+        "The fit runs in stages (a grid, then an optimiser, then MCMC), and the results show the degeneracies between parameters and between components, not only error bars.",
+        "Continuum placement is treated as a major source of systematic error, and the continuum and masks stay editable, with the result shown live.",
+        "Instrument sub-bands are kept separate throughout, with each sub-band's noise estimated and coloured separately."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Data",
+      "summary": "Loads a target's spectrum from a scanned folder, an upload or a cube aperture, and plots it by sub-band with optional line IDs.",
+      "views": [
+        "line chart",
+        "image viewer",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1062,
+          "end": 1150,
+          "role": "markup",
+          "symbol": "_build_data_tab",
+          "anchor": "2b214cff084e",
+          "first": "def _build_data_tab(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1153,
+          "end": 1168,
+          "role": "logic",
+          "symbol": "scan_root",
+          "anchor": "2eedbe3bcac9",
+          "first": "def scan_root(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1278,
+          "end": 1307,
+          "role": "logic",
+          "symbol": "load_target",
+          "anchor": "7e1d59e7b6be",
+          "first": "def load_target(self, path: str):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1170,
+          "end": 1176,
+          "role": "logic",
+          "symbol": "_file_uploaded",
+          "anchor": "66012466553f",
+          "first": "def _file_uploaded(self, e):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1268,
+          "end": 1275,
+          "role": "logic",
+          "symbol": "_tap_cube",
+          "anchor": "5fac8b31a857",
+          "first": "def _tap_cube(self, event):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1374,
+          "end": 1397,
+          "role": "logic",
+          "symbol": "_update_lineids",
+          "anchor": "a5c538a3d72f",
+          "first": "def _update_lineids(self):"
+        }
+      ]
+    },
+    {
+      "id": "continuum-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Continuum and masks",
+      "summary": "Estimates the continuum with a chosen method or with anchors tapped on the plot, masks line ranges, and shows the continuum-subtracted spectrum and the noise for each sub-band.",
+      "views": [
+        "line chart",
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "select",
+        "exclude and refit",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1400,
+          "end": 1487,
+          "role": "markup",
+          "symbol": "_build_continuum_tab",
+          "anchor": "fddeb2cb02ba",
+          "first": "def _build_continuum_tab(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1520,
+          "end": 1578,
+          "role": "logic",
+          "symbol": "estimate_continuum",
+          "anchor": "05a830376c75",
+          "first": "def estimate_continuum(self, gas_model=None):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1493,
+          "end": 1498,
+          "role": "logic",
+          "symbol": "_tap_anchor",
+          "anchor": "dada6c6200c3",
+          "first": "def _tap_anchor(self, event):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1500,
+          "end": 1506,
+          "role": "logic",
+          "symbol": "_untap_anchor",
+          "anchor": "23f098d872a3",
+          "first": "def _untap_anchor(self, event):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1489,
+          "end": 1491,
+          "role": "logic",
+          "symbol": "_method_changed",
+          "anchor": "6f45ec9d400d",
+          "first": "def _method_changed(self, e):"
+        },
+        {
+          "file": "code/src/jalebi/continuum.py",
+          "start": 393,
+          "end": 439,
+          "role": "logic",
+          "symbol": "estimate_continuum",
+          "anchor": "08417a6c822d",
+          "first": "def estimate_continuum(spec: Spectrum, settings: ContinuumSettings, gas_model: np.ndarray | None = None) -> np.ndarray:"
+        }
+      ]
+    },
+    {
+      "id": "model-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Model",
+      "summary": "Overlays the total model and each component on the data, with a linked residual plot, χ², an NNLS area solve and a (log N, T) grid map.",
+      "views": [
+        "line chart",
+        "heatmap",
+        "summary stats"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1581,
+          "end": 1657,
+          "role": "markup",
+          "symbol": "_build_model_tab",
+          "anchor": "c05ac00b55e4",
+          "first": "def _build_model_tab(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1865,
+          "end": 1913,
+          "role": "logic",
+          "symbol": "update_model_plot",
+          "anchor": "2e501485b91f",
+          "first": "def update_model_plot(self, refresh_data: bool = False):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1915,
+          "end": 1935,
+          "role": "logic",
+          "symbol": "auto_areas",
+          "anchor": "a4016e6e6dc6",
+          "first": "def auto_areas(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1938,
+          "end": 1966,
+          "role": "logic",
+          "symbol": "run_grid_one",
+          "anchor": "d3db9c8cbbf2",
+          "first": "def run_grid_one(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1722,
+          "end": 1784,
+          "role": "logic",
+          "symbol": "on_structure_change",
+          "anchor": "c625a887b934",
+          "first": "def on_structure_change(self):"
+        }
+      ]
+    },
+    {
+      "id": "component-cards",
+      "level": "component",
+      "parent": "model-tab",
+      "title": "Component cards",
+      "summary": "One card per model component, with sliders for its physical parameters and fields to tie it, group it, fix its parameters or limit its wavelength windows.",
+      "views": [
+        "form",
+        "list"
+      ],
+      "interactions": [
+        "inline edit",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 417,
+          "end": 549,
+          "role": "markup",
+          "symbol": "ComponentCard",
+          "anchor": "9dd8bcb49fe8",
+          "first": "class ComponentCard:"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1681,
+          "end": 1692,
+          "role": "logic",
+          "symbol": "add_component",
+          "anchor": "eacdfd9e8ed4",
+          "first": "def add_component(self, cfg: ComponentConfig, rebuild=True):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1694,
+          "end": 1699,
+          "role": "logic",
+          "symbol": "remove_component",
+          "anchor": "ba288365dee5",
+          "first": "def remove_component(self, card):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1786,
+          "end": 1789,
+          "role": "logic",
+          "symbol": "on_param_change",
+          "anchor": "202752700bb6",
+          "first": "def on_param_change(self):"
+        }
+      ]
+    },
+    {
+      "id": "detect-molecules",
+      "level": "component",
+      "parent": "model-tab",
+      "title": "Detect molecules",
+      "summary": "Fits templates of every candidate at once, lists those that pass a ΔBIC threshold, and offers to use them as the component list or add the missing ones.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "accept or reject",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1598,
+          "end": 1610,
+          "role": "markup",
+          "anchor": "535b797c7662",
+          "first": "self.detect_btn = pn.widgets.Button(name=\"🔍 Detect molecules\", button_type=\"default\", width=170, margin=(22, 5, 5, 5),"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1969,
+          "end": 2004,
+          "role": "logic",
+          "symbol": "_detect_start",
+          "anchor": "23f4950e7cc7",
+          "first": "def _detect_start(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2007,
+          "end": 2033,
+          "role": "logic",
+          "symbol": "_detect_poll",
+          "anchor": "8312c7be0d88",
+          "first": "def _detect_poll(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2036,
+          "end": 2067,
+          "role": "logic",
+          "symbol": "_detect_apply",
+          "anchor": "4b9023c985b7",
+          "first": "def _detect_apply(self, replace: bool):"
+        }
+      ]
+    },
+    {
+      "id": "fit-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Fit",
+      "summary": "Sets the fit stages and the sampler and optimiser settings, then runs the fit in the background with progress, or gets quick Laplace errors.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "inline edit",
+        "select"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2070,
+          "end": 2131,
+          "role": "markup",
+          "symbol": "_build_fit_tab",
+          "anchor": "b35aebc0d309",
+          "first": "def _build_fit_tab(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2225,
+          "end": 2250,
+          "role": "logic",
+          "symbol": "start_fit",
+          "anchor": "4614b6811081",
+          "first": "def start_fit(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2252,
+          "end": 2319,
+          "role": "logic",
+          "symbol": "_fit_worker",
+          "anchor": "80019571fe5b",
+          "first": "def _fit_worker(self, cfg, spec):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2322,
+          "end": 2345,
+          "role": "logic",
+          "symbol": "_poll",
+          "anchor": "7feb93927d3b",
+          "first": "def _poll(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2458,
+          "end": 2491,
+          "role": "logic",
+          "symbol": "start_laplace",
+          "anchor": "ff450d11be5d",
+          "first": "def start_laplace(self):"
+        }
+      ]
+    },
+    {
+      "id": "results-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Results",
+      "summary": "Shows the parameter table with a CSV download, the best-fit spectra, the posterior predictive, a corner plot for the chosen components, correlations and walker traces.",
+      "views": [
+        "table view",
+        "line chart",
+        "scatter plot",
+        "heatmap",
+        "summary stats"
+      ],
+      "interactions": [
+        "multi-select",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2370,
+          "end": 2409,
+          "role": "markup",
+          "symbol": "_build_results_tab",
+          "anchor": "f72f578192ac",
+          "first": "def _build_results_tab(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2412,
+          "end": 2455,
+          "role": "logic",
+          "symbol": "show_results",
+          "anchor": "cbe167c833d7",
+          "first": "def show_results(self, run: RunResult):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2525,
+          "end": 2534,
+          "role": "logic",
+          "symbol": "_draw_corner",
+          "anchor": "f1dbb682fb65",
+          "first": "def _draw_corner(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2494,
+          "end": 2522,
+          "role": "logic",
+          "symbol": "_laplace_done",
+          "anchor": "8a535d7cf8aa",
+          "first": "def _laplace_done(self, out: dict):"
+        }
+      ]
+    },
+    {
+      "id": "batch-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Batch",
+      "summary": "Scans a folder of targets and runs the current configuration on each one, filling an editable table of results.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "inline edit"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2634,
+          "end": 2660,
+          "role": "markup",
+          "symbol": "_build_batch_tab",
+          "anchor": "7ce867d51e1f",
+          "first": "def _build_batch_tab(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2663,
+          "end": 2676,
+          "role": "logic",
+          "symbol": "_batch_scan",
+          "anchor": "546e1d574f3b",
+          "first": "def _batch_scan(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2756,
+          "end": 2796,
+          "role": "logic",
+          "symbol": "_batch_start",
+          "anchor": "0f46800f4eb7",
+          "first": "def _batch_start(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2799,
+          "end": 2806,
+          "role": "logic",
+          "symbol": "_batch_poll",
+          "anchor": "9e44943d9c0a",
+          "first": "def _batch_poll(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2748,
+          "end": 2754,
+          "role": "logic",
+          "symbol": "_batch_edit",
+          "anchor": "ad0dbfbb973b",
+          "first": "def _batch_edit(self, event):"
+        }
+      ]
+    },
+    {
+      "id": "sidebar-config",
+      "level": "component",
+      "parent": null,
+      "title": "Config import and export",
+      "summary": "Exports the whole setup as a YAML configuration and loads one back, so a fit can be repeated or run from the command line.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1004,
+          "end": 1043,
+          "role": "markup",
+          "symbol": "_build_sidebar",
+          "anchor": "82dff514720e",
+          "first": "def _build_sidebar(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1045,
+          "end": 1047,
+          "role": "logic",
+          "symbol": "_config_bytes",
+          "anchor": "67e228386a90",
+          "first": "def _config_bytes(self):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 1049,
+          "end": 1059,
+          "role": "logic",
+          "symbol": "_config_uploaded",
+          "anchor": "21d9dad7e156",
+          "first": "def _config_uploaded(self, e):"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2133,
+          "end": 2164,
+          "role": "logic",
+          "symbol": "current_config",
+          "anchor": "933d4dda7ae8",
+          "first": "def current_config(self, light: bool = False) -> ProjectConfig:"
+        },
+        {
+          "file": "code/src/jalebi/app.py",
+          "start": 2167,
+          "end": 2212,
+          "role": "logic",
+          "symbol": "apply_config",
+          "anchor": "f9bbee9f354c",
+          "first": "def apply_config(self, cfg: ProjectConfig):"
+        }
+      ]
+    }
+  ]
+}

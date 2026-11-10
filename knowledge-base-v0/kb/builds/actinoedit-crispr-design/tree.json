@@ -1,0 +1,685 @@
+{
+ "interface": {
+  "title": "ActinoEdit — CRISPR Design Toolkit for Actinomycetes (v0.4.0)",
+  "field": "microbial genome engineering / synthetic biology (CRISPR guide design in actinomycetes)",
+  "stage_of_work": "experiment design — choosing and vetting sgRNA guides before cloning",
+  "what_it_is_for": "Scan a microbial genome around a target gene for CRISPR guides, score them with an organism-specific profile, check off-targets, CRISPRi placement and BGC overlap, and export a shareable guide-design report."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "Used the bundled Streptomyces demo pre-loaded on '/' (/work/app/examples/demo_genome.fasta + demo_annotation.gff, optional demo_bgc.bed), re-applied with 'Load Demo Data'. Contig1 is 603 bp; geneA maps to contig1:1-300. The supplied test files could not be uploaded: the upload handler raises \"'UploadEventArguments' object has no attribute 'content'\" (screens/014.webp), so only the 'or path' text fields work. The app was served with --demo, so '/' renders the demo design page rather than the main page."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Pick a small set of trustworthy targeting reagents for one gene and hand them on as a documented, shareable design",
+  "specific": "Design, score and vet sgRNA guides against a target gene in a Streptomyces genome and export the guide design",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Set up the inputs and the rules the search will follow",
+    "specific": "Load genome + annotation, pick the organism profile and CRISPR parameters",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Bring in a worked example so the tool has data to act on",
+      "specific": "Load the bundled Streptomyces demo genome FASTA and GFF annotation by path",
+      "screens": [
+       "screens/001.webp",
+       "screens/011.webp"
+      ],
+      "branch": "one-of (bundled demo paths vs manual upload — upload is broken, see not_done)",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened '/' with the demo banner and the /work/app/examples paths already pre-filled",
+        "screens": [
+         "screens/001.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Load Demo Data → 'Demo data loaded' toast, paths and Annotation Format = gff restored",
+        "screens": [
+         "screens/011.webp",
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the Annotation Format list (gff / gbk)",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed a bad genome path and ran → inline red 'Genome file not found: /nonexistent/path.fasta'",
+        "screens": [
+         "screens/015.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Choose the species-specific assumptions that govern scoring",
+      "specific": "Pick an organism profile from streptomyces / actinomycete / bacillus / ecoli / yeast / custom",
+      "screens": [
+       "screens/005.webp",
+       "screens/026.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Profile dropdown and saw the six profiles",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "switched Profile from streptomyces to ecoli and re-ran",
+        "screens": [
+         "screens/025.webp",
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Set the search rules: recognition motif, probe length, tolerance",
+      "specific": "Set PAM Pattern, Spacer Length and Max Mismatches, and choose the design mode",
+      "screens": [
+       "screens/006.webp",
+       "screens/023.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Design Mode (knockout / crispri)",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed PAM Pattern NNN in place of NGG and re-ran",
+        "screens": [
+         "screens/023.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Load Demo Data to restore the defaults NGG / 20 / 3 after parameter edits",
+        "screens": [
+         "screens/022.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Say which stretch of the sequence to work on, by name or by coordinates",
+      "specific": "Enter the Target Gene as a gene name (geneA) or as contig:start-end",
+      "screens": [
+       "screens/017.webp",
+       "screens/036.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "left Target Gene as geneA and ran — the resolved 'Region: contig1:1-300' is only visible on a freshly loaded page, not on the run screen itself",
+        "screens": [
+         "screens/008.webp",
+         "check/screens/011.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed contig1:1-900 → inline red 'Target region (1, 900) exceeds contig length (603)'",
+        "screens": [
+         "screens/017.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed contig1:300-600 as a coordinate target and ran",
+        "screens": [
+         "screens/036.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Run the search and judge which candidates are safe to use",
+    "specific": "Run the design pipeline and read scores, off-target counts and recommendations",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Execute the search and score every candidate",
+      "specific": "Press Run Design and get scored guide candidates for the target",
+      "screens": [
+       "screens/008.webp",
+       "screens/024.webp",
+       "screens/032.webp"
+      ],
+      "branch": "repeat (re-run after each parameter change)",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Run Design → 'Design started' toast and a Progress card",
+        "screens": [
+         "screens/023.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "confirmed each re-run really re-computed by re-exporting: downloads/actinoedit_guides.csv changed between runs (82693 bytes of scored guides with gc_content, specificity_score, gc_score, position_score, homopolymer_penalty, final_score, recommendation)",
+        "screens": [
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Read the scored candidates in the interface itself",
+      "specific": "Read the Design Summary (Target / Region / Guides) and the Guide Candidates table with GC%, off-target total, score and colour-coded recommendation",
+      "screens": [
+       "check/screens/012.webp",
+       "check/screens/013.webp"
+      ],
+      "branch": "optional (the on-screen view is built at page render, so it needs a load/reload to show a result)",
+      "children": [
+       {
+        "kind": "action",
+        "label": "loaded the page and read Design Summary: Target geneA / Region contig1:1-300 / Guides 2",
+        "screens": [
+         "check/screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "read the Guide Candidates rows: both guides with GC%, a single Off-targets total (132, 145), score and recommendation 'avoid'",
+        "screens": [
+         "check/screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run Design again on the same open page — the summary and table stayed on the earlier result, so the on-screen view is stale until the page is loaded again",
+        "screens": [
+         "check/screens/026.webp"
+        ]
+       }
+      ],
+      "id": "n1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check whether each candidate also matches elsewhere in the sequence",
+      "specific": "Read the off-target counts at 0/1/2/3 mismatches per guide",
+      "screens": [
+       "screens/032.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "read the off_target_0mm/1mm/2mm/3mm columns in downloads/actinoedit_guides.csv and the 'Off-Target Summary' table in downloads/actinoedit_report.html (e.g. 126/1/5/0 and 125/6/8/6), obtained with the Download buttons on this card",
+        "screens": [
+         "screens/032.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "compared with the on-screen table, which carries only one combined Off-targets figure per guide (132, 145) and no per-mismatch breakdown",
+        "screens": [
+         "check/screens/013.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Narrow the candidate list to the ones worth ordering",
+      "specific": "Use the Recommendation Filter and Max Off-targets fields on Guide Candidates",
+      "screens": [
+       "screens/028.webp",
+       "screens/029.webp",
+       "screens/037.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Recommendation Filter (all / excellent / good / caution / avoid)",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'good'",
+        "screens": [
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "set Max Off-targets to 0 — nothing changed in this session (table unchanged, re-exported CSV byte-identical at 82693 bytes), because the filtered rows are built when the page renders",
+        "screens": [
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "re-checked with Recommendation Filter = excellent and Max Off-targets = 10 on an already-rendered page — both guides, rated 'avoid' with 132 and 145 off-targets, were still listed ('1-2 of 2')",
+        "screens": [
+         "check/screens/017.webp",
+         "check/screens/018.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Add the extra context that decides if the design fits the intended intervention",
+    "specific": "Screen for CRISPRi placement and flag guides sitting in biosynthetic gene clusters",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Check the candidates sit where a silencing (not cutting) reagent needs to sit",
+      "specific": "Switch Design Mode to crispri and read region type, distance to start codon and strand relation",
+      "screens": [
+       "screens/031.webp"
+      ],
+      "branch": "one-of (knockout vs crispri)",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Design Mode dropdown, selected crispri and pressed Run Design — no kept screen records the mode actually set to crispri (screens/030.webp shows the list open with knockout still selected, screens/031.webp is scrolled past the field)",
+        "screens": [
+         "screens/030.webp",
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "read downloads/actinoedit_report.html and downloads/actinoedit_guides.csv: crispri_region_type 'cds', distance_to_start_codon 176 and 237, target_strand_relation 'non_template' for geneA, with scores rising to 0.295/0.120",
+        "screens": [
+         "check/screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "switched back to knockout and re-ran — the same three columns came back empty in the export",
+        "screens": [
+         "screens/033.webp",
+         "screens/036.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Mark candidates that fall inside or beside regions of special interest",
+      "specific": "Supply a BGC regions .bed and get guides tagged with BGC id, type and context",
+      "screens": [
+       "screens/031.webp",
+       "screens/032.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed /work/app/examples/demo_bgc.bed into 'BGC Regions (optional .bed/.tsv)' and re-ran",
+        "screens": [
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "read bgc_id=bgc_demo1 / bgc_type=PKS / bgc_context='inside:PKS' for the geneA guides in downloads/actinoedit_guides.csv and the BGC column of downloads/actinoedit_report.html",
+        "screens": [
+         "check/screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "re-ran on a coordinate target and read the proximity form 'near:NRPS (upstream 0.1kb)' in the same export",
+        "screens": [
+         "screens/036.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "task",
+    "general": "Repeat the whole assessment for a second region and compare",
+    "specific": "Re-target the design to a second locus and re-run the scoring, CRISPRi and BGC steps",
+    "screens": [
+     "screens/035.webp",
+     "screens/036.webp"
+    ],
+    "branch": "repeat (loops the set-up, run and context phases)",
+    "children": [
+     {
+      "kind": "action",
+      "label": "typed geneB → the GFF resolves it to 400-800 and the run is refused: 'Target region (400, 800) exceeds contig length (603)'",
+      "screens": [
+       "screens/035.webp"
+      ]
+     },
+     {
+      "kind": "action",
+      "label": "used the coordinate target contig1:300-600 instead and re-ran successfully",
+      "screens": [
+       "screens/036.webp"
+      ]
+     },
+     {
+      "kind": "action",
+      "label": "read the second locus only out of downloads/actinoedit_guides.csv (~40 guides with good/caution/avoid and their own BGC and CRISPRi values); the on-screen summary and table still showed the first geneA result",
+      "screens": [
+       "check/screens/024.webp",
+       "check/screens/026.webp"
+      ]
+     }
+    ],
+    "id": "t10",
+    "check": "replayed"
+   },
+   {
+    "kind": "phase",
+    "general": "Hand the finished design on to collaborators",
+    "specific": "Export the guide design as CSV, Excel or an HTML report",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Write the result out in the three formats offered",
+      "specific": "Download CSV, Excel and HTML from the Download Results card",
+      "screens": [
+       "screens/032.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Download CSV → actinoedit_guides.csv, 82693 bytes, 28 columns from guide_id through target_strand_relation, ending bgc_id / bgc_type / bgc_context / crispri_region_type / distance_to_start_codon / target_strand_relation",
+        "screens": [
+         "screens/032.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download Excel → actinoedit_report.xlsx, 17.8 kB, with an 'Excel download started' toast",
+        "screens": [
+         "screens/032.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download HTML → actinoedit_report.html with Target Information, a Warnings list (e.g. 'High GC content (100.0%)'), Guide Candidates (Top 20) and Off-Target Summary; its Design Parameters table lists only 'source: ActinoEdit Web' and does not echo the PAM / spacer / mismatch settings used",
+        "screens": [
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Search-parameter panel with target resolution and guarded errors",
+   "general": "A compact form that turns a reference sequence, a named or coordinate-specified region and a few search rules into one runnable job, refusing impossible requests with a specific reason",
+   "specific": "Input Files + Organism Profile + CRISPR Parameters + Target cards feeding one Run Design button; the Target field accepts a locus_tag/gene name or contig:start-end and resolves it against the GFF",
+   "steps": [
+    "Press Load Demo Data (or type genome/annotation paths) and pick gff or gbk",
+    "Pick an organism profile from the six on offer",
+    "Choose Design Mode knockout or crispri and leave PAM / Spacer Length / Max Mismatches at NGG / 20 / 3",
+    "Type the target as a gene name or as contig:start-end",
+    "Press Run Design and read the inline red message if the genome path, region or a parameter is bad",
+    "Note the guard is incomplete: an unknown contig name in the coordinate form returns silently with no guides and no message"
+   ],
+   "serves_tasks": [
+    "set the rules the search will follow",
+    "say which stretch of sequence to work on",
+    "execute the search"
+   ],
+   "screens": [
+    "screens/001.webp",
+    "screens/015.webp",
+    "screens/017.webp",
+    "screens/035.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Background run with progress feedback",
+   "general": "A long analysis is handed to a background job so the form stays usable: pressing go acknowledges the request and a progress card reports the job rather than freezing the page",
+   "specific": "Run Design starts a background task: a 'Design started' toast appears and a Progress card is shown while the pipeline scans and scores guides; the result is fetched from the Download Results card afterwards",
+   "steps": [
+    "Fill the input, parameter and target cards",
+    "Press Run Design and read the 'Design started' toast",
+    "Watch the Progress card while the job runs",
+    "When it is done, download CSV/Excel/HTML to read the result (the on-screen tables do not refresh on their own)"
+   ],
+   "serves_tasks": [
+    "execute the search",
+    "repeat the whole assessment for a second region"
+   ],
+   "screens": [
+    "screens/023.webp",
+    "screens/024.webp"
+   ],
+   "id": "f5",
+   "check": "in_place_only"
+  },
+  {
+   "name": "On-screen result review: summary chips, ranked candidate table and filters",
+   "general": "A short summary of what was analysed plus a ranked table of candidates with their key measures and a verdict badge, narrowed by a couple of threshold controls",
+   "specific": "Design Summary (Target / Region / Guides) above a Guide Candidates table with GC%, Off-targets total, score and colour-coded recommendation, plus Recommendation Filter and Max Off-targets fields",
+   "steps": [
+    "Run a design, then load or reload the page — the summary and rows are built at page render, so they are stale until then",
+    "Read the chips: Target geneA / Region contig1:1-300 / Guides 2",
+    "Read each row's GC%, Off-targets total, score and recommendation badge",
+    "Set Recommendation Filter and/or Max Off-targets to narrow the list",
+    "Reload again to see a filter take effect — set on an already-rendered page, neither changed the rows in this session"
+   ],
+   "serves_tasks": [
+    "read the scored candidates in the interface itself",
+    "narrow the candidate list to the ones worth ordering"
+   ],
+   "screens": [
+    "check/screens/012.webp",
+    "check/screens/013.webp",
+    "check/screens/017.webp",
+    "check/screens/018.webp",
+    "screens/028.webp",
+    "screens/037.webp"
+   ],
+   "id": "f6",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Design-mode switch that changes which columns the result carries",
+   "general": "One selector that re-runs the same analysis under a different intervention model, so the result gains or loses a block of mode-specific measures",
+   "specific": "Design Mode knockout ↔ crispri; under crispri the export fills crispri_region_type, distance_to_start_codon and target_strand_relation, under knockout they stay blank",
+   "steps": [
+    "Set Design Mode to crispri",
+    "Press Run Design",
+    "Download the HTML report or CSV and read crispri_region_type, distance_to_start_codon and target_strand_relation (cds / 176 and 237 / non_template for geneA)",
+    "Switch back to knockout, re-run, re-download and confirm those columns are empty",
+    "Expect the mode block only in the downloads — the on-screen candidate table has no CRISPRi columns"
+   ],
+   "serves_tasks": [
+    "check the candidates sit where a silencing reagent needs to sit",
+    "execute the search"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/030.webp",
+    "screens/036.webp",
+    "check/screens/021.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Optional region-overlay annotation of candidates",
+   "general": "Drop in an optional file of interesting intervals and every candidate comes back labelled by whether it sits inside one, or how far it sits from the nearest",
+   "specific": "The 'BGC Regions (optional .bed/.tsv)' field adds bgc_id / bgc_type / bgc_context to each guide, e.g. 'inside:PKS' or 'near:NRPS (upstream 0.1kb)'",
+   "steps": [
+    "Run once with the BGC field empty — the bgc columns stay blank and the report warns 'BGC annotation requested but no regions loaded'",
+    "Type a path to a .bed of regions into the BGC field",
+    "Press Run Design again",
+    "Download CSV or HTML and read bgc_id / bgc_type / bgc_context per guide (bgc_demo1 / PKS / inside:PKS)",
+    "Re-target elsewhere to see the proximity form 'near:NRPS (upstream 0.1kb)' instead of 'inside:'",
+    "Expect the tags in the exports only — they never appear in the on-screen table"
+   ],
+   "serves_tasks": [
+    "mark candidates that fall inside or beside regions of special interest",
+    "repeat the whole assessment for a second region"
+   ],
+   "screens": [
+    "screens/031.webp",
+    "screens/032.webp",
+    "screens/036.webp",
+    "check/screens/022.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Three-format export of the scored design",
+   "general": "One result set written out as a flat table for analysis, a spreadsheet for colleagues, and a formatted report with warnings and a ranked top list",
+   "specific": "Download Results card with Download CSV / Download Excel / Download HTML, all driven by the last Run Design",
+   "steps": [
+    "Run a design",
+    "Press Download CSV for the full 28-column guide table (guide_id … bgc_id, bgc_type, bgc_context, crispri_region_type, distance_to_start_codon, target_strand_relation)",
+    "Press Download Excel for the same as actinoedit_report.xlsx",
+    "Press Download HTML for Target Information, a GC-content Warnings list, Guide Candidates (Top 20) and the Off-Target Summary",
+    "Do not expect the report's Design Parameters table to record the run settings — it lists only 'source: ActinoEdit Web'"
+   ],
+   "serves_tasks": [
+    "hand the finished design on to collaborators",
+    "check whether candidates match elsewhere in the sequence"
+   ],
+   "screens": [
+    "screens/032.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Local project database for saving and browsing designs (not reached)",
+   "general": "A local store that keeps finished designs under named projects alongside the organisms and reference sequences they came from, so earlier results can be re-opened and re-exported instead of re-run",
+   "specific": "Projects / Organisms / Genomes pages plus a 'Save current guides to DB' card on the main design page, backed by a local SQLite database",
+   "steps": [
+    "Initialise the store with 'actinoedit db init' from the CLI",
+    "Open the main (non-demo) design page and save a finished run to a named project",
+    "Create or delete projects on /projects and link an organism and a genome",
+    "Re-open a project and export its saved guides"
+   ],
+   "serves_tasks": [
+    "hand the finished design on to collaborators"
+   ],
+   "screens": [
+    "screens/002.webp",
+    "screens/003.webp",
+    "screens/004.webp"
+   ],
+   "id": "f7",
+   "check": "in_place_only"
+  }
+ ],
+ "screens_never_reached": [
+  "Projects & Database (Local SQLite) — /projects renders only 'DB not available. Run \"actinoedit db init\" from CLI first.' (screens/003.webp); no shell is available to run it",
+  "Organisms — same DB-not-available state (screens/002.webp)",
+  "Genomes — same DB-not-available state (screens/004.webp)",
+  "'Save current guides to DB' — the app was served with --demo, so '/' is the demo design page, which has no DB card at all; the save card and the Projects/Organisms/Genomes CRUD surface live on the main page and the DB pages, and all of them need 'actinoedit db init' (screens/032.webp)",
+  "A refreshed Guide Candidates table or Design Summary after a re-run — both are built when the page renders, so within one never-reloaded session they stayed on the first result; the populated view itself was reached on load (check/screens/012.webp, check/screens/013.webp)",
+  "The Task Status panel's Cancel button, the live progress log, and the 'Reports auto-saved to results/web_autosave/' notification — only the 'Design started' toast and the Progress card were captured (screens/023.webp, screens/024.webp)"
+ ],
+ "not_done": [
+  "Base-editing feasibility screening: no control for it anywhere in the web UI, and no editable-base / codon / amino-acid columns in the CSV (28 columns, none base-edit related) or the HTML report. It appears to be CLI-only in this build.",
+  "Saving guides to the local project database and browsing/exporting them later: the demo page carries no DB card, and the main page and DB pages need 'actinoedit db init', which requires a shell I do not have (screens/003.webp).",
+  "Uploading the supplied demo_genome.fasta / demo_annotation.gff / demo_bgc.bed through the file pickers: the handler throws \"'UploadEventArguments' object has no attribute 'content'\" (screens/014.webp). Only the 'or path' text fields work, so all runs used the bundled copies under /work/app/examples/.",
+  "Changing Spacer Length or Max Mismatches away from their defaults: entering a value in either number field makes the run fail with \"'float' object cannot be interpreted as an integer\" (screens/020.webp, which shows Spacer Length 15 with PAM NNN and target contig1:1-603 — 15 is the field minimum, so the 12 that was typed could not be submitted at all). Both parameters could therefore only be used at 20 and 3.",
+  "Showing the Recommendation Filter or Max Off-targets controls change the listed candidates: both accept input and the filtering is applied when rows are built, but on an already-rendered page nothing changed in-session — Max Off-targets 0 left the table as it was and re-exported a byte-identical 82693-byte CSV (screens/029.webp, screens/037.webp), and Recommendation Filter = excellent with Max Off-targets = 10 still listed both 'avoid' guides with 132 and 145 off-targets (check/screens/017.webp, check/screens/018.webp).",
+  "Designing against geneB: its GFF coordinates (400-800) run past the end of the 603 bp demo contig, so the bundled demo data cannot support a second named gene (screens/035.webp). A coordinate target was used instead.",
+  "Getting any feedback for a mistyped contig name: the coordinate form with an unknown contig (contig_1:1000-2000) returned no guides and no error message at all, so this input is a silent dead end.",
+  "Capturing the Design Mode field while set to crispri: the mode was selected and the crispri-only columns did fill in the export, but screens/030.webp shows the dropdown with knockout still selected and screens/031.webp is scrolled past the field, so no kept screen records the switch."
+ ],
+ "applied": [
+  "Reframed the Guide Candidates / Design Summary claim from 'never renders' to 'stale until the page is loaded again', citing the populated view in the replay screens",
+  "Added task n1 for reading the Design Summary chips and Guide Candidates table on screen, with the render-time caveat",
+  "Rewrote t7 and the filter note: filters are real but read at render time; kept the in-session finding that nothing changed, with the reason",
+  "Added feature f6 for on-screen result review (summary chips, ranked table, recommendation/off-target filters) with the reload caveat",
+  "Added feature f5 for the background run (Run Design → 'Design started' toast + Progress card), limited to what a kept screen shows",
+  "Corrected the CSV to 28 columns and listed the trailing bgc_id/bgc_type/bgc_context/crispri_region_type/distance_to_start_codon/target_strand_relation columns in t11 and f4",
+  "Corrected the Spacer Length finding to screens/020.webp (15, not 12), noted the field minimum of 15, and moved the float/int crash out of t3 into not_done",
+  "Re-cited every result-content claim (off-targets, CRISPRi values, BGC tags, re-run proof) to downloads/actinoedit_guides.csv and downloads/actinoedit_report.html instead of the download-button screenshot",
+  "Stated plainly in t8, f2 and not_done that no kept screen records Design Mode set to crispri",
+  "Fixed the 'Save current guides to DB' explanation: with --demo, '/' is the demo page which has no DB card; the card and the CRUD pages are elsewhere and need 'actinoedit db init'",
+  "Added feature f7 for the local SQLite project database, marked as not reached, so the README's local-database half is represented",
+  "Moved t10 out of the CRISPRi/BGC phase to sit directly under the goal as a loop over the whole workflow",
+  "Moved t7 to sit beside the on-screen reading of results (n1) in the run-and-judge phase",
+  "Moved the bad-genome-path error action from t4 to t1, where the genome input lives",
+  "Moved the upload-handler crash action out of t1 (it is already recorded in not_done)",
+  "Added the silent no-result on an unknown contig name to not_done and as a caveat step in f1",
+  "Added the replay's export findings to t11 and f4: 'High GC content (100.0%)' warning and the Design Parameters table that does not echo run settings"
+ ],
+ "open_fixes": [
+  "Capture the Task Status panel, its Cancel button, the live progress log and the 'Reports auto-saved to results/web_autosave/' notification — the run kept only the 'Design started' toast and the Progress card, so the full job-control feature cannot be written from this record.",
+  "Take a screenshot with Design Mode visibly set to crispri (scroll the parameter card into view before running) so the mode switch behind the CRISPRi columns is evidenced on screen, not only in the download.",
+  "Re-run the Recommendation Filter and Max Off-targets controls and then reload the page, to settle whether they actually narrow the list or are inert; this session only ever set them on an already-rendered page.",
+  "Reach the local SQLite half of the tool: run 'actinoedit db init' in a shell, then start the app without --demo, to exercise 'Save current guides to DB', the Projects/Organisms/Genomes CRUD and project guide export.",
+  "Exercise base-editing feasibility screening from the CLI (or confirm a web control exists in another build) — no web control was found in this one.",
+  "Retry the file pickers once the upload handler is fixed, so the genome, annotation and BGC files can be supplied by upload rather than only by path.",
+  "Re-try Spacer Length and Max Mismatches once the float/int crash is fixed, to see how non-default values change scoring and off-target counts.",
+  "Use a genome whose annotation fits the contig (or a longer demo contig) to design against a second named gene, since geneB's 400-800 coordinates exceed the 603 bp demo contig.",
+  "Probe the coordinate form with other malformed inputs (unknown contig, reversed range, non-numeric) to map how much of the target guard is silent."
+ ],
+ "screens_at": "pilot/public/runs/actinoedit-crispr-design/20261101-065841/",
+ "screens_filed": {
+  "screens/001.webp": "screens/001.webp",
+  "screens/008.webp": "screens/008.webp",
+  "screens/031.webp": "screens/031.webp",
+  "screens/032.webp": "screens/032.webp"
+ }
+}

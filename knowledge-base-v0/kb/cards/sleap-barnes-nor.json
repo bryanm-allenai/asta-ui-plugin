@@ -1,0 +1,514 @@
+{
+  "schema": "astaui.card/1",
+  "id": "sleap-barnes-nor",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T15:24:43Z"
+  },
+  "app": {
+    "title": "SLEAP analysis pipeline for Barnes maze and Novel Object Recognition",
+    "summary": "A person picks a cohort folder of trial videos and sets the cleaning and flagging thresholds. On one frame they click the reference positions that the measures depend on: the maze centre and target hole, then the two object positions. They also record which side held the novel object in each test video. They then run one pipeline that predicts keypoints, cleans and validates every trajectory and computes behavioural measures per video, with live progress. Last, they review quality warnings, summary tables, bar charts and a per-video path plot, filtered to original or hand-corrected tracking, and download the tables as CSV.",
+    "task": {
+      "text": "Turn pose-tracked trial videos into cleaned trajectories and per-video behavioural measures, using setup positions clicked once per cohort, and export them for statistics.",
+      "verbs": [
+        "derive",
+        "annotate",
+        "clean",
+        "summarize",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "A folder of trial videos grouped by experiment, with predicted keypoint positions per frame. These are turned into per-frame trajectories, per-video quality summaries and per-video metric records.",
+      "item": "a video of one animal's trial, with its nose and tail trajectory",
+      "shapes": [
+        "media",
+        "image",
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "scoring behaviour from pose-tracked trial videos after recording, before statistics",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "Numbered tabs lead from calibration to results. Clicks on a video frame in pick-mode place reference points, which are drawn back on the frame and saved as cohort configs. A run button sends those configs and the sidebar thresholds to a batch pipeline with a streamed status. The results tab reads its outputs into tables, bar charts and a trajectory plot, all filtered by one original-or-corrected switch.",
+      "views": [
+        "image viewer",
+        "form",
+        "table view",
+        "bar chart",
+        "scatter plot",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "place point",
+        "apply label",
+        "filter",
+        "export",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard",
+        "status pipeline"
+      ]
+    },
+    "field": {
+      "text": "pose-estimation behavioural scoring of rodent maze and object tests in behavioural neuroscience",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "behavioural neuroscience",
+        "pose estimation",
+        "barnes maze"
+      ]
+    },
+    "workflow": {
+      "name": "calibrate the setup once, then batch-compute per-item measures and export a table",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A sidebar dropdown picks a cohort folder. Videos are found by subfolder name (BARNES_DAY*, NOR*). Number fields set the frame rate, maximum interpolation gap, collapse threshold, speed limit and missing-gap limit.",
+          "parts": [
+            "sidebar-config"
+          ]
+        },
+        {
+          "step": "mark reference positions on one frame",
+          "here": "Pick-mode buttons ('Pick centre', 'Pick target hole', 'Pick left object', 'Pick right object') turn the next click on the frame into a point. Each point is drawn back on the frame, and the derived angle and distance are shown before 'Save geometry' or 'Save cohort calibration'.",
+          "parts": [
+            "barnes-calibration",
+            "nor-cohort-calibration"
+          ]
+        },
+        {
+          "step": "label each item with its condition",
+          "here": "For each test video, a left/right radio records which side held the novel object, and 'Save side' writes it. A status table and the sidebar count show how many videos are done.",
+          "parts": [
+            "nor-side-annotation",
+            "sidebar-config"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Run full pipeline' runs inference on videos without predictions, then filter and interpolate, validation, and Barnes/NOR metrics. A collapsed status line reports the current phase and video. Filtering and validation can also be run on their own.",
+          "parts": [
+            "run-pipeline"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Warning banners list videos whose inference failed or whose tracking has long gaps. An All / Original only / Corrected only radio filters every table, chart and the trajectory list.",
+          "parts": [
+            "results-dashboard"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Tables show filter, validation and metric results. Bar charts per video show collapsed and interpolated frames, implausible-speed frames, latency, time at target, quadrant occupancy, discrimination index and side bias. A trajectory plot draws one video's nose path coloured by frame.",
+          "parts": [
+            "results-dashboard",
+            "trajectory-viewer"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download buttons save the filter summary, the validation summary and the combined behavioural_metrics.csv.",
+          "parts": [
+            "results-dashboard"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Setup positions are clicked once per cohort and reused for every video. Videos with a different frame size are excluded with a reason from an exclusions file.",
+        "The target zone is drawn on the calibration frame as a ring at 12% of the centre-to-target distance, the radius the metrics use.",
+        "A video is flagged for missing data only when both keypoints have a long gap. The flag prompts a review and does not exclude the video.",
+        "Hand-corrected tracking files sit beside the originals by a filename suffix, so corrected and original metrics can be filtered and compared.",
+        "Frames are converted to seconds using each video's own frame rate unless one is set by hand."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar-config",
+      "level": "view",
+      "parent": null,
+      "title": "Configuration sidebar",
+      "summary": "Picks the cohort, sets the cleaning and flagging thresholds, and shows which calibrations and side labels are done.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/ui/app.py",
+          "start": 302,
+          "end": 373,
+          "role": "markup",
+          "anchor": "c67406c412fa",
+          "first": "# sidebar config"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 135,
+          "end": 140,
+          "role": "logic",
+          "symbol": "list_cohorts",
+          "anchor": "99567157521e",
+          "first": "def list_cohorts():"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 143,
+          "end": 152,
+          "role": "logic",
+          "symbol": "derive_cohort_id",
+          "anchor": "4c2e6201377f",
+          "first": "def derive_cohort_id(cohort_dir):"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 124,
+          "end": 132,
+          "role": "logic",
+          "symbol": "list_nor_videos",
+          "anchor": "1a1f1909097c",
+          "first": "def list_nor_videos(project_root):"
+        }
+      ]
+    },
+    {
+      "id": "barnes-calibration",
+      "level": "view",
+      "parent": null,
+      "title": "Barnes geometry calibration",
+      "summary": "Places the maze centre and target hole on a chosen video frame in pick-mode, previews the target angle and zone, and saves the cohort geometry.",
+      "views": [
+        "image viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "place point",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/ui/app.py",
+          "start": 389,
+          "end": 530,
+          "role": "markup",
+          "anchor": "5d22690536e5",
+          "first": "# Tab 1: Barnes geometry"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 155,
+          "end": 170,
+          "role": "logic",
+          "symbol": "compute_geometry",
+          "anchor": "cf86c0522380",
+          "first": "def compute_geometry(cx, cy, tx, ty):"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 183,
+          "end": 194,
+          "role": "logic",
+          "symbol": "draw_target_zone",
+          "anchor": "68126b7d4d0c",
+          "first": "def draw_target_zone(img, geom):"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 173,
+          "end": 175,
+          "role": "logic",
+          "symbol": "draw_centre",
+          "anchor": "6709682633d1",
+          "first": "def draw_centre(img, x, y):"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 178,
+          "end": 180,
+          "role": "logic",
+          "symbol": "draw_target_only",
+          "anchor": "543029307705",
+          "first": "def draw_target_only(img, x, y):"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 112,
+          "end": 121,
+          "role": "logic",
+          "symbol": "list_barnes_videos",
+          "anchor": "83e60d61ad30",
+          "first": "def list_barnes_videos(project_root):"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 94,
+          "end": 99,
+          "role": "logic",
+          "symbol": "get_frame",
+          "anchor": "c1c00b76487b",
+          "first": "def get_frame(video_path, frame_idx=0):"
+        }
+      ]
+    },
+    {
+      "id": "nor-scenes",
+      "level": "view",
+      "parent": null,
+      "title": "NOR scene annotation",
+      "summary": "Holds the two NOR setup steps: object positions calibrated once per cohort, then the novel side for each test video.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/ui/app.py",
+          "start": 532,
+          "end": 551,
+          "role": "markup",
+          "anchor": "9b74085947d1",
+          "first": "# Tab 2: NOR"
+        }
+      ]
+    },
+    {
+      "id": "nor-cohort-calibration",
+      "level": "component",
+      "parent": "nor-scenes",
+      "title": "Object position calibration",
+      "summary": "Places the left and right object positions on a familiar-phase frame, loads any saved calibration for editing, and saves it for the cohort.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "place point"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/ui/app.py",
+          "start": 552,
+          "end": 681,
+          "role": "logic",
+          "anchor": "c40bdfcbb296",
+          "first": "# Step 1: cohort calibration"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 197,
+          "end": 199,
+          "role": "logic",
+          "symbol": "draw_marker",
+          "anchor": "1dc0add5323c",
+          "first": "def draw_marker(img, x, y, label, colour):"
+        }
+      ]
+    },
+    {
+      "id": "nor-side-annotation",
+      "level": "component",
+      "parent": "nor-scenes",
+      "title": "Test-phase novel side",
+      "summary": "Shows each test video's frame with both object positions marked, and records with a left/right choice which side held the novel object, plus a table of which videos are done.",
+      "views": [
+        "image viewer",
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "apply label"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/ui/app.py",
+          "start": 683,
+          "end": 755,
+          "role": "logic",
+          "anchor": "f74dc6225cfd",
+          "first": "# Step 2: test-phase annotation"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 539,
+          "end": 540,
+          "role": "logic",
+          "symbol": "_scene_path_for",
+          "anchor": "006daaab451f",
+          "first": "def _scene_path_for(v):"
+        }
+      ]
+    },
+    {
+      "id": "run-pipeline",
+      "level": "view",
+      "parent": null,
+      "title": "Run pipeline",
+      "summary": "Builds the pipeline command from the configs and thresholds, warns about missing calibrations, and runs inference, cleaning, validation and metrics with a streamed status.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/ui/app.py",
+          "start": 758,
+          "end": 868,
+          "role": "markup",
+          "anchor": "2ab63676182e",
+          "first": "# Tab 3: Run pipeline"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 281,
+          "end": 285,
+          "role": "logic",
+          "symbol": "run_with_status",
+          "anchor": "a1464ab3318c",
+          "first": "def run_with_status("
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 207,
+          "end": 278,
+          "role": "logic",
+          "symbol": "run_cmd",
+          "anchor": "e59a5e0c0536",
+          "first": "def run_cmd(cmd, status):"
+        }
+      ]
+    },
+    {
+      "id": "results-dashboard",
+      "level": "view",
+      "parent": null,
+      "title": "Results",
+      "summary": "Shows quality warnings and the filter, validation and behavioural-metric tables with bar charts per video, filtered to original or corrected tracking, with a CSV download for each table.",
+      "views": [
+        "table view",
+        "bar chart"
+      ],
+      "interactions": [
+        "filter",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/ui/app.py",
+          "start": 870,
+          "end": 1112,
+          "role": "markup",
+          "anchor": "3a6e2793fece",
+          "first": "# Tab 4: Results"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 939,
+          "end": 954,
+          "role": "logic",
+          "symbol": "_apply_version_filter",
+          "anchor": "8df8f0df349a",
+          "first": "def _apply_version_filter(dframe, video_col, choice):"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 936,
+          "end": 937,
+          "role": "logic",
+          "symbol": "_is_corrected",
+          "anchor": "9e4eb89ba5e9",
+          "first": "def _is_corrected(stem):"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 58,
+          "end": 70,
+          "role": "logic",
+          "symbol": "pink_bar",
+          "anchor": "6b0bc392f226",
+          "first": "def pink_bar(df, x_col, y_col, title, xlabel=None, ylabel=None, rotate=45):"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 73,
+          "end": 80,
+          "role": "logic",
+          "symbol": "csv_download",
+          "anchor": "6aae94822d9b",
+          "first": "def csv_download(df, filename, label='Download CSV'):"
+        }
+      ]
+    },
+    {
+      "id": "trajectory-viewer",
+      "level": "component",
+      "parent": "results-dashboard",
+      "title": "Trajectory viewer",
+      "summary": "Plots the chosen video's cleaned nose path in image coordinates, coloured by frame number.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/ui/app.py",
+          "start": 1114,
+          "end": 1156,
+          "role": "logic",
+          "anchor": "59152e906d24",
+          "first": "# Trajectory viewer"
+        },
+        {
+          "file": "code/ui/app.py",
+          "start": 41,
+          "end": 55,
+          "role": "logic",
+          "symbol": "pink_fig",
+          "anchor": "7600993bec04",
+          "first": "def pink_fig(figsize=(10, 4)):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "interactions",
+      "term": "place point"
+    }
+  ]
+}

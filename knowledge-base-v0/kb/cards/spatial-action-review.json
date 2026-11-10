@@ -1,0 +1,704 @@
+{
+  "schema": "astaui.card/1",
+  "id": "spatial-action-review",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T17:47:27Z"
+  },
+  "app": {
+    "title": "Spatial Action Review — Autonomous EM Oversight",
+    "summary": "A reviewer loads a model's evaluation run: a shipped record set with a model condition, or an uploaded JSON export with an optional zip of image crops. They then set a reliability threshold. The app puts every record into one of four states, depending on whether the model's answer was right and whether the points it predicted cover enough of the labelled objects. A 2×2 ledger counts the four states, and a heatmap shows the failure rate by task and dataset; clicking a cell in either narrows the review queue. The reviewer steps through the queue one record at a time, looking at the image with true and predicted points overlaid beside the question, the answer and the scores. For each record they choose one of four routing decisions and can add a reason. A threshold sweep shows how the counts move as the gate changes, and the decision log can be exported as CSV or JSON.",
+    "task": {
+      "text": "Find the model outputs where a correct answer hides an unreliable spatial action, and record a routing decision for each one before the action is used downstream.",
+      "verbs": [
+        "triage",
+        "review",
+        "identify",
+        "summarize",
+        "decide",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "Records from a model evaluation run, one per image region and question. Each has the answer's correctness, the labelled object centroids, the predicted points, recall scores, and an image crop.",
+      "item": "an image crop paired with a question, the model's answer and the points it predicted",
+      "shapes": [
+        "table",
+        "image collection",
+        "judgements",
+        "notes"
+      ]
+    },
+    "stage": {
+      "text": "reviewing a model's outputs after an evaluation run, before its actions are cleared for downstream use",
+      "terms": [
+        "review",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "A threshold slider puts every record into one of four answer-action states. A clickable 2×2 ledger and a task×dataset heatmap both filter the review queue that drives a one-record image audit with point overlays, where the reviewer records a routing decision. Tabs below hold a threshold sweep chart, a table comparing conditions, the decision log with exports, and a side-by-side live re-ask of the open record.",
+      "views": [
+        "sidebar list",
+        "heatmap",
+        "summary stats",
+        "image viewer",
+        "detail panel",
+        "line chart",
+        "table view",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "select",
+        "toggle view",
+        "accept or reject",
+        "write notes",
+        "export",
+        "hover for detail",
+        "undo"
+      ],
+      "patterns": [
+        "linked views",
+        "review queue",
+        "overview and detail",
+        "dashboard",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "auditing vision-language model point predictions against labelled objects, as visual analytics for model oversight",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "vision language models",
+        "visual analytics",
+        "electron microscopy"
+      ]
+    },
+    "workflow": {
+      "name": "triage model outputs one at a time and record a routing decision for each",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pick a shipped record set and model condition in the sidebar, or upload an inspector_data.json with an optional zip of crops named <crop_id>.png",
+          "parts": [
+            "run-config"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A τ slider sets the object-recall gate. Each record becomes aligned pass, silent failure, action-only pass or blocked, and the ledger shows the count and rate of each",
+          "parts": [
+            "run-config",
+            "answer-action-ledger"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Clicking a ledger cell picks the state to review (silent failure by default). Clicking a task×dataset heatmap cell narrows the queue to that region, and clicking it again clears it",
+          "parts": [
+            "answer-action-ledger",
+            "risk-map"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "prev/next walk the queue. Each record shows the crop with green crosses on the labelled objects and red rings on the predicted points, a verdict, stray-point flags, and the question, answer and scores",
+          "parts": [
+            "region-audit"
+          ]
+        },
+        {
+          "step": "decide what happens to each item, with a reason",
+          "here": "Four buttons record a decision: accept action, escalate for expert review, hold for a stricter gate, or flag for model revision. An optional reason is saved with it, and a counter shows how many records in the queue are signed off",
+          "parts": [
+            "routing-decision"
+          ]
+        },
+        {
+          "step": "compare outcomes across settings",
+          "here": "A sweep chart and table show how many actions are cleared, held, or fall in the silent-failure queue as τ moves from 0.05 to 0.95",
+          "parts": [
+            "threshold-sweep"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The review log counts decisions by route, warns when a decision was made under a different τ, and downloads the decisions as CSV or self-describing JSON. The current queue can also be downloaded as CSV",
+          "parts": [
+            "review-log",
+            "routing-decision"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each item has two linked outputs, a text answer and a set of spatial points, and the review targets the case where the answer passes but the points fail",
+        "The reliability gate τ is adjustable, and every decision stores the τ it was made under; decisions made under a different τ are flagged as stale rather than re-evaluated",
+        "The whole view is encoded in the URL (source, condition, τ, state, cell, open record, theme), so any state can be shared and reopened",
+        "The open record can be re-asked live against a served model endpoint, and the new points are shown beside the stored record without changing the audit",
+        "Points that land on no labelled object are counted and flagged separately, because the gate measures coverage, not precision"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "run-config",
+      "level": "view",
+      "parent": null,
+      "title": "Run configuration sidebar",
+      "summary": "Chooses the record source and model condition or takes an uploaded run, sets the reliability gate τ, and offers pinned worked examples for each state.",
+      "views": [
+        "sidebar list",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 311,
+          "end": 502,
+          "role": "markup",
+          "anchor": "db8abb3c206c",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 237,
+          "end": 245,
+          "role": "logic",
+          "symbol": "_select_build",
+          "anchor": "20ebc16e5cf8",
+          "first": "def _select_build(name: str) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 248,
+          "end": 256,
+          "role": "logic",
+          "symbol": "_reset_config",
+          "anchor": "e6324d4f7293",
+          "first": "def _reset_config() -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 299,
+          "end": 306,
+          "role": "logic",
+          "symbol": "_open_example",
+          "anchor": "fbe6de4b90d7",
+          "first": "def _open_example(quadrant: str, question_id: str) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 148,
+          "end": 165,
+          "role": "logic",
+          "symbol": "_ingest_upload",
+          "anchor": "c227488cd40c",
+          "first": "def _ingest_upload(json_bytes: bytes, zip_bytes: bytes | None):"
+        },
+        {
+          "file": "code/sar/ingest.py",
+          "start": 140,
+          "end": 275,
+          "role": "logic",
+          "symbol": "ingest",
+          "anchor": "70c494ee8690",
+          "first": "def ingest(payload: dict, image_dir: Path | None = None) -> Ingested:"
+        },
+        {
+          "file": "code/sar/data.py",
+          "start": 101,
+          "end": 107,
+          "role": "logic",
+          "symbol": "with_gate",
+          "anchor": "5678fd485b5f",
+          "first": "def with_gate("
+        },
+        {
+          "file": "code/release/manifest.json",
+          "start": 1,
+          "end": 60,
+          "role": "data",
+          "anchor": "8d7a890b8d4d",
+          "first": "{"
+        }
+      ]
+    },
+    {
+      "id": "answer-action-ledger",
+      "level": "view",
+      "parent": null,
+      "title": "Answer–action ledger",
+      "summary": "A 2×2 grid of answer correctness against action reliability. Each cell shows a count and rate, and clicking it picks the state to review.",
+      "views": [
+        "summary stats",
+        "fixed-layout grid"
+      ],
+      "interactions": [
+        "select",
+        "filter"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 585,
+          "end": 647,
+          "role": "markup",
+          "anchor": "b33dc3f66480",
+          "first": "# The audit queue is derived once here: the ledger card reports its size and the"
+        },
+        {
+          "file": "code/app.py",
+          "start": 259,
+          "end": 261,
+          "role": "logic",
+          "symbol": "_select_quadrant",
+          "anchor": "fed87d04adc5",
+          "first": "def _select_quadrant(quadrant: str) -> None:"
+        },
+        {
+          "file": "code/sar/ui.py",
+          "start": 619,
+          "end": 620,
+          "role": "logic",
+          "symbol": "ledger_button_label",
+          "anchor": "b10f1415fdd2",
+          "first": "def ledger_button_label(quadrant: str, rate: float, count: int) -> str:"
+        },
+        {
+          "file": "code/sar/ui.py",
+          "start": 826,
+          "end": 841,
+          "role": "logic",
+          "symbol": "stray_summary_html",
+          "anchor": "7f77adf93421",
+          "first": "def stray_summary_html(summary) -> str:"
+        },
+        {
+          "file": "code/sar/data.py",
+          "start": 169,
+          "end": 233,
+          "role": "logic",
+          "symbol": "summarise",
+          "anchor": "983a6315e40c",
+          "first": "def summarise(scored: pd.DataFrame, n_boot: int = N_BOOT, seed: int = BOOT_SEED) -> Summary:"
+        }
+      ]
+    },
+    {
+      "id": "risk-map",
+      "level": "view",
+      "parent": null,
+      "title": "Risk map",
+      "summary": "A task × dataset heatmap of the silent-failure rate. Clicking a cell narrows the review queue to that region, and clicking it again clears it.",
+      "views": [
+        "heatmap"
+      ],
+      "interactions": [
+        "select",
+        "filter",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 649,
+          "end": 710,
+          "role": "markup",
+          "anchor": "1631220e5ef4",
+          "first": "with st.container(border=True):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 264,
+          "end": 267,
+          "role": "logic",
+          "symbol": "_select_region",
+          "anchor": "566452554497",
+          "first": "def _select_region(task: str, dataset: str) -> None:"
+        },
+        {
+          "file": "code/sar/ui.py",
+          "start": 623,
+          "end": 626,
+          "role": "logic",
+          "symbol": "risk_cell_label",
+          "anchor": "d8308421de30",
+          "first": "def risk_cell_label(rate: float, n: int) -> str:"
+        },
+        {
+          "file": "code/sar/ui.py",
+          "start": 629,
+          "end": 636,
+          "role": "style",
+          "symbol": "risk_cell_style",
+          "anchor": "9bc042ddc399",
+          "first": "def risk_cell_style(key: str, rate: float, max_rate: float) -> str:"
+        },
+        {
+          "file": "code/sar/data.py",
+          "start": 236,
+          "end": 249,
+          "role": "logic",
+          "symbol": "risk_map",
+          "anchor": "e903d633e194",
+          "first": "def risk_map(scored: pd.DataFrame) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "region-audit",
+      "level": "view",
+      "parent": null,
+      "title": "Image-region audit",
+      "summary": "Steps through the filtered queue one record at a time. Each record shows the crop with labelled objects and predicted points drawn over it, a verdict on its state, stray-point flags, and the full set of question, answer and scores.",
+      "views": [
+        "image viewer",
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "review queue",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 715,
+          "end": 805,
+          "role": "markup",
+          "anchor": "c615fedb58eb",
+          "first": "with right:"
+        },
+        {
+          "file": "code/sar/render.py",
+          "start": 92,
+          "end": 98,
+          "role": "logic",
+          "symbol": "crop_tile",
+          "anchor": "20c62d3258ee",
+          "first": "def crop_tile("
+        },
+        {
+          "file": "code/sar/ui.py",
+          "start": 648,
+          "end": 719,
+          "role": "logic",
+          "symbol": "audit_html",
+          "anchor": "3b75e04b48eb",
+          "first": "def audit_html(record, *, gate_reliable: bool, tau: float, image_available: bool) -> str:"
+        },
+        {
+          "file": "code/sar/ui.py",
+          "start": 758,
+          "end": 763,
+          "role": "logic",
+          "symbol": "verdict_html",
+          "anchor": "ea2eadc6992c",
+          "first": "def verdict_html(quadrant: str, blurb: str) -> str:"
+        },
+        {
+          "file": "code/sar/ui.py",
+          "start": 766,
+          "end": 781,
+          "role": "logic",
+          "symbol": "key_legend_html",
+          "anchor": "f828969e6f83",
+          "first": "def key_legend_html() -> str:"
+        },
+        {
+          "file": "code/sar/ui.py",
+          "start": 801,
+          "end": 823,
+          "role": "logic",
+          "symbol": "stray_flag_html",
+          "anchor": "afe8fbfe73c6",
+          "first": "def stray_flag_html(record) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "routing-decision",
+      "level": "component",
+      "parent": "region-audit",
+      "title": "Routing decision",
+      "summary": "Records one of four routes for the open record, with an optional reason, and shows how many records in the queue are signed off. The queue can also be downloaded here.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "accept or reject",
+        "write notes",
+        "undo",
+        "export"
+      ],
+      "patterns": [
+        "review queue"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 807,
+          "end": 861,
+          "role": "markup",
+          "anchor": "bf09328f84d0",
+          "first": "# ---------------------------------------------------- sign-off"
+        },
+        {
+          "file": "code/app.py",
+          "start": 274,
+          "end": 281,
+          "role": "logic",
+          "symbol": "_sign_off",
+          "anchor": "d13e39f25c6d",
+          "first": "def _sign_off(row, source: str, tau: float, route: str) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 284,
+          "end": 285,
+          "role": "logic",
+          "symbol": "_clear_sign_off",
+          "anchor": "5d70baf7a52b",
+          "first": "def _clear_sign_off(question_id: str) -> None:"
+        },
+        {
+          "file": "code/sar/review.py",
+          "start": 33,
+          "end": 37,
+          "role": "data",
+          "symbol": "Route",
+          "anchor": "bb78cf5dd43e",
+          "first": "class Route:"
+        },
+        {
+          "file": "code/sar/review.py",
+          "start": 40,
+          "end": 60,
+          "role": "data",
+          "anchor": "9f543502639d",
+          "first": "ROUTES: tuple[Route, ...] = ("
+        },
+        {
+          "file": "code/sar/review.py",
+          "start": 86,
+          "end": 93,
+          "role": "logic",
+          "symbol": "record",
+          "anchor": "f1255082f843",
+          "first": "def record("
+        },
+        {
+          "file": "code/sar/review.py",
+          "start": 137,
+          "end": 141,
+          "role": "logic",
+          "symbol": "coverage",
+          "anchor": "409e03bb34c8",
+          "first": "def coverage(log: dict[str, Disposition], queue_ids) -> tuple[int, int]:"
+        },
+        {
+          "file": "code/sar/ui.py",
+          "start": 784,
+          "end": 798,
+          "role": "logic",
+          "symbol": "signed_off_html",
+          "anchor": "8ef2317906aa",
+          "first": "def signed_off_html(disposition, *, stale: bool) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "threshold-sweep",
+      "level": "view",
+      "parent": null,
+      "title": "Threshold sensitivity",
+      "summary": "Charts the aligned-pass and silent-failure rates across gate values, with a table of how many actions are cleared, held or queued at each τ.",
+      "views": [
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 866,
+          "end": 915,
+          "role": "markup",
+          "anchor": "851742dd6b7d",
+          "first": "st.write(\"\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 90,
+          "end": 107,
+          "role": "logic",
+          "symbol": "_tau_sweep_source",
+          "anchor": "51294b36a501",
+          "first": "def _tau_sweep_source(records: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/sar/ui.py",
+          "start": 844,
+          "end": 898,
+          "role": "logic",
+          "symbol": "threshold_chart",
+          "anchor": "a6e88a1b71c5",
+          "first": "def threshold_chart(frame, *, tau: float, palette_name: str = theme_mod.DEFAULT):"
+        }
+      ]
+    },
+    {
+      "id": "review-log",
+      "level": "view",
+      "parent": null,
+      "title": "Review log",
+      "summary": "Lists every routing decision with its τ and state, counts decisions by route, warns about decisions made under a different τ, and exports the log as CSV or JSON.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "export",
+        "undo"
+      ],
+      "patterns": [
+        "version history"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 950,
+          "end": 1002,
+          "role": "markup",
+          "anchor": "d8aa2a3ef887",
+          "first": "with log_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 288,
+          "end": 289,
+          "role": "logic",
+          "symbol": "_clear_all_sign_offs",
+          "anchor": "71e99f435f24",
+          "first": "def _clear_all_sign_offs() -> None:"
+        },
+        {
+          "file": "code/sar/review.py",
+          "start": 128,
+          "end": 134,
+          "role": "logic",
+          "symbol": "to_frame",
+          "anchor": "43b071e8689c",
+          "first": "def to_frame(log: dict[str, Disposition]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/sar/review.py",
+          "start": 162,
+          "end": 196,
+          "role": "logic",
+          "symbol": "to_document",
+          "anchor": "8b00cab21c94",
+          "first": "def to_document(log: dict[str, Disposition], *, context: dict | None = None) -> dict:"
+        },
+        {
+          "file": "code/sar/review.py",
+          "start": 144,
+          "end": 146,
+          "role": "logic",
+          "symbol": "stale",
+          "anchor": "d3358d79e36e",
+          "first": "def stale("
+        },
+        {
+          "file": "code/sar/review.py",
+          "start": 121,
+          "end": 125,
+          "role": "logic",
+          "symbol": "counts",
+          "anchor": "9c7f0b06e0dd",
+          "first": "def counts(log: dict[str, Disposition]) -> dict[str, int]:"
+        }
+      ]
+    },
+    {
+      "id": "live-reask",
+      "level": "view",
+      "parent": null,
+      "title": "Live model re-ask",
+      "summary": "Sends the open record to a configured model endpoint and shows the fresh answer and points beside the stored record, scored the same way, without changing the audit.",
+      "views": [
+        "side-by-side panes",
+        "image viewer"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1005,
+          "end": 1120,
+          "role": "markup",
+          "anchor": "9d96537e12f0",
+          "first": "with model_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 292,
+          "end": 296,
+          "role": "logic",
+          "symbol": "_reask",
+          "anchor": "9d5a282efe40",
+          "first": "def _reask(row, image_path, tau: float, endpoint) -> None:"
+        },
+        {
+          "file": "code/sar/serve.py",
+          "start": 196,
+          "end": 231,
+          "role": "logic",
+          "symbol": "reask",
+          "anchor": "2148e3a402ad",
+          "first": "def reask(endpoint: Endpoint, record, image_path: Path, tau: float) -> LiveResult:"
+        },
+        {
+          "file": "code/sar/scoring.py",
+          "start": 86,
+          "end": 106,
+          "role": "logic",
+          "symbol": "point_metrics",
+          "anchor": "2c4ce0635889",
+          "first": "def point_metrics(pred: list, gt: list, threshold: float = POINT_THRESHOLD) -> dict[str, float]:"
+        }
+      ]
+    }
+  ]
+}

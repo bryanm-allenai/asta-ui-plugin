@@ -1,0 +1,702 @@
+{
+  "schema": "astaui.card/1",
+  "id": "actinoedit-crispr-design",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T15:23:17Z"
+  },
+  "app": {
+    "title": "ActinoEdit — CRISPR Design Toolkit for Actinomycetes",
+    "summary": "A person loads a microbial genome sequence and its annotation (by upload or by path), picks an organism profile that sets the GC window and search strictness, adjusts the PAM pattern, spacer length and mismatch tolerance, and names the gene or coordinate range to target. Running the design scans both strands for protospacer sites, searches the whole genome for near-matches, and scores every candidate, reporting progress in a log that can be cancelled while it runs. The scored candidates arrive in a sortable table that can be narrowed to a recommendation band and a maximum number of near-matches, and the chosen set is downloaded as a spreadsheet or report. The same results can be filed into a named project in a local database, linked to organism and genome records that other pages let the person import, search, edit and export.",
+    "task": {
+      "text": "Design and shortlist candidate guide sequences for one target region of a microbial genome, then export and file them for later use.",
+      "verbs": [
+        "plan",
+        "derive",
+        "rate",
+        "decide",
+        "curate"
+      ]
+    },
+    "data": {
+      "text": "An annotated microbial genome — contig sequences plus gene features — from which candidate target sites are enumerated, each with position, composition and genome-wide near-match counts; alongside a local store of organisms, genomes, genes, design runs and saved candidates.",
+      "item": "one candidate guide: a spacer with its adjacent motif, contig, coordinates, strand, GC fraction, near-match count and score",
+      "shapes": [
+        "sequence",
+        "table",
+        "spans",
+        "hierarchy"
+      ]
+    },
+    "stage": {
+      "text": "planning an editing experiment from an annotated genome, before anything is done at the bench, and keeping the designs on file afterwards",
+      "terms": [
+        "plan",
+        "decide",
+        "maintain"
+      ]
+    },
+    "mechanism": {
+      "text": "A single scrolling column of input cards feeds one long computation that runs on a background thread behind a progress log, a cancel button and a status panel; the result appears as a summary of the target region and a paginated, sortable candidate table with two filters and colour-coded verdict badges, followed by download buttons. Separate pages hold the stored collection, where searchable tables of organisms and genomes open into expansion rows listing the genes and saved candidates beneath each one.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats",
+        "detail panel",
+        "tree view"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "sort",
+        "search",
+        "export",
+        "select",
+        "write notes"
+      ],
+      "patterns": [
+        "overview and detail",
+        "master-detail",
+        "status pipeline"
+      ]
+    },
+    "field": {
+      "text": "CRISPR guide RNA design against annotated bacterial genomes, tuned for high-GC industrial strains",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "crispr guide design",
+        "microbial genomics",
+        "genome engineering"
+      ]
+    },
+    "workflow": {
+      "name": "enumerate candidate sites in a reference, score and rank them, then shortlist and file the best",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "upload a genome FASTA and a GFF or GenBank annotation, or type their paths; a demo button fills both fields with the bundled example",
+          "parts": [
+            "design-inputs"
+          ]
+        },
+        {
+          "step": "set the parameters the computation will use",
+          "here": "pick an organism profile that carries the motif, spacer length, GC window and mismatch strictness, then override the motif pattern, spacer length, mismatch limit and design mode by hand; an optional region file can be supplied for context",
+          "parts": [
+            "design-inputs"
+          ]
+        },
+        {
+          "step": "name the region to work on",
+          "here": "one text field accepts a locus tag, a gene name, or a contig:start-end range",
+          "parts": [
+            "design-inputs"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run Design scans both strands for motif-adjacent sites, searches the whole genome for near-matches and scores each candidate; it runs on a background thread with a live progress log, a cancel button and a timeout",
+          "parts": [
+            "run-controls"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "the candidate table sorts on any column and narrows to one verdict band and to a maximum near-match count, with the verdict shown as a coloured badge; a summary names the resolved region and the candidate count, and an empty result explains what to check",
+          "parts": [
+            "guide-results-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "buttons generate and download a table, a multi-sheet workbook and a formatted report, and every completed run is auto-saved to a results folder",
+          "parts": [
+            "report-downloads"
+          ]
+        },
+        {
+          "step": "keep a record of changes",
+          "here": "the current design is saved under a named project in the local store, linked to an organism and a genome, and can be re-exported from the library page later",
+          "parts": [
+            "report-downloads",
+            "project-library"
+          ]
+        }
+      ],
+      "distinctive": [
+        "the organism profile is a named parameter set carrying a preferred composition window and search strictness, so the same genome is scored differently for a high-GC strain than for a low-GC one",
+        "a second design mode re-scores candidates by proximity to the start codon and adds extra columns for region type and strand relation, for repression rather than disruption",
+        "an optional region file tags each candidate with the biosynthetic cluster it falls inside or is nearest to",
+        "the genome-wide near-match search is slow enough to need a background thread, a progress log, a cancel button and a timeout that marks the run as abandoned",
+        "the result does not end at a file: designs are filed into a local project store whose organism, genome and gene records have their own searchable, editable pages"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "design-workspace",
+      "level": "view",
+      "parent": null,
+      "title": "Design page",
+      "summary": "The single scrolling page that holds every step of one design, from inputs through the run to the results and downloads, with a header linking to the stored collection.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 35,
+          "end": 90,
+          "role": "markup",
+          "symbol": "create_main_page",
+          "anchor": "410fa8a2f3ab",
+          "first": "def create_main_page(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 144,
+          "end": 148,
+          "role": "markup",
+          "symbol": "create_demo_page",
+          "anchor": "c1fb277c01c5",
+          "first": "def create_demo_page("
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 10,
+          "end": 18,
+          "role": "markup",
+          "symbol": "create_header",
+          "anchor": "fc1a7b489102",
+          "first": "def create_header() -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 21,
+          "end": 24,
+          "role": "markup",
+          "symbol": "create_footer",
+          "anchor": "585efc14a3f3",
+          "first": "def create_footer() -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/app.py",
+          "start": 26,
+          "end": 63,
+          "role": "logic",
+          "symbol": "create_app",
+          "anchor": "32ae24e0ab3c",
+          "first": "def create_app(*, demo_mode: bool = False, auto_run_design: bool = False) -> WebState:"
+        },
+        {
+          "file": "code/src/actinoedit/web/state.py",
+          "start": 18,
+          "end": 141,
+          "role": "logic",
+          "symbol": "WebState",
+          "anchor": "1a35d8ce7d5e",
+          "first": "class WebState:"
+        }
+      ]
+    },
+    {
+      "id": "design-inputs",
+      "level": "component",
+      "parent": "design-workspace",
+      "title": "Input, profile, parameter and target cards",
+      "summary": "Stacked cards where the person supplies the sequence and annotation files, chooses an organism profile, sets the motif, spacer length, mismatch limit and design mode, and names the target region.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 27,
+          "end": 82,
+          "role": "markup",
+          "symbol": "create_file_inputs",
+          "anchor": "7dfb7ef4bfb6",
+          "first": "def create_file_inputs(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 85,
+          "end": 98,
+          "role": "markup",
+          "symbol": "create_profile_selector",
+          "anchor": "28b53a95f073",
+          "first": "def create_profile_selector(state: WebState, profiles: list[str]) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 101,
+          "end": 133,
+          "role": "markup",
+          "symbol": "create_crispr_params",
+          "anchor": "c6938f9156ef",
+          "first": "def create_crispr_params(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 136,
+          "end": 156,
+          "role": "markup",
+          "symbol": "create_target_input",
+          "anchor": "bf4ae81ff475",
+          "first": "def create_target_input(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/runner.py",
+          "start": 146,
+          "end": 148,
+          "role": "logic",
+          "symbol": "get_profile_names",
+          "anchor": "91967dab0de6",
+          "first": "def get_profile_names() -> list[str]:"
+        },
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 200,
+          "end": 209,
+          "role": "logic",
+          "symbol": "_load_demo",
+          "anchor": "52f2ac9845e2",
+          "first": "def _load_demo(state: WebState) -> None:"
+        },
+        {
+          "file": "code/examples/profiles/streptomyces.yaml",
+          "start": 1,
+          "end": 11,
+          "role": "data",
+          "anchor": "ccd2b2714456",
+          "first": "name: streptomyces"
+        }
+      ]
+    },
+    {
+      "id": "run-controls",
+      "level": "component",
+      "parent": "design-workspace",
+      "title": "Run, cancel, status and progress log",
+      "summary": "Starts the computation on a background thread and reports it back as a status line, a spinner and a scrolling progress log, with a cancel button enabled only while it runs and a timeout that abandons it.",
+      "views": [
+        "list",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 55,
+          "end": 65,
+          "role": "markup",
+          "anchor": "fdb0231d4e98",
+          "first": "with ui.row().classes(\"w-full gap-2\"):"
+        },
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 93,
+          "end": 141,
+          "role": "logic",
+          "symbol": "_run_design_handler",
+          "anchor": "6509906d3b06",
+          "first": "def _run_design_handler(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 170,
+          "end": 175,
+          "role": "markup",
+          "symbol": "create_task_status_panel",
+          "anchor": "3a8c8eb78e6d",
+          "first": "def create_task_status_panel(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 178,
+          "end": 188,
+          "role": "markup",
+          "symbol": "create_progress_panel",
+          "anchor": "05e03b0e4a01",
+          "first": "def create_progress_panel(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 200,
+          "end": 208,
+          "role": "markup",
+          "symbol": "create_error_display",
+          "anchor": "8ac8d1a7fd9d",
+          "first": "def create_error_display(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/runner.py",
+          "start": 18,
+          "end": 47,
+          "role": "logic",
+          "symbol": "build_design_input",
+          "anchor": "ce6eaee9edb0",
+          "first": "def build_design_input(state: WebState) -> DesignInput:"
+        },
+        {
+          "file": "code/src/actinoedit/web/runner.py",
+          "start": 67,
+          "end": 71,
+          "role": "logic",
+          "symbol": "run_design_background",
+          "anchor": "72b218df2eea",
+          "first": "def run_design_background("
+        },
+        {
+          "file": "code/src/actinoedit/web/runner.py",
+          "start": 141,
+          "end": 143,
+          "role": "logic",
+          "symbol": "cancel_design",
+          "anchor": "aade558b249d",
+          "first": "def cancel_design(state: WebState) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "guide-results-table",
+      "level": "component",
+      "parent": "design-workspace",
+      "title": "Scored candidate table with filters",
+      "summary": "Shows the resolved target region and candidate count, then every candidate as a sortable row with position, composition, near-match count, score and a colour-coded verdict, narrowed by verdict band and maximum near-matches.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "sort",
+        "filter"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 211,
+          "end": 233,
+          "role": "markup",
+          "symbol": "create_summary_panel",
+          "anchor": "2b7cde72a459",
+          "first": "def create_summary_panel(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 236,
+          "end": 316,
+          "role": "markup",
+          "symbol": "create_results_table",
+          "anchor": "dbde0c7f216c",
+          "first": "def create_results_table(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 307,
+          "end": 316,
+          "role": "style",
+          "anchor": "8cca69e0c1f3",
+          "first": "table.add_slot(\"body-cell-recommendation\", \"\"\""
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 191,
+          "end": 197,
+          "role": "markup",
+          "symbol": "create_empty_result_panel",
+          "anchor": "4115a47118cc",
+          "first": "def create_empty_result_panel(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/state.py",
+          "start": 112,
+          "end": 141,
+          "role": "logic",
+          "symbol": "filtered_guides",
+          "anchor": "8ae68c842c0a",
+          "first": "def filtered_guides(self) -> list[tuple[GuideCandidate, GuideScore | None, int]]:"
+        }
+      ]
+    },
+    {
+      "id": "report-downloads",
+      "level": "component",
+      "parent": "design-workspace",
+      "title": "Download buttons and save-to-project card",
+      "summary": "Generates and downloads the results as a table, a multi-sheet workbook or a formatted report, and files the same design under a named project in the local store.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export",
+        "write notes"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 319,
+          "end": 331,
+          "role": "markup",
+          "symbol": "create_download_buttons",
+          "anchor": "24c40a0495e1",
+          "first": "def create_download_buttons(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 334,
+          "end": 353,
+          "role": "logic",
+          "symbol": "_download_csv",
+          "anchor": "e3d4664f24c9",
+          "first": "def _download_csv(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 356,
+          "end": 377,
+          "role": "logic",
+          "symbol": "_download_excel",
+          "anchor": "a35224c7a035",
+          "first": "def _download_excel(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 380,
+          "end": 402,
+          "role": "logic",
+          "symbol": "_download_html",
+          "anchor": "1e109801cfdd",
+          "first": "def _download_html(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 77,
+          "end": 88,
+          "role": "markup",
+          "anchor": "99f0234d787d",
+          "first": "with ui.card().classes(\"w-full\").bind_visibility_from(state, \"has_result\"):"
+        },
+        {
+          "file": "code/src/actinoedit/web/db_service.py",
+          "start": 163,
+          "end": 168,
+          "role": "logic",
+          "symbol": "save_design_to_project",
+          "anchor": "319a8d71e2c2",
+          "first": "def save_design_to_project("
+        }
+      ]
+    },
+    {
+      "id": "project-library",
+      "level": "view",
+      "parent": null,
+      "title": "Projects page",
+      "summary": "A searchable list of stored projects, each opening to show its saved candidates, its organism and genome links, and buttons to relink, export, delete or add the current design.",
+      "views": [
+        "list",
+        "table view",
+        "tree view"
+      ],
+      "interactions": [
+        "search",
+        "select",
+        "export",
+        "inline edit"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 212,
+          "end": 229,
+          "role": "markup",
+          "symbol": "create_projects_page",
+          "anchor": "b9ec67a185f9",
+          "first": "def create_projects_page(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 232,
+          "end": 259,
+          "role": "markup",
+          "symbol": "_render_project_create_card",
+          "anchor": "82bbb11fa3d4",
+          "first": "def _render_project_create_card(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 262,
+          "end": 281,
+          "role": "markup",
+          "symbol": "_render_project_export_card",
+          "anchor": "24abe3ef7fa5",
+          "first": "def _render_project_export_card() -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 284,
+          "end": 377,
+          "role": "markup",
+          "symbol": "_render_projects_list",
+          "anchor": "ab39661c19b6",
+          "first": "def _render_projects_list(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 412,
+          "end": 418,
+          "role": "logic",
+          "symbol": "_export_project",
+          "anchor": "908b2313786b",
+          "first": "def _export_project(project_name: str) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/db_service.py",
+          "start": 76,
+          "end": 77,
+          "role": "logic",
+          "symbol": "list_projects_summary",
+          "anchor": "b3be6baf9614",
+          "first": "def list_projects_summary() -> list[dict[str, Any]]:"
+        },
+        {
+          "file": "code/src/actinoedit/web/db_service.py",
+          "start": 154,
+          "end": 155,
+          "role": "logic",
+          "symbol": "get_project_guides_summary",
+          "anchor": "0c14a11b2510",
+          "first": "def get_project_guides_summary(project_name: str, limit: int = 100) -> list[dict[str, Any]]:"
+        },
+        {
+          "file": "code/src/actinoedit/web/db_service.py",
+          "start": 178,
+          "end": 179,
+          "role": "logic",
+          "symbol": "export_guides_csv",
+          "anchor": "d024fb8f233a",
+          "first": "def export_guides_csv(project_name: str, output_path: str | Path) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "reference-library",
+      "level": "view",
+      "parent": null,
+      "title": "Organisms and genomes pages",
+      "summary": "Standalone pages for keeping the reference collection in order: add, edit, delete and search strain records, import a sequence with its annotation, link the two, and open any entry to browse the features stored beneath it or export the filtered list.",
+      "views": [
+        "table view",
+        "form",
+        "tree view"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "filter",
+        "export",
+        "inline edit"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 421,
+          "end": 541,
+          "role": "markup",
+          "symbol": "create_organisms_page",
+          "anchor": "38201b4239ce",
+          "first": "def create_organisms_page(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 544,
+          "end": 651,
+          "role": "markup",
+          "symbol": "create_genomes_page",
+          "anchor": "6dd9060a89a3",
+          "first": "def create_genomes_page(state: WebState) -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 380,
+          "end": 390,
+          "role": "markup",
+          "symbol": "_render_organisms_preview",
+          "anchor": "83bbe57216b8",
+          "first": "def _render_organisms_preview() -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/pages.py",
+          "start": 393,
+          "end": 409,
+          "role": "markup",
+          "symbol": "_render_genomes_preview",
+          "anchor": "23a957112d6a",
+          "first": "def _render_genomes_preview() -> None:"
+        },
+        {
+          "file": "code/src/actinoedit/web/db_service.py",
+          "start": 276,
+          "end": 280,
+          "role": "logic",
+          "symbol": "import_genome_record",
+          "anchor": "38b278c60868",
+          "first": "def import_genome_record("
+        },
+        {
+          "file": "code/src/actinoedit/web/db_service.py",
+          "start": 322,
+          "end": 323,
+          "role": "logic",
+          "symbol": "get_genome_genes",
+          "anchor": "ad129b8be763",
+          "first": "def get_genome_genes(genome_id: int, limit: int = 50) -> list[dict[str, Any]]:"
+        },
+        {
+          "file": "code/src/actinoedit/web/components.py",
+          "start": 159,
+          "end": 167,
+          "role": "markup",
+          "symbol": "create_db_status_banner",
+          "anchor": "57921a7a5ef1",
+          "first": "def create_db_status_banner() -> None:"
+        }
+      ]
+    }
+  ]
+}

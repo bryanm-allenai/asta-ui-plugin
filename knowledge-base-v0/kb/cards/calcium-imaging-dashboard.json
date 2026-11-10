@@ -1,0 +1,914 @@
+{
+  "schema": "astaui.card/1",
+  "id": "calcium-imaging-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:32:48Z"
+  },
+  "app": {
+    "title": "Calcium Imaging Dashboard",
+    "summary": "A person opens a database of segmented cells built from several imaging sessions, then picks a cohort and an animal and puts that animal's sessions in order. In each session they select cell footprints on the image, look at their activity traces and quality distributions, and discard artifacts or merge duplicate detections. Next they register every session's field of view to a reference session, check the alignment scores and nudge it by hand where needed. Last, they match cells across all sessions into tracks, resolve conflicts, and save one curated database with the matching result.",
+    "task": {
+      "text": "Clean the cells segmented in each imaging session, align the sessions to a common frame, and track the same cells across sessions.",
+      "verbs": [
+        "clean",
+        "derive",
+        "compare",
+        "organize",
+        "curate"
+      ]
+    },
+    "data": {
+      "text": "Repeated imaging sessions for each animal, stored in a hierarchical HDF5 database. Each session has a stack of spatial footprints, one activity trace per cell, a max-projection image and optional per-cell quality metrics.",
+      "item": "a segmented cell in one session: its spatial footprint and its activity trace",
+      "shapes": [
+        "image collection",
+        "image",
+        "time series",
+        "table",
+        "hierarchy",
+        "versions"
+      ]
+    },
+    "stage": {
+      "text": "curating segmented cells and registering them across sessions, after source extraction and before longitudinal analysis",
+      "terms": [
+        "clean",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A header sets the scope (cohort, animal, working or raw copy), and a session list drives three tabs that share one undoable workspace. Cleaning links a footprint map to traces and quality histograms. Alignment shows before and after overlays with scores and a sortable grid-search table. Matching links a centroid map, a presence heatmap, a track list and distribution charts, and the header Save writes everything as one checkpoint.",
+      "views": [
+        "image viewer",
+        "sidebar list",
+        "line chart",
+        "bar chart",
+        "heatmap",
+        "table view",
+        "side-by-side panes",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "brush",
+        "zoom and pan",
+        "hover for detail",
+        "exclude and refit",
+        "toggle view",
+        "sort",
+        "filter",
+        "drag to arrange",
+        "undo",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail",
+        "master-detail",
+        "side-by-side comparison",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "longitudinal cell registration of calcium imaging in neuroscience",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "neuroscience",
+        "calcium imaging",
+        "cell registration"
+      ]
+    },
+    "workflow": {
+      "name": "clean detected objects, register images across sessions, and track the objects over time",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Browse opens an HDF5 database, Cohort and Animal set the scope, and a Working Copy / Raw Preview switch picks the view; the session list can be reordered with arrows",
+          "parts": [
+            "header-scope",
+            "session-list"
+          ]
+        },
+        {
+          "step": "find bad items and drop them",
+          "here": "click or ellipse-drag footprints on the map and read their traces; Find & Select Candidates applies enabled area, contrast, eccentricity and native CaImAn rules but only selects; Discard Selected or Discard Unselected removes cells",
+          "parts": [
+            "cleaning-view",
+            "quality-tools"
+          ]
+        },
+        {
+          "step": "merge duplicate items",
+          "here": "Merge Selected combines footprints and traces; Run Auto-Merge groups cells by distance, temporal correlation and spatial overlap, and pairwise distributions help set those limits",
+          "parts": [
+            "cleaning-view",
+            "quality-tools"
+          ]
+        },
+        {
+          "step": "align every image to a common reference",
+          "here": "Run Auto Alignment with a translation, rigid, similarity or non-rigid mode, Direct or Sequential to a reference session, using the MIP or the footprint sum; check MIP and footprint NCC and before/after coherence, then nudge shift, rotation and scale",
+          "parts": [
+            "alignment-view"
+          ]
+        },
+        {
+          "step": "compare parameter settings and keep the best",
+          "here": "a grid search over mode, strategy, source and reference fills a table that can be sorted and filtered by NCC and displacement; applying a row sets that session's transform",
+          "parts": [
+            "grid-search-table"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Execute Matching links cells across all sessions into master tracks by a distance limit, an overlap limit, a cost weight and a cosine or Jaccard metric; Optimize Params aims for a target track count. Counts, coverage, a presence heatmap and matched-vs-other histograms show the result",
+          "parts": [
+            "matching-view"
+          ]
+        },
+        {
+          "step": "find conflicts and resolve them",
+          "here": "check master-cell rows to find intra-session collisions, check them out with traces and metrics, apply the merges or delete groups, and rerun matching; Undo/Redo and Save write a _curated checkpoint",
+          "parts": [
+            "conflict-merge",
+            "header-scope"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Rule-based quality detection only selects candidates; deleting still needs an explicit discard, so the rules guide the person and never decide",
+        "Two image sources (max projection and summed footprints) are scored separately, because a high score on one does not prove a good registration",
+        "Sequential alignment crawls neighbour to neighbour from a root session and accumulates the transforms, for sessions that drift too far to align directly",
+        "Cell identity across sessions is a one-per-session assignment, so duplicates within a session show up as collisions to merge before rematching",
+        "The raw database is never changed; all tabs share one in-memory, undoable workspace saved as a sibling _curated file"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "header-scope",
+      "level": "view",
+      "parent": null,
+      "title": "Header: database, scope and history",
+      "summary": "Opens a database, chooses the cohort, animal and working or raw view, and holds the shared undo, redo and save checkpoint.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "undo",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 48,
+          "end": 117,
+          "role": "markup",
+          "symbol": "header.bg-[#111827]",
+          "anchor": "3489b2a12e62",
+          "first": "<header class=\"bg-[#111827] border-b border-gray-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3 z-10\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 1046,
+          "end": 1059,
+          "role": "logic",
+          "symbol": "browseDatabase",
+          "anchor": "0986870a9fae",
+          "first": "async function browseDatabase() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 1230,
+          "end": 1249,
+          "role": "logic",
+          "symbol": "selectCohort",
+          "anchor": "1897c46bd2f1",
+          "first": "async function selectCohort(cohort, restoreAnimal = false) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 1113,
+          "end": 1136,
+          "role": "logic",
+          "symbol": "toggleDatabaseType",
+          "anchor": "ecb4abc6bb1f",
+          "first": "async function toggleDatabaseType() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 1175,
+          "end": 1193,
+          "role": "logic",
+          "symbol": "runWorkspaceAction",
+          "anchor": "f99b7ee84e7f",
+          "first": "async function runWorkspaceAction(action, loaderText) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 1225,
+          "end": 1228,
+          "role": "logic",
+          "symbol": "workspaceSave",
+          "anchor": "5bb97afc8c1e",
+          "first": "async function workspaceSave() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/workspace.py",
+          "start": 113,
+          "end": 565,
+          "role": "logic",
+          "symbol": "EditWorkspace",
+          "anchor": "2668aba41aaa",
+          "first": "class EditWorkspace:"
+        }
+      ]
+    },
+    {
+      "id": "session-list",
+      "level": "view",
+      "parent": null,
+      "title": "Session sequence sidebar",
+      "summary": "Lists the animal's sessions in order, lets the person reorder them, and switches between one session and an all-session Overview.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "select",
+        "drag to arrange"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 126,
+          "end": 134,
+          "role": "markup",
+          "symbol": "#session-sequence-panel",
+          "anchor": "e7b8a2e380f8",
+          "first": "<div id=\"session-sequence-panel\" class=\"flex flex-col space-y-2\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 1361,
+          "end": 1427,
+          "role": "logic",
+          "symbol": "renderSessionsSidebar",
+          "anchor": "71ebc77cd98b",
+          "first": "function renderSessionsSidebar() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 1430,
+          "end": 1443,
+          "role": "logic",
+          "symbol": "moveSessionUp",
+          "anchor": "1fdc40730fc8",
+          "first": "function moveSessionUp(idx) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 1446,
+          "end": 1459,
+          "role": "logic",
+          "symbol": "moveSessionDown",
+          "anchor": "06949b186ba7",
+          "first": "function moveSessionDown(idx) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 1629,
+          "end": 1729,
+          "role": "logic",
+          "symbol": "selectActiveSession",
+          "anchor": "cf84128f4fb0",
+          "first": "async function selectActiveSession(idx) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 1549,
+          "end": 1626,
+          "role": "logic",
+          "symbol": "selectOverviewMode",
+          "anchor": "75f6a75faa3b",
+          "first": "async function selectOverviewMode() {"
+        }
+      ]
+    },
+    {
+      "id": "cleaning-view",
+      "level": "view",
+      "parent": null,
+      "title": "Cell Cleaning & Merging",
+      "summary": "Shows footprints over the max projection, where the person clicks or ellipse-selects cells, compares their traces, and discards or merges them.",
+      "views": [
+        "image viewer",
+        "line chart",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "brush",
+        "zoom and pan",
+        "hover for detail",
+        "exclude and refit"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 385,
+          "end": 491,
+          "role": "markup",
+          "symbol": "#view-cleaning",
+          "anchor": "7637d6c5ae64",
+          "first": "<div id=\"view-cleaning\" class=\"tab-view flex flex-col space-y-5 hidden\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 139,
+          "end": 156,
+          "role": "markup",
+          "anchor": "6a7f58c53164",
+          "first": "<div id=\"controls-cleaning\" class=\"tab-controls space-y-4 hidden\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 1928,
+          "end": 2014,
+          "role": "logic",
+          "symbol": "renderCleaningView",
+          "anchor": "9264d43e7fc4",
+          "first": "function renderCleaningView() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 4746,
+          "end": 4920,
+          "role": "logic",
+          "symbol": "setupCanvasInteractions",
+          "anchor": "e4a8483f12c3",
+          "first": "function setupCanvasInteractions() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 2075,
+          "end": 2249,
+          "role": "logic",
+          "symbol": "updateTracesPlot",
+          "anchor": "ef18b51ce30a",
+          "first": "async function updateTracesPlot() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 2656,
+          "end": 2736,
+          "role": "logic",
+          "symbol": "discardSelectedCells",
+          "anchor": "9953f8dcda7d",
+          "first": "async function discardSelectedCells() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 2739,
+          "end": 2835,
+          "role": "logic",
+          "symbol": "discardUnselectedCells",
+          "anchor": "9651b4c7531a",
+          "first": "async function discardUnselectedCells() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 2838,
+          "end": 2883,
+          "role": "logic",
+          "symbol": "manualMergeSelected",
+          "anchor": "607b540baaa8",
+          "first": "async function manualMergeSelected() {"
+        }
+      ]
+    },
+    {
+      "id": "quality-tools",
+      "level": "component",
+      "parent": "cleaning-view",
+      "title": "Quality candidates and auto-merge",
+      "summary": "Selects cells that fail the enabled quality rules and finds groups of likely duplicates, with histograms of the metrics and pairwise statistics to help set the thresholds.",
+      "views": [
+        "bar chart",
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "multi-select"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 158,
+          "end": 216,
+          "role": "markup",
+          "anchor": "49b21550e361",
+          "first": "<!-- Non-mutating quality candidate configuration -->"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 449,
+          "end": 463,
+          "role": "markup",
+          "symbol": "#quality-distributions-container",
+          "anchor": "ab04c5cfbd68",
+          "first": "<div id=\"quality-distributions-container\" class=\"hidden grid grid-cols-3 gap-4\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 479,
+          "end": 489,
+          "role": "markup",
+          "symbol": "#distributions-container",
+          "anchor": "2f3805d7b618",
+          "first": "<div id=\"distributions-container\" class=\"hidden grid grid-cols-3 gap-5 h-[180px]\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 2431,
+          "end": 2494,
+          "role": "logic",
+          "symbol": "runAutoClean",
+          "anchor": "19616548a950",
+          "first": "async function runAutoClean() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 2391,
+          "end": 2416,
+          "role": "logic",
+          "symbol": "computeCellQualityDistributions",
+          "anchor": "83a60ef136fb",
+          "first": "async function computeCellQualityDistributions() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 2504,
+          "end": 2653,
+          "role": "logic",
+          "symbol": "computePairwiseDistributions",
+          "anchor": "bf5e63081e66",
+          "first": "async function computePairwiseDistributions() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 2917,
+          "end": 2982,
+          "role": "logic",
+          "symbol": "runAutoMerge",
+          "anchor": "fd1dd8e7f88a",
+          "first": "async function runAutoMerge() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/quality.py",
+          "start": 10,
+          "end": 14,
+          "role": "logic",
+          "symbol": "cell_quality_metrics",
+          "anchor": "ff2e5489714e",
+          "first": "def cell_quality_metrics("
+        }
+      ]
+    },
+    {
+      "id": "alignment-view",
+      "level": "view",
+      "parent": null,
+      "title": "Session Alignment",
+      "summary": "Registers each session to a reference by the chosen mode, strategy and source image. It shows before and after overlays with NCC and coherence scores, and has buttons to nudge the shift, rotation and scale by hand.",
+      "views": [
+        "image viewer",
+        "side-by-side panes",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "zoom and pan",
+        "inline edit"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 227,
+          "end": 312,
+          "role": "markup",
+          "symbol": "#controls-alignment",
+          "anchor": "3785a5971730",
+          "first": "<div id=\"controls-alignment\" class=\"tab-controls space-y-5 hidden\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 495,
+          "end": 525,
+          "role": "markup",
+          "symbol": "#align-single-view",
+          "anchor": "1ed56e4f7bba",
+          "first": "<div id=\"align-single-view\" class=\"grid grid-cols-2 gap-6\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 528,
+          "end": 579,
+          "role": "markup",
+          "symbol": "#align-overview-view",
+          "anchor": "8f9a32dfc183",
+          "first": "<div id=\"align-overview-view\" class=\"hidden grid grid-cols-4 gap-4\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 3000,
+          "end": 3066,
+          "role": "logic",
+          "symbol": "renderAlignmentView",
+          "anchor": "f4b300c8f6a0",
+          "first": "async function renderAlignmentView() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 3479,
+          "end": 3582,
+          "role": "logic",
+          "symbol": "runAutoAlignment",
+          "anchor": "5743247e3a73",
+          "first": "async function runAutoAlignment() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 3069,
+          "end": 3138,
+          "role": "logic",
+          "symbol": "drawOverviewOverlay",
+          "anchor": "71084221c5e4",
+          "first": "function drawOverviewOverlay(canvasId, type, before) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 3151,
+          "end": 3220,
+          "role": "logic",
+          "symbol": "fetchBackendNCC",
+          "anchor": "f2e6d4df894a",
+          "first": "async function fetchBackendNCC(scheduledToken = null) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 3437,
+          "end": 3444,
+          "role": "logic",
+          "symbol": "nudgeShift",
+          "anchor": "a6ee93671854",
+          "first": "function nudgeShift(ndx, ndy) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 3447,
+          "end": 3455,
+          "role": "logic",
+          "symbol": "nudgeRotate",
+          "anchor": "b9780f240cf0",
+          "first": "function nudgeRotate(dir) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 3458,
+          "end": 3463,
+          "role": "logic",
+          "symbol": "nudgeScale",
+          "anchor": "6549072650b8",
+          "first": "function nudgeScale(factor) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/alignment.py",
+          "start": 122,
+          "end": 229,
+          "role": "logic",
+          "symbol": "register_images",
+          "anchor": "7ab1ecb933d6",
+          "first": "def register_images(ref, target, mode='translation', demons_smoothing=1.5):"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/alignment_models.py",
+          "start": 29,
+          "end": 33,
+          "role": "logic",
+          "symbol": "resolve_alignment_reference",
+          "anchor": "3c355f36d239",
+          "first": "def resolve_alignment_reference("
+        }
+      ]
+    },
+    {
+      "id": "grid-search-table",
+      "level": "component",
+      "parent": "alignment-view",
+      "title": "Alignment grid search results",
+      "summary": "Runs combinations of mode, strategy, source and reference, then lists their NCC, displacement and transform values in a table the person can sort and filter, and applies a chosen row.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort",
+        "filter",
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 602,
+          "end": 638,
+          "role": "markup",
+          "symbol": "#gs-params-panel",
+          "anchor": "e673817dedc9",
+          "first": "<div id=\"gs-params-panel\" class=\"hidden bg-gray-950/60 border border-gray-800 rounded-lg p-3 space-y-3\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 642,
+          "end": 665,
+          "role": "markup",
+          "symbol": "#gs-table",
+          "anchor": "23e7c900050f",
+          "first": "<table class=\"w-full text-left text-xs border-collapse\" id=\"gs-table\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 669,
+          "end": 679,
+          "role": "markup",
+          "symbol": "#gs-filter-popover",
+          "anchor": "fbb113371070",
+          "first": "<div id=\"gs-filter-popover\" class=\"hidden fixed z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-3 w-52 te"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 5350,
+          "end": 5401,
+          "role": "logic",
+          "symbol": "runAlignmentGridSearch",
+          "anchor": "01fe93111c8a",
+          "first": "async function runAlignmentGridSearch() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 5121,
+          "end": 5249,
+          "role": "logic",
+          "symbol": "renderGridSearchTable",
+          "anchor": "f28f35dd95d8",
+          "first": "function renderGridSearchTable(key) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 5252,
+          "end": 5262,
+          "role": "logic",
+          "symbol": "sortGridTable",
+          "anchor": "b2b89fecace0",
+          "first": "function sortGridTable(col) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 5315,
+          "end": 5333,
+          "role": "logic",
+          "symbol": "applyGsFilter",
+          "anchor": "2c9354e99627",
+          "first": "function applyGsFilter() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 5516,
+          "end": 5578,
+          "role": "logic",
+          "symbol": "applyRowShifts",
+          "anchor": "c8ad11cf00cc",
+          "first": "async function applyRowShifts(mode, strategy, source, refSession, sessionName, btn) {"
+        }
+      ]
+    },
+    {
+      "id": "matching-view",
+      "level": "view",
+      "parent": null,
+      "title": "Multi-Session Matching",
+      "summary": "Matches cells across all sessions into master tracks from distance and overlap limits. It shows tracked centroids, counts and coverage, a presence heatmap by session, a single-cell zoom, the optimizer log, and histograms of matched cells against all other cells.",
+      "views": [
+        "image viewer",
+        "heatmap",
+        "table view",
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "zoom and pan",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail",
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 315,
+          "end": 368,
+          "role": "markup",
+          "symbol": "#controls-matching",
+          "anchor": "d1d2c769ddd9",
+          "first": "<div id=\"controls-matching\" class=\"tab-controls space-y-5 hidden\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 684,
+          "end": 839,
+          "role": "markup",
+          "symbol": "#view-matching",
+          "anchor": "a38403d2e3d0",
+          "first": "<div id=\"view-matching\" class=\"tab-view flex flex-col space-y-6 hidden\">"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 4270,
+          "end": 4312,
+          "role": "logic",
+          "symbol": "runCellMatching",
+          "anchor": "befe03e87cf4",
+          "first": "async function runCellMatching() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 4678,
+          "end": 4743,
+          "role": "logic",
+          "symbol": "optimizeMatchingParams",
+          "anchor": "58ceb5dc81af",
+          "first": "async function optimizeMatchingParams() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 3815,
+          "end": 3919,
+          "role": "logic",
+          "symbol": "renderMatchingView",
+          "anchor": "d3ae8b1a1f06",
+          "first": "function renderMatchingView() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 4076,
+          "end": 4150,
+          "role": "logic",
+          "symbol": "renderMatchingHeatmap",
+          "anchor": "cbcea4152f2c",
+          "first": "function renderMatchingHeatmap() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 3924,
+          "end": 3964,
+          "role": "logic",
+          "symbol": "renderSingleCellZoom",
+          "anchor": "3aa95934c160",
+          "first": "async function renderSingleCellZoom() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 4152,
+          "end": 4268,
+          "role": "logic",
+          "symbol": "drawMatchingDistributionCharts",
+          "anchor": "46a84b335461",
+          "first": "function drawMatchingDistributionCharts(data) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 4314,
+          "end": 4341,
+          "role": "logic",
+          "symbol": "populateMatchingTable",
+          "anchor": "552d6e06b34c",
+          "first": "function populateMatchingTable() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/matching.py",
+          "start": 199,
+          "end": 308,
+          "role": "logic",
+          "symbol": "match_cells_across_sessions",
+          "anchor": "aac5425e07fe",
+          "first": "def match_cells_across_sessions(sessions_list, max_dist=20.0, min_overlap=0.03, cost_weight=0.50, overlap_type='cosine')"
+        }
+      ]
+    },
+    {
+      "id": "conflict-merge",
+      "level": "component",
+      "parent": "matching-view",
+      "title": "Master cell merging and conflicts",
+      "summary": "For selected master tracks, lists duplicates within a session with their distance, correlation and overlap, lets the person check each one out and merge it, or deletes whole cell groups.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "multi-select",
+        "accept or reject",
+        "exclude and refit"
+      ],
+      "patterns": [
+        "review queue"
+      ],
+      "spans": [
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 718,
+          "end": 765,
+          "role": "markup",
+          "anchor": "2c7b714dcb3a",
+          "first": "<!-- Right Side: Merging Panel -->"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 4343,
+          "end": 4351,
+          "role": "logic",
+          "symbol": "toggleMergeSelection",
+          "anchor": "c5c8077f5898",
+          "first": "function toggleMergeSelection(mIdx) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 4428,
+          "end": 4491,
+          "role": "logic",
+          "symbol": "checkMasterCellMerge",
+          "anchor": "366e150ecd7c",
+          "first": "async function checkMasterCellMerge() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 4493,
+          "end": 4529,
+          "role": "logic",
+          "symbol": "checkItOutCollision",
+          "anchor": "d557cc97bcfa",
+          "first": "async function checkItOutCollision(sessInfoStr, idx1, idx2) {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 4552,
+          "end": 4594,
+          "role": "logic",
+          "symbol": "applyAllIntraSessionMerges",
+          "anchor": "efe289593912",
+          "first": "async function applyAllIntraSessionMerges() {"
+        },
+        {
+          "file": "code/src/calcium_imaging_dashboard/cell_registration_dashboard/frontend/index.html",
+          "start": 4379,
+          "end": 4426,
+          "role": "logic",
+          "symbol": "deleteSelectedMasterGroups",
+          "anchor": "b80d0f5a4db8",
+          "first": "async function deleteSelectedMasterGroups() {"
+        }
+      ]
+    }
+  ]
+}

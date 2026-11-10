@@ -1,0 +1,566 @@
+{
+  "schema": "astaui.card/1",
+  "id": "oas-spectrum-studio",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:44:48Z"
+  },
+  "app": {
+    "title": "OAS Spectrum Studio",
+    "summary": "A person chooses a single-spectrum or a time-series analysis, uploads a reference intensity spectrum and one or more measured spectra, sets the absorption path length, and agrees to contribute the run before it can start. The app turns the intensities into optical depth and fits it as a non-negative sum of fixed reference cross sections. It reports a number density for each species, fit-quality metrics and chips naming the corrections it applied. The person checks the fit by overlaying measured against reconstructed optical depth, broken down by species. For a series they follow each species over time and step through frames to check each one, then download the reconstruction or a per-timepoint summary as CSV. Advanced settings in the sidebar change the fitting rules, and the person can switch between auto-cleaning false positives and keeping every species.",
+    "task": {
+      "text": "Estimate how much of each absorbing species is present in each measured spectrum by fitting reference cross sections, check that the fit reproduces the measurement, and export the concentrations.",
+      "verbs": [
+        "derive",
+        "compare",
+        "monitor",
+        "clean"
+      ]
+    },
+    "data": {
+      "text": "Raw intensity spectra (wavelength against counts) from a spectrometer: a reference and one or more measured spectra, which form a time series when file names carry ordered suffixes, fitted against a fixed library of per-species absorption cross sections.",
+      "item": "one measured intensity spectrum, paired with the reference spectrum",
+      "shapes": [
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "retrieving species concentrations from raw absorption spectra, after measurement and before interpretation",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar settings and a choice of auto-cleaning or keeping all species control a fit that runs on uploaded spectra. Results open in tabs: a species table and bar chart, a measured-against-reconstructed overlay, and for a series, a log-scaled trend, a summary table and a timepoint picker that redraws the overlay for one frame. Downloads save the results as CSV.",
+      "views": [
+        "line chart",
+        "bar chart",
+        "table view",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "select",
+        "hover for detail",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "spectral fitting of optical absorption spectra against reference cross sections in plasma physics",
+      "disciplines": [
+        "physics"
+      ],
+      "terms": [
+        "optical absorption spectroscopy",
+        "plasma diagnostics",
+        "spectral fitting"
+      ]
+    },
+    "workflow": {
+      "name": "fit reference components to measured signals and export the amounts",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a reference I₀ spectrum and a measured Iₜ spectrum, or a batch for a time series where the lowest-suffix file is I₀. Set the path length in cm and tick the required consent box to enable Run.",
+          "parts": [
+            "single-analysis",
+            "timeseries-analysis"
+          ]
+        },
+        {
+          "step": "set how the computation treats the data",
+          "here": "Sidebar sliders and toggles set the minimum fit fraction, false-positive coefficient, OD clip threshold, number of refits, NO band alignment and resolution matching, the NO hot band and the O₃ tail. A reset button restores the defaults.",
+          "parts": [
+            "fit-config"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run converts intensities to optical depth and fits a non-negative least-squares sum of eight species' cross sections. It shows number densities in a table and bar chart, with R², RMSE, MAE, MAPE and chips naming the corrections applied.",
+          "parts": [
+            "species-extraction"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "The Auto-clean and Keep all species buttons re-run the fit at once, with or without dropping false-positive NO or O₃. The re-run is shown as an unsaved preview.",
+          "parts": [
+            "fit-config",
+            "species-extraction"
+          ]
+        },
+        {
+          "step": "check the fit against the measurement",
+          "here": "An overlay of measured against reconstructed optical depth, with each species' contribution as a dashed trace that can be toggled from the legend.",
+          "parts": [
+            "validation-overlay",
+            "frame-validation"
+          ]
+        },
+        {
+          "step": "follow values over time and open one timepoint",
+          "here": "A log-scaled trend of every species' number density over time, a summary table, counts of timepoints and detected species, and a timepoint picker that redraws the overlay and metrics for that frame.",
+          "parts": [
+            "species-trend",
+            "frame-validation"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download the per-wavelength reconstruction CSV for a single spectrum, or the per-timepoint number-density summary CSV for a series.",
+          "parts": [
+            "species-extraction",
+            "species-trend"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The amounts are fitted against a fixed library of laboratory absorption cross sections, converted to number densities using the path length the person enters.",
+        "Domain corrections are built into the fit: NO band shift and resolution matching, a hot-band component for excited NO, O₃ wing and baseline refinement, and suppression of false-positive species. The applied corrections are reported as chips.",
+        "Running requires consent, and every run (raw spectra plus results) is auto-saved to a shared corpus used to retrain a machine-learning model. Re-runs from the variant switch stay unsaved previews.",
+        "In a time series the reference spectrum is picked automatically as the file with the lowest numeric suffix in its name."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Mode and settings sidebar",
+      "summary": "Switches between single and time-series analysis and shows the fit settings and the status of the ML model and cross-section library.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1233,
+          "end": 1433,
+          "role": "logic",
+          "symbol": "render_sidebar",
+          "anchor": "d262d9ea1cc5",
+          "first": "def render_sidebar() -> tuple[str, FitConfig]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 511,
+          "end": 603,
+          "role": "style",
+          "anchor": "4db3859c3b88",
+          "first": "/* Sidebar brand + status panel */"
+        },
+        {
+          "file": "code/app.py",
+          "start": 657,
+          "end": 760,
+          "role": "style",
+          "anchor": "00da2f43f095",
+          "first": "/* ── Sidebar layout + bottom-pin + screencast polish (modern) ─── */"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2137,
+          "end": 2166,
+          "role": "logic",
+          "symbol": "main",
+          "anchor": "28e1fb4b984f",
+          "first": "def main() -> None:"
+        }
+      ]
+    },
+    {
+      "id": "fit-config",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Advanced fit configuration",
+      "summary": "Sliders, toggles and two variant buttons that set the fitting rules, switch false-positive cleaning on or off and restore defaults.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "exclude and refit",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1184,
+          "end": 1230,
+          "role": "logic",
+          "anchor": "9bbfd08d3ec0",
+          "first": "# The \"Result variant\" buttons map to an internal O3-mode suppression rule."
+        },
+        {
+          "file": "code/app.py",
+          "start": 1254,
+          "end": 1388,
+          "role": "logic",
+          "anchor": "d312b1358694",
+          "first": "st.markdown(\"---\")"
+        },
+        {
+          "file": "code/oas_web/analysis.py",
+          "start": 173,
+          "end": 188,
+          "role": "data",
+          "symbol": "FitConfig",
+          "anchor": "8fe27b588ad2",
+          "first": "class FitConfig:"
+        }
+      ]
+    },
+    {
+      "id": "single-analysis",
+      "level": "view",
+      "parent": null,
+      "title": "Single OAS analysis",
+      "summary": "Takes a reference and a measured spectrum and a path length, previews both intensities, and runs the fit once consent is given.",
+      "views": [
+        "form",
+        "line chart"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1651,
+          "end": 1747,
+          "role": "logic",
+          "anchor": "f1e56c7a6fa2",
+          "first": "def render_single_page(selected_cross: str, config: FitConfig) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1601,
+          "end": 1648,
+          "role": "logic",
+          "symbol": "_run_single_from_ctx",
+          "anchor": "271219a7a355",
+          "first": "def _run_single_from_ctx(ctx: dict, cross_dir: str, config: FitConfig,"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1441,
+          "end": 1469,
+          "role": "logic",
+          "symbol": "render_consent_block",
+          "anchor": "31d8884676fc",
+          "first": "def render_consent_block(key: str) -> bool:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1063,
+          "end": 1072,
+          "role": "markup",
+          "symbol": "render_hero",
+          "anchor": "c17fad2115aa",
+          "first": "def render_hero(title: str, subtitle: str, badge: str) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1075,
+          "end": 1081,
+          "role": "markup",
+          "symbol": "render_step",
+          "anchor": "56c387675218",
+          "first": "def render_step(num: int, title: str) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 479,
+          "end": 509,
+          "role": "style",
+          "anchor": "fd939c6d2258",
+          "first": "/* ML-only consent card (banner that sits above the Run button) */"
+        },
+        {
+          "file": "code/oas_web/plots.py",
+          "start": 194,
+          "end": 198,
+          "role": "logic",
+          "symbol": "make_intensity_preview",
+          "anchor": "4b7e6eae5479",
+          "first": "def make_intensity_preview("
+        },
+        {
+          "file": "code/oas_web/analysis.py",
+          "start": 273,
+          "end": 289,
+          "role": "logic",
+          "symbol": "load_spectrum",
+          "anchor": "9484713731f0",
+          "first": "def load_spectrum(file_or_path: str | Path | BinaryIO | bytes) -> SpectrumData:"
+        }
+      ]
+    },
+    {
+      "id": "species-extraction",
+      "level": "component",
+      "parent": "single-analysis",
+      "title": "Chemical extraction results",
+      "summary": "Shows fit metrics, a table and bar chart of number densities per species, chips for the corrections applied, and a CSV download of the reconstruction.",
+      "views": [
+        "table view",
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "export",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1748,
+          "end": 1795,
+          "role": "logic",
+          "anchor": "187b2b888dc0",
+          "first": "# ── Result card ────────────────────────────────────────────"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1817,
+          "end": 1836,
+          "role": "logic",
+          "anchor": "beefb223f688",
+          "first": "with tab_downloads:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1084,
+          "end": 1089,
+          "role": "logic",
+          "symbol": "render_metric_row",
+          "anchor": "9047000c9f7c",
+          "first": "def render_metric_row(metrics: dict[str, float]) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1092,
+          "end": 1117,
+          "role": "logic",
+          "symbol": "render_chemical_table",
+          "anchor": "c031365c4d70",
+          "first": "def render_chemical_table(species: list[str], values: np.ndarray) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1120,
+          "end": 1130,
+          "role": "logic",
+          "symbol": "render_diagnostics",
+          "anchor": "b2d4255b5be3",
+          "first": "def render_diagnostics("
+        },
+        {
+          "file": "code/app.py",
+          "start": 469,
+          "end": 477,
+          "role": "style",
+          "anchor": "091c02d6a0e3",
+          "first": "/* Section chip */"
+        },
+        {
+          "file": "code/oas_web/plots.py",
+          "start": 165,
+          "end": 168,
+          "role": "logic",
+          "symbol": "make_species_bar",
+          "anchor": "12fd9b82b0f2",
+          "first": "def make_species_bar("
+        },
+        {
+          "file": "code/oas_web/analysis.py",
+          "start": 1598,
+          "end": 1603,
+          "role": "logic",
+          "symbol": "prepare_download_frame",
+          "anchor": "4ee715368f37",
+          "first": "def prepare_download_frame("
+        }
+      ]
+    },
+    {
+      "id": "validation-overlay",
+      "level": "component",
+      "parent": "single-analysis",
+      "title": "Validation overlay",
+      "summary": "Overlays measured and reconstructed optical depth with each species' contribution as a dashed trace that can be toggled.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1796,
+          "end": 1815,
+          "role": "logic",
+          "anchor": "b5d0e033a70e",
+          "first": "with tab_validate:"
+        },
+        {
+          "file": "code/oas_web/plots.py",
+          "start": 61,
+          "end": 67,
+          "role": "logic",
+          "symbol": "make_overlay_figure",
+          "anchor": "1a557b0a0ec3",
+          "first": "def make_overlay_figure("
+        }
+      ]
+    },
+    {
+      "id": "timeseries-analysis",
+      "level": "view",
+      "parent": null,
+      "title": "Time-series OAS analysis",
+      "summary": "Takes a batch of spectra, uses the lowest-suffix file as reference, fits every frame with progress, and summarises timepoints, detected species and duration.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1844,
+          "end": 1972,
+          "role": "logic",
+          "anchor": "c7cdb0b2dca8",
+          "first": "def render_timeseries_page(selected_cross: str, config: FitConfig) -> None:"
+        },
+        {
+          "file": "code/oas_web/analysis.py",
+          "start": 1288,
+          "end": 1296,
+          "role": "logic",
+          "symbol": "sort_time_series_files_by_name",
+          "anchor": "5fcebd2f409a",
+          "first": "def sort_time_series_files_by_name(file_items: list[tuple[str, bytes]]) -> list[tuple[str, bytes]]:"
+        },
+        {
+          "file": "code/oas_web/analysis.py",
+          "start": 1299,
+          "end": 1306,
+          "role": "logic",
+          "symbol": "run_time_series_from_intensity_files",
+          "anchor": "92b6a1d56a7c",
+          "first": "def run_time_series_from_intensity_files("
+        }
+      ]
+    },
+    {
+      "id": "species-trend",
+      "level": "component",
+      "parent": "timeseries-analysis",
+      "title": "Species trend and summary",
+      "summary": "Plots every species' number density over time on a log axis, lists them per timepoint in a table, and downloads the summary as CSV.",
+      "views": [
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1974,
+          "end": 1986,
+          "role": "logic",
+          "anchor": "bc8d5814b060",
+          "first": "tab_trend, tab_summary, tab_validate, tab_downloads = st.tabs("
+        },
+        {
+          "file": "code/app.py",
+          "start": 2049,
+          "end": 2061,
+          "role": "logic",
+          "anchor": "a0cabe584f11",
+          "first": "with tab_downloads:"
+        },
+        {
+          "file": "code/oas_web/plots.py",
+          "start": 230,
+          "end": 232,
+          "role": "logic",
+          "symbol": "make_timeseries_trend",
+          "anchor": "c8400c921762",
+          "first": "def make_timeseries_trend("
+        }
+      ]
+    },
+    {
+      "id": "frame-validation",
+      "level": "component",
+      "parent": "timeseries-analysis",
+      "title": "Per-frame validation",
+      "summary": "A timepoint picker that shows that frame's fit metrics, its measured-against-reconstructed overlay and the corrections applied.",
+      "views": [
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1988,
+          "end": 2047,
+          "role": "logic",
+          "anchor": "fa0c83c8e47a",
+          "first": "with tab_validate:"
+        },
+        {
+          "file": "code/oas_web/plots.py",
+          "start": 61,
+          "end": 67,
+          "role": "logic",
+          "symbol": "make_overlay_figure",
+          "anchor": "1a557b0a0ec3",
+          "first": "def make_overlay_figure("
+        }
+      ]
+    }
+  ]
+}

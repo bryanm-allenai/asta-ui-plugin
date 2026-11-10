@@ -1,0 +1,372 @@
+{
+  "schema": "astaui.card/1",
+  "id": "pcr-primer-design-tool",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:49:47Z"
+  },
+  "app": {
+    "title": "Primer Design Tool (Streamlit)",
+    "summary": "A person brings in one DNA template, either by pasting it, uploading a FASTA or text file, or fetching a record from NCBI by accession with an optional interval and strand. They set a product-size range and how many primer pairs they want, then click Design primers. Primer3 generates ranked candidate pairs, and each pair is checked for melting temperature, GC content, homopolymer runs and predicted hairpins and dimers. The person compares the pairs in a summary table, opens any pair for its binding positions, structure table and warnings, and downloads an order-ready CSV with one row per primer.",
+    "task": {
+      "text": "Design ranked forward and reverse PCR primer pairs for a DNA template, screen each pair against design rules, and export an order-ready primer list.",
+      "verbs": [
+        "derive",
+        "plan",
+        "compare",
+        "review"
+      ]
+    },
+    "data": {
+      "text": "One DNA template sequence, pasted, uploaded or fetched from NCBI, and the table of candidate primer pairs computed from it, each with its thermodynamic properties and rule-based warnings.",
+      "item": "a candidate forward and reverse primer pair that binds the template, with its expected product",
+      "shapes": [
+        "sequence",
+        "table",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "designing primers for a target sequence before running conventional PCR",
+      "terms": [
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "An input step (paste, upload or NCBI fetch with a preview) feeds a settings form. Submitting it computes ranked primer pairs, shown as a summary table, then as expandable per-pair detail panels with metrics, a secondary-structure table and warnings, followed by a CSV download.",
+      "views": [
+        "form",
+        "table view",
+        "detail panel",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "PCR primer design with Primer3 in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "molecular biology",
+        "primer design",
+        "pcr"
+      ]
+    },
+    "workflow": {
+      "name": "generate ranked candidates from a source sequence, screen them against rules, and export the set",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A radio button picks the source: paste or upload a FASTA or text file, or fetch from NCBI by accession with an optional start and stop interval and a choice of strand. A fetched record shows its ID, header, length and a FASTA preview, and can be cleared.",
+          "parts": [
+            "sequence-source",
+            "ncbi-fetch",
+            "paste-upload"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The person sets the minimum and maximum product size (bp) and the number of pairs (1–20), then clicks Design primers. Primer3 generates the pairs, and each one is analysed for Tm, GC, Tm difference, homopolymers, hairpin, homodimer and heterodimer, then given a recommendation.",
+          "parts": [
+            "design-settings"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A summary table shows one row per ranked pair: both sequences, Tm, Tm difference, GC, product size, Primer3 penalty, warning count and recommendation.",
+          "parts": [
+            "results",
+            "summary-table"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "An expander for each pair shows the expected product size, binding positions, Tm and GC metrics, a table of predicted hairpin and dimer structures with Tm and ΔG, and each warning.",
+          "parts": [
+            "results",
+            "pair-details"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download order-ready CSV writes primer_results.csv with one row per primer: name, orientation, 5′→3′ sequence, length, Tm, GC, product size, penalty, recommendation and a warning summary.",
+          "parts": [
+            "csv-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The template can be fetched straight from NCBI EFetch by accession, with a coordinate interval and a choice of forward or reverse-complement strand.",
+        "Each pair is screened against fixed design rules (primer length, a Tm window, a GC window, the Tm difference between primers, homopolymer runs, and the Tm of predicted secondary structures), and warnings are counted to give a three-level recommendation.",
+        "Secondary structures (hairpins, homodimers, the forward–reverse heterodimer) are predicted thermodynamically and reported with Tm and ΔG.",
+        "The export splits each pair into two rows, one per primer, with systematic names, so the file is ready to order from.",
+        "Genome-wide specificity is not checked. The best recommendation reads 'Recommended for specificity checking', which hands the pair on to a separate check."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sequence-source",
+      "level": "view",
+      "parent": null,
+      "title": "Sequence source",
+      "summary": "Lets the person choose whether the DNA template comes from a paste or upload or from an NCBI fetch.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 255,
+          "end": 284,
+          "role": "markup",
+          "anchor": "3c23c075cb80",
+          "first": "st.title(\"🧬 Primer Design Tool\")"
+        }
+      ]
+    },
+    {
+      "id": "ncbi-fetch",
+      "level": "component",
+      "parent": "sequence-source",
+      "title": "NCBI fetch form",
+      "summary": "Retrieves one nucleotide FASTA record by accession, with an optional interval and strand, then shows its ID, header, length and a preview, with a button to clear it.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 286,
+          "end": 429,
+          "role": "markup",
+          "anchor": "863e62e97534",
+          "first": "if sequence_source == \"Fetch a sequence from NCBI\":"
+        },
+        {
+          "file": "code/ncbi_fetcher.py",
+          "start": 241,
+          "end": 247,
+          "role": "logic",
+          "symbol": "fetch_nucleotide_fasta",
+          "anchor": "8538117b40ff",
+          "first": "def fetch_nucleotide_fasta("
+        },
+        {
+          "file": "code/ncbi_fetcher.py",
+          "start": 20,
+          "end": 30,
+          "role": "data",
+          "symbol": "NCBIFastaRecord",
+          "anchor": "2dcc5b433519",
+          "first": "class NCBIFastaRecord:"
+        }
+      ]
+    },
+    {
+      "id": "paste-upload",
+      "level": "component",
+      "parent": "sequence-source",
+      "title": "Paste or upload template",
+      "summary": "Accepts a FASTA or plain-text DNA template, either as a file upload or pasted into a text box.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 431,
+          "end": 450,
+          "role": "markup",
+          "anchor": "448c5363a773",
+          "first": "else:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 16,
+          "end": 29,
+          "role": "logic",
+          "symbol": "read_uploaded_sequence",
+          "anchor": "17eff4d4894d",
+          "first": "def read_uploaded_sequence(uploaded_file) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "design-settings",
+      "level": "view",
+      "parent": null,
+      "title": "Product settings and primer design",
+      "summary": "Collects the product-size range and the number of pairs, then runs Primer3 design and the per-pair rule analysis on the chosen template.",
+      "views": [
+        "form"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 453,
+          "end": 544,
+          "role": "markup",
+          "anchor": "cbe33954740b",
+          "first": "with st.form(\"primer_design_form\"):"
+        },
+        {
+          "file": "code/primer_generator.py",
+          "start": 77,
+          "end": 81,
+          "role": "logic",
+          "symbol": "generate_primer_pairs",
+          "anchor": "abe9b7c1393a",
+          "first": "def generate_primer_pairs("
+        },
+        {
+          "file": "code/primer_analyzer.py",
+          "start": 125,
+          "end": 128,
+          "role": "logic",
+          "symbol": "analyse_primer_pair",
+          "anchor": "e4d3adae0d69",
+          "first": "def analyse_primer_pair("
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "level": "view",
+      "parent": null,
+      "title": "Primer-pair results",
+      "summary": "Shows the ranked pairs as a summary table, followed by a detail panel for each pair that can be expanded.",
+      "views": [
+        "table view",
+        "detail panel"
+      ],
+      "interactions": [],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 546,
+          "end": 562,
+          "role": "markup",
+          "anchor": "7b3aeb6424ad",
+          "first": "st.subheader(\"Primer-pair summary\")"
+        }
+      ]
+    },
+    {
+      "id": "summary-table",
+      "level": "component",
+      "parent": "results",
+      "title": "Primer-pair summary table",
+      "summary": "Gives one row per pair with its sequences, Tm, GC, product size, penalty, warning count and recommendation, so the pairs can be compared.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 32,
+          "end": 81,
+          "role": "logic",
+          "symbol": "build_summary_table",
+          "anchor": "07f42fb1cab1",
+          "first": "def build_summary_table(results: dict) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "pair-details",
+      "level": "component",
+      "parent": "results",
+      "title": "Pair detail expander",
+      "summary": "Shows one pair's sequences, product size, binding positions, Tm and GC metrics, a secondary-structure table with Tm and ΔG, and each warning or an all-clear message.",
+      "views": [
+        "detail panel",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 84,
+          "end": 252,
+          "role": "logic",
+          "symbol": "display_pair_details",
+          "anchor": "666973aa9a84",
+          "first": "def display_pair_details(pair: dict) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "csv-export",
+      "level": "component",
+      "parent": "results",
+      "title": "Order-ready CSV download",
+      "summary": "Downloads the pairs as a CSV with one row per primer, with names, orientation, sequence, properties, recommendation and a warning summary.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 564,
+          "end": 577,
+          "role": "markup",
+          "anchor": "e087dc4881a2",
+          "first": "export_rows = build_export_rows(results)"
+        },
+        {
+          "file": "code/export_results.py",
+          "start": 20,
+          "end": 95,
+          "role": "logic",
+          "symbol": "build_export_rows",
+          "anchor": "f0bf68a94385",
+          "first": "def build_export_rows(result: dict) -> list[dict]:"
+        }
+      ]
+    }
+  ]
+}

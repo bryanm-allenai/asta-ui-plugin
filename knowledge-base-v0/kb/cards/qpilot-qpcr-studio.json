@@ -1,0 +1,532 @@
+{
+  "schema": "astaui.card/1",
+  "id": "qpilot-qpcr-studio",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T16:39:17Z"
+  },
+  "app": {
+    "title": "qPilot Studio",
+    "summary": "A person loads a qPCR instrument export, with an optional sample sheet and a one-sentence description of the experiment. Rules or a model propose the study design and which curves count as amplified. The engine checks each proposal against the data, and the person accepts, edits or rejects each one with a reason, then confirms the stage. Results stay hidden until both of those stages are confirmed. After that, the person decides each choice that could change a conclusion on a Decision Card and drafts a project for the statistics package. They send it as tables plus a script, then read back what was changed there and answer each change with a reason. The result is a confirmed design, a recorded decision for every conclusion-changing choice, and a bundle ready for the statistics package.",
+    "task": {
+      "text": "Turn raw qPCR amplification curves into a group comparison whose design, curve calls and conclusion-changing analysis choices are each confirmed by a person with a reason, then hand it to a statistics package and reconcile what changes there.",
+      "verbs": [
+        "review",
+        "decide",
+        "derive",
+        "annotate",
+        "compare",
+        "reconcile",
+        "export"
+      ]
+    },
+    "data": {
+      "text": "A qPCR run file with raw amplification curves for every well on many plates, plus an optional sample sheet. From these come proposals about each sample's and well's role, per-well amplification calls, per-gene fold changes under every reasonable analysis, and tables of log2 relative quantities per biological unit.",
+      "item": "a proposal about one sample, well or series in the study design, checked against the curves",
+      "shapes": [
+        "grid of series",
+        "table",
+        "categories",
+        "judgements",
+        "notes",
+        "events"
+      ]
+    },
+    "stage": {
+      "text": "reviewing and deciding a qPCR study's design and analysis choices after the run, before statistics and figures",
+      "terms": [
+        "review",
+        "decide",
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A staged inbox in the middle shows one card per proposal. Each card has the engine's check (consistent, contradicted or cannot check), its sources and accept, edit and reject controls, and a well cited on a card can be plotted as its curve. A left-hand strip shows which stage is open, confirmed or blocked. The right-hand pane stays blind until the design and curve stages are confirmed; then it shows the results, the Decision Cards, the drafted project with a per-gene graph and table, sending the project to the statistics package, and the round trip back from it.",
+      "views": [
+        "form",
+        "list",
+        "detail panel",
+        "line chart",
+        "strip plot",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "accept or reject",
+        "inline edit",
+        "write notes",
+        "select",
+        "multi-select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "review queue",
+        "status pipeline",
+        "master-detail",
+        "rubric",
+        "version history"
+      ]
+    },
+    "field": {
+      "text": "relative quantification of gene expression by qPCR (LinRegPCR curve analysis, geNorm reference genes, Welch's t-test on log2 values) in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "qpcr",
+        "gene expression",
+        "molecular biology"
+      ]
+    },
+    "workflow": {
+      "name": "check proposed annotations stage by stage, then decide the analysis choices that change conclusions",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drop in an RDML file (or use the cached demo), an optional .xlsx/.csv sample sheet and one sentence about the experiment, then press Open; opening analyses and proposes nothing",
+          "parts": [
+            "intake"
+          ]
+        },
+        {
+          "step": "have proposals made for each item, checked against the data",
+          "here": "Propose the design, Propose the comparison and Check the curves fill the inbox of the open stage; each card shows the engine check (consistent, contradicted, cannot check), its cited sources and a level",
+          "parts": [
+            "proposal-inbox",
+            "stage-strip"
+          ]
+        },
+        {
+          "step": "decide keep or drop for each item, with a reason",
+          "here": "Accept, Reject with a reason, or edit the JSON payload and accept; a reason is required to accept what the engine contradicts; Accept all consistent and Reject all contradicted AI calls first list exactly what they cover",
+          "parts": [
+            "proposal-inbox",
+            "well-curve"
+          ]
+        },
+        {
+          "step": "confirm the stage before moving on",
+          "here": "Confirm this stage… shows what it covers, and only Yes, confirm closes it; results stay hidden until the Design and Curves stages are both confirmed",
+          "parts": [
+            "proposal-inbox",
+            "stage-strip"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Once both blind stages are confirmed, a study summary and fold changes appear, computed under every reasonable analysis, along with how many conclusions the usual spreadsheet routes would change",
+          "parts": [
+            "decision-cards"
+          ]
+        },
+        {
+          "step": "decide each choice that could change the result, with a reason",
+          "here": "Pick a Decision Card, choose an option and type a reason, then Decide; cards are the choices (control genes, cut-off, empty wells, amplification rule) that can flip a conclusion",
+          "parts": [
+            "decision-cards"
+          ]
+        },
+        {
+          "step": "export the result, then reconcile changes made outside",
+          "here": "Draft the Prism project, preview the per-gene graph and table, then Send to Prism (tables, script and provenance, or a zip); Read what changed in Prism turns each changed or missing value into a question that needs a reason and shows its consequence",
+          "parts": [
+            "prism-pane"
+          ]
+        }
+      ],
+      "distinctive": [
+        "blind stages: no conclusion, fold change or card can appear until a person confirms both the design and the curve calls",
+        "only choices that can flip a conclusion across every reasonable analysis reach a person, as Decision Cards ranked by how many conclusions they change",
+        "AI proposals are never applied: a deterministic check can only refute, and accepting a contradicted proposal needs a reason",
+        "the round trip from the statistics package reports each value changed or left out there, with its effect on every gene's conclusion, before the person accepts it",
+        "every accept, reject, decision and export is written with who made it and why to a hash-chained record"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "intake",
+      "level": "view",
+      "parent": null,
+      "title": "1 · Intake",
+      "summary": "Takes the run file, an optional sample sheet and one sentence about the experiment, and opens a session without analysing anything.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1324,
+          "end": 1349,
+          "role": "markup",
+          "anchor": "e5abc835a565",
+          "first": "with gr.Column(scale=1, min_width=260):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 817,
+          "end": 839,
+          "role": "logic",
+          "symbol": "on_open",
+          "anchor": "4388f5706dc7",
+          "first": "def on_open(session, upload, sheet_file):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 301,
+          "end": 311,
+          "role": "logic",
+          "symbol": "keep_input",
+          "anchor": "ed3c55b53531",
+          "first": "def keep_input(upload: str, kind: str) -> Path:"
+        }
+      ]
+    },
+    {
+      "id": "stage-strip",
+      "level": "component",
+      "parent": "intake",
+      "title": "Stage strip",
+      "summary": "Shows each stage (Design, Curves, Choices, Prism draft, Round trip) as open, confirmed or not yet open, with what is waiting and what blocks it.",
+      "views": [
+        "list",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1347,
+          "end": 1347,
+          "role": "markup",
+          "anchor": "55757a5c090c",
+          "first": "ui.strip = gr.HTML()"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 518,
+          "end": 550,
+          "role": "logic",
+          "symbol": "stage_buttons",
+          "anchor": "06c405b243be",
+          "first": "def stage_buttons(stage, by, proposals, pending, confirms) -> dict[Any, Any]:"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 755,
+          "end": 757,
+          "role": "logic",
+          "symbol": "on_stage",
+          "anchor": "8f093452384a",
+          "first": "def on_stage(session, stage):"
+        }
+      ]
+    },
+    {
+      "id": "proposal-inbox",
+      "level": "view",
+      "parent": null,
+      "title": "2 · What the AI thinks",
+      "summary": "Lists the open stage's proposals one card each, contradicted ones first, so the person can accept, edit or reject each with a reason, act on the consistent or contradicted ones in bulk, and confirm the stage.",
+      "views": [
+        "list",
+        "detail panel"
+      ],
+      "interactions": [
+        "accept or reject",
+        "inline edit",
+        "write notes",
+        "multi-select",
+        "select"
+      ],
+      "patterns": [
+        "review queue",
+        "rubric",
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1350,
+          "end": 1449,
+          "role": "markup",
+          "anchor": "3eeccf173346",
+          "first": "with gr.Column(scale=2, min_width=380):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 856,
+          "end": 864,
+          "role": "logic",
+          "symbol": "on_propose_design",
+          "anchor": "465147bc7b27",
+          "first": "def on_propose_design(session, sentence):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 885,
+          "end": 900,
+          "role": "logic",
+          "symbol": "on_propose_curves",
+          "anchor": "357f8aec185f",
+          "first": "def on_propose_curves(session):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 995,
+          "end": 1019,
+          "role": "logic",
+          "symbol": "make_accept",
+          "anchor": "6a6832597e9e",
+          "first": "def make_accept(i: int) -> Callable:"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1021,
+          "end": 1042,
+          "role": "logic",
+          "symbol": "make_reject",
+          "anchor": "ba67829dde56",
+          "first": "def make_reject(i: int) -> Callable:"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1044,
+          "end": 1084,
+          "role": "logic",
+          "symbol": "make_edit",
+          "anchor": "15b7ac2f5ce2",
+          "first": "def make_edit(i: int) -> Callable:"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1124,
+          "end": 1146,
+          "role": "logic",
+          "symbol": "on_bulk_accept",
+          "anchor": "655ef198310b",
+          "first": "def on_bulk_accept(session):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1174,
+          "end": 1192,
+          "role": "logic",
+          "symbol": "on_reject_all",
+          "anchor": "396a6d72649d",
+          "first": "def on_reject_all(session, reason):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1197,
+          "end": 1224,
+          "role": "logic",
+          "symbol": "on_confirm",
+          "anchor": "225015a91d9d",
+          "first": "def on_confirm(session):"
+        }
+      ]
+    },
+    {
+      "id": "well-curve",
+      "level": "component",
+      "parent": "proposal-inbox",
+      "title": "Curve of a cited well",
+      "summary": "Plots the amplification curve of a well that a proposal cites, so the person can see the evidence before deciding.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1450,
+          "end": 1457,
+          "role": "markup",
+          "anchor": "9ae11ff363ff",
+          "first": "with gr.Row():"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 792,
+          "end": 807,
+          "role": "logic",
+          "symbol": "on_curve",
+          "anchor": "759099b5f787",
+          "first": "def on_curve(session, well):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 271,
+          "end": 285,
+          "role": "logic",
+          "symbol": "well_curve",
+          "anchor": "f515ec866581",
+          "first": "def well_curve(sid: str, key: str) -> dict[str, list[float]]:"
+        }
+      ]
+    },
+    {
+      "id": "decision-cards",
+      "level": "component",
+      "parent": "prism-pane",
+      "title": "Results and Decision Cards",
+      "summary": "After the blind stages are confirmed, shows the study summary and how often the usual routes change conclusions, and lets the person choose an option with a reason for each choice that could flip a conclusion.",
+      "views": [
+        "summary stats",
+        "detail panel",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "score",
+        "write notes"
+      ],
+      "patterns": [
+        "review queue",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1460,
+          "end": 1474,
+          "role": "markup",
+          "anchor": "9a2d89254887",
+          "first": "ui.blind_note = gr.HTML(BLIND_PANE)"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 615,
+          "end": 724,
+          "role": "logic",
+          "symbol": "results",
+          "anchor": "7a28f2068455",
+          "first": "def results(session: dict[str, Any], sid: str, by, out: dict[Any, Any]) -> dict[str, Any]:"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 767,
+          "end": 769,
+          "role": "logic",
+          "symbol": "on_card_pick",
+          "anchor": "e30907f3e500",
+          "first": "def on_card_pick(session, card_id):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1246,
+          "end": 1271,
+          "role": "logic",
+          "symbol": "on_decide",
+          "anchor": "79c658590113",
+          "first": "def on_decide(session, option, reason):"
+        }
+      ]
+    },
+    {
+      "id": "prism-pane",
+      "level": "view",
+      "parent": null,
+      "title": "3 · Prism preview",
+      "summary": "Drafts the statistics-package project, previews its per-gene graph and tables, sends the bundle, and reads back the values changed there as questions that need a reason.",
+      "views": [
+        "strip plot",
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "export",
+        "import",
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1458,
+          "end": 1496,
+          "role": "markup",
+          "anchor": "20966097193e",
+          "first": "with gr.Column(scale=2, min_width=380):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 919,
+          "end": 932,
+          "role": "logic",
+          "symbol": "on_propose_prism",
+          "anchor": "1637868b6199",
+          "first": "def on_propose_prism(session):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 726,
+          "end": 748,
+          "role": "logic",
+          "symbol": "prism_graph",
+          "anchor": "9c6dcb3d50a0",
+          "first": "def prism_graph(sid: str, preview: dict[str, Any], gene: str | None) -> dict[Any, Any]:"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 771,
+          "end": 790,
+          "role": "logic",
+          "symbol": "on_gene",
+          "anchor": "b988f4da05bd",
+          "first": "def on_gene(session, gene):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 1273,
+          "end": 1315,
+          "role": "logic",
+          "symbol": "on_send",
+          "anchor": "14ca35e12f38",
+          "first": "def on_send(session):"
+        },
+        {
+          "file": "code/qpilot/studio.py",
+          "start": 934,
+          "end": 961,
+          "role": "logic",
+          "symbol": "on_roundtrip",
+          "anchor": "449a539c3a25",
+          "first": "def on_roundtrip(session, bundle, folder):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "task",
+      "list": "verbs",
+      "term": "export"
+    }
+  ]
+}

@@ -1,0 +1,658 @@
+{
+  "schema": "astaui.card/1",
+  "id": "censor-check",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T10:35:51Z"
+  },
+  "app": {
+    "title": "Censor Check",
+    "summary": "A person loads a table of potency measurements, either a bundled example or their own CSV or database export. Columns are matched by name. They set a threshold for what counts as weak and the minimum group sizes, then run the check. The tool shows what an exact-values-only filter removes: per-category bars of the weak share before and after the filter, which can be limited to groups that could reach the threshold, and a table of how many records are kept and how many are lost. It then fits pooled and grouped censored-normal models to show how much dropping bounds overstates each group's mean. The person picks two categories to compare pooled against within-group, reads the checks for counter-screens and disguised ceilings, and exports a summary CSV, a results JSON or the figure as a PNG.",
+    "task": {
+      "text": "Measure what an exact-value filter removes from a table of censored measurements, estimate the bias that follows, and check whether pooled comparisons still hold inside the groups that produced the data.",
+      "verbs": [
+        "clean",
+        "derive",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A table of measurement records, each with a relation (exact, greater-than or less-than), a concentration value with units, the source paper it came from, the target or other category it belongs to, a compound identifier and a validity flag.",
+      "item": "one reported potency record: a relation and a value for one compound against one target in one paper",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "auditing censored records in a compiled potency table before modelling or comparing targets",
+      "terms": [
+        "clean",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A settings form loads the table and runs every computation at once. The results are laid out as a long dashboard of headline metrics, per-category bar charts, accounting and estimate tables, a histogram of per-group shifts and verdict cards. A separate compare form picks two categories and redraws the pooled-versus-within-group difference chart. Changing an input marks the results as out of date and disables the exports until the check is run again.",
+      "views": [
+        "form",
+        "summary stats",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "censored-data (Tobit) audit of IC50 potency tables in medicinal chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "medicinal chemistry",
+        "censored regression",
+        "bioactivity data"
+      ]
+    },
+    "workflow": {
+      "name": "audit what a data filter removes and whether pooled comparisons hold within groups",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pick the bundled subset or a file. Delimiters and column names are detected, and the matched columns are listed.",
+          "parts": [
+            "data-controls"
+          ]
+        },
+        {
+          "step": "set the rule and run the computation",
+          "here": "Set the weakness threshold in nM, the minimum records per paper and the minimum exact values for a shift, then press 'Run the check'.",
+          "parts": [
+            "data-controls"
+          ]
+        },
+        {
+          "step": "count what the filter removes",
+          "here": "The accounting table counts exact, right-censored, left-censored and validity-flagged records and how many the filter keeps. Bars show the weak share per target with all evidence and after the filter, with a toggle for 'only papers whose reported values reach the threshold'.",
+          "parts": [
+            "weak-tail-results",
+            "weak-share-chart"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Pooled and grouped censored-normal fits give the mean overstatement, the between-paper and within-paper SDs, and a histogram of per-paper shifts with its median. A bar shows where the bounds sit relative to the threshold.",
+          "parts": [
+            "aggregation"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Choose stratum A, stratum B and which records to use. The chart shows the pooled difference, the pooled difference over shared papers only, and the Mantel–Haenszel within-paper difference, and flags a sign reversal.",
+          "parts": [
+            "strata-compare"
+          ]
+        },
+        {
+          "step": "check for hidden problems in the records",
+          "here": "Verdict cards compare how often counter-screen and primary targets are censored, and compare ties at each paper's top exact value with ties in the interior.",
+          "parts": [
+            "strata-compare",
+            "ceiling-ties"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Summary CSV per stratum, results JSON or the weak-share figure as PNG. These are disabled whenever the inputs have changed since the last run.",
+          "parts": [
+            "exports"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Greater-than bounds are treated as measurements: they enter the likelihood as censored values, not as dropped rows.",
+        "Each paper is a group with its own mean and a shared within-group spread, so the tool separates between-paper from within-paper variation.",
+        "Pooled differences are set against within-paper differences weighted by Mantel–Haenszel, and a Simpson-style sign reversal is flagged.",
+        "A reachability restriction keeps only the groups whose highest reported value reaches the threshold, so weakness could have been recorded there at all.",
+        "A test for disguised ceilings looks for ties at each group's top exact value."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Data source and settings",
+      "summary": "Loads the bundled or uploaded table, matches its columns, takes the threshold and group minimums, and runs the full check.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 22,
+          "end": 22,
+          "role": "markup",
+          "symbol": "section.toolbar",
+          "anchor": "81749533da55",
+          "first": "<section class=\"toolbar\" aria-label=\"Data source\"><label for=\"source\">Data</label><select id=\"source\"><option value=\"bun"
+        },
+        {
+          "file": "code/web/index.html",
+          "start": 24,
+          "end": 39,
+          "role": "markup",
+          "symbol": "#controls",
+          "anchor": "ac5c8357a4ec",
+          "first": "<form id=\"controls\" novalidate>"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 15,
+          "end": 27,
+          "role": "logic",
+          "symbol": "load",
+          "anchor": "bedb298b20d3",
+          "first": "async function load() {"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 29,
+          "end": 37,
+          "role": "logic",
+          "symbol": "ingest",
+          "anchor": "874b2fbea58e",
+          "first": "function ingest(text, name) {"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 41,
+          "end": 56,
+          "role": "logic",
+          "symbol": "run",
+          "anchor": "ab1a667e7c8e",
+          "first": "function run(ev) {"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 196,
+          "end": 204,
+          "role": "logic",
+          "anchor": "b60af2e55353",
+          "first": "function init() {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 105,
+          "end": 127,
+          "role": "logic",
+          "symbol": "parseDelimited",
+          "anchor": "4780366b7fb9",
+          "first": "export function parseDelimited(text, delimiter) {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 140,
+          "end": 148,
+          "role": "logic",
+          "symbol": "mapColumns",
+          "anchor": "3ff5e399627e",
+          "first": "export function mapColumns(header) {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 162,
+          "end": 181,
+          "role": "logic",
+          "symbol": "toRecords",
+          "anchor": "6d81c3e60ae3",
+          "first": "export function toRecords(parsed, map) {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 412,
+          "end": 412,
+          "role": "logic",
+          "symbol": "runAll",
+          "anchor": "32547510b43d",
+          "first": "export function runAll(records, opts = {}) {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 130,
+          "end": 138,
+          "role": "data",
+          "symbol": "COLUMN_ALIASES",
+          "anchor": "e90253994748",
+          "first": "export const COLUMN_ALIASES = {"
+        }
+      ]
+    },
+    {
+      "id": "exports",
+      "level": "component",
+      "parent": "data-controls",
+      "title": "Exports",
+      "summary": "Saves the per-stratum summary as CSV, the full results as JSON, or the weak-share chart as PNG.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 37,
+          "end": 37,
+          "role": "markup",
+          "symbol": "#csv",
+          "anchor": "55410a7e0a61",
+          "first": "<div class=\"exports\"><button type=\"button\" id=\"csv\" disabled>Summary CSV</button><button type=\"button\" id=\"json\" disable"
+        },
+        {
+          "file": "code/web/index.html",
+          "start": 37,
+          "end": 37,
+          "role": "markup",
+          "symbol": "#json",
+          "anchor": "55410a7e0a61",
+          "first": "<div class=\"exports\"><button type=\"button\" id=\"csv\" disabled>Summary CSV</button><button type=\"button\" id=\"json\" disable"
+        },
+        {
+          "file": "code/web/index.html",
+          "start": 37,
+          "end": 37,
+          "role": "markup",
+          "symbol": "#png",
+          "anchor": "55410a7e0a61",
+          "first": "<div class=\"exports\"><button type=\"button\" id=\"csv\" disabled>Summary CSV</button><button type=\"button\" id=\"json\" disable"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 194,
+          "end": 194,
+          "role": "logic",
+          "symbol": "download",
+          "anchor": "cac855012bfb",
+          "first": "function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 205,
+          "end": 207,
+          "role": "logic",
+          "anchor": "f0cad98c6980",
+          "first": "$('csv').addEventListener('click', () => download('censor-check-summary.csv', new Blob([M.summaryCSV(result)], { type: '"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 430,
+          "end": 434,
+          "role": "logic",
+          "symbol": "summaryCSV",
+          "anchor": "b09a9f6f99af",
+          "first": "export function summaryCSV(res) {"
+        }
+      ]
+    },
+    {
+      "id": "weak-tail-results",
+      "level": "view",
+      "parent": null,
+      "title": "Filter accounting and weak tail",
+      "summary": "A headline, a severity badge and four metrics give the weak share before and after the filter, and a table accounts for every record class the filter keeps or removes.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 40,
+          "end": 46,
+          "role": "markup",
+          "symbol": "#results",
+          "anchor": "2327f3e477f7",
+          "first": "<div class=\"results\" id=\"results\">"
+        },
+        {
+          "file": "code/web/style.css",
+          "start": 27,
+          "end": 27,
+          "role": "style",
+          "symbol": ".metrics.four",
+          "anchor": "268dc61c7558",
+          "first": ".metrics.four{grid-template-columns:repeat(4,1fr)}"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 60,
+          "end": 80,
+          "role": "logic",
+          "anchor": "b24c7bb8cfa7",
+          "first": "function render() {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 190,
+          "end": 201,
+          "role": "logic",
+          "symbol": "accounting",
+          "anchor": "28fba93cfefc",
+          "first": "export function accounting(records) {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 211,
+          "end": 247,
+          "role": "logic",
+          "symbol": "weakTail",
+          "anchor": "d0bc46a1d953",
+          "first": "export function weakTail(set, T = 10000, minGroup = 5) {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 337,
+          "end": 348,
+          "role": "logic",
+          "symbol": "compoundLevel",
+          "anchor": "524fe5b2f259",
+          "first": "export function compoundLevel(set) {"
+        }
+      ]
+    },
+    {
+      "id": "weak-share-chart",
+      "level": "component",
+      "parent": "weak-tail-results",
+      "title": "Weak share by stratum",
+      "summary": "Paired horizontal bars give each stratum's weak share with all evidence and after the filter, with a toggle that limits the bars to papers that reach the threshold.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "filter",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 43,
+          "end": 43,
+          "role": "markup",
+          "symbol": "#bars",
+          "anchor": "584afde9ae50",
+          "first": "<div class=\"plot-panel\"><div class=\"plot-heading\"><h3>Share of records weaker than the threshold, all evidence versus th"
+        },
+        {
+          "file": "code/web/index.html",
+          "start": 44,
+          "end": 44,
+          "role": "markup",
+          "symbol": "#reach",
+          "anchor": "9513846d30fb",
+          "first": "<label for=\"reach\" style=\"margin-top:14px\"><input id=\"reach\" type=\"checkbox\" style=\"width:auto;margin-right:8px\">Only pa"
+        },
+        {
+          "file": "code/web/style.css",
+          "start": 31,
+          "end": 31,
+          "role": "style",
+          "symbol": "#bars",
+          "anchor": "c5d46cdc1a5a",
+          "first": "#bars{height:340px}#shifts{height:260px}#boundsbar{height:120px}#cmp{height:220px}"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 137,
+          "end": 153,
+          "role": "logic",
+          "symbol": "drawBars",
+          "anchor": "6c2a67590fe8",
+          "first": "function drawBars() {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 404,
+          "end": 410,
+          "role": "logic",
+          "symbol": "strataSummary",
+          "anchor": "b9a263680494",
+          "first": "export function strataSummary(set, T = 10000) {"
+        }
+      ]
+    },
+    {
+      "id": "aggregation",
+      "level": "view",
+      "parent": null,
+      "title": "Pooled or within-paper?",
+      "summary": "Verdict cards, a histogram of per-paper potency overstatement, a table of pooled and grouped censored-normal estimates, and a bar of where the bounds sit relative to the threshold.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 49,
+          "end": 55,
+          "role": "markup",
+          "symbol": "#aggregation",
+          "anchor": "cbdda74ae994",
+          "first": "<section class=\"section\" id=\"aggregation\"><p class=\"eyebrow\">POOLED OR WITHIN-PAPER?</p><h2>Most of the spread belongs t"
+        },
+        {
+          "file": "code/web/style.css",
+          "start": 28,
+          "end": 28,
+          "role": "style",
+          "symbol": ".verdicts",
+          "anchor": "3aa419c12a1b",
+          "first": ".verdicts{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:18px 0}.verdicts article{background:var(--sur"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 82,
+          "end": 97,
+          "role": "logic",
+          "anchor": "7e82653a9a76",
+          "first": "$('agg-cards').innerHTML = g ? ["
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 155,
+          "end": 166,
+          "role": "logic",
+          "symbol": "drawShifts",
+          "anchor": "b39b63df66a8",
+          "first": "function drawShifts() {"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 169,
+          "end": 176,
+          "role": "logic",
+          "symbol": "drawBoundsBar",
+          "anchor": "dd8744c0e4e6",
+          "first": "function drawBoundsBar() {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 258,
+          "end": 276,
+          "role": "logic",
+          "symbol": "pooledEstimates",
+          "anchor": "83c4df982a12",
+          "first": "export function pooledEstimates(set, T = 10000) {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 280,
+          "end": 280,
+          "role": "logic",
+          "symbol": "groupedEstimates",
+          "anchor": "28df171be852",
+          "first": "export function groupedEstimates(set, { minExactForShift = 5, iterations = 30 } = {}) {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 250,
+          "end": 253,
+          "role": "logic",
+          "symbol": "boundPositions",
+          "anchor": "a23ec26c1fcf",
+          "first": "export function boundPositions(set, T = 10000) {"
+        }
+      ]
+    },
+    {
+      "id": "strata-compare",
+      "level": "view",
+      "parent": null,
+      "title": "Compare two strata",
+      "summary": "Two strata and a record set are picked to chart the pooled, shared-paper and within-paper differences in weak share, with a reversal note and verdict cards on counter-screen censoring.",
+      "views": [
+        "form",
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 57,
+          "end": 62,
+          "role": "markup",
+          "symbol": "#compare",
+          "anchor": "491d3275838e",
+          "first": "<section class=\"section\" id=\"compare\"><p class=\"eyebrow\">COMPARE TWO STRATA</p><h2>A pooled difference answers a questio"
+        },
+        {
+          "file": "code/web/style.css",
+          "start": 29,
+          "end": 29,
+          "role": "style",
+          "symbol": ".compare-form",
+          "anchor": "f3829bc95a00",
+          "first": ".compare-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 18px;background:var(--surface);border:"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 117,
+          "end": 126,
+          "role": "logic",
+          "symbol": "compare",
+          "anchor": "006a2cc9cea3",
+          "first": "function compare() {"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 178,
+          "end": 190,
+          "role": "logic",
+          "symbol": "drawCompare",
+          "anchor": "ec5f943a86ff",
+          "first": "function drawCompare(c) {"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 99,
+          "end": 108,
+          "role": "logic",
+          "anchor": "a4cdb8063133",
+          "first": "const strata = r.strata.map(s => s.stratum);"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 354,
+          "end": 354,
+          "role": "logic",
+          "symbol": "compareStrata",
+          "anchor": "96c9bb326435",
+          "first": "export function compareStrata(set, A, B, { T = 10000, use = 'all' } = {}) {"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 385,
+          "end": 400,
+          "role": "logic",
+          "symbol": "counterScreens",
+          "anchor": "27100bd005b2",
+          "first": "export function counterScreens(set) {"
+        }
+      ]
+    },
+    {
+      "id": "ceiling-ties",
+      "level": "view",
+      "parent": null,
+      "title": "Disguised ceilings",
+      "summary": "Verdict cards compare ties at each paper's highest exact value with ties among interior values, and count ceilings written both as values and as bounds.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 64,
+          "end": 67,
+          "role": "markup",
+          "symbol": "#ties",
+          "anchor": "270ab52cd8a1",
+          "first": "<section class=\"section\" id=\"ties\"><p class=\"eyebrow\">DISGUISED CEILINGS</p><h2>If bounds were written as values, the to"
+        },
+        {
+          "file": "code/web/app.js",
+          "start": 109,
+          "end": 114,
+          "role": "logic",
+          "anchor": "72185afb1367",
+          "first": "const t = r.ties;"
+        },
+        {
+          "file": "code/web/model.js",
+          "start": 320,
+          "end": 320,
+          "role": "logic",
+          "symbol": "ceilingTies",
+          "anchor": "0f949c0ae9ca",
+          "first": "export function ceilingTies(set, { minExact = 8, k = 3 } = {}) {"
+        }
+      ]
+    }
+  ]
+}

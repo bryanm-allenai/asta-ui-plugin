@@ -1,0 +1,438 @@
+{
+  "schema": "astaui.card/1",
+  "id": "invisible-hands-vam-triage",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T02:18:38Z"
+  },
+  "app": {
+    "title": "Invisible Hands: V&A Collections API Research Prototype",
+    "summary": "A person enters a search query and sets a page size, and the interface pulls matching catalogue records from a museum collections API. If the live request fails, it falls back to a small set of illustrative sample rows. The person narrows the records to a made-after and made-before year range, and can choose whether records with dates that cannot be parsed are kept. Each record is scored by how many of the catalogue fields that support follow-up are filled in. The score gives it a cautious evidence-status label, the list of fields that were found, and suggested archival follow-up routes. The person reads summary counts, the enriched record table and image thumbnails, then downloads the enriched table as CSV to decide which records deserve closer archival research.",
+    "task": {
+      "text": "Rank museum catalogue records by how traceable they are in archives, so a researcher can pick which ones to follow up and know where to look next.",
+      "verbs": [
+        "triage",
+        "derive",
+        "summarize",
+        "explore",
+        "filter"
+      ]
+    },
+    "data": {
+      "text": "Museum object catalogue records fetched as CSV from a collections API, one row per object with metadata fields (type, title, place, maker, maker role, date, material, technique, image id)",
+      "item": "a museum object's catalogue record",
+      "shapes": [
+        "table",
+        "image collection",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "first-pass triage of catalogue records before archival research",
+      "terms": [
+        "explore",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls for the search and the date filter drive a single pipeline: fetch, filter by year, score each record by its filled fields, then add a label, reasons and next steps. Summary metrics, the enriched record table and a thumbnail grid all redraw from the result, and the table can be exported as CSV.",
+      "views": [
+        "sidebar list",
+        "summary stats",
+        "table view",
+        "thumbnail grid",
+        "form"
+      ],
+      "interactions": [
+        "search",
+        "filter",
+        "toggle view",
+        "export",
+        "import"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "metadata-based archival triage of museum collections in the digital humanities",
+      "disciplines": [
+        "humanities"
+      ],
+      "terms": [
+        "museum collections data",
+        "archival research",
+        "craft history"
+      ]
+    },
+    "workflow": {
+      "name": "score records by completeness and pick which to follow up",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A search query, a page-size slider and an images-only checkbox build a CSV request to the collections API. The exact URL is shown in an expander, and a sample CSV is used if the request fails or the person asks for it.",
+          "parts": [
+            "search-controls",
+            "source-status"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Made-after and made-before year inputs filter on the first four-digit year parsed from the free-text date. A strict toggle decides whether records whose dates cannot be parsed are dropped.",
+          "parts": [
+            "date-filter"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Each record scores 0 to 9, one point for each of nine catalogue fields that is filled in. The score maps to an evidence-status label, and the record gets reasons ('maker name present; ...') and rule-based archival next steps.",
+          "parts": [
+            "records-table"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "Metrics show the number of records loaded, the mean score and the maximum possible score, along with counts by evidence status and the top five maker names and places.",
+          "parts": [
+            "summary-panel"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A four-column grid shows a thumbnail for each record that has an image id, captioned with title, maker, date and a link to the object page. A slider sets how many thumbnails are shown.",
+          "parts": [
+            "thumbnail-grid"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "A 'Download enriched CSV' button saves the displayed table with its scores, labels, reasons and next steps.",
+          "parts": [
+            "records-table"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The score measures archival tractability (how many follow-up fields are filled in), not the likelihood of the property being researched, and the interface states this caution explicitly.",
+        "Each record gets suggested archival routes based on which fields are present: prosopographical, role-term, place-based, business-archive and object-led routes, plus a separate prompt for records with little metadata.",
+        "Free-text historical dates are parsed for a year, and the strict toggle controls whether records with dates that cannot be parsed are kept.",
+        "Live API data falls back to labelled illustrative sample rows, so the workflow still runs offline."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "search-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Search controls sidebar",
+      "summary": "Sets the API search query, page size, thumbnail limit, an images-only option and a sample-data-only option.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "search",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 165,
+          "end": 175,
+          "role": "markup",
+          "anchor": "7886988bea3e",
+          "first": "st.sidebar.header(\"Search controls\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 189,
+          "end": 189,
+          "role": "markup",
+          "anchor": "f549f4726553",
+          "first": "fallback_only = st.sidebar.checkbox(\"Use fallback sample data only\", value=False)"
+        },
+        {
+          "file": "code/src/vam_api.py",
+          "start": 16,
+          "end": 27,
+          "role": "logic",
+          "symbol": "build_api_url",
+          "anchor": "f48dc7f06318",
+          "first": "def build_api_url(query: str, page_size: int, images_only: bool = False) -> str:"
+        },
+        {
+          "file": "code/src/vam_api.py",
+          "start": 30,
+          "end": 34,
+          "role": "logic",
+          "symbol": "fetch_vam_csv",
+          "anchor": "333c26c698d9",
+          "first": "def fetch_vam_csv("
+        },
+        {
+          "file": "code/app.py",
+          "start": 48,
+          "end": 50,
+          "role": "logic",
+          "symbol": "load_live_records",
+          "anchor": "c1f042832903",
+          "first": "def load_live_records(query: str, page_size: int, images_only: bool):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 53,
+          "end": 55,
+          "role": "logic",
+          "symbol": "load_fallback_records",
+          "anchor": "4477c932acfd",
+          "first": "def load_fallback_records() -> pd.DataFrame:"
+        },
+        {
+          "file": "code/data/sample_records.csv",
+          "start": 1,
+          "end": 9,
+          "role": "data",
+          "anchor": "0999c3ead708",
+          "first": "accessionNumber,accessionYear,systemNumber,objectType,_primaryTitle,_primaryPlace,_primaryMaker__name,_primaryMaker__ass"
+        }
+      ]
+    },
+    {
+      "id": "date-filter",
+      "level": "component",
+      "parent": "search-controls",
+      "title": "Local date filter",
+      "summary": "Keeps only records whose parsed year falls between the made-after and made-before years, with a strict option for dates that cannot be parsed.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 177,
+          "end": 196,
+          "role": "markup",
+          "anchor": "e0e6eef169e0",
+          "first": "st.sidebar.header(\"Local date filter\")"
+        },
+        {
+          "file": "code/src/utils.py",
+          "start": 90,
+          "end": 94,
+          "role": "logic",
+          "symbol": "filter_by_date_range",
+          "anchor": "69041c2eaa46",
+          "first": "def filter_by_date_range("
+        },
+        {
+          "file": "code/src/utils.py",
+          "start": 78,
+          "end": 87,
+          "role": "logic",
+          "symbol": "extract_first_year",
+          "anchor": "cf8b11c1cb3d",
+          "first": "def extract_first_year(value: object) -> int | None:"
+        }
+      ]
+    },
+    {
+      "id": "source-status",
+      "level": "component",
+      "parent": null,
+      "title": "Data source status and API request",
+      "summary": "Says whether live or sample data is in use, warns when the request failed, and shows the exact API URL.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 198,
+          "end": 245,
+          "role": "logic",
+          "anchor": "1251a50ad085",
+          "first": "api_url = build_api_url(query, page_size, images_only)"
+        },
+        {
+          "file": "code/src/utils.py",
+          "start": 133,
+          "end": 150,
+          "role": "logic",
+          "symbol": "has_usable_rows",
+          "anchor": "9aeb273b0bd3",
+          "first": "def has_usable_rows(df: pd.DataFrame) -> bool:"
+        }
+      ]
+    },
+    {
+      "id": "summary-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Summary",
+      "summary": "Shows the number of records, the mean and maximum score, counts by evidence status, and the top maker names and places.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 74,
+          "end": 112,
+          "role": "logic",
+          "symbol": "render_summary",
+          "anchor": "1dabc1955905",
+          "first": "def render_summary(df: pd.DataFrame) -> None:"
+        },
+        {
+          "file": "code/src/utils.py",
+          "start": 159,
+          "end": 171,
+          "role": "logic",
+          "symbol": "top_nonempty_values",
+          "anchor": "6d0dc88d86d7",
+          "first": "def top_nonempty_values(series: pd.Series, limit: int = 5) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "records-table",
+      "level": "view",
+      "parent": null,
+      "title": "Object records table",
+      "summary": "Lists each filtered record with object-page links, its tractability score, evidence status, reasons and archival next steps, and exports the table as CSV.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 258,
+          "end": 283,
+          "role": "markup",
+          "anchor": "331e6c8ce3b3",
+          "first": "st.subheader(\"Object records\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 58,
+          "end": 71,
+          "role": "logic",
+          "symbol": "enrich_records",
+          "anchor": "5c354df918e3",
+          "first": "def enrich_records(df: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/scoring.py",
+          "start": 32,
+          "end": 49,
+          "role": "logic",
+          "symbol": "score_record",
+          "anchor": "5c304b346ace",
+          "first": "def score_record(row) -> dict:"
+        },
+        {
+          "file": "code/src/scoring.py",
+          "start": 21,
+          "end": 29,
+          "role": "logic",
+          "symbol": "evidence_status_for_score",
+          "anchor": "0e32f2972801",
+          "first": "def evidence_status_for_score(score: int) -> str:"
+        },
+        {
+          "file": "code/src/archival_routes.py",
+          "start": 11,
+          "end": 81,
+          "role": "logic",
+          "symbol": "recommend_next_steps",
+          "anchor": "5e7746ce3438",
+          "first": "def recommend_next_steps(row) -> str:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 27,
+          "end": 44,
+          "role": "data",
+          "anchor": "0327cb1bbf39",
+          "first": "DISPLAY_COLUMNS = ["
+        }
+      ]
+    },
+    {
+      "id": "thumbnail-grid",
+      "level": "view",
+      "parent": null,
+      "title": "Thumbnails",
+      "summary": "Previews images of records that have an image id, up to the thumbnail limit, each captioned with title, maker, date and a link to the object page.",
+      "views": [
+        "thumbnail grid"
+      ],
+      "interactions": [],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 115,
+          "end": 146,
+          "role": "logic",
+          "symbol": "render_thumbnails",
+          "anchor": "b3d2a1e3d9e1",
+          "first": "def render_thumbnails(df: pd.DataFrame, thumbnail_limit: int) -> None:"
+        },
+        {
+          "file": "code/src/utils.py",
+          "start": 114,
+          "end": 122,
+          "role": "logic",
+          "symbol": "make_thumbnail_url",
+          "anchor": "5e3b44c5032e",
+          "first": "def make_thumbnail_url(image_id: object) -> str:"
+        },
+        {
+          "file": "code/src/utils.py",
+          "start": 125,
+          "end": 130,
+          "role": "logic",
+          "symbol": "make_object_page_url",
+          "anchor": "6243855f317a",
+          "first": "def make_object_page_url(system_number: object) -> str:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "task",
+      "list": "verbs",
+      "term": "filter"
+    }
+  ]
+}

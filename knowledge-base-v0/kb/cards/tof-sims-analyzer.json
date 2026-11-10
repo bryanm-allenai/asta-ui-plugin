@@ -1,0 +1,392 @@
+{
+  "schema": "astaui.card/1",
+  "id": "tof-sims-analyzer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T07:34:41Z"
+  },
+  "app": {
+    "title": "TOF-SIMS Analyzer",
+    "summary": "A person loads several mass spectrum files, or switches on six synthetic demo spectra. The app bins every spectrum onto one shared m/z axis at a chosen bin width, then applies the chosen normalization and scaling. Next the person overlays the aligned spectra and can export the aligned matrix. They can then subtract one chosen sample from another to find the masses that differ most, run PCA to see how the samples separate and which masses drive each component, and cluster the samples or the most variable masses into a dendrogram with a distance heatmap. The outputs are an aligned intensity table, PCA scores as CSV, and a picture of which samples group together and why.",
+    "task": {
+      "text": "Align a set of mass spectra on a common axis and find which samples group together, and which masses separate them.",
+      "verbs": [
+        "compare",
+        "derive",
+        "organize",
+        "explore",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Several mass spectra, each a list of intensities over m/z, binned into a matrix with one sample per row and one m/z bin per column.",
+      "item": "one sample's mass spectrum (intensity against m/z)",
+      "shapes": [
+        "table",
+        "spectra"
+      ]
+    },
+    "stage": {
+      "text": "exploring and comparing a batch of instrument spectra soon after measurement, before interpreting peaks",
+      "terms": [
+        "explore",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Settings in the sidebar for loading, binning, normalization and scaling feed one processed matrix, and every tab is redrawn from it. The tabs give an overlay of all spectra, a difference between two spectra, PCA scores and loadings, and hierarchical clustering. Each tab adds its own selectors: the sample pair, the components on each axis, the distance metric and the linkage method.",
+      "views": [
+        "line chart",
+        "table view",
+        "bar chart",
+        "scatter plot",
+        "heatmap",
+        "dendrogram"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "multivariate analysis of TOF-SIMS mass spectra in surface analysis",
+      "disciplines": [
+        "materials science"
+      ],
+      "terms": [
+        "tof sims",
+        "surface analysis",
+        "multivariate analysis"
+      ]
+    },
+    "workflow": {
+      "name": "align a set of spectra and find what separates the samples",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload several .asc/.txt/.csv spectrum files. The parser skips header lines on its own and merges duplicate m/z values. A checkbox loads six synthetic demo spectra instead.",
+          "parts": [
+            "data-import"
+          ]
+        },
+        {
+          "step": "put every item on a common axis and normalize it",
+          "here": "Choose a bin width of 0.1, 0.5 or 1 Da to bin all spectra onto one m/z grid, filling empty bins with zero. Then choose TIC normalization and one of mean-centering, autoscaling or Poisson scaling.",
+          "parts": [
+            "preprocessing"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Overlay all aligned spectra on one plot, with toggles for a log intensity axis and raw versus normalized data. Read the aligned matrix in a table and download it as aligned_spectra.csv.",
+          "parts": [
+            "spectra-overlay"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Pick a reference sample A and a comparison sample B. A red/blue bar chart shows the normalized B − A difference per m/z bin, and a table lists the 20 bins with the largest absolute difference.",
+          "parts": [
+            "difference-spectrum"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run PCA with a slider for the number of components. Choose which components go on the score plot axes, read the explained-variance bars, and view the top m/z loadings for one component. Download the scores as pca_scores.csv.",
+          "parts": [
+            "pca"
+          ]
+        },
+        {
+          "step": "group items into clusters",
+          "here": "Run hierarchical clustering on either the samples or the highest-variance m/z bins, with a choice of distance metric and linkage method. Ward linkage forces Euclidean distance. The result is drawn as a dendrogram, plus a sample-to-sample distance heatmap.",
+          "parts": [
+            "hca"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Spectra from separate files are re-binned onto one shared m/z grid before any comparison, at a bin width the person picks.",
+        "Scaling options come from mass-spectrometry chemometrics, including Poisson scaling, which divides by the square root of each bin's mean count.",
+        "The difference spectrum is signed and coloured by which sample has more at that mass, and a table ranks the masses that differ most.",
+        "Clustering can run on the samples or be transposed to run on masses, keeping only the most variable m/z bins."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Loading and preprocessing sidebar",
+      "summary": "Holds all the input and preprocessing settings that every analysis tab is computed from.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 186,
+          "end": 224,
+          "role": "markup",
+          "anchor": "9b6d1895f067",
+          "first": "# ──────────────────────────────────────────────"
+        },
+        {
+          "file": "code/app.py",
+          "start": 226,
+          "end": 286,
+          "role": "logic",
+          "anchor": "56426c253756",
+          "first": "# ──────────────────────────────────────────────"
+        }
+      ]
+    },
+    {
+      "id": "data-import",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Spectrum file upload and demo data",
+      "summary": "Reads several spectrum files, works out where the numeric data starts, or generates synthetic demo spectra.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 190,
+          "end": 200,
+          "role": "markup",
+          "anchor": "5946ae2bcc79",
+          "first": "st.header(\"📂 ファイル読み込み\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 64,
+          "end": 93,
+          "role": "logic",
+          "symbol": "parse_phi_asc",
+          "anchor": "535b6438116f",
+          "first": "def parse_phi_asc(file_bytes: bytes, filename: str) -> Optional[pd.Series]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 133,
+          "end": 169,
+          "role": "data",
+          "symbol": "generate_demo_spectra",
+          "anchor": "25297340f2f9",
+          "first": "def generate_demo_spectra(n_per_group: int = 3, seed: int = 42) -> list[pd.Series]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 229,
+          "end": 252,
+          "role": "logic",
+          "anchor": "3e57efd6d73e",
+          "first": "if not uploaded_files and not use_demo:"
+        }
+      ]
+    },
+    {
+      "id": "preprocessing",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Alignment, normalization and scaling",
+      "summary": "Bins all spectra onto a common m/z axis and applies TIC normalization and the chosen scaling.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 202,
+          "end": 220,
+          "role": "markup",
+          "anchor": "8e8121769ad8",
+          "first": "st.header(\"⚙️ アライメント設定\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 96,
+          "end": 98,
+          "role": "logic",
+          "symbol": "bin_spectra",
+          "anchor": "d4b9a089bb5a",
+          "first": "def bin_spectra("
+        },
+        {
+          "file": "code/app.py",
+          "start": 126,
+          "end": 130,
+          "role": "logic",
+          "symbol": "apply_normalization",
+          "anchor": "145128af09d2",
+          "first": "def apply_normalization(df: pd.DataFrame, method: str) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 172,
+          "end": 183,
+          "role": "logic",
+          "symbol": "apply_scaling",
+          "anchor": "d7696e783746",
+          "first": "def apply_scaling(df: pd.DataFrame, method: str) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 254,
+          "end": 270,
+          "role": "logic",
+          "anchor": "2c8b6ac87b70",
+          "first": "# ビン化・アライメント"
+        }
+      ]
+    },
+    {
+      "id": "spectra-overlay",
+      "level": "view",
+      "parent": null,
+      "title": "Raw data and alignment tab",
+      "summary": "Overlays every aligned spectrum on one plot, shows the aligned matrix and exports it as CSV.",
+      "views": [
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 289,
+          "end": 334,
+          "role": "logic",
+          "anchor": "f1e8fd6a5e79",
+          "first": "# ══════════════════════════════════════════════"
+        }
+      ]
+    },
+    {
+      "id": "difference-spectrum",
+      "level": "view",
+      "parent": null,
+      "title": "Difference spectrum tab",
+      "summary": "Subtracts one chosen sample from another per m/z bin and ranks the masses that differ most.",
+      "views": [
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 337,
+          "end": 398,
+          "role": "logic",
+          "anchor": "73c2d70a1926",
+          "first": "# ══════════════════════════════════════════════"
+        }
+      ]
+    },
+    {
+      "id": "pca",
+      "level": "view",
+      "parent": null,
+      "title": "PCA tab",
+      "summary": "Fits PCA to the processed matrix and shows a score plot with selectable axes, explained variance and the top loadings, with the scores available as CSV.",
+      "views": [
+        "scatter plot",
+        "bar chart"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 401,
+          "end": 508,
+          "role": "logic",
+          "anchor": "4d7142dc3749",
+          "first": "# ══════════════════════════════════════════════"
+        }
+      ]
+    },
+    {
+      "id": "hca",
+      "level": "view",
+      "parent": null,
+      "title": "Hierarchical clustering tab",
+      "summary": "Clusters the samples or the most variable masses with a chosen metric and linkage method, and draws a dendrogram and a distance heatmap.",
+      "views": [
+        "dendrogram",
+        "heatmap"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 511,
+          "end": 598,
+          "role": "logic",
+          "anchor": "8a307f7f851f",
+          "first": "# ══════════════════════════════════════════════"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "data",
+      "list": "shapes",
+      "term": "spectra"
+    },
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "dendrogram"
+    }
+  ]
+}

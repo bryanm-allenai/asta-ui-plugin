@@ -1,0 +1,521 @@
+{
+  "schema": "astaui.card/1",
+  "id": "binary-classification-workbench",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:20:58Z"
+  },
+  "app": {
+    "title": "Binary Classification Workbench",
+    "summary": "A person loads a table of labelled observations from a built-in example, an uploaded CSV or a public URL, picks the two-class target column, which class counts as positive and which columns to leave out, and compares the two classes' distributions on each predictor. They then choose a classifier, a class-imbalance method, a test fraction and a seed, fit the model on a stratified hold-out split, and judge it with a confusion matrix, precision-recall and ROC curves and a sweep of metrics across decision thresholds. They settle on an operating threshold, which starts at the F1-maximising value. Last, they upload new unlabelled rows, score them with the fitted model at that threshold, and download the scored CSV.",
+    "task": {
+      "text": "Fit and evaluate a binary classifier on labelled tabular data, choose the decision threshold that balances precision, recall and the share of items flagged, and apply it to new unlabelled data.",
+      "verbs": [
+        "derive",
+        "decide",
+        "compare",
+        "explore",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A table of observations with numeric predictor columns and one two-class label column, often with one class much rarer than the other; later, a table of new unlabelled rows with the same predictors.",
+      "item": "one labelled observation: a row of numeric predictors with a two-class label",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "modelling labelled data and choosing a decision threshold, before scoring new cases",
+      "terms": [
+        "analyze",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar loads the data and sets the target, positive class and excluded columns, and these drive six tabs. A fitted model is held in the session under a signature of its settings, so the threshold, evaluation and prediction tabs open only while that signature matches the current controls. Moving a threshold slider redraws the metrics, confusion matrix and curves without refitting the model.",
+      "views": [
+        "sidebar list",
+        "form",
+        "summary stats",
+        "table view",
+        "bar chart",
+        "heatmap",
+        "line chart",
+        "strip plot"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "supervised binary classification with imbalanced classes in machine learning",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "machine learning",
+        "imbalanced classification",
+        "threshold tuning"
+      ]
+    },
+    "workflow": {
+      "name": "train a two-class model, pick its decision threshold, and score new items",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A sidebar radio picks a built-in example dataset, an uploaded CSV or a public CSV URL (Google Drive share links are rewritten to direct downloads); rows and memory use are shown once it loads.",
+          "parts": [
+            "data-sidebar"
+          ]
+        },
+        {
+          "step": "choose what to predict and which columns to use",
+          "here": "Select the target column (it must have exactly two classes), the positive class, and identifier or non-predictor columns to exclude. Non-numeric and constant columns are dropped automatically, and the class counts and majority-class accuracy baseline are shown.",
+          "parts": [
+            "class-config",
+            "dataset-overview"
+          ]
+        },
+        {
+          "step": "compare the two classes on each predictor",
+          "here": "Pick a feature and a bin count to get overlaid per-class histograms on a symlog count axis, plus n, mean, SD and median for each class.",
+          "parts": [
+            "feature-explorer"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Choose XGBoost, Random Forest, Logistic Regression or Decision Tree, an imbalance method (none, class weighting, SMOTE, under-sampling), a test fraction and a seed, then press Run model. Imputation, scaling and resampling are fitted on the stratified training split only.",
+          "parts": [
+            "model-settings"
+          ]
+        },
+        {
+          "step": "pick an operating threshold from the trade-off",
+          "here": "A threshold slider starts at the F1-maximising value and updates the precision, recall, F1 and positive-rate figures, the confusion matrix and the PR curve. The ROC curve and per-class mean probabilities with a chosen CI are shown beside them. A 0.01–0.99 sweep plots every metric against the threshold.",
+          "parts": [
+            "model-evaluation",
+            "threshold-tuning"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download an empty template with the required predictor columns, upload an unlabelled CSV, check its schema, and score it at the chosen threshold. Counts per predicted class are shown, and the CSV with the probability and predicted class added can be downloaded.",
+          "parts": [
+            "predict-new-data"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The threshold is not fixed at 0.5. It starts at the value that maximises F1 across a 0.01–0.99 sweep, and the chosen threshold is set against 0.5 on the held-out test set.",
+        "The share of items predicted positive (an alert rate) is tracked alongside precision and recall as a measure of workload.",
+        "Class-imbalance handling is chosen per run (class weighting, SMOTE or under-sampling) and applied only to the training split; the test set keeps its original class balance.",
+        "Each fitted result is stamped with a signature of the data and settings. If any control changes, the result is marked stale and the downstream tabs stay locked until the model is refit.",
+        "Before scoring, new data is checked against the fitted model's predictor schema, and a blank input template can be downloaded."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Data source sidebar",
+      "summary": "Loads a built-in example, an uploaded CSV or a public CSV URL and reports its size.",
+      "views": [
+        "sidebar list",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 88,
+          "end": 144,
+          "role": "data",
+          "anchor": "ac8c520a7c48",
+          "first": "BUILTIN_DATASETS = {"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 774,
+          "end": 857,
+          "role": "markup",
+          "anchor": "e2e330a8003c",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 152,
+          "end": 153,
+          "role": "logic",
+          "symbol": "load_csv",
+          "anchor": "f3e5e3ada7ab",
+          "first": "def load_csv(source):"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 156,
+          "end": 162,
+          "role": "logic",
+          "symbol": "normalise_remote_url",
+          "anchor": "931e3d43f26e",
+          "first": "def normalise_remote_url(url: str) -> str:"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 165,
+          "end": 166,
+          "role": "logic",
+          "symbol": "dataframe_memory_mb",
+          "anchor": "78dc2d66c3c9",
+          "first": "def dataframe_memory_mb(dataframe: pd.DataFrame) -> float:"
+        }
+      ]
+    },
+    {
+      "id": "class-config",
+      "level": "component",
+      "parent": "data-sidebar",
+      "title": "Classification setup",
+      "summary": "Sets the two-class target, the positive class and the excluded columns, and builds the numeric predictor matrix from them.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 864,
+          "end": 949,
+          "role": "markup",
+          "anchor": "fb14ec77da45",
+          "first": "all_columns = data.columns.tolist()"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 169,
+          "end": 172,
+          "role": "logic",
+          "symbol": "clean_text_target",
+          "anchor": "3d1775a627eb",
+          "first": "def clean_text_target(series: pd.Series) -> pd.Series:"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 188,
+          "end": 192,
+          "role": "logic",
+          "symbol": "prepare_xy",
+          "anchor": "5e99261bc451",
+          "first": "def prepare_xy("
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 175,
+          "end": 185,
+          "role": "logic",
+          "symbol": "class_summary",
+          "anchor": "71babfb84d5f",
+          "first": "def class_summary(target: pd.Series, positive_value) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "dataset-overview",
+      "level": "view",
+      "parent": null,
+      "title": "Dataset overview",
+      "summary": "Shows class counts, the positive-class rate and the majority-class accuracy baseline, with a row preview and descriptive statistics.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 956,
+          "end": 1066,
+          "role": "markup",
+          "anchor": "5f7a0ddf367e",
+          "first": "tabs = st.tabs("
+        }
+      ]
+    },
+    {
+      "id": "feature-explorer",
+      "level": "view",
+      "parent": null,
+      "title": "Feature explorer",
+      "summary": "Compares one predictor's distribution between the two classes with overlaid symlog histograms and per-class summary statistics.",
+      "views": [
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 1072,
+          "end": 1118,
+          "role": "markup",
+          "anchor": "fb71dc5c65ca",
+          "first": "with tabs[1]:"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 454,
+          "end": 460,
+          "role": "logic",
+          "symbol": "make_class_histogram",
+          "anchor": "d59e9458d839",
+          "first": "def make_class_histogram("
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 415,
+          "end": 447,
+          "role": "logic",
+          "symbol": "fix_log",
+          "anchor": "256e93274d4a",
+          "first": "def fix_log(axis, ticks, start, end):"
+        }
+      ]
+    },
+    {
+      "id": "model-settings",
+      "level": "component",
+      "parent": "model-evaluation",
+      "title": "Model settings and run",
+      "summary": "Picks the classifier, imbalance method, test fraction and seed, fits the model on a stratified split, and warns when the stored fit no longer matches the controls.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 219,
+          "end": 231,
+          "role": "data",
+          "anchor": "d2e65fb473db",
+          "first": "MODEL_NAMES = ["
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 1125,
+          "end": 1292,
+          "role": "markup",
+          "anchor": "703e36f830bb",
+          "first": "with tabs[2]:"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 234,
+          "end": 238,
+          "role": "logic",
+          "symbol": "build_classifier",
+          "anchor": "1d2f57ca9e1f",
+          "first": "def build_classifier("
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 278,
+          "end": 284,
+          "role": "logic",
+          "symbol": "fit_and_score_model",
+          "anchor": "ccc3f35fe198",
+          "first": "def fit_and_score_model("
+        }
+      ]
+    },
+    {
+      "id": "model-evaluation",
+      "level": "view",
+      "parent": null,
+      "title": "Model workbench evaluation",
+      "summary": "A threshold slider that starts at the F1-best value drives the metric tiles, confusion matrix and PR curve. Beside them are the ROC curve, per-class mean probabilities with a confidence interval, and feature importance.",
+      "views": [
+        "summary stats",
+        "heatmap",
+        "line chart",
+        "strip plot",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "dashboard",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 1293,
+          "end": 1416,
+          "role": "markup",
+          "anchor": "42d0304266e4",
+          "first": "else:"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 357,
+          "end": 373,
+          "role": "logic",
+          "symbol": "metrics_at_threshold",
+          "anchor": "3e5f9853be75",
+          "first": "def metrics_at_threshold(y_true, y_prob, threshold: float) -> dict:"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 507,
+          "end": 548,
+          "role": "logic",
+          "symbol": "make_confusion_plot",
+          "anchor": "0cf24e4405fc",
+          "first": "def make_confusion_plot(result, negative_label, positive_label):"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 551,
+          "end": 586,
+          "role": "logic",
+          "symbol": "make_pr_plot",
+          "anchor": "b9f990cdba1a",
+          "first": "def make_pr_plot(y_true, y_prob, threshold):"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 589,
+          "end": 621,
+          "role": "logic",
+          "symbol": "make_roc_plot",
+          "anchor": "77629d408d34",
+          "first": "def make_roc_plot(y_true, y_prob):"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 624,
+          "end": 629,
+          "role": "logic",
+          "symbol": "make_probability_separation_plot",
+          "anchor": "43120a8e1668",
+          "first": "def make_probability_separation_plot("
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 743,
+          "end": 766,
+          "role": "logic",
+          "symbol": "make_feature_importance_plot",
+          "anchor": "8f98a689027f",
+          "first": "def make_feature_importance_plot(feature_names, importance):"
+        }
+      ]
+    },
+    {
+      "id": "threshold-tuning",
+      "level": "view",
+      "parent": null,
+      "title": "Threshold tuning",
+      "summary": "Plots F1, precision, recall and positive-prediction rate across a sweep of thresholds and marks the F1 maximum. A slider inspects any threshold, and the full sweep table can be opened. The interpretation tab restates the best operating point in words.",
+      "views": [
+        "line chart",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 1423,
+          "end": 1568,
+          "role": "markup",
+          "anchor": "a549312e9f3d",
+          "first": "with tabs[3]:"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 377,
+          "end": 390,
+          "role": "logic",
+          "symbol": "threshold_table",
+          "anchor": "2dcaf7444267",
+          "first": "def threshold_table(y_true, y_prob):"
+        },
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 707,
+          "end": 740,
+          "role": "logic",
+          "symbol": "make_threshold_plot",
+          "anchor": "6c4befd6fa65",
+          "first": "def make_threshold_plot(table, selected_threshold, rate_label):"
+        }
+      ]
+    },
+    {
+      "id": "predict-new-data",
+      "level": "view",
+      "parent": null,
+      "title": "Predict new data",
+      "summary": "Checks an uploaded unlabelled CSV against the required predictors and scores it at the chosen threshold. It shows counts per predicted class and exports the scored CSV, with a blank template and a comparison against a 0.5 threshold.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/binary_classification_app.py",
+          "start": 1575,
+          "end": 1807,
+          "role": "markup",
+          "anchor": "06049d9f70e8",
+          "first": "with tabs[5]:"
+        }
+      ]
+    }
+  ]
+}

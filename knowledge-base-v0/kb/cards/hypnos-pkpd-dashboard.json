@@ -1,0 +1,428 @@
+{
+  "schema": "astaui.card/1",
+  "id": "hypnos-pkpd-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T15:51:55Z"
+  },
+  "app": {
+    "title": "Hypnos — anesthetic PK/PD model divergence",
+    "summary": "A person sets up a virtual patient and a dosing schedule in a sidebar: the drug, body size, organ function, bolus and infusion, the time horizon, and optionally seeded prediction bands and uncertainty in the weight value. The dashboard runs every published model for that drug on the same scenario. It overlays their plasma and effect-site curves, greys out models whose applicability range the patient falls outside, and reports how far apart the models are at the peak and which pair drives the gap. With bands on, it also shows whether the models can be told apart beyond their own stated variability, and how the uncertainty splits into structural, between-subject, residual and covariate shares. Further panels apply the same treatment to drug interactions, local anesthetics, inhaled agents, reversal agents, children and a declared genotype.",
+    "task": {
+      "text": "Measure how much published population models disagree when they predict the same scenario, and judge whether that disagreement goes beyond each model's own stated uncertainty.",
+      "verbs": [
+        "compare",
+        "derive",
+        "explore",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "A curated library of published parameter sets for population models, with citations, confidence tiers, applicability ranges and variability terms, simulated forward over time for a scenario the person sets",
+      "item": "a published population model of one drug, simulated as a concentration or effect curve over time for the chosen patient and dose",
+      "shapes": [
+        "time series",
+        "table",
+        "categories",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "comparing published models against each other before choosing one for a study or simulation",
+      "terms": [
+        "compare",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar inputs drive a single simulation of every eligible model. Its results feed overlaid line charts with optional percentile ribbons, a status list of models that were kept, greyed out or unavailable, and summary metrics for the divergence and the variance decomposition. Self-contained panels further down repeat the same simulate-and-overlay approach for other subsystems, each with its own column of controls.",
+      "views": [
+        "line chart",
+        "summary stats",
+        "bar chart",
+        "table view",
+        "list",
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "toggle view",
+        "hover for detail",
+        "select"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "population pharmacokinetic/pharmacodynamic model simulation and comparison in anesthesia pharmacology",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "pharmacometrics",
+        "pk pd modelling",
+        "anesthesia"
+      ]
+    },
+    "workflow": {
+      "name": "run competing published models on one scenario and measure how much they disagree",
+      "steps": [
+        {
+          "step": "set up the scenario to test",
+          "here": "Sidebar: pick a drug, set age, weight, height and sex, add organ function (Child-Pugh, CrCl, albumin, ejection fraction), and enter bolus and infusion text from drug-appropriate defaults, plus a time horizon",
+          "parts": [
+            "scenario-sidebar"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Models whose applicability range the patient violates are greyed out and tiered down to D, with reasons; models without a kernel are listed as unavailable",
+          "parts": [
+            "model-status"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Effect-site and plasma concentration curves from every included model are overlaid on shared time axes, each labelled with its tier",
+          "parts": [
+            "divergence-curves"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A metric for peak divergence across models (absolute and relative spread), the driver pair furthest apart at the peak, each model's published MDAPE, and a table of time to peak effect with ke0",
+          "parts": [
+            "model-status"
+          ]
+        },
+        {
+          "step": "add uncertainty and test whether the difference survives it",
+          "here": "Turning on seeded 5–95% bands (with a seed and Monte-Carlo sample count), or a weight SD, draws ribbons only for models that publish variability. The view then reports a separation index, a variance-share bar chart, the reducible vs irreducible split, and a PK variability band carried through into effect (BIS)",
+          "parts": [
+            "scenario-sidebar",
+            "divergence-curves",
+            "uncertainty-readouts",
+            "effect-band"
+          ]
+        },
+        {
+          "step": "repeat the comparison for special cases",
+          "here": "Separate panels for propofol–remifentanil synergy, local-anesthetic absorption by injection site against toxicity-threshold ranges, inhaled-agent MAC and wash-in/out, reversal agents, a child patient by post-menstrual age, and a declared genotype",
+          "parts": [
+            "subsystem-panels",
+            "developmental-overlay",
+            "pgx-overlay"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each model has an applicability range, and a patient outside it greys the model out and forces its confidence tier down to D. The set of eligible models changes as the patient changes.",
+        "Prediction bands are drawn only for models that publish between-subject variability. The other models stay as dashed point lines and are named, never given a borrowed band.",
+        "Uncertainty is split into structural (which model), between-subject, residual and covariate shares, and also into reducible vs irreducible, at the moment of peak disagreement.",
+        "The interface only simulates forward from a dose the person enters. It never computes a dose, and it repeats this in its labels throughout.",
+        "Confidence tiers carry through composed simulations: a PK model, an effect link and an interaction surface together take the worst tier among their components."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "scenario-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Scenario sidebar",
+      "summary": "Sets the drug, the virtual patient, organ function, the dosing schedule, the horizon, and the switches for prediction bands and weight uncertainty that every other view simulates from.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 92,
+          "end": 141,
+          "role": "markup",
+          "anchor": "a83203ae0605",
+          "first": "drugs = pk_drugs(ds)"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 142,
+          "end": 158,
+          "role": "logic",
+          "anchor": "f2471bd7cfce",
+          "first": "show_cov = weight_sd > 0"
+        }
+      ]
+    },
+    {
+      "id": "divergence-curves",
+      "level": "component",
+      "parent": "main-view",
+      "title": "Overlaid model curves",
+      "summary": "Overlays effect-site and plasma concentration curves from every included model. With bands on, models that publish variability get shaded percentile ribbons, and the rest are drawn as dashed point lines.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 38,
+          "end": 80,
+          "role": "logic",
+          "symbol": "band_chart",
+          "anchor": "8d2daf0e32e1",
+          "first": "def band_chart(t, results, key, f, unit, percentile=(5, 95)):"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 162,
+          "end": 189,
+          "role": "markup",
+          "anchor": "b1e970a7e3d9",
+          "first": "col1, col2 = st.columns([3, 2])"
+        }
+      ]
+    },
+    {
+      "id": "model-status",
+      "level": "component",
+      "parent": "main-view",
+      "title": "Model status and divergence",
+      "summary": "Lists the models that were included (with tier, peak and published MDAPE), greyed out (with reasons) or unavailable, and shows the peak divergence, the driver pair and a table of time to peak effect.",
+      "views": [
+        "list",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 191,
+          "end": 212,
+          "role": "markup",
+          "anchor": "1537533a384e",
+          "first": "with col2:"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 258,
+          "end": 269,
+          "role": "logic",
+          "anchor": "4048b1c5118d",
+          "first": "# Onset (time-to-peak-effect) for models with a ke0 link"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty-readouts",
+      "level": "component",
+      "parent": "main-view",
+      "title": "Are the models distinguishable?",
+      "summary": "With bands on, shows a separation index for the driver pair, a bar chart splitting variance into structural, between-subject, residual and covariate shares, the reducible vs irreducible split, and which models were left out of the band math.",
+      "views": [
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 213,
+          "end": 256,
+          "role": "markup",
+          "anchor": "5e259364fef0",
+          "first": "# v0.2 uncertainty-aware divergence: does the gap survive the models' own BSV?"
+        }
+      ]
+    },
+    {
+      "id": "effect-band",
+      "level": "view",
+      "parent": null,
+      "title": "PD effect band",
+      "summary": "Carries one model's between-subject PK variability through a fixed effect link into a BIS ribbon with a median line, and gives the band at peak effect, labelled as a lower bound.",
+      "views": [
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 271,
+          "end": 306,
+          "role": "markup",
+          "anchor": "1d689f9d8692",
+          "first": "# --- PD effect (BIS) prediction band: PK BSV propagated through the Hill link (v0.2 §14) ---"
+        }
+      ]
+    },
+    {
+      "id": "subsystem-panels",
+      "level": "view",
+      "parent": null,
+      "title": "Interaction, local anesthetic, inhaled agent and reversal panels",
+      "summary": "Self-contained sections with their own controls that compare propofol with and without remifentanil, local-anesthetic absorption by injection site against toxicity-threshold ranges, age-corrected MAC and wash-in/out across inhaled agents, and a given reversal dose acting on its agonist.",
+      "views": [
+        "line chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "small multiples",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 308,
+          "end": 330,
+          "role": "markup",
+          "anchor": "956ba176689a",
+          "first": "if drug == \"propofol\":"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 339,
+          "end": 409,
+          "role": "markup",
+          "anchor": "68b05ff35c13",
+          "first": "la_models = sorted(m.id for m in ds if m.subsystem == \"local_anesthetics\")"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 415,
+          "end": 453,
+          "role": "markup",
+          "anchor": "668e03bd6966",
+          "first": "volatiles = sorted(m.id for m in ds if m.purpose == \"physicochemical\")"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 458,
+          "end": 514,
+          "role": "markup",
+          "anchor": "3522470705de",
+          "first": "reversal_agents = {m.drug_name: m for m in ds if m.is_reversal_agent}"
+        }
+      ]
+    },
+    {
+      "id": "developmental-overlay",
+      "level": "view",
+      "parent": null,
+      "title": "Developmental extrapolation",
+      "summary": "For a child set by post-menstrual age, weight and height, overlays models actually fitted in children against adult models scaled to that child and a naive per-kg scaling, alongside a table of which fitted models apply and the maturation factor.",
+      "views": [
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 521,
+          "end": 579,
+          "role": "markup",
+          "anchor": "021cbab9333e",
+          "first": "dev_drugs = sorted({m.drug_name for m in ds if m.has_developmental_model})"
+        }
+      ]
+    },
+    {
+      "id": "pgx-overlay",
+      "level": "view",
+      "parent": null,
+      "title": "Pharmacogenomics overlay",
+      "summary": "Once a genotype is declared, lists drugs to avoid first, then drugs to be aware of, then opt-in kinetic modifiers, the drugs not affected, and the drugs with no evidence.",
+      "views": [
+        "list",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 584,
+          "end": 625,
+          "role": "markup",
+          "anchor": "4a7b9f51073b",
+          "first": "if any(m.has_pharmacogenomics for m in ds):"
+        }
+      ]
+    },
+    {
+      "id": "main-view",
+      "level": "view",
+      "parent": null,
+      "title": "Model-divergence view",
+      "summary": "The main two-column area: overlaid concentration curves on the left, and model status with divergence and uncertainty readouts on the right.",
+      "views": [
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 82,
+          "end": 90,
+          "role": "markup",
+          "anchor": "0eb6985e0b7d",
+          "first": "st.set_page_config(page_title=\"Hypnos — model-divergence view\", layout=\"wide\")"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 159,
+          "end": 162,
+          "role": "logic",
+          "anchor": "29bb9c794606",
+          "first": "unit = cmp.concentration_unit"
+        }
+      ]
+    }
+  ]
+}

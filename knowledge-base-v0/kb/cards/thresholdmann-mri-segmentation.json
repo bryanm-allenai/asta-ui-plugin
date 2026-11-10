@@ -1,0 +1,714 @@
+{
+  "schema": "astaui.card/1",
+  "id": "thresholdmann-mri-segmentation",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:30:31Z"
+  },
+  "app": {
+    "title": "Thresholdmann",
+    "summary": "A person loads a 3D MRI volume from a NIfTI file, or opens a demo volume, and moves through its slices in one of three planes. They place control points in the volume and give each one a local intensity threshold. The thresholds are blended across space by inverse-distance weighting into a threshold that varies from place to place, and the mask overlay updates on every change. They pick the threshold direction, switch between seeing the mask and the threshold field, and can check the mask as a 3D surface. At the end they save the binary mask as a NIfTI file and the control points as JSON, so a script can make the same mask again.",
+    "task": {
+      "text": "Build a brain mask from an MRI volume with a threshold that varies across space, set by hand at control points, and save the mask and the points that reproduce it.",
+      "verbs": [
+        "derive",
+        "annotate",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "A 3D intensity volume read from a NIfTI file, plus a small table of control points, each with voxel coordinates and a local threshold value.",
+      "item": "a control point in the volume, with its i, j, k voxel position and its local threshold",
+      "shapes": [
+        "field",
+        "image",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "making first brain masks from MRI volumes, before detailed manual editing and analysis",
+      "terms": [
+        "annotate"
+      ]
+    },
+    "mechanism": {
+      "text": "A slice viewer shows the MRI with the thresholded mask laid over it, and the control points are drawn on the current slice. These points are linked to a table that lists every point with a slider and a number box for its threshold. Clicking a row jumps the viewer to that point's slice. Clicking a point highlights its row. Each edit redraws the interpolated threshold right away. A web worker thresholds the whole volume for the 3D surface render and for the mask export.",
+      "views": [
+        "image viewer",
+        "table view",
+        "3d surface view"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "drag to arrange",
+        "inline edit",
+        "keyboard shortcuts",
+        "toggle view",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "master-detail",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "segmenting MRI volumes with an interactive, space-varying threshold, in neuroimaging",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "neuroimaging",
+        "brain extraction",
+        "image segmentation"
+      ]
+    },
+    "workflow": {
+      "name": "fit a space-varying threshold from hand-placed control points and export the mask",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drag a .nii or .nii.gz file onto the upload box, choose one with the file picker, or open the bundled demo MRI. The file name, dimensions and voxel size then appear in the info panel.",
+          "parts": [
+            "upload-box",
+            "tool-panel"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Step through slices with the slice slider and switch between sagittal, axial and coronal planes. The opacity, contrast and brightness sliders change how the overlay and the image look.",
+          "parts": [
+            "slice-viewer",
+            "tool-panel"
+          ]
+        },
+        {
+          "step": "place reference points in the data",
+          "here": "With the Add, Move and Remove tools (keys A, M, R), click to add a control point, which takes the last threshold used, drag a point to move it, or click a point to delete it. One point is placed at the volume's centre to start.",
+          "parts": [
+            "control-point-editing",
+            "tool-panel"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Set each point's local threshold with its slider or number box. The threshold is blended between points by inverse-distance weighting and the mask overlay redraws at once. Select Up and Select Down set which side of the threshold the mask keeps.",
+          "parts": [
+            "control-points-table",
+            "slice-viewer",
+            "tool-panel"
+          ]
+        },
+        {
+          "step": "check the result from another angle",
+          "here": "Switch the overlay from Threshold Mask to Threshold Value to see the interpolated threshold field itself. Render 3D builds a surface mesh of the mask and opens it in a window where it can be rotated and zoomed.",
+          "parts": [
+            "tool-panel",
+            "render-3d"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Save Mask thresholds the whole volume in a worker, showing its progress, and downloads a .nii.gz mask. Save Control Points writes the points and their values as JSON, and Load Control Points brings a saved set back.",
+          "parts": [
+            "save-mask",
+            "control-points-file"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The threshold is not one number. It is blended between control points by inverse-distance weighting, with a weak background value, to make up for brightness gradients across the volume.",
+        "A direction toggle sets whether the mask keeps voxels above or below the local threshold, so it works for images with different contrasts.",
+        "The control points saved as JSON let a separate script rebuild the same mask from the original volume.",
+        "The overlay can show the interpolated threshold field instead of the mask, so the person can see the threshold they have built.",
+        "A surface mesh of the mask is computed from the thresholded volume to inspect it in 3D."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "upload-box",
+      "level": "view",
+      "parent": null,
+      "title": "Volume upload box",
+      "summary": "Takes a NIfTI volume by drag-and-drop, file picker or demo link, and opens it in the viewer.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 34,
+          "end": 45,
+          "role": "markup",
+          "symbol": "#upload-box",
+          "anchor": "ae245f2edbfe",
+          "first": "<div id=\"upload-box\" class=\"init\">"
+        },
+        {
+          "file": "code/thresholdmann.css",
+          "start": 166,
+          "end": 180,
+          "role": "style",
+          "symbol": "#upload-box",
+          "anchor": "04d10d437eb7",
+          "first": "#upload-box {"
+        },
+        {
+          "file": "code/thresholdmann.css",
+          "start": 187,
+          "end": 189,
+          "role": "style",
+          "symbol": "#upload-box.is-dragover",
+          "anchor": "d91f02b57c18",
+          "first": "#upload-box.is-dragover {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 209,
+          "end": 243,
+          "role": "logic",
+          "anchor": "79306ebe2654",
+          "first": "<script>"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 750,
+          "end": 791,
+          "role": "logic",
+          "anchor": "b4be4cfb65e7",
+          "first": "window.init = async (file) => {"
+        }
+      ]
+    },
+    {
+      "id": "tool-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Tool and display panel",
+      "summary": "Holds the control-point tools with their keys, the threshold direction toggle, the mask or threshold-value overlay toggle, the opacity, contrast and brightness sliders, and the volume info.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "keyboard shortcuts"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 50,
+          "end": 121,
+          "role": "markup",
+          "anchor": "b8f1e58e1319",
+          "first": "<div id=\"buttons\" style=\"background:#222\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 155,
+          "end": 159,
+          "role": "markup",
+          "symbol": "#image-adjust",
+          "anchor": "a7467f832641",
+          "first": "<div id=\"image-adjust\">"
+        },
+        {
+          "file": "code/thresholdmann.css",
+          "start": 42,
+          "end": 49,
+          "role": "style",
+          "symbol": "#info",
+          "anchor": "7768559e26aa",
+          "first": "#info {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 614,
+          "end": 640,
+          "role": "logic",
+          "symbol": "initKeyboardShortcuts",
+          "anchor": "249033d1f345",
+          "first": "const initKeyboardShortcuts = () => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 658,
+          "end": 663,
+          "role": "logic",
+          "anchor": "8a913695f9e8",
+          "first": "// Display volume info"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 688,
+          "end": 712,
+          "role": "logic",
+          "anchor": "5c84983a1a6a",
+          "first": "MUI.chose(document.querySelector('#tools'), (option) => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 798,
+          "end": 826,
+          "role": "logic",
+          "anchor": "619fd8e0e75c",
+          "first": "window.changeAlpha = (ev) => {"
+        }
+      ]
+    },
+    {
+      "id": "slice-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "Slice viewer with threshold overlay",
+      "summary": "Shows one MRI slice in a chosen plane with the space-varying threshold mask, or the threshold field, laid over it, and draws the control points on that slice.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 168,
+          "end": 171,
+          "role": "markup",
+          "symbol": "#panel-middle",
+          "anchor": "e3362a998878",
+          "first": "<div id=\"panel-middle\" style=\"flex:1\">"
+        },
+        {
+          "file": "code/thresholdmann.css",
+          "start": 254,
+          "end": 258,
+          "role": "style",
+          "symbol": "#viewer",
+          "anchor": "e975714fdef2",
+          "first": "#viewer {"
+        },
+        {
+          "file": "code/thresholdmann.css",
+          "start": 129,
+          "end": 142,
+          "role": "style",
+          "symbol": ".sag-btn, .axi-btn, .cor-btn",
+          "anchor": "2293530d2fbe",
+          "first": ".sag-btn, .axi-btn, .cor-btn {"
+        },
+        {
+          "file": "code/thresholdmann.css",
+          "start": 53,
+          "end": 64,
+          "role": "style",
+          "symbol": ".cpoint",
+          "anchor": "1a32a8f37ed2",
+          "first": ".cpoint {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 724,
+          "end": 724,
+          "role": "logic",
+          "symbol": "_newMRIViewer",
+          "anchor": "046821f6d454",
+          "first": "const _newMRIViewer = ({file, path}) => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 559,
+          "end": 596,
+          "role": "logic",
+          "symbol": "_newPlaneSelectionUI",
+          "anchor": "05096e828f92",
+          "first": "const _newPlaneSelectionUI = () => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 254,
+          "end": 275,
+          "role": "logic",
+          "symbol": "threshold",
+          "anchor": "91de313729f9",
+          "first": "const threshold = () => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 150,
+          "end": 168,
+          "role": "logic",
+          "symbol": "displayControlPoints",
+          "anchor": "197ba087bdcd",
+          "first": "const displayControlPoints = () => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 29,
+          "end": 52,
+          "role": "logic",
+          "symbol": "interpolation",
+          "anchor": "3266332b1e57",
+          "first": "const interpolation = (pos) => {"
+        }
+      ]
+    },
+    {
+      "id": "control-point-editing",
+      "level": "component",
+      "parent": "slice-viewer",
+      "title": "Control point add, move and remove",
+      "summary": "Lets the person click to add a control point, drag one to move it, click one to remove it, or select one and highlight its row in the table.",
+      "views": [],
+      "interactions": [
+        "select",
+        "drag to arrange"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/thresholdmann.css",
+          "start": 70,
+          "end": 77,
+          "role": "style",
+          "symbol": ".cpoint.selected",
+          "anchor": "6cc416305930",
+          "first": ".cpoint.selected {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 297,
+          "end": 307,
+          "role": "logic",
+          "symbol": "clickOnViewer",
+          "anchor": "4c1eb8bac8a3",
+          "first": "const clickOnViewer = (ev) => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 287,
+          "end": 295,
+          "role": "logic",
+          "symbol": "addControlPoint",
+          "anchor": "9b6f25e24827",
+          "first": "const addControlPoint = (i, j, k) => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 470,
+          "end": 482,
+          "role": "logic",
+          "symbol": "controlPointDownHandler",
+          "anchor": "4c45c1278498",
+          "first": "const controlPointDownHandler = (ev) => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 411,
+          "end": 432,
+          "role": "logic",
+          "symbol": "controlPointMoveHandler",
+          "anchor": "fff4b97be1d4",
+          "first": "const controlPointMoveHandler = (ev) => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 434,
+          "end": 468,
+          "role": "logic",
+          "symbol": "controlPointUpHandler",
+          "anchor": "f9a0492fffd8",
+          "first": "const controlPointUpHandler = (ev) => {"
+        }
+      ]
+    },
+    {
+      "id": "control-points-table",
+      "level": "view",
+      "parent": null,
+      "title": "Control points table",
+      "summary": "Lists every control point with its i, j, k coordinates and a slider and a number box for its local threshold. Clicking a row jumps the viewer to that point's slice.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "select"
+      ],
+      "patterns": [
+        "linked views",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 173,
+          "end": 192,
+          "role": "markup",
+          "symbol": "#panel-right",
+          "anchor": "9ef8af7ee57b",
+          "first": "<div id=\"panel-right\">"
+        },
+        {
+          "file": "code/thresholdmann.css",
+          "start": 85,
+          "end": 87,
+          "role": "style",
+          "symbol": "tr.selected",
+          "anchor": "89c31f1bb501",
+          "first": "tr.selected {"
+        },
+        {
+          "file": "code/thresholdmann.css",
+          "start": 109,
+          "end": 118,
+          "role": "style",
+          "symbol": "input.value",
+          "anchor": "fc29289dd996",
+          "first": "input.value {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 55,
+          "end": 81,
+          "role": "logic",
+          "symbol": "displayControlPointsTable",
+          "anchor": "60a55ceaee63",
+          "first": "const displayControlPointsTable = () => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 277,
+          "end": 285,
+          "role": "logic",
+          "symbol": "selectThresholdSlider",
+          "anchor": "ca8e491fef2c",
+          "first": "const selectThresholdSlider = (cpid) => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 319,
+          "end": 409,
+          "role": "logic",
+          "anchor": "fa14c50e078a",
+          "first": "window.selectRow = (trSelected) => {"
+        }
+      ]
+    },
+    {
+      "id": "render-3d",
+      "level": "component",
+      "parent": "tool-panel",
+      "title": "3D mask render",
+      "summary": "Thresholds the whole volume, builds a surface mesh of the mask with surface nets, and opens it in a window where it can be rotated and zoomed.",
+      "views": [
+        "3d surface view"
+      ],
+      "interactions": [
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 123,
+          "end": 129,
+          "role": "markup",
+          "anchor": "1fbbf7463acc",
+          "first": "<div id=\"render3D\""
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 598,
+          "end": 612,
+          "role": "logic",
+          "symbol": "render3D",
+          "anchor": "43b037b896b5",
+          "first": "const render3D = () => {"
+        },
+        {
+          "file": "code/render3D/index.html",
+          "start": 38,
+          "end": 49,
+          "role": "markup",
+          "symbol": "#splash",
+          "anchor": "0770b72132e4",
+          "first": "<div id=\"splash\" style=\"display:flex;flex-direction:column\">"
+        },
+        {
+          "file": "code/render3D/index.js",
+          "start": 66,
+          "end": 106,
+          "role": "logic",
+          "symbol": "startRender3D",
+          "anchor": "5dd0af5722f3",
+          "first": "const startRender3D = () => {"
+        },
+        {
+          "file": "code/render3D/index.js",
+          "start": 15,
+          "end": 45,
+          "role": "logic",
+          "symbol": "createMesh",
+          "anchor": "e5db46331302",
+          "first": "const createMesh = (vertices, faces) => {"
+        },
+        {
+          "file": "code/render3D/surfacenets.worker.js",
+          "start": 34,
+          "end": 128,
+          "role": "logic",
+          "symbol": "surfaceNets",
+          "anchor": "6c8fe9839d67",
+          "first": "const surfaceNets = (data, dims, pixdims, level) => {"
+        }
+      ]
+    },
+    {
+      "id": "save-mask",
+      "level": "component",
+      "parent": "tool-panel",
+      "title": "Save mask",
+      "summary": "Thresholds the full volume in a web worker, showing its progress, and downloads the binary mask as a NIfTI file.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 146,
+          "end": 152,
+          "role": "markup",
+          "anchor": "257cc0dc2be1",
+          "first": "<div id=\"saveMask\""
+        },
+        {
+          "file": "code/index.html",
+          "start": 170,
+          "end": 170,
+          "role": "markup",
+          "symbol": "#progress",
+          "anchor": "6af646a8056c",
+          "first": "<div id=\"progress\"></div>"
+        },
+        {
+          "file": "code/thresholdmann.css",
+          "start": 147,
+          "end": 159,
+          "role": "style",
+          "symbol": "#progress",
+          "anchor": "0369b5237b7a",
+          "first": "#progress {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 489,
+          "end": 491,
+          "role": "logic",
+          "symbol": "saveMask",
+          "anchor": "dc7475ab1eb9",
+          "first": "const saveMask = () => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 223,
+          "end": 232,
+          "role": "logic",
+          "symbol": "thresholdJob",
+          "anchor": "7b26616f471f",
+          "first": "const thresholdJob = () => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 188,
+          "end": 218,
+          "role": "logic",
+          "symbol": "thresholdWorker",
+          "anchor": "2e896f377b43",
+          "first": "const thresholdWorker = (callback) => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 174,
+          "end": 186,
+          "role": "logic",
+          "symbol": "saveNifti",
+          "anchor": "30107ca9fede",
+          "first": "const saveNifti = (data) => {"
+        },
+        {
+          "file": "code/thresholdmann-worker.js",
+          "start": 25,
+          "end": 48,
+          "role": "logic",
+          "symbol": "thresholdMRI",
+          "anchor": "7d21feae68ff",
+          "first": "const thresholdMRI = (params) => {"
+        }
+      ]
+    },
+    {
+      "id": "control-points-file",
+      "level": "component",
+      "parent": "tool-panel",
+      "title": "Save and load control points",
+      "summary": "Writes the control points and their thresholds to a JSON file, and reads a saved file back in place of the current points.",
+      "views": [],
+      "interactions": [
+        "export",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 132,
+          "end": 145,
+          "role": "markup",
+          "anchor": "f38da67527fe",
+          "first": "<div id=\"loadControlPoints\""
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 493,
+          "end": 504,
+          "role": "logic",
+          "symbol": "saveControlPoints",
+          "anchor": "c38adde2acbb",
+          "first": "const saveControlPoints = () => {"
+        },
+        {
+          "file": "code/thresholdmann.js",
+          "start": 527,
+          "end": 553,
+          "role": "logic",
+          "symbol": "loadControlPoints",
+          "anchor": "5f26f6943293",
+          "first": "const loadControlPoints = () => {"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "3d surface view"
+    }
+  ]
+}

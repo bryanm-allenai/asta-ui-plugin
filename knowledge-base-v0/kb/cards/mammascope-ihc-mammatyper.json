@@ -1,0 +1,547 @@
+{
+  "schema": "astaui.card/1",
+  "id": "mammascope-ihc-mammatyper",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:29:07Z"
+  },
+  "app": {
+    "title": "MammaScope · IHC vs MammaTyper® concordance analysis",
+    "summary": "A person uploads one or more immunohistochemistry spreadsheet exports and one or more RT-qPCR report PDFs, then runs a seven-step pipeline. The pipeline checks both formats, pulls biomarker results out of each source, pairs records by biopsy number and stores the matched samples in a database. It sets aside the records found in only one source. The results screen shows batch counts and automatic alerts for each sample, with the reasons grouped by priority. It also has a heatmap of agreement for each sample and biomarker, and the combined table. From there the person downloads a table, a concordance workbook with a dashboard, and a clinical PDF report for each sample. Separate modes let them query the stored samples, review and delete the unmatched records, and compute agreement statistics across every sample collected so far.",
+    "task": {
+      "text": "Check two diagnostic methods against each other for the same samples: flag the samples where they disagree for review, and measure how well the methods agree overall.",
+      "verbs": [
+        "compare",
+        "identify",
+        "derive",
+        "summarize",
+        "triage",
+        "curate"
+      ]
+    },
+    "data": {
+      "text": "Paired results from two assays on the same biopsies: categorical scores pulled from the free-text reports of one method, and quantitative expression values with fixed cutoffs from the other, joined on a shared sample id and kept in a growing database.",
+      "item": "a biopsy sample with four biomarker results from each of the two methods",
+      "shapes": [
+        "table",
+        "document",
+        "judgements",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "comparing a molecular assay's results with routine staining after both reports exist, before clinical review and reporting",
+      "terms": [
+        "compare",
+        "confirm",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A stepped flow (upload, process, results) gates each stage on the one before, and a progress bar tracks the pipeline. The results screen puts summary metrics, per-sample alert lists, an agreement heatmap with hover detail and a table colour-coded by data source above a set of export buttons. Other modes in the sidebar open database queries with up to three combined filters, a review of unmatched records with delete-by-id, and a statistics dashboard.",
+      "views": [
+        "summary stats",
+        "heatmap",
+        "table view",
+        "list",
+        "bar chart",
+        "form",
+        "detail panel"
+      ],
+      "interactions": [
+        "import",
+        "hover for detail",
+        "filter",
+        "search",
+        "select",
+        "export",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard",
+        "agreement summary",
+        "status pipeline",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "method concordance between immunohistochemistry and RT-qPCR biomarker testing in breast cancer pathology",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "pathology",
+        "diagnostic concordance",
+        "molecular subtyping"
+      ]
+    },
+    "workflow": {
+      "name": "match records from two sources and measure where they agree",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Two uploaders, one for spreadsheet exports and one for report PDFs, each accept several files and merge them. 'Ir al paso 2' appears only when both sources are loaded.",
+          "parts": [
+            "upload-step"
+          ]
+        },
+        {
+          "step": "pair the records from both sources by a shared id",
+          "here": "'Procesar y guardar muestras en BD' runs seven steps with a progress bar: validate both formats, extract the records, sort out repeated biopsy ids by tissue block, fuse on sample_id, log unmatched ids from either side, and save the fused samples.",
+          "parts": [
+            "processing-pipeline"
+          ]
+        },
+        {
+          "step": "flag the items that need attention, with reasons",
+          "here": "Automatic alerts for each sample are grouped by priority (discordances, possible discordances, HER2 completeness, values near a cutoff, missing data), each with summary chips. An expander lists the ids that appear in only one file.",
+          "parts": [
+            "batch-alerts"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A heatmap with samples as rows and the four biomarkers plus a global column marks each cell OK, DISC or missing. Hovering a cell shows both methods' raw values, and totals of concordant, discordant and incomplete samples sit below.",
+          "parts": [
+            "concordance-heatmap"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Downloads include a CSV of the batch, an Excel table with headers coloured by source, a concordance workbook with a dashboard sheet, and PDF reports for the whole batch (as a ZIP or one merged file) or for one selected sample.",
+          "parts": [
+            "batch-exports"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "The stored samples, and separately the unmatched records, can be loaded in full or narrowed with up to three column filters ('contiene' or exact value). Unmatched records that have been resolved can be deleted by id.",
+          "parts": [
+            "database-queries"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "For every sample collected so far, each biomarker gets percent agreement, Cohen's kappa with a 95% CI, McNemar's test, sensitivity, specificity, PPV, NPV and diagnostic OR. These come with confusion-matrix heatmaps, a kappa interval chart, a radar profile, charts of which way the discordances run, and plain-language verdicts.",
+          "parts": [
+            "statistics-dashboard"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Biomarker values are pulled from the free-text clinical reports of one source and from PDF pages of the other, so validation and sorting out repeated ids by tissue block come before matching",
+        "Each quantitative value is placed in a category by configurable cutoffs for each gene, and values within a small distance of a cutoff raise critical or near-cutoff alerts",
+        "Records found in only one source are kept in their own table for follow-up and deleted once resolved, so pairing gaps are tracked rather than silently dropped",
+        "Agreement is measured as a diagnostic-test comparison (kappa, McNemar, sensitivity, specificity, PPV, NPV) over the growing database, not only within one batch",
+        "A clinical PDF report is generated for each sample, showing where each value falls against its cutoffs"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "upload-step",
+      "level": "view",
+      "parent": null,
+      "title": "Step 1 · File upload",
+      "summary": "Takes several spreadsheet exports and several report PDFs, merges each set into one input, and allows moving on only when both are present.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/codigo/app.py",
+          "start": 950,
+          "end": 1036,
+          "role": "markup",
+          "anchor": "99dbe0e43fa2",
+          "first": "if step == 1:"
+        },
+        {
+          "file": "code/codigo/app.py",
+          "start": 37,
+          "end": 65,
+          "role": "logic",
+          "symbol": "init_session_state",
+          "anchor": "2153dbb3aa1a",
+          "first": "def init_session_state():"
+        },
+        {
+          "file": "code/codigo/app.py",
+          "start": 68,
+          "end": 74,
+          "role": "logic",
+          "symbol": "ir_a_paso",
+          "anchor": "10189f4a4fca",
+          "first": "def ir_a_paso(n: int):"
+        }
+      ]
+    },
+    {
+      "id": "processing-pipeline",
+      "level": "view",
+      "parent": null,
+      "title": "Step 2 · Processing pipeline",
+      "summary": "Validates both inputs, extracts and fuses the records by sample id with a seven-step progress bar, stores matched samples, and logs the unmatched ones.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/codigo/app.py",
+          "start": 1041,
+          "end": 1268,
+          "role": "logic",
+          "anchor": "f45f1d45475b",
+          "first": "elif step == 2:"
+        },
+        {
+          "file": "code/codigo/validacion_archivos.py",
+          "start": 11,
+          "end": 45,
+          "role": "logic",
+          "symbol": "validar_excel_patwin",
+          "anchor": "1fe57da76ef7",
+          "first": "def validar_excel_patwin(excel_bytes: bytes):"
+        },
+        {
+          "file": "code/codigo/validacion_archivos.py",
+          "start": 49,
+          "end": 65,
+          "role": "logic",
+          "symbol": "validar_pdf_mmt",
+          "anchor": "6c591770ddbe",
+          "first": "def validar_pdf_mmt(pdf_bytes: bytes) -> Tuple[bool, str]:"
+        },
+        {
+          "file": "code/codigo/extraccion.py",
+          "start": 616,
+          "end": 810,
+          "role": "logic",
+          "symbol": "extraer_registros_patwin",
+          "anchor": "ef65be12556b",
+          "first": "def extraer_registros_patwin(excel_file) -> List[Dict[str, Any]]:"
+        },
+        {
+          "file": "code/codigo/extraccion.py",
+          "start": 946,
+          "end": 963,
+          "role": "logic",
+          "symbol": "extraer_registros_pdf",
+          "anchor": "31ab9c667d89",
+          "first": "def extraer_registros_pdf(file) -> List[Dict[str, Any]]:"
+        },
+        {
+          "file": "code/codigo/extraccion.py",
+          "start": 1203,
+          "end": 1337,
+          "role": "logic",
+          "symbol": "fusionar_registro_patwin_pdf",
+          "anchor": "b0757213b584",
+          "first": "def fusionar_registro_patwin_pdf(reg_excel: Dict[str, Any], reg_pdf: Dict[str, Any]) -> Dict[str, Any]:"
+        },
+        {
+          "file": "code/codigo/db.py",
+          "start": 251,
+          "end": 320,
+          "role": "logic",
+          "symbol": "insertar_muestra_combinada",
+          "anchor": "eb03348736d5",
+          "first": "def insertar_muestra_combinada(muestra: Dict[str, Any]) -> str:"
+        },
+        {
+          "file": "code/codigo/db.py",
+          "start": 321,
+          "end": 345,
+          "role": "logic",
+          "symbol": "registrar_muestra_sin_match",
+          "anchor": "f2f2b9e22fc0",
+          "first": "def registrar_muestra_sin_match(sample_id: str, origen: str, detalle: Optional[str] = None) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "results-view",
+      "level": "view",
+      "parent": null,
+      "title": "Step 3 · Batch results and export",
+      "summary": "Shows the latest processed batch: record counts, alerts, the agreement map, the combined table and every download.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/codigo/vista_historico.py",
+          "start": 768,
+          "end": 1651,
+          "role": "logic",
+          "symbol": "mostrar_paso_3",
+          "anchor": "8e79569f9472",
+          "first": "def mostrar_paso_3(ir_a_paso_callback):"
+        }
+      ]
+    },
+    {
+      "id": "batch-alerts",
+      "level": "component",
+      "parent": "results-view",
+      "title": "Automatic alerts and unmatched samples",
+      "summary": "Lists the samples recommended for review, each with chips and reasons grouped by clinical priority, and shows which ids appear in only one source.",
+      "views": [
+        "list",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "review queue"
+      ],
+      "spans": [
+        {
+          "file": "code/codigo/vista_historico.py",
+          "start": 930,
+          "end": 1221,
+          "role": "logic",
+          "anchor": "197e3ac0bd62",
+          "first": "# =================================================="
+        },
+        {
+          "file": "code/codigo/discordancia.py",
+          "start": 288,
+          "end": 692,
+          "role": "logic",
+          "symbol": "construir_aviso_rico",
+          "anchor": "aa9831cc9681",
+          "first": "def construir_aviso_rico(m: Mapping[str, Any]) -> Optional[str]:"
+        },
+        {
+          "file": "code/codigo/discordancia.py",
+          "start": 96,
+          "end": 113,
+          "role": "logic",
+          "symbol": "extraer_sample_ids_con_aviso",
+          "anchor": "7521700991bd",
+          "first": "def extraer_sample_ids_con_aviso(registros: List[Dict[str, Any]]) -> List[str]:"
+        }
+      ]
+    },
+    {
+      "id": "concordance-heatmap",
+      "level": "component",
+      "parent": "results-view",
+      "title": "Agreement for each sample and biomarker",
+      "summary": "A sample × biomarker heatmap marking each pair of results as concordant, discordant or missing. Hovering a cell shows both raw values, and totals sit underneath.",
+      "views": [
+        "heatmap",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail",
+        "agreement summary"
+      ],
+      "spans": [
+        {
+          "file": "code/codigo/vista_historico.py",
+          "start": 1223,
+          "end": 1384,
+          "role": "logic",
+          "anchor": "addb9966844d",
+          "first": "# =================================================="
+        }
+      ]
+    },
+    {
+      "id": "batch-exports",
+      "level": "component",
+      "parent": "results-view",
+      "title": "Batch table and downloads",
+      "summary": "Shows the combined table colour-coded by data source and offers CSV and Excel exports, a concordance workbook with a dashboard, PDF reports for each sample (ZIP, merged or one at a time) and a sync package.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/codigo/vista_historico.py",
+          "start": 1386,
+          "end": 1644,
+          "role": "logic",
+          "anchor": "c44f5edbf091",
+          "first": "# =================================================="
+        },
+        {
+          "file": "code/codigo/vista_historico.py",
+          "start": 674,
+          "end": 765,
+          "role": "logic",
+          "symbol": "render_lote_coloreado",
+          "anchor": "8554a8230bd5",
+          "first": "def render_lote_coloreado(df_lote: pd.DataFrame) -> None:"
+        },
+        {
+          "file": "code/codigo/vista_historico.py",
+          "start": 91,
+          "end": 671,
+          "role": "logic",
+          "symbol": "construir_excel_concordancia_dashboard",
+          "anchor": "b0d9b07e76ab",
+          "first": "def construir_excel_concordancia_dashboard(df_lote: pd.DataFrame) -> io.BytesIO:"
+        },
+        {
+          "file": "code/codigo/informes.py",
+          "start": 1422,
+          "end": 1424,
+          "role": "logic",
+          "symbol": "generar_informe_pdf_bytes",
+          "anchor": "039d2cf4babb",
+          "first": "def generar_informe_pdf_bytes("
+        },
+        {
+          "file": "code/codigo/sync_pack.py",
+          "start": 99,
+          "end": 102,
+          "role": "logic",
+          "symbol": "build_transfer_zip",
+          "anchor": "afd7538d0d9d",
+          "first": "def build_transfer_zip("
+        }
+      ]
+    },
+    {
+      "id": "database-queries",
+      "level": "view",
+      "parent": null,
+      "title": "Stored samples and unmatched records",
+      "summary": "Loads the stored samples, or the unmatched records, in full or narrowed by up to three combined column filters, exports what is shown, and deletes resolved unmatched records by id.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "search",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/codigo/app.py",
+          "start": 203,
+          "end": 499,
+          "role": "logic",
+          "symbol": "mostrar_exploracion_sql",
+          "anchor": "58ae03f1fea8",
+          "first": "def mostrar_exploracion_sql():"
+        },
+        {
+          "file": "code/codigo/app.py",
+          "start": 505,
+          "end": 812,
+          "role": "logic",
+          "symbol": "mostrar_bases_no_cruzadas",
+          "anchor": "16bf5a1840f3",
+          "first": "def mostrar_bases_no_cruzadas():"
+        },
+        {
+          "file": "code/codigo/db.py",
+          "start": 348,
+          "end": 364,
+          "role": "logic",
+          "symbol": "eliminar_muestras_sin_match_por_ids",
+          "anchor": "48ee87509615",
+          "first": "def eliminar_muestras_sin_match_por_ids(ids: list[int]) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "statistics-dashboard",
+      "level": "view",
+      "parent": null,
+      "title": "Global agreement statistics",
+      "summary": "For every stored sample, computes agreement statistics for each biomarker and shows them as a table, confusion matrices, a kappa interval chart, a radar profile, discordance-direction and McNemar charts, and interpretive verdicts.",
+      "views": [
+        "table view",
+        "heatmap",
+        "bar chart",
+        "summary stats",
+        "small multiples"
+      ],
+      "interactions": [
+        "toggle view",
+        "export",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard",
+        "agreement summary"
+      ],
+      "spans": [
+        {
+          "file": "code/codigo/vista_estadistico.py",
+          "start": 377,
+          "end": 942,
+          "role": "logic",
+          "symbol": "mostrar_estadistico",
+          "anchor": "6178af49ccab",
+          "first": "def mostrar_estadistico():"
+        },
+        {
+          "file": "code/codigo/vista_estadistico.py",
+          "start": 329,
+          "end": 374,
+          "role": "logic",
+          "symbol": "mostrar_resumen_interpretativo",
+          "anchor": "db8d188043ff",
+          "first": "def mostrar_resumen_interpretativo(stats: \"pd.DataFrame\"):"
+        },
+        {
+          "file": "code/codigo/vista_estadistico.py",
+          "start": 26,
+          "end": 326,
+          "role": "logic",
+          "symbol": "_generar_veredicto",
+          "anchor": "905013ef5ab3",
+          "first": "def _generar_veredicto(row: dict) -> tuple[str, str]:"
+        },
+        {
+          "file": "code/codigo/stats_biomarcadores.py",
+          "start": 417,
+          "end": 419,
+          "role": "logic",
+          "symbol": "build_stats_table_from_df",
+          "anchor": "763ebabb26e8",
+          "first": "def build_stats_table_from_df("
+        }
+      ]
+    }
+  ]
+}

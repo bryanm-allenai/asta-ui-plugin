@@ -1,0 +1,516 @@
+{
+  "schema": "astaui.card/1",
+  "id": "floodnet-telemetry-planner",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T08:59:56Z"
+  },
+  "app": {
+    "title": "Flood-Net (ALERT flood-warning telemetry network planner)",
+    "summary": "A person loads a register of radio telemetry stations from a file, a repository or a database. They narrow it with stacked searches and filters by network, role, sensor, region and owner, and watch the matching stations and their radio relay links redraw on a map and in a table. Picking a station, from a pin or a row, opens its card and lists the repeaters whose address ranges carry it. Clicking a radio path shows the terrain profile and link budget along it. A person can then mark a set of stations on the map and export it as a file.",
+    "task": {
+      "text": "Find, inspect and plan the stations, repeaters and radio paths of a telemetry network from its register.",
+      "verbs": [
+        "lookup",
+        "locate",
+        "explore",
+        "curate",
+        "plan",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "A register of field stations with coordinates, roles, sensors and radio addresses, together with the relay links between stations and repeaters that come from each repeater's address ranges.",
+      "item": "a telemetry station (a field gauge, repeater or base station) in the register",
+      "shapes": [
+        "table",
+        "geospatial",
+        "network"
+      ]
+    },
+    "stage": {
+      "text": "keeping a telemetry network's station register in order and planning its radio paths",
+      "terms": [
+        "maintain",
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "A search and filter card drives one filtered set, which the map draws as pins with relay links and the table lists row by row. Choosing a station on either view opens its card and its carrying repeaters, and clicking a link opens a terrain profile and link budget for that path.",
+      "views": [
+        "map",
+        "table view",
+        "detail panel",
+        "network diagram",
+        "line chart",
+        "form"
+      ],
+      "interactions": [
+        "search",
+        "filter",
+        "select",
+        "multi-select",
+        "hover for detail",
+        "zoom and pan",
+        "toggle view",
+        "import",
+        "export",
+        "inline edit"
+      ],
+      "patterns": [
+        "linked views",
+        "master-detail",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "radio telemetry network engineering for flood warning",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "radio telemetry",
+        "link budget",
+        "alert network"
+      ]
+    },
+    "workflow": {
+      "name": "find items in a register on a map and inspect how they connect",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "the station register is loaded as stations.json from the device, from GitHub, or from the database by default",
+          "parts": [
+            "load-register"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "stacked search rows with abbreviation and address-range matching, plus filters by network, role, sensor type, region and owner, all feed one filtered set",
+          "parts": [
+            "station-filters"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "the filtered stations are drawn as pins on a Leaflet map with relay links between them, and listed in a table with a live count",
+          "parts": [
+            "stations-map",
+            "stations-table"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "clicking a pin or a table row selects the station, zooms to it and opens its card with its owner, sensors and actions",
+          "parts": [
+            "station-card",
+            "stations-map",
+            "stations-table"
+          ]
+        },
+        {
+          "step": "trace the links of the selected item",
+          "here": "the carriers card lists the repeaters whose address ranges carry the station, and the map can focus on one repeater's stations",
+          "parts": [
+            "carriers-card"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "a set of stations picked on the map is saved as a CSV",
+          "parts": [
+            "stations-map"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Links between stations come from address ranges: a repeater carries a station when the station's radio address falls inside one of the repeater's ranges.",
+        "A clicked radio path opens a terrain elevation profile and a fade-margin link budget for that path.",
+        "Stations can be proposed, meaning planned but not yet built, and these are marked apart from stations on the ground."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "load-register",
+      "level": "component",
+      "parent": null,
+      "title": "Register loader",
+      "summary": "Loads the station register from a local file, from GitHub or from the database, and applies it.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 78,
+          "end": 78,
+          "role": "markup",
+          "symbol": "#file-input",
+          "anchor": "4d139f9e5f83",
+          "first": "<input type=\"file\" id=\"file-input\" accept=\".json\" style=\"display:none\" onchange=\"onFileLoad(this)\">"
+        },
+        {
+          "file": "code/app.js",
+          "start": 158,
+          "end": 171,
+          "role": "logic",
+          "symbol": "onFileLoad",
+          "anchor": "2ba803dbdc3c",
+          "first": "function onFileLoad(input) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 205,
+          "end": 207,
+          "role": "logic",
+          "symbol": "loadFromGitHub",
+          "anchor": "407824b76dbb",
+          "first": "function loadFromGitHub() {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 520,
+          "end": 555,
+          "role": "logic",
+          "symbol": "applyStationDoc",
+          "anchor": "3f510bd683d3",
+          "first": "function applyStationDoc(text, source) {"
+        }
+      ]
+    },
+    {
+      "id": "stations-map",
+      "level": "view",
+      "parent": null,
+      "title": "Stations map",
+      "summary": "Draws the filtered stations as pins with relay links, lets the person select, multi-select and focus a repeater, and exports the selection.",
+      "views": [
+        "map",
+        "network diagram"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.js",
+          "start": 3972,
+          "end": 4007,
+          "role": "markup",
+          "anchor": "e40f56b521b1",
+          "first": "<div class=\"mn-map-stage\">"
+        },
+        {
+          "file": "code/app.js",
+          "start": 6247,
+          "end": 6461,
+          "role": "logic",
+          "symbol": "initMap",
+          "anchor": "c50c62b363b5",
+          "first": "function initMap() {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 6568,
+          "end": 6568,
+          "role": "logic",
+          "symbol": "refreshMapLayers",
+          "anchor": "d464796848b6",
+          "first": "function refreshMapLayers({ skipFit = false, animate } = {}) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 7269,
+          "end": 7326,
+          "role": "logic",
+          "symbol": "onStationPinClick",
+          "anchor": "9a53428bd3db",
+          "first": "function onStationPinClick(e) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 7024,
+          "end": 7028,
+          "role": "logic",
+          "symbol": "toggleMapSelection",
+          "anchor": "ab74a558b9f7",
+          "first": "function toggleMapSelection(id) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 7346,
+          "end": 7367,
+          "role": "logic",
+          "symbol": "setMapFocusRepeater",
+          "anchor": "1912f14f942f",
+          "first": "function setMapFocusRepeater(id) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 7414,
+          "end": 7418,
+          "role": "logic",
+          "symbol": "exportMapSelection",
+          "anchor": "e019fec053b4",
+          "first": "function exportMapSelection() {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 7422,
+          "end": 7439,
+          "role": "logic",
+          "symbol": "stationsCsvText",
+          "anchor": "27f30d5c3013",
+          "first": "function stationsCsvText(rows) {"
+        }
+      ]
+    },
+    {
+      "id": "station-filters",
+      "level": "component",
+      "parent": "stations-table",
+      "title": "Search and filters",
+      "summary": "Narrows the register with stacked search rows and filters by network, role, sensor, region and owner.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "search",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.js",
+          "start": 4057,
+          "end": 4063,
+          "role": "markup",
+          "anchor": "bd36862de532",
+          "first": "<div class=\"filter-card\" id=\"stations-filter-card\">"
+        },
+        {
+          "file": "code/app.js",
+          "start": 9121,
+          "end": 9147,
+          "role": "logic",
+          "symbol": "stationFiltersHtml",
+          "anchor": "ec47f553728f",
+          "first": "function stationFiltersHtml() {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 9197,
+          "end": 9211,
+          "role": "logic",
+          "symbol": "filterQuickHtml",
+          "anchor": "1cc129c448a3",
+          "first": "function filterQuickHtml() {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 1293,
+          "end": 1321,
+          "role": "logic",
+          "symbol": "computeFilteredStations",
+          "anchor": "e118923c6fa3",
+          "first": "function computeFilteredStations() {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 1007,
+          "end": 1012,
+          "role": "logic",
+          "symbol": "stationMatchesSearchStack",
+          "anchor": "f14734510625",
+          "first": "function stationMatchesSearchStack(s, active, mode) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 6114,
+          "end": 6121,
+          "role": "logic",
+          "symbol": "stationsFilterChanged",
+          "anchor": "afe73c9403b0",
+          "first": "function stationsFilterChanged() {"
+        }
+      ]
+    },
+    {
+      "id": "stations-table",
+      "level": "view",
+      "parent": null,
+      "title": "Stations list",
+      "summary": "Lists the same filtered set one row per station with a live count, and selects a station on the map from its row.",
+      "views": [
+        "table view",
+        "sidebar list"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.js",
+          "start": 4036,
+          "end": 4076,
+          "role": "markup",
+          "anchor": "98005f26cee3",
+          "first": "<div class=\"panel stn-list-card card-kind card-kind-register\" id=\"stations-list-card\">"
+        },
+        {
+          "file": "code/app.js",
+          "start": 7644,
+          "end": 7745,
+          "role": "logic",
+          "symbol": "stationsTable",
+          "anchor": "2aa419c149d5",
+          "first": "function stationsTable(allStations) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 4323,
+          "end": 4334,
+          "role": "logic",
+          "symbol": "pickStationFromList",
+          "anchor": "e0ec84564e4c",
+          "first": "function pickStationFromList(id) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 7894,
+          "end": 7928,
+          "role": "logic",
+          "symbol": "selectStation",
+          "anchor": "bde3e544c319",
+          "first": "function selectStation(id) {"
+        }
+      ]
+    },
+    {
+      "id": "station-card",
+      "level": "component",
+      "parent": "stations-map",
+      "title": "Station card",
+      "summary": "Shows everything about the selected station over the map, with actions to edit it, open its data or go to it.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.js",
+          "start": 3999,
+          "end": 3999,
+          "role": "markup",
+          "anchor": "6c5d5fdc0ab7",
+          "first": "<div id=\"stn-card\" class=\"acma-card stn-card\" hidden></div>"
+        },
+        {
+          "file": "code/app.js",
+          "start": 8233,
+          "end": 8233,
+          "role": "logic",
+          "symbol": "showStationCard",
+          "anchor": "371da3c1fd15",
+          "first": "function showStationCard(id, { takeFocus = false, opener = document.activeElement, select = true } = {}) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 8594,
+          "end": 8810,
+          "role": "logic",
+          "symbol": "stnCardHtml",
+          "anchor": "b6c3c15a745b",
+          "first": "function stnCardHtml(s) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 8377,
+          "end": 8422,
+          "role": "logic",
+          "symbol": "closeStnCard",
+          "anchor": "a3d2647904cb",
+          "first": "function closeStnCard(refocus = true) {"
+        }
+      ]
+    },
+    {
+      "id": "carriers-card",
+      "level": "component",
+      "parent": null,
+      "title": "Carrying repeaters",
+      "summary": "Lists the repeaters whose address ranges carry the selected station, with the ranges that match.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app.js",
+          "start": 4096,
+          "end": 4098,
+          "role": "markup",
+          "anchor": "8bd758f100cc",
+          "first": "<div class=\"panel card-kind card-kind-links\" id=\"stations-carriers-card\" ${carriers ? '' : 'hidden'}>"
+        },
+        {
+          "file": "code/app.js",
+          "start": 8918,
+          "end": 9010,
+          "role": "logic",
+          "symbol": "stationCarriersHtml",
+          "anchor": "d52bbc481281",
+          "first": "function stationCarriersHtml() {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 1465,
+          "end": 1467,
+          "role": "logic",
+          "symbol": "findRepeaterMatches",
+          "anchor": "b7bb461789bf",
+          "first": "function findRepeaterMatches(station) {"
+        },
+        {
+          "file": "code/app.js",
+          "start": 1367,
+          "end": 1374,
+          "role": "logic",
+          "symbol": "passRangeCoversId",
+          "anchor": "1eef7833d49e",
+          "first": "function passRangeCoversId(repeater, alertId) {"
+        }
+      ]
+    }
+  ]
+}

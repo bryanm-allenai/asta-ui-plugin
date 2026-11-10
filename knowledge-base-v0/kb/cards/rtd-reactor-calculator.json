@@ -1,0 +1,712 @@
+{
+  "schema": "astaui.card/1",
+  "id": "rtd-reactor-calculator",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T11:16:49Z"
+  },
+  "app": {
+    "title": "RTD Reactor Calculator",
+    "summary": "A person enters a tube reactor's geometry, flow and fluid properties, then picks a microbiological or a chemical calculation. Microbiological mode predicts a survival ratio from a rate constant and a fluence rate. A measured survival ratio can be added, and the tool works back from it to the rate constant, either for one point or for a pasted batch of points. Chemical mode derives the rate constant from photochemical properties and works back from each measured conversion to the fluence rate. A sweep over fluence rates sets the residence-time-weighted prediction against a naive average-dose prediction, as a table and as a log-scale chart, and the inputs can be saved to a file and reloaded.",
+    "task": {
+      "text": "Validate a laminar-flow UV reactor by predicting survival under its residence time distribution and back-solving the rate constant or fluence rate from measured survival ratios.",
+      "verbs": [
+        "derive",
+        "compare",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "A handful of reactor and kinetic parameters, plus short lists of measured survival or conversion ratios and fluence rates pasted from a spreadsheet.",
+      "item": "one measured survival ratio (C/C0) from a bioassay or actinometer run, with its fluence rate",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "analysing bioassay or actinometry measurements to validate a UV reactor, after the runs",
+      "terms": [
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "A form of reactor and kinetic inputs, with a mode switch for microbiological or chemical inputs, recalculates everything live as values are edited. Its results go to a summary panel with regime verdict badges, a batch back-solve table, a sweep table and a log-scale chart of the residence-time-weighted and well-mixed survival curves with fitted exponential trendlines.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view",
+        "scatter plot",
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "import",
+        "export",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "residence time distribution modelling of UV disinfection reactors in environmental engineering",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "uv disinfection",
+        "residence time distribution",
+        "chemical actinometry"
+      ]
+    },
+    "workflow": {
+      "name": "back-solve a model parameter from measurements through a forward model",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Reactor length, radius, flow rate, viscosity, density and diffusivity are typed into a form, or a saved inputs JSON file is loaded. Values are seeded from the legacy spreadsheet's defaults.",
+          "parts": [
+            "inputs-panel",
+            "save-load"
+          ]
+        },
+        {
+          "step": "choose which kind of calculation applies",
+          "here": "A Calculation type selector swaps between a microbiological fieldset (rate constant k, fluence rate, optional measured C/C0) and a chemical fieldset (wavelength, cross-section, quantum yield, molecular weight). Choosing chemical also fills in the diffusivity estimated from molecular weight.",
+          "parts": [
+            "mode-toggle"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Every edit triggers a debounced recalculation of the predicted reactor C/C0, the mean residence time, the velocities, and Reynolds and Peclet verdicts shown as coloured badges. If a measured C/C0 is given, an estimated k and its residual are also shown.",
+          "parts": [
+            "results-panel"
+          ]
+        },
+        {
+          "step": "work back from each measurement to the unknown parameter",
+          "here": "Measured C/C0 values (and in microbiological mode their paired fluence rates) are pasted from Excel into a list. Calculate fills a table with k per row, or E' per row in chemical mode. Rows outside the solver bracket are marked unreachable, and the bracket can be widened under the advanced settings.",
+          "parts": [
+            "backsolve-table",
+            "inputs-panel"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "A list of fluence rates is swept. The table gives the RTD and well-mixed C/C0, the log10 inactivation and the % relative difference. The chart plots both curves on a log axis with forced-intercept exponential trendlines.",
+          "parts": [
+            "sweep-table",
+            "sweep-chart"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Save inputs downloads every input, including the mode and the value lists, as a JSON scenario file.",
+          "parts": [
+            "save-load"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The direction of the back-solve flips with the mode: microbiological mode solves for the rate constant at known fluence rates, and chemical mode holds a rate constant derived from photochemistry fixed and solves for the fluence rate.",
+        "Reynolds and Peclet numbers give plain-language verdicts on whether the model's assumptions (laminar flow, no diffusion) hold for the entered reactor.",
+        "A user-adjustable root-finding bracket marks out-of-range measurements as unreachable instead of returning a wrong answer.",
+        "Every prediction is set against a naive well-mixed average-dose estimate, to show how much dose non-uniformity matters.",
+        "In chemical mode, diffusivity is estimated from molecular weight with a power-law fit to reference compounds."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "inputs-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Inputs",
+      "summary": "A form of reactor, flow and solver-bracket inputs with units, prefilled with defaults, that recalculates the results as values are edited.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/static/index.html",
+          "start": 14,
+          "end": 165,
+          "role": "markup",
+          "symbol": "#inputs",
+          "anchor": "3b425f39138b",
+          "first": "<aside class=\"panel\" id=\"inputs\">"
+        },
+        {
+          "file": "code/static/css/styles.css",
+          "start": 143,
+          "end": 149,
+          "role": "style",
+          "symbol": ".field-row",
+          "anchor": "155d60b92311",
+          "first": ".field-row {"
+        },
+        {
+          "file": "code/static/css/styles.css",
+          "start": 237,
+          "end": 239,
+          "role": "style",
+          "symbol": "details.advanced",
+          "anchor": "80440c59a260",
+          "first": "details.advanced {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 55,
+          "end": 63,
+          "role": "logic",
+          "symbol": "fillDefaults",
+          "anchor": "f52da6792e05",
+          "first": "function fillDefaults() {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 159,
+          "end": 170,
+          "role": "logic",
+          "symbol": "fillSolverDefaults",
+          "anchor": "cef6076bbbac",
+          "first": "async function fillSolverDefaults() {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 172,
+          "end": 181,
+          "role": "logic",
+          "symbol": "readReactorInputs",
+          "anchor": "190614063c4f",
+          "first": "function readReactorInputs() {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 183,
+          "end": 190,
+          "role": "logic",
+          "symbol": "readSolverSettings",
+          "anchor": "52819447cd21",
+          "first": "function readSolverSettings() {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 441,
+          "end": 518,
+          "role": "logic",
+          "anchor": "476bafaf4966",
+          "first": "// Auto-recalc is scoped exactly like the two \"Calculate\" buttons: each"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 11,
+          "end": 16,
+          "role": "data",
+          "symbol": "DEFAULTS",
+          "anchor": "e18bbdca121a",
+          "first": "const DEFAULTS = {"
+        },
+        {
+          "file": "code/static/js/tooltips.js",
+          "start": 8,
+          "end": 47,
+          "role": "logic",
+          "symbol": "applyTooltips",
+          "anchor": "5f7e9b072ef9",
+          "first": "async function applyTooltips() {"
+        }
+      ]
+    },
+    {
+      "id": "mode-toggle",
+      "level": "component",
+      "parent": "inputs-panel",
+      "title": "Calculation type switch",
+      "summary": "Swaps between microbiological and chemical inputs, relabels the back-solve table, and in chemical mode derives the rate constant and diffusivity from photochemical properties.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/static/index.html",
+          "start": 58,
+          "end": 64,
+          "role": "markup",
+          "symbol": "#calc-type-row",
+          "anchor": "65bf2821990d",
+          "first": "<div class=\"field-row\" id=\"calc-type-row\">"
+        },
+        {
+          "file": "code/static/index.html",
+          "start": 66,
+          "end": 83,
+          "role": "markup",
+          "symbol": "#microbio-fieldset",
+          "anchor": "a54643e43462",
+          "first": "<fieldset id=\"microbio-fieldset\">"
+        },
+        {
+          "file": "code/static/index.html",
+          "start": 85,
+          "end": 112,
+          "role": "markup",
+          "symbol": "#chemical-fieldset",
+          "anchor": "1fbb936f2a33",
+          "first": "<fieldset id=\"chemical-fieldset\" class=\"hidden\">"
+        },
+        {
+          "file": "code/static/css/styles.css",
+          "start": 185,
+          "end": 187,
+          "role": "style",
+          "symbol": "#calc-type-row",
+          "anchor": "c9c029b677c2",
+          "first": "#calc-type-row {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 70,
+          "end": 117,
+          "role": "logic",
+          "symbol": "applyModeVisibility",
+          "anchor": "d2660e16c4d9",
+          "first": "async function applyModeVisibility() {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 120,
+          "end": 136,
+          "role": "logic",
+          "symbol": "getChemicalKp",
+          "anchor": "feefd40d7560",
+          "first": "async function getChemicalKp() {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 144,
+          "end": 157,
+          "role": "logic",
+          "symbol": "updateDiffusivityFromMolecularWeight",
+          "anchor": "d2e580994dc3",
+          "first": "async function updateDiffusivityFromMolecularWeight() {"
+        },
+        {
+          "file": "code/app/api/routes_chemical.py",
+          "start": 23,
+          "end": 28,
+          "role": "logic",
+          "symbol": "compute_kp",
+          "anchor": "a924eb4c9a99",
+          "first": "def compute_kp(req: ChemicalKpRequest) -> ChemicalKpResponse:"
+        },
+        {
+          "file": "code/app/api/routes_chemical.py",
+          "start": 32,
+          "end": 39,
+          "role": "logic",
+          "symbol": "compute_diffusivity",
+          "anchor": "cd4c5bd4e1cf",
+          "first": "def compute_diffusivity(req: ChemicalDiffusivityRequest) -> ChemicalDiffusivityResponse:"
+        }
+      ]
+    },
+    {
+      "id": "save-load",
+      "level": "component",
+      "parent": "inputs-panel",
+      "title": "Save and load inputs",
+      "summary": "Downloads all inputs as a JSON scenario file and restores them from one, including the mode.",
+      "views": [],
+      "interactions": [
+        "export",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/static/index.html",
+          "start": 18,
+          "end": 22,
+          "role": "markup",
+          "symbol": "#save-load-row",
+          "anchor": "b19eef88f2e8",
+          "first": "<div class=\"field-row\" id=\"save-load-row\">"
+        },
+        {
+          "file": "code/static/css/styles.css",
+          "start": 193,
+          "end": 197,
+          "role": "style",
+          "symbol": "#save-load-row",
+          "anchor": "b1339ac26cee",
+          "first": "#save-load-row {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 241,
+          "end": 257,
+          "role": "logic",
+          "symbol": "saveInputsToFile",
+          "anchor": "354411eadbde",
+          "first": "function saveInputsToFile() {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 259,
+          "end": 279,
+          "role": "logic",
+          "symbol": "loadInputsFromFile",
+          "anchor": "3cfccb6d3e15",
+          "first": "async function loadInputsFromFile(file) {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 30,
+          "end": 37,
+          "role": "data",
+          "symbol": "SAVE_LOAD_FIELD_IDS",
+          "anchor": "ac5b22c4a4bc",
+          "first": "const SAVE_LOAD_FIELD_IDS = ["
+        }
+      ]
+    },
+    {
+      "id": "results-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Results",
+      "summary": "Shows the predicted reactor survival ratio, the estimated k and its residual, residence time and velocities, and flow and diffusion regime verdict badges.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/static/index.html",
+          "start": 170,
+          "end": 205,
+          "role": "markup",
+          "symbol": "#headline-results",
+          "anchor": "4344a5114148",
+          "first": "<div class=\"results-grid\" id=\"headline-results\">"
+        },
+        {
+          "file": "code/static/css/styles.css",
+          "start": 310,
+          "end": 315,
+          "role": "style",
+          "symbol": ".results-grid",
+          "anchor": "eed62ffdbcce",
+          "first": ".results-grid {"
+        },
+        {
+          "file": "code/static/css/styles.css",
+          "start": 338,
+          "end": 345,
+          "role": "style",
+          "symbol": ".badge",
+          "anchor": "4af44a2d63f3",
+          "first": ".badge {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 289,
+          "end": 304,
+          "role": "logic",
+          "symbol": "renderHeadline",
+          "anchor": "a135d6143d1f",
+          "first": "function renderHeadline(data) {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 281,
+          "end": 287,
+          "role": "logic",
+          "symbol": "regimeBadgeClass",
+          "anchor": "ac9b319a22c3",
+          "first": "function regimeBadgeClass(text) {"
+        },
+        {
+          "file": "code/app/api/routes_microbiology.py",
+          "start": 50,
+          "end": 75,
+          "role": "logic",
+          "symbol": "headline",
+          "anchor": "8067b3a35e4c",
+          "first": "def headline(req: HeadlineRequest) -> HeadlineResponse:"
+        },
+        {
+          "file": "code/app/api/routes_microbiology.py",
+          "start": 32,
+          "end": 46,
+          "role": "logic",
+          "symbol": "_derive",
+          "anchor": "c4544cd652ff",
+          "first": "def _derive(reactor) -> ReactorDerived:"
+        }
+      ]
+    },
+    {
+      "id": "backsolve-table",
+      "level": "component",
+      "parent": "results-panel",
+      "title": "Batch back-solve table",
+      "summary": "Takes a pasted list of measured C/C0 values and solves for the rate constant or fluence rate for each, marking unreachable rows.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/static/index.html",
+          "start": 114,
+          "end": 126,
+          "role": "markup",
+          "anchor": "5789eaaa20ee",
+          "first": "<details class=\"advanced\">"
+        },
+        {
+          "file": "code/static/index.html",
+          "start": 207,
+          "end": 225,
+          "role": "markup",
+          "anchor": "88618e837c75",
+          "first": "<div class=\"section-header\">"
+        },
+        {
+          "file": "code/static/css/styles.css",
+          "start": 299,
+          "end": 308,
+          "role": "style",
+          "symbol": "textarea.value-list",
+          "anchor": "b481aca99b0d",
+          "first": "textarea.value-list {"
+        },
+        {
+          "file": "code/static/css/styles.css",
+          "start": 351,
+          "end": 356,
+          "role": "style",
+          "symbol": "table.data-table",
+          "anchor": "b1c2453b3c64",
+          "first": "table.data-table {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 395,
+          "end": 439,
+          "role": "logic",
+          "symbol": "calculateBackSolveK",
+          "anchor": "18460114f792",
+          "first": "async function calculateBackSolveK(autoOpen = true) {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 323,
+          "end": 341,
+          "role": "logic",
+          "symbol": "renderBackSolveTable",
+          "anchor": "c86d015d26f3",
+          "first": "function renderBackSolveTable(backSolveResponse, mode) {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 207,
+          "end": 225,
+          "role": "logic",
+          "symbol": "attachPasteNormalizer",
+          "anchor": "63bc9b3e0e90",
+          "first": "function attachPasteNormalizer(elementId) {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 196,
+          "end": 201,
+          "role": "logic",
+          "symbol": "readCommaList",
+          "anchor": "3bccebf7c369",
+          "first": "function readCommaList(elementId) {"
+        },
+        {
+          "file": "code/app/api/routes_microbiology.py",
+          "start": 98,
+          "end": 118,
+          "role": "logic",
+          "symbol": "back_solve_k",
+          "anchor": "5fcb1a3d55a8",
+          "first": "def back_solve_k(req: BackSolveKRequest) -> BackSolveKResponse:"
+        },
+        {
+          "file": "code/app/api/routes_chemical.py",
+          "start": 43,
+          "end": 63,
+          "role": "logic",
+          "symbol": "back_solve_eavg",
+          "anchor": "1f29f1f2c50a",
+          "first": "def back_solve_eavg(req: BackSolveEavgRequest) -> BackSolveEavgResponse:"
+        }
+      ]
+    },
+    {
+      "id": "sweep-table",
+      "level": "component",
+      "parent": "results-panel",
+      "title": "Fluence-rate sweep table",
+      "summary": "For each fluence rate in a pasted list, gives the residence-time-weighted and well-mixed survival, the log10 inactivation and their relative difference.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/static/index.html",
+          "start": 128,
+          "end": 134,
+          "role": "markup",
+          "anchor": "0bd81765156f",
+          "first": "<details class=\"advanced\">"
+        },
+        {
+          "file": "code/static/index.html",
+          "start": 227,
+          "end": 248,
+          "role": "markup",
+          "anchor": "bf2d93355d71",
+          "first": "<div class=\"section-header\">"
+        },
+        {
+          "file": "code/static/css/styles.css",
+          "start": 287,
+          "end": 289,
+          "role": "style",
+          "symbol": "details.table-collapse",
+          "anchor": "0b6a39aa724d",
+          "first": "details.table-collapse {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 343,
+          "end": 393,
+          "role": "logic",
+          "symbol": "calculateHeadlineAndSweep",
+          "anchor": "0fb6629b2c16",
+          "first": "async function calculateHeadlineAndSweep(autoOpen = true) {"
+        },
+        {
+          "file": "code/static/js/calculator.js",
+          "start": 306,
+          "end": 321,
+          "role": "logic",
+          "symbol": "renderSweepTable",
+          "anchor": "e940242a8cdf",
+          "first": "function renderSweepTable(sweepResponse) {"
+        },
+        {
+          "file": "code/app/api/routes_microbiology.py",
+          "start": 79,
+          "end": 94,
+          "role": "logic",
+          "symbol": "sweep",
+          "anchor": "f24c069cfbf8",
+          "first": "def sweep(req: SweepRequest) -> SweepResponse:"
+        },
+        {
+          "file": "code/app/core/sweep.py",
+          "start": 16,
+          "end": 34,
+          "role": "logic",
+          "symbol": "build_sweep_table",
+          "anchor": "56b14e20102c",
+          "first": "def build_sweep_table(L: float, U0: float, q: float, k: float, eavg_values: list[float]) -> list[dict]:"
+        }
+      ]
+    },
+    {
+      "id": "sweep-chart",
+      "level": "view",
+      "parent": null,
+      "title": "RTD vs. well-mixed survival chart",
+      "summary": "Plots both survival predictions against fluence rate on a log axis, each with a fitted exponential trendline.",
+      "views": [
+        "scatter plot",
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/static/index.html",
+          "start": 252,
+          "end": 255,
+          "role": "markup",
+          "symbol": "#chart",
+          "anchor": "19734bdae80d",
+          "first": "<section class=\"panel\" id=\"chart\">"
+        },
+        {
+          "file": "code/static/css/styles.css",
+          "start": 374,
+          "end": 378,
+          "role": "style",
+          "symbol": "#chart-container",
+          "anchor": "5698ab241ee2",
+          "first": "#chart-container {"
+        },
+        {
+          "file": "code/static/js/chart.js",
+          "start": 4,
+          "end": 53,
+          "role": "logic",
+          "symbol": "renderSweepChart",
+          "anchor": "230e98e2b6bd",
+          "first": "function renderSweepChart(sweepResponse) {"
+        },
+        {
+          "file": "code/app/core/sweep.py",
+          "start": 37,
+          "end": 43,
+          "role": "logic",
+          "symbol": "fit_forced_exponential",
+          "anchor": "e5d8bc5d62ba",
+          "first": "def fit_forced_exponential(x: list[float], y: list[float]) -> float:"
+        }
+      ]
+    }
+  ]
+}

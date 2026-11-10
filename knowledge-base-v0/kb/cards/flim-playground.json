@@ -1,0 +1,631 @@
+{
+  "schema": "astaui.card/1",
+  "id": "flim-playground",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:58:08Z"
+  },
+  "app": {
+    "title": "FLIM Playground – Data Analysis",
+    "summary": "A person uploads a table of per-cell measurements, checks how its columns were read (row ID, categorical metadata, measurement groups), and picks a univariate, bivariate or multivariate module. They narrow the rows with categorical and numeric filters, then encode categories by colour, shape, opacity or separate panels, and can average replicates into one point per group. Each module computes something specific: group comparisons with effect sizes and t-tests, histograms or 2D distributions with Gaussian mixture subpopulations, phasor plots, PCA/UMAP/t-SNE embeddings, or a trained classifier with ROC and confusion matrix. They leave with the figure, a CSV of the subpopulation each row was assigned to, and a standalone Python script that reproduces the whole analysis.",
+    "task": {
+      "text": "Compare per-cell measurements across experimental groups, find subpopulations and separate conditions, and export a reproducible analysis.",
+      "verbs": [
+        "compare",
+        "derive",
+        "explore",
+        "identify",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A table of measurements per item, with categorical metadata columns (condition, replicate, image) and numeric feature columns organised into named groups, such as per-channel lifetime, intensity and phasor features.",
+      "item": "a single cell segmented from an image, with its metadata and measured features",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "analysing extracted single-cell features and comparing conditions, after image extraction",
+      "terms": [
+        "analyze",
+        "compare",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A left column picks the module, features and model settings; the right column holds filters, encoding channels, the plot and its styling, so every module shares the same filter and grouping controls. Plots split by a category show an overview grid where clicking a panel promotes it to the large view, and fitted subpopulations can be named and exported alongside a generated script that reproduces the figure.",
+      "views": [
+        "scatter plot",
+        "strip plot",
+        "bar chart",
+        "small multiples",
+        "summary stats",
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "filter",
+        "toggle view",
+        "hover for detail",
+        "drag to arrange",
+        "inline edit",
+        "export"
+      ],
+      "patterns": [
+        "small multiples",
+        "overview and detail",
+        "focus and context"
+      ]
+    },
+    "field": {
+      "text": "single-cell feature analysis of fluorescence lifetime imaging (FLIM) in cell biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "fluorescence lifetime imaging",
+        "single cell analysis",
+        "phasor analysis"
+      ]
+    },
+    "workflow": {
+      "name": "compare groups of measured items across features and export a reproducible analysis",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a CSV, TSV, Excel or ODS table; a review gate shows the detected column roles and feature groups, which can be edited, applied to this upload or saved as a reusable profile before any plot appears.",
+          "parts": [
+            "upload-review"
+          ]
+        },
+        {
+          "step": "choose the analysis and the features it uses",
+          "here": "Radio buttons pick Univariate, Bivariate or Multivariate, then a module (Feature Comparison, Feature Histogram, 2D Feature Distribution, Phasor Plot, Dimension Reduction, Classification); grouped feature selectors pick one, two or many features, with module settings such as effect size, t-test, UMAP/t-SNE hyperparameters or classifier and train split.",
+          "parts": [
+            "module-picker"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Categorical columns become include/exclude multiselects and numeric conditions (feature, operator, threshold) can be chained; rows missing the selected features are dropped.",
+          "parts": [
+            "filter-encoding"
+          ]
+        },
+        {
+          "step": "group items by their categories",
+          "here": "Colour, shape, opacity, subcolour and separate-by channels map categorical columns onto the plot; collapse-by averages replicates (e.g. per patient) into one point per group.",
+          "parts": [
+            "filter-encoding"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Each module computes its result: Glass's delta or Cohen's d and t-tests between groups, Gaussian mixture subpopulations chosen by BIC, regression and marginals, phasor coordinates, PCA/UMAP/t-SNE embeddings, or classifier metrics with ROC and confusion matrix.",
+          "parts": [
+            "analysis-plot",
+            "classification-results"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "A plot split by a category shows every level as a small panel; clicking one promotes it to the large view, and the x-axis order of groups can be dragged.",
+          "parts": [
+            "analysis-plot",
+            "facet-focus"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Name the fitted mixture components and download a CSV of each row's subpopulation, then download a standalone Python script that reproduces the filters, encodings, fits and figure.",
+          "parts": [
+            "subpopulation-export",
+            "script-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Columns are sorted into three roles (row ID, categorical metadata, grouped numeric features) and every control is driven by those roles, so filters come from categories and selectors from feature groups.",
+        "Collapse-by averages replicate measurements within each group, so statistics compare biological replicates instead of individual cells.",
+        "A phasor plot of lifetime G/S coordinates per channel and harmonic appears only when the table holds phasor features.",
+        "Gaussian mixture components found in a histogram or 2D distribution can be named and written back as a per-cell subpopulation column.",
+        "The whole on-screen analysis, including filters and styling, is exported as an editable Python script that redraws the figure."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "module-picker",
+      "level": "view",
+      "parent": null,
+      "title": "Modules and settings",
+      "summary": "Picks the kind of analysis, the module, the features to analyse and the module's statistical or model settings.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/data_analysis.py",
+          "start": 328,
+          "end": 363,
+          "role": "markup",
+          "anchor": "1668e926089c",
+          "first": "multivar_methods = [\"Dimension Reduction\", \"Classification\"]"
+        },
+        {
+          "file": "code/pages/data_analysis.py",
+          "start": 424,
+          "end": 464,
+          "role": "logic",
+          "anchor": "4867a4a6dcd9",
+          "first": "if upload_complete:"
+        },
+        {
+          "file": "code/src/widgets/selection_widgets.py",
+          "start": 62,
+          "end": 160,
+          "role": "logic",
+          "anchor": "9240cc603342",
+          "first": "def single_feature_select_widget(feature_groups_dict, data_extraction=True, n_per_row=2,"
+        },
+        {
+          "file": "code/src/widgets/classification_widgets.py",
+          "start": 159,
+          "end": 167,
+          "role": "logic",
+          "symbol": "classifier_hyperparams_widget",
+          "anchor": "19bf2b097064",
+          "first": "def classifier_hyperparams_widget(classifier):"
+        }
+      ]
+    },
+    {
+      "id": "upload-review",
+      "level": "component",
+      "parent": "module-picker",
+      "title": "Upload and column review",
+      "summary": "Loads the table and gates analysis behind a review of detected column roles and feature groups, which can be edited and saved as a profile.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/data_analysis.py",
+          "start": 368,
+          "end": 413,
+          "role": "markup",
+          "anchor": "924d482ea6f4",
+          "first": "uploaded_file = st.file_uploader("
+        },
+        {
+          "file": "code/src/widgets/review_table_widget.py",
+          "start": 361,
+          "end": 436,
+          "role": "logic",
+          "anchor": "28e4fc787949",
+          "first": "def review_gate(uploaded_file, df):"
+        },
+        {
+          "file": "code/src/widgets/review_table_widget.py",
+          "start": 583,
+          "end": 671,
+          "role": "logic",
+          "anchor": "40a1d01154c5",
+          "first": "def _editor(df):"
+        },
+        {
+          "file": "code/src/dataset_io.py",
+          "start": 577,
+          "end": 598,
+          "role": "logic",
+          "symbol": "read_table",
+          "anchor": "a23d05254295",
+          "first": "def read_table(uploaded_file):"
+        },
+        {
+          "file": "code/src/dataset_io.py",
+          "start": 601,
+          "end": 637,
+          "role": "logic",
+          "symbol": "interpret_table",
+          "anchor": "66ffcd5c03d3",
+          "first": "def interpret_table(df, categorical_cols, unique_row_id_col, fov_name_col,"
+        },
+        {
+          "file": "code/src/column_roles.py",
+          "start": 40,
+          "end": 74,
+          "role": "logic",
+          "symbol": "detect_column_roles",
+          "anchor": "242b18356e71",
+          "first": "def detect_column_roles(df, guess_row_id=True, id_hints=(),"
+        }
+      ]
+    },
+    {
+      "id": "filter-encoding",
+      "level": "component",
+      "parent": "analysis-plot",
+      "title": "Filters and visual encoding",
+      "summary": "Narrows rows by category and numeric threshold, maps categories to colour, shape, opacity and panels, and optionally collapses replicates.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "multi-select",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/data_analysis.py",
+          "start": 466,
+          "end": 522,
+          "role": "logic",
+          "anchor": "6ef61d1aef50",
+          "first": "with col2:"
+        },
+        {
+          "file": "code/src/widgets/filter_widgets.py",
+          "start": 82,
+          "end": 254,
+          "role": "logic",
+          "symbol": "filters_widget",
+          "anchor": "0a5b19debf79",
+          "first": "def filters_widget(df, categorical_cols):"
+        },
+        {
+          "file": "code/src/widgets/visualization_widgets.py",
+          "start": 278,
+          "end": 522,
+          "role": "logic",
+          "anchor": "c1d31b56f34f",
+          "first": "def visual_encoding_channels_widget(filtered_df, categorical_cols, color_based=True, point_based=True, separate_by_avail"
+        },
+        {
+          "file": "code/src/collapse.py",
+          "start": 10,
+          "end": 75,
+          "role": "logic",
+          "symbol": "collapse_rows",
+          "anchor": "1ba289b8b8f8",
+          "first": "def collapse_rows(df, collapse_by, slot_cols, row_id_col, count_label=\"n\"):"
+        }
+      ]
+    },
+    {
+      "id": "analysis-plot",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis plot",
+      "summary": "Draws the selected module's figure with its statistics: group comparisons with effect sizes, histograms and 2D distributions with mixture fits, phasor plots or embeddings, plus styling controls.",
+      "views": [
+        "strip plot",
+        "bar chart",
+        "scatter plot",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view",
+        "drag to arrange"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/data_analysis.py",
+          "start": 523,
+          "end": 630,
+          "role": "logic",
+          "anchor": "7637d58810e6",
+          "first": "# Choose the result column after collapse and before fitting so a"
+        },
+        {
+          "file": "code/pages/data_analysis.py",
+          "start": 709,
+          "end": 846,
+          "role": "logic",
+          "symbol": "_render_plot_and_controls",
+          "anchor": "a62ae9ae401f",
+          "first": "def _render_plot_and_controls(base_fig, build_params):"
+        },
+        {
+          "file": "code/src/vis/feature_comparison.py",
+          "start": 131,
+          "end": 713,
+          "role": "logic",
+          "symbol": "feature_comparison_plot",
+          "anchor": "db24cd8b8aa2",
+          "first": "def feature_comparison_plot(df, unique_row_id_col, fov_name_col, selected_var, color_by, opacity_by=None, shape_by=None,"
+        },
+        {
+          "file": "code/src/vis/feature_histogram.py",
+          "start": 271,
+          "end": 283,
+          "role": "logic",
+          "symbol": "feature_gmm_plot",
+          "anchor": "59f6e967f2e7",
+          "first": "def feature_gmm_plot(df, selected_var, color_by=None, colormap=\"tab10\", log_x=False,"
+        },
+        {
+          "file": "code/src/vis/distribution_2d.py",
+          "start": 283,
+          "end": 588,
+          "role": "logic",
+          "symbol": "feature_2d_distribution_plot",
+          "anchor": "c9ea1e739e39",
+          "first": "def feature_2d_distribution_plot(df, unique_row_id_col, fov_name_col, selected_x,"
+        },
+        {
+          "file": "code/src/vis/phasor.py",
+          "start": 265,
+          "end": 362,
+          "role": "logic",
+          "symbol": "phasor_plot",
+          "anchor": "c38fc9589751",
+          "first": "def phasor_plot(df, unique_row_id_col, fov_name_col, selected_channel, color_by=[], shape_by=None, opacity_by=None, colo"
+        },
+        {
+          "file": "code/src/vis/dimension_reduction.py",
+          "start": 85,
+          "end": 260,
+          "role": "logic",
+          "symbol": "dimension_reduction_plot",
+          "anchor": "e1c0a3ad78c5",
+          "first": "def dimension_reduction_plot(df, unique_row_id_col, fov_name_col, selected_features, colored_by=None, opacity_by=None, s"
+        },
+        {
+          "file": "code/src/widgets/visualization_widgets.py",
+          "start": 661,
+          "end": 720,
+          "role": "logic",
+          "anchor": "9e0ed97408dc",
+          "first": "def plot_config_widget(point_based=True, show_colormap=False, show_count_toggle=False):"
+        }
+      ]
+    },
+    {
+      "id": "facet-focus",
+      "level": "component",
+      "parent": "analysis-plot",
+      "title": "Faceted overview with focus",
+      "summary": "Shows every level of the separating category as a small panel and promotes the clicked panel to the large view.",
+      "views": [
+        "small multiples",
+        "scatter plot"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "small multiples",
+        "focus and context",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/vis/dimension_facets.py",
+          "start": 197,
+          "end": 263,
+          "role": "logic",
+          "symbol": "focus_facet_figure",
+          "anchor": "cda189ae254d",
+          "first": "def focus_facet_figure(fig, focus=None):"
+        },
+        {
+          "file": "code/src/vis/dimension_facets.py",
+          "start": 266,
+          "end": 286,
+          "role": "logic",
+          "symbol": "facet_focus_from_click",
+          "anchor": "611e4f8afefe",
+          "first": "def facet_focus_from_click(fig, selection, current=None):"
+        },
+        {
+          "file": "code/src/widgets/visualization_widgets.py",
+          "start": 77,
+          "end": 119,
+          "role": "logic",
+          "anchor": "f377690d15fe",
+          "first": "def facet_focus_selection(fig, state_key):"
+        },
+        {
+          "file": "code/src/widgets/plot_layout.py",
+          "start": 174,
+          "end": 344,
+          "role": "markup",
+          "symbol": "dimension_reduction_chart",
+          "anchor": "f3b2272536f5",
+          "first": "def dimension_reduction_chart(fig, *, key, container_key=\"dimension_reduction_plot\","
+        }
+      ]
+    },
+    {
+      "id": "classification-results",
+      "level": "component",
+      "parent": "analysis-plot",
+      "title": "Classification results",
+      "summary": "Builds class labels from categorical combinations, trains the chosen classifier on the selected features and shows ROC, confusion matrix, feature importance and accuracy tables.",
+      "views": [
+        "line chart",
+        "heatmap",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/data_analysis.py",
+          "start": 631,
+          "end": 671,
+          "role": "logic",
+          "anchor": "90d47f00f75c",
+          "first": "elif method == \"Classification\":"
+        },
+        {
+          "file": "code/src/widgets/classification_widgets.py",
+          "start": 170,
+          "end": 244,
+          "role": "logic",
+          "symbol": "classifier_options_widget",
+          "anchor": "0216c073c4fb",
+          "first": "def classifier_options_widget(df, categorical_cols, fov_name_col, selected_features, classifier, splits):"
+        },
+        {
+          "file": "code/src/widgets/classification_widgets.py",
+          "start": 246,
+          "end": 289,
+          "role": "markup",
+          "symbol": "classification_plot_widget",
+          "anchor": "5de301a8ce04",
+          "first": "def classification_plot_widget(results, classification_method, threshold_method):"
+        },
+        {
+          "file": "code/src/classify.py",
+          "start": 410,
+          "end": 479,
+          "role": "logic",
+          "symbol": "run_classification",
+          "anchor": "0cced8e00404",
+          "first": "def run_classification(df, method, splits, sampling_method, class_weight, threshold_method, classifier_params=None, rand"
+        }
+      ]
+    },
+    {
+      "id": "subpopulation-export",
+      "level": "component",
+      "parent": "analysis-plot",
+      "title": "Subpopulation labels export",
+      "summary": "Lets the person name the fitted mixture components and download each row with its assigned subpopulation as CSV.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/data_analysis.py",
+          "start": 673,
+          "end": 693,
+          "role": "logic",
+          "anchor": "65c5779444d2",
+          "first": "if fig is not None:"
+        },
+        {
+          "file": "code/pages/data_analysis.py",
+          "start": 769,
+          "end": 790,
+          "role": "markup",
+          "anchor": "998c57963174",
+          "first": "# 1. Data export (if applicable)"
+        },
+        {
+          "file": "code/src/widgets/export_labels_widgets.py",
+          "start": 36,
+          "end": 106,
+          "role": "logic",
+          "symbol": "export_labels_widget",
+          "anchor": "6cef9151c8b6",
+          "first": "def export_labels_widget(df, source_column, *, method, context, component_tables=None,"
+        },
+        {
+          "file": "code/src/export_labels.py",
+          "start": 46,
+          "end": 55,
+          "role": "logic",
+          "symbol": "apply_export_labels",
+          "anchor": "5694a47af376",
+          "first": "def apply_export_labels(df, source_column, settings=None):"
+        },
+        {
+          "file": "code/src/vis/feature_histogram.py",
+          "start": 105,
+          "end": 163,
+          "role": "logic",
+          "symbol": "histogram_gmm",
+          "anchor": "a923ffb3ea81",
+          "first": "def histogram_gmm(values, label, max_components=3, min_weight_threshold=0.1,"
+        }
+      ]
+    },
+    {
+      "id": "script-export",
+      "level": "component",
+      "parent": "analysis-plot",
+      "title": "Export as Python script",
+      "summary": "Collects the dataset, filters, encodings, module settings and styling and downloads a standalone script that reproduces the analysis.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/data_analysis.py",
+          "start": 178,
+          "end": 326,
+          "role": "logic",
+          "symbol": "_export_script_button",
+          "anchor": "b54266511f70",
+          "first": "def _export_script_button(method, uploaded_file, categorical_cols, color_by, opacity_by, shape_by, separate_by, subcolor"
+        },
+        {
+          "file": "code/pages/data_analysis.py",
+          "start": 132,
+          "end": 145,
+          "role": "logic",
+          "symbol": "_collect_categorical_filters",
+          "anchor": "15e1be5bbdde",
+          "first": "def _collect_categorical_filters(categorical_cols, df):"
+        },
+        {
+          "file": "code/pages/data_analysis.py",
+          "start": 147,
+          "end": 162,
+          "role": "logic",
+          "symbol": "_collect_numerical_filters",
+          "anchor": "7159c095f66e",
+          "first": "def _collect_numerical_filters():"
+        },
+        {
+          "file": "code/src/export_script/__init__.py",
+          "start": 47,
+          "end": 59,
+          "role": "logic",
+          "symbol": "generate_script",
+          "anchor": "5ca3d4d73a03",
+          "first": "def generate_script(state: dict) -> str:"
+        }
+      ]
+    }
+  ]
+}

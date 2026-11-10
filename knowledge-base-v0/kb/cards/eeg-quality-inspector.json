@@ -1,0 +1,450 @@
+{
+  "schema": "astaui.card/1",
+  "id": "eeg-quality-inspector",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T18:27:34Z"
+  },
+  "app": {
+    "title": "EEG Quality Inspector",
+    "summary": "A person loads a multichannel recording, either a synthetic demo with known artifacts or an uploaded EDF or CSV file. For a CSV they must state the sampling rate and units. They look over the stacked per-channel waveforms, choosing which channels to show and narrowing to a time window. They then read a per-channel table of quality indicators: missing samples, flat windows, amplitude exceedances and possible clipping. The table puts flagged channels first and recomputes whenever they change a threshold in the sidebar. They check each channel's power spectrum, with an optional 50 or 60 Hz line-noise ratio, and finish by downloading a self-contained HTML report and a CSV of the metrics.",
+    "task": {
+      "text": "Find which channels of a multichannel recording have recording problems, using explainable indicators with adjustable thresholds, and export a report of what was found.",
+      "verbs": [
+        "clean",
+        "identify",
+        "derive",
+        "summarize",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A multichannel signal recording sampled uniformly over time and converted to one voltage unit, with a per-channel table of computed quality indicators and power spectra.",
+      "item": "one channel of a multichannel recording",
+      "shapes": [
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "screening raw EEG recordings for recording problems after acquisition, before analysis",
+      "terms": [
+        "clean",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls load the recording and set the thresholds. Four tabs then show the same recording as stacked per-channel waveforms with a channel picker and time-window slider, as an indicator table that recomputes when a threshold changes, as overlaid power spectra with a line-noise check, and as an export page with downloads.",
+      "views": [
+        "form",
+        "summary stats",
+        "small multiples",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "multi-select",
+        "time slider",
+        "zoom and pan",
+        "hover for detail",
+        "toggle view",
+        "set threshold",
+        "export"
+      ],
+      "patterns": [
+        "small multiples",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "signal quality checks on EEG recordings in electrophysiology",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "eeg",
+        "electrophysiology",
+        "signal quality"
+      ]
+    },
+    "workflow": {
+      "name": "screen a multichannel recording for quality problems and export a report",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Load the seeded synthetic demo, or upload an EDF file (units come from its header) or a CSV (the sampling rate and units must be stated). Size, rate and duration limits are checked before loading.",
+          "parts": [
+            "data-source",
+            "recording-header"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Stacked per-channel traces on a shared time axis. A channel multiselect and a time-window slider narrow what is drawn.",
+          "parts": [
+            "waveforms"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "For each channel, compute missing samples, the flat-window fraction, amplitude exceedances and possible-clipping runs over 1-second windows. The table sorts flagged channels to the top.",
+          "parts": [
+            "quality-indicators"
+          ]
+        },
+        {
+          "step": "set the criteria and recompute",
+          "here": "Sidebar inputs set the flat peak-to-peak limit, the amplitude threshold and the minimum clipping run. The indicators recompute at once without reloading the data.",
+          "parts": [
+            "thresholds",
+            "quality-indicators"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Welch power spectra for all channels are overlaid on a log axis. An optional 50 or 60 Hz selector shows each channel's line-noise ratio against neighbouring bands.",
+          "parts": [
+            "spectrum"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download a self-contained HTML report (plots, thresholds, units, missing-data accounting) and a CSV of the per-channel metrics.",
+          "parts": [
+            "export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Analysis runs in nonoverlapping 1-second windows. Windows containing missing samples are excluded and counted, never interpolated, and a channel with no usable window is marked unavailable.",
+        "Waveforms are thinned for display by binning that keeps each bin's extremes, the reduction is shown on screen, and the analysis still uses every sample.",
+        "Units are never guessed. A CSV needs the units stated, an EDF's units are read from its header, and channels that are not voltage are excluded with a notice.",
+        "The indicators are descriptive flags with visible thresholds and no good/bad verdict. The line-noise check is offered only when its frequency bands fit below Nyquist.",
+        "A seeded synthetic demo with a known artifact on each channel lets a person try every check without a file."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-source",
+      "level": "view",
+      "parent": null,
+      "title": "Data source sidebar",
+      "summary": "Lets the person load the synthetic demo or upload an EDF or CSV file, stating the sampling rate and units for a CSV, with readable errors when a file is rejected.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 74,
+          "end": 158,
+          "role": "markup",
+          "anchor": "845c7a25aa05",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 42,
+          "end": 45,
+          "role": "logic",
+          "symbol": "load_demo_cached",
+          "anchor": "467c8894d32d",
+          "first": "def load_demo_cached(_seed: int):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 49,
+          "end": 54,
+          "role": "logic",
+          "symbol": "load_csv_cached",
+          "anchor": "ee3caf0d2fc2",
+          "first": "def load_csv_cached(_blob: bytes, name: str, sfreq: float, units: str):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 58,
+          "end": 63,
+          "role": "logic",
+          "symbol": "load_edf_cached",
+          "anchor": "60360dec4c9b",
+          "first": "def load_edf_cached(_blob: bytes, name: str):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 66,
+          "end": 69,
+          "role": "logic",
+          "symbol": "reset_analysis",
+          "anchor": "0e38e763b2ca",
+          "first": "def reset_analysis():"
+        },
+        {
+          "file": "code/eeg_quality/io.py",
+          "start": 172,
+          "end": 281,
+          "role": "logic",
+          "symbol": "load_csv",
+          "anchor": "c090bf039554",
+          "first": "def load_csv(file, sfreq_hz: float, units: str) -> Recording:"
+        },
+        {
+          "file": "code/eeg_quality/io.py",
+          "start": 378,
+          "end": 527,
+          "role": "logic",
+          "symbol": "load_edf",
+          "anchor": "7e58a3dfde70",
+          "first": "def load_edf(file) -> Recording:"
+        },
+        {
+          "file": "code/eeg_quality/io.py",
+          "start": 68,
+          "end": 132,
+          "role": "data",
+          "symbol": "Recording",
+          "anchor": "5211d9f0c4fd",
+          "first": "class Recording:"
+        },
+        {
+          "file": "code/eeg_quality/demo.py",
+          "start": 21,
+          "end": 121,
+          "role": "data",
+          "symbol": "make_demo",
+          "anchor": "8c9efa024eed",
+          "first": "def make_demo(seed: int = DEMO_SEED) -> Recording:"
+        }
+      ]
+    },
+    {
+      "id": "thresholds",
+      "level": "component",
+      "parent": "data-source",
+      "title": "Threshold controls",
+      "summary": "Number inputs for the flat-window, amplitude and clipping-run thresholds; changing any of them recomputes the indicators.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "set threshold"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 211,
+          "end": 248,
+          "role": "markup",
+          "anchor": "6b2641957f84",
+          "first": "# Threshold controls"
+        },
+        {
+          "file": "code/eeg_quality/quality.py",
+          "start": 28,
+          "end": 48,
+          "role": "logic",
+          "symbol": "QualityConfig",
+          "anchor": "994eb6ed587f",
+          "first": "class QualityConfig:"
+        }
+      ]
+    },
+    {
+      "id": "recording-header",
+      "level": "view",
+      "parent": null,
+      "title": "Recording header",
+      "summary": "Shows the loaded recording's channel count, duration, sampling rate and size, with notes on units and provenance and any channels that were excluded.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 186,
+          "end": 209,
+          "role": "markup",
+          "anchor": "da787da36afc",
+          "first": "# Header: recording provenance"
+        }
+      ]
+    },
+    {
+      "id": "waveforms",
+      "level": "view",
+      "parent": null,
+      "title": "Waveforms tab",
+      "summary": "Draws the selected channels as stacked traces on a shared time axis, limited to a chosen time window and thinned for display without losing peaks.",
+      "views": [
+        "small multiples",
+        "line chart"
+      ],
+      "interactions": [
+        "multi-select",
+        "time slider",
+        "zoom and pan",
+        "hover for detail"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 259,
+          "end": 337,
+          "role": "logic",
+          "anchor": "b0088421efb8",
+          "first": "with tabs[0]:"
+        },
+        {
+          "file": "code/eeg_quality/display.py",
+          "start": 15,
+          "end": 16,
+          "role": "logic",
+          "symbol": "downsample_extrema_preserving",
+          "anchor": "b0dc855cba17",
+          "first": "def downsample_extrema_preserving("
+        }
+      ]
+    },
+    {
+      "id": "quality-indicators",
+      "level": "view",
+      "parent": null,
+      "title": "Quality indicators tab",
+      "summary": "A table with one row per channel showing missing, flat, amplitude and clipping indicators, flagged channels first, with an explanation of each indicator.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 343,
+          "end": 398,
+          "role": "markup",
+          "anchor": "8773532b3d74",
+          "first": "with tabs[1]:"
+        },
+        {
+          "file": "code/eeg_quality/quality.py",
+          "start": 100,
+          "end": 216,
+          "role": "logic",
+          "symbol": "analyze_quality",
+          "anchor": "d5ae4e6cc34a",
+          "first": "def analyze_quality(recording: Recording, config: QualityConfig | None = None) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "spectrum",
+      "level": "view",
+      "parent": null,
+      "title": "Spectrum tab",
+      "summary": "Overlays each channel's Welch power spectrum on a log scale, reports windows excluded for missing data, and offers an optional 50 or 60 Hz line-noise ratio per channel.",
+      "views": [
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 406,
+          "end": 510,
+          "role": "markup",
+          "symbol": "_render_spectrum_tab",
+          "anchor": "e59b70fc4512",
+          "first": "def _render_spectrum_tab(recording, meta):"
+        },
+        {
+          "file": "code/eeg_quality/spectral.py",
+          "start": 26,
+          "end": 113,
+          "role": "logic",
+          "symbol": "compute_psd",
+          "anchor": "c6f4cb5da31a",
+          "first": "def compute_psd(recording: Recording, window_s: float = 1.0) -> dict:"
+        },
+        {
+          "file": "code/eeg_quality/spectral.py",
+          "start": 116,
+          "end": 178,
+          "role": "logic",
+          "symbol": "line_noise_ratio",
+          "anchor": "2d19137dfa70",
+          "first": "def line_noise_ratio(psd: dict, line_hz: float = 50.0) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "export",
+      "level": "view",
+      "parent": null,
+      "title": "Thresholds & export tab",
+      "summary": "Restates the active thresholds and offers downloads of a self-contained HTML quality report and a CSV of the per-channel metrics, with the raw metric table below.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 520,
+          "end": 560,
+          "role": "markup",
+          "anchor": "1758d6f36d6e",
+          "first": "with tabs[3]:"
+        },
+        {
+          "file": "code/eeg_quality/report.py",
+          "start": 32,
+          "end": 36,
+          "role": "logic",
+          "symbol": "build_report",
+          "anchor": "d40189614d96",
+          "first": "def build_report("
+        },
+        {
+          "file": "code/eeg_quality/report.py",
+          "start": 268,
+          "end": 272,
+          "role": "logic",
+          "symbol": "metrics_to_csv",
+          "anchor": "04a84bf4908d",
+          "first": "def metrics_to_csv(metrics: pd.DataFrame) -> bytes:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "interactions",
+      "term": "set threshold"
+    }
+  ]
+}

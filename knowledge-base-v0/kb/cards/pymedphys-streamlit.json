@@ -1,0 +1,314 @@
+{
+  "schema": "astaui.card/1",
+  "id": "pymedphys-streamlit",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:04:26Z"
+  },
+  "app": {
+    "title": "MetersetMap Comparison: planned against delivered radiotherapy fluence",
+    "summary": "The person chooses a configuration mode: upload and download files only, or bundled demo data. They then pick a reference treatment plan, either by uploading a DICOM RT Plan file or by searching a planning-system export location. Next they pick the evaluation delivery, either by uploading linac log (TRF) files or by searching an indexed log directory. A sidebar overview shows the patient identifiers and total MU of each side so the person can check the two match. The app computes the MetersetMap for each side, compares them with a gamma pass rate, and writes the result to a configured output location, such as a scanned-documents (eSCAN) directory for the record.",
+    "task": {
+      "text": "Check that a delivered radiotherapy treatment, read from linac log files, matches its plan by comparing the MetersetMap fluence of each.",
+      "verbs": [
+        "compare",
+        "derive",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "A treatment plan as a DICOM RT Plan and the matching machine delivery logs, each turned into a 2D MetersetMap (MU fluence) grid built from MLC and jaw positions weighted by MU.",
+      "item": "a pair of one planned treatment and its recorded delivery for a single patient",
+      "shapes": [
+        "field",
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "checking a delivered treatment against its plan after delivery, as patient-specific QA",
+      "terms": [
+        "confirm",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Two side-by-side columns set the reference (plan) source against the evaluation (delivery log) source, each with a radio choice of import method and a file uploader or directory search. A sidebar summarises both sides' identifiers and total MU so the person can check them before the maps are computed, compared and written to an output directory.",
+      "views": [
+        "side-by-side panes",
+        "form",
+        "summary stats",
+        "heatmap"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "search",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "patient-specific QA comparing planned and log-file-delivered fluence in radiotherapy medical physics",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "medical physics",
+        "radiotherapy qa",
+        "gamma analysis"
+      ]
+    },
+    "workflow": {
+      "name": "compare a planned specification with a recorded execution and report agreement",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A Config Mode radio picks file upload/download only or demo data, which sets where reference and evaluation files can come from.",
+          "parts": [
+            "sidebar",
+            "config-choice"
+          ]
+        },
+        {
+          "step": "choose the reference item",
+          "here": "Under Reference, a DICOM import method radio offers file upload of an RT Plan or a search of the Monaco file export location.",
+          "parts": [
+            "data-selection",
+            "reference-input"
+          ]
+        },
+        {
+          "step": "choose the item to evaluate against it",
+          "here": "Under Evaluation, a TRF import method radio offers upload of TRF log files or a search of an indexed TRF directory.",
+          "parts": [
+            "data-selection",
+            "evaluation-input"
+          ]
+        },
+        {
+          "step": "check the two sides belong together",
+          "here": "The sidebar MetersetMap Overview lists Patient ID, Patient Name and Total MU for Reference and for Evaluation.",
+          "parts": [
+            "sidebar",
+            "overview"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A MetersetMap is calculated for the plan and for the logs and compared with gamma, giving a pass rate.",
+          "parts": [
+            "data-selection"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Output Locations name where the result goes, such as an eSCAN directory of logfile PDFs.",
+          "parts": [
+            "output-locations"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The reference is a treatment plan and the evaluation is the linac's own delivery log, so the check compares intended against recorded machine motion, not measured dose.",
+        "Total MU and patient identifiers on both sides are shown together as a sanity check before comparing.",
+        "Each side can come from a manual upload or from a search of a site-configured directory (planning-system exports, an indexed log archive).",
+        "Agreement is judged with a gamma pass rate over the fluence grid.",
+        "The result goes to a department's scanned-documents directory as part of the patient record."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar",
+      "summary": "Holds the configuration choice and a running overview of both sides of the comparison.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/lib/pymedphys/_app.py",
+          "start": 16,
+          "end": 24,
+          "role": "logic",
+          "anchor": "37b7fa9690ae",
+          "first": "from pymedphys._streamlit import index"
+        }
+      ]
+    },
+    {
+      "id": "config-choice",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Configuration Choice",
+      "summary": "A radio that switches between working only with uploaded files and loading bundled demo data.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/lib/pymedphys/_gui.py",
+          "start": 32,
+          "end": 49,
+          "role": "logic",
+          "anchor": "86fa91376612",
+          "first": "def main(args):"
+        }
+      ]
+    },
+    {
+      "id": "overview",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "MetersetMap Overview",
+      "summary": "Shows Patient ID, Patient Name and Total MU for the reference and the evaluation, so a mismatch is caught before comparing.",
+      "views": [
+        "summary stats",
+        "side-by-side panes"
+      ],
+      "interactions": [],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/lib/pymedphys/metersetmap.py",
+          "start": 25,
+          "end": 31,
+          "role": "logic",
+          "anchor": "600ec0b4bcbd",
+          "first": "import textwrap as _textwrap"
+        }
+      ]
+    },
+    {
+      "id": "data-selection",
+      "level": "view",
+      "parent": null,
+      "title": "Selection of data to compare",
+      "summary": "The main page, where the plan and the delivery are chosen in two columns and their MetersetMaps are compared.",
+      "views": [
+        "side-by-side panes",
+        "heatmap"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 16,
+          "end": 30,
+          "role": "logic",
+          "anchor": "4cb3d1e56ecc",
+          "first": "\"\"\"This is a streamlit app. To run this on your machine first install"
+        },
+        {
+          "file": "code/lib/pymedphys/metersetmap.py",
+          "start": 1,
+          "end": 31,
+          "role": "logic",
+          "anchor": "9ac1bbae2c19",
+          "first": "\"\"\"A suite of functions to determine the MetersetMap for a range of"
+        }
+      ]
+    },
+    {
+      "id": "reference-input",
+      "level": "component",
+      "parent": "data-selection",
+      "title": "Reference",
+      "summary": "Picks the planned treatment by uploading a DICOM RT Plan or searching the planning system's export location.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/lib/pymedphys/metersetmap.py",
+          "start": 27,
+          "end": 29,
+          "role": "logic",
+          "anchor": "a09383d8a5eb",
+          "first": "from ._metersetmap.metersetmap import calc_metersetmap as calculate"
+        }
+      ]
+    },
+    {
+      "id": "evaluation-input",
+      "level": "component",
+      "parent": "data-selection",
+      "title": "Evaluation",
+      "summary": "Picks the delivered treatment by uploading TRF log files or searching an indexed TRF directory.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/lib/pymedphys/metersetmap.py",
+          "start": 27,
+          "end": 29,
+          "role": "logic",
+          "anchor": "a09383d8a5eb",
+          "first": "from ._metersetmap.metersetmap import calc_metersetmap as calculate"
+        }
+      ]
+    },
+    {
+      "id": "output-locations",
+      "level": "view",
+      "parent": null,
+      "title": "Output Locations",
+      "summary": "Names where the comparison result is written, such as the eSCAN directory for the patient record.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/lib/pymedphys/_gui.py",
+          "start": 91,
+          "end": 106,
+          "role": "logic",
+          "anchor": "e9e19da554b1",
+          "first": "def _fill_streamlit_credentials():"
+        }
+      ]
+    }
+  ]
+}

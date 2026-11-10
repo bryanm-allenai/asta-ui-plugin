@@ -1,0 +1,544 @@
+{
+  "schema": "astaui.card/1",
+  "id": "infoclus-explainable-clustering",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T04:17:38Z"
+  },
+  "app": {
+    "title": "InfoClus: explainable clustering dashboard",
+    "summary": "A person picks a bundled dataset or uploads a table, and the interface clusters it hierarchically. It shows the rows as points in a 2D embedding, coloured by cluster. They can adjust the hyper-parameters that trade explanation strength against explanation length, then recompute within a chosen time budget. For any cluster, they read density curves of the few attributes that best set it apart from the whole dataset. They can also drag over any region of the embedding to get the same explanation for that region. They can then ask a language model to propose a name for each cluster from those explanations, and keep the names as another set of labels.",
+    "task": {
+      "text": "Find groups in a table of instances and explain each group by the attributes whose distributions most set it apart from the whole dataset.",
+      "verbs": [
+        "explore",
+        "organize",
+        "identify",
+        "derive",
+        "annotate"
+      ]
+    },
+    "data": {
+      "text": "A numeric table of instances by attributes, with precomputed 2D embeddings (t-SNE, PCA) and one or more sets of cluster labels per row.",
+      "item": "a row of the table (one instance with its attribute values)",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "exploring a new tabular dataset to find and explain its groups, before deeper analysis",
+      "terms": [
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A left sidebar loads the data and sets the clustering hyper-parameters. A centre scatter plot shows the embedding coloured by the chosen labels. Brushing points in the scatter fills a row of density plots that explain the selected region. A right panel shows, for the chosen cluster, one density plot per explanatory attribute, comparing the cluster with the whole dataset. A modal builds a prompt from those explanations and turns a language model's reply into a new set of labels.",
+      "views": [
+        "scatter plot",
+        "line chart",
+        "small multiples",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "brush",
+        "hover for detail",
+        "toggle view",
+        "apply label"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "small multiples"
+      ]
+    },
+    "field": {
+      "text": "information-theoretic explainable clustering in exploratory data mining",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "explainable clustering",
+        "exploratory data mining",
+        "dimensionality reduction"
+      ]
+    },
+    "workflow": {
+      "name": "cluster a table and explain each cluster by its distinguishing attributes",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Choose a bundled dataset from the Dataset dropdown, or use Upload Dataset (CSV) or Upload Embedding. A line shows the number of instances and dimensions.",
+          "parts": [
+            "data-panel"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Hierarchical clustering runs over k-means base clusters on the embedding. Adjust the alpha and beta sliders and the min_att/max_att inputs, then choose a 'recalculate in N s' runtime to search for the clustering with the best explanation score.",
+          "parts": [
+            "hyperparameter-controls"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A 2D embedding scatter of every row, coloured by cluster. Menus switch between embeddings (t-SNE/PCA) and label sets, including uploaded label CSVs. Point size and transparency can be changed.",
+          "parts": [
+            "embedding-scatter"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Pick 'Cluster N' to see one density plot for each explanatory attribute, comparing the cluster with the whole dataset and showing the attribute's information content. A tooltip gives the cluster's share of the data.",
+          "parts": [
+            "cluster-explanation"
+          ]
+        },
+        {
+          "step": "explain a hand-picked selection",
+          "here": "Box- or lasso-select points in the scatter. The best explanatory attributes for that selection are worked out on the fly and drawn as a row of density plots, headed by the selection's share of the data.",
+          "parts": [
+            "selection-explanation",
+            "embedding-scatter"
+          ]
+        },
+        {
+          "step": "name each group",
+          "here": "In the LLM modal, choose a provider, key, model and optional task, then Create prompt and Query LLM. 'update infoclus labels' parses the 'cluster i: label' reply into a new label set and shows it in the scatter.",
+          "parts": [
+            "llm-labeling"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Explanatory attributes are chosen by how far each attribute's distribution in a cluster departs from the whole dataset (information content). This is weighed against the length of the explanation through the alpha and beta parameters, with a minimum and maximum number of attributes per cluster.",
+        "The clustering search is bounded by a runtime budget the person picks, rather than by a fixed number of clusters.",
+        "Each density plot overlays the dataset's density, the cluster's density, and a shaded area scaled by the cluster's share of the data.",
+        "Any region brushed in the embedding is explained the same way as a computed cluster.",
+        "Cluster names proposed by a language model must come back in a strict 'cluster i: label' format, and are kept as a separate label set alongside the computed and uploaded ones."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Dataset and embedding sidebar",
+      "summary": "Loads a bundled or uploaded dataset and embedding, and shows how many instances and dimensions it has.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/layout.py",
+          "start": 322,
+          "end": 381,
+          "role": "markup",
+          "anchor": "40a136b9850f",
+          "first": "dbc.Col("
+        },
+        {
+          "file": "code/src/assets/infoc.css",
+          "start": 38,
+          "end": 43,
+          "role": "style",
+          "symbol": ".infoc-column-card",
+          "anchor": "206a9b8ba3ed",
+          "first": ".infoc-column-card {"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 53,
+          "end": 136,
+          "role": "logic",
+          "symbol": "update_store",
+          "anchor": "00b559a98b58",
+          "first": "def update_store(dataset, recalc_hyperparams, labels_contents, labels_filename, embedding_contents, embedding_filename,"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 366,
+          "end": 370,
+          "role": "logic",
+          "symbol": "import_dataset",
+          "anchor": "f2c5134d14b3",
+          "first": "def import_dataset(contents, filename):"
+        },
+        {
+          "file": "code/src/dash_utils.py",
+          "start": 50,
+          "end": 66,
+          "role": "logic",
+          "symbol": "save_dataset_in_folder",
+          "anchor": "5f3f6773859e",
+          "first": "def save_dataset_in_folder(contents, filename, base_path=DATA_FOLDER):"
+        }
+      ]
+    },
+    {
+      "id": "hyperparameter-controls",
+      "level": "component",
+      "parent": "data-panel",
+      "title": "Hyper-parameters and recalculation",
+      "summary": "Sets alpha, beta and the minimum and maximum number of attributes per explanation, then reruns the clustering search within a chosen time budget.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/layout.py",
+          "start": 382,
+          "end": 452,
+          "role": "markup",
+          "anchor": "aea1bab5ca05",
+          "first": "dbc.Card("
+        },
+        {
+          "file": "code/src/layout.py",
+          "start": 285,
+          "end": 292,
+          "role": "data",
+          "symbol": "get_runtime_dropdown_items",
+          "anchor": "a88e62f726cb",
+          "first": "def get_runtime_dropdown_items():"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 84,
+          "end": 89,
+          "role": "logic",
+          "anchor": "642427b3cda1",
+          "first": "elif trigger_id == 'recalc-hyperparameters':"
+        },
+        {
+          "file": "code/src/infoclus.py",
+          "start": 396,
+          "end": 419,
+          "role": "logic",
+          "symbol": "optimise",
+          "anchor": "f58726c3009e",
+          "first": "def optimise(self,"
+        }
+      ]
+    },
+    {
+      "id": "embedding-scatter",
+      "level": "view",
+      "parent": null,
+      "title": "Embedding scatter plot",
+      "summary": "Shows every row in a 2D embedding coloured by the chosen label set, with menus to switch embedding and labels, upload labels, and change point style.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view",
+        "brush",
+        "import"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/layout.py",
+          "start": 468,
+          "end": 680,
+          "role": "markup",
+          "anchor": "a67048eb8d21",
+          "first": "dbc.Col("
+        },
+        {
+          "file": "code/src/assets/infoc.css",
+          "start": 61,
+          "end": 63,
+          "role": "style",
+          "symbol": ".scatter-control-btn .btn",
+          "anchor": "5b023a5c9457",
+          "first": ".scatter-control-btn .btn {"
+        },
+        {
+          "file": "code/src/layout.py",
+          "start": 120,
+          "end": 179,
+          "role": "logic",
+          "symbol": "config_scatter_graph",
+          "anchor": "287c25ba2536",
+          "first": "def config_scatter_graph(clustering: list, embedding: np.ndarray, marker_size: float = 1, marker_opacity: float = 1.0):"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 298,
+          "end": 328,
+          "role": "logic",
+          "symbol": "update_scatter_plot",
+          "anchor": "e77e8e585abe",
+          "first": "def update_scatter_plot(emb_name, label_key, point_size, point_opacity, labels, embedding_store, infoc_store):"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 157,
+          "end": 170,
+          "role": "logic",
+          "symbol": "select_clustering_from_menu",
+          "anchor": "bf033793654b",
+          "first": "def select_clustering_from_menu(n_clicks_list):"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 198,
+          "end": 211,
+          "role": "logic",
+          "symbol": "select_embedding_from_menu",
+          "anchor": "e3c156ef015a",
+          "first": "def select_embedding_from_menu(n_clicks_list):"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 283,
+          "end": 284,
+          "role": "logic",
+          "symbol": "toggle_scatter_point_style",
+          "anchor": "f740d47ac112",
+          "first": "def toggle_scatter_point_style(n_clicks, is_open):"
+        }
+      ]
+    },
+    {
+      "id": "selection-explanation",
+      "level": "component",
+      "parent": "embedding-scatter",
+      "title": "Explanation for the selected region",
+      "summary": "For points brushed in the scatter, picks the attributes that best set the selection apart and draws a density plot for each one, comparing the selection with the whole dataset.",
+      "views": [
+        "line chart",
+        "small multiples"
+      ],
+      "interactions": [
+        "brush",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views",
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/src/layout.py",
+          "start": 685,
+          "end": 719,
+          "role": "markup",
+          "anchor": "9abe538d532c",
+          "first": "html.Div("
+        },
+        {
+          "file": "code/src/assets/infoc.css",
+          "start": 46,
+          "end": 51,
+          "role": "style",
+          "symbol": ".kde-scroll-hide-horizontal",
+          "anchor": "b42f352c0caa",
+          "first": ".kde-scroll-hide-horizontal {"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 340,
+          "end": 359,
+          "role": "logic",
+          "symbol": "select_embedding",
+          "anchor": "9fe653c5948c",
+          "first": "def select_embedding(selected, infoc_dict, data_store):"
+        },
+        {
+          "file": "code/src/layout.py",
+          "start": 218,
+          "end": 276,
+          "role": "logic",
+          "symbol": "config_selected_explanations",
+          "anchor": "fcae862fb4bd",
+          "first": "def config_selected_explanations(infoc_para_res: dict = None, df_data: pd.DataFrame=None, selected_idxes=None, ics_clust"
+        },
+        {
+          "file": "code/src/layout.py",
+          "start": 67,
+          "end": 118,
+          "role": "logic",
+          "symbol": "get_fastkde",
+          "anchor": "bd6cd646e580",
+          "first": "def get_fastkde(data_att: np.ndarray, cluster_att: np.ndarray, att_name: str, ic, cluster_color: str = '#2ca02c'):"
+        }
+      ]
+    },
+    {
+      "id": "cluster-explanation",
+      "level": "view",
+      "parent": null,
+      "title": "Per-cluster explanation panel",
+      "summary": "For the chosen cluster, stacks one density plot per explanatory attribute, comparing the cluster with the whole dataset and showing each attribute's information content.",
+      "views": [
+        "line chart",
+        "small multiples"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "small multiples",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/layout.py",
+          "start": 730,
+          "end": 780,
+          "role": "markup",
+          "anchor": "080ba646c80f",
+          "first": "dbc.Col("
+        },
+        {
+          "file": "code/src/layout.py",
+          "start": 181,
+          "end": 216,
+          "role": "logic",
+          "symbol": "config_explanations",
+          "anchor": "e6d3e57aa646",
+          "first": "def config_explanations(infoc_para_res: dict, df_data: pd.DataFrame, cluster_label: int = 0):"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 225,
+          "end": 238,
+          "role": "logic",
+          "symbol": "select_cluster_from_menu",
+          "anchor": "849d0c275d3f",
+          "first": "def select_cluster_from_menu(n_clicks_list):"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 256,
+          "end": 258,
+          "role": "logic",
+          "symbol": "select_cluster_explanation",
+          "anchor": "3a384bf1a4b6",
+          "first": "def select_cluster_explanation(cluster_id, infoc_dict, data_store):"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 265,
+          "end": 275,
+          "role": "logic",
+          "symbol": "update_cluster_select_tooltip",
+          "anchor": "afaaca6c040a",
+          "first": "def update_cluster_select_tooltip(cluster_id, infoc_dict):"
+        }
+      ]
+    },
+    {
+      "id": "llm-labeling",
+      "level": "component",
+      "parent": "cluster-explanation",
+      "title": "LLM cluster naming",
+      "summary": "Builds a prompt from the cluster explanations, queries the language model the person configures, and turns the reply into a new set of named cluster labels.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "apply label"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/layout.py",
+          "start": 783,
+          "end": 868,
+          "role": "markup",
+          "anchor": "37f567bcd9b7",
+          "first": "dbc.Modal(["
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 379,
+          "end": 382,
+          "role": "logic",
+          "symbol": "toggle_llm_modal",
+          "anchor": "a73c2e43a6df",
+          "first": "def toggle_llm_modal(llm_btn_clicks, is_open):"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 393,
+          "end": 402,
+          "role": "logic",
+          "symbol": "generate_prompt",
+          "anchor": "0657aef2ddd8",
+          "first": "def generate_prompt(n_clicks, infoclus_store, dataset_store, task):"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 414,
+          "end": 424,
+          "role": "logic",
+          "symbol": "run_llm_query",
+          "anchor": "84e7439667aa",
+          "first": "def run_llm_query(n_clicks, provider, api_key, model, endpoint, prompt_text):"
+        },
+        {
+          "file": "code/src/callbacks.py",
+          "start": 437,
+          "end": 483,
+          "role": "logic",
+          "symbol": "apply_llm_labels",
+          "anchor": "b7a43e746b17",
+          "first": "def apply_llm_labels(n_clicks, llm_response, labels, infoclus_store):"
+        },
+        {
+          "file": "code/src/dash_utils.py",
+          "start": 136,
+          "end": 181,
+          "role": "logic",
+          "symbol": "create_prompt",
+          "anchor": "e2e94cc77a15",
+          "first": "def create_prompt(infoclus_store=None, dataset_store=None, task=None):"
+        },
+        {
+          "file": "code/src/dash_utils.py",
+          "start": 184,
+          "end": 273,
+          "role": "logic",
+          "symbol": "query_llm",
+          "anchor": "508ce3d5150d",
+          "first": "def query_llm(provider, api_key, model, prompt, endpoint=None, timeout=60):"
+        },
+        {
+          "file": "code/src/dash_utils.py",
+          "start": 276,
+          "end": 302,
+          "role": "logic",
+          "symbol": "parse_llm_cluster_labels",
+          "anchor": "7deea7e78d87",
+          "first": "def parse_llm_cluster_labels(response_text, expected_cluster_ids=None):"
+        }
+      ]
+    }
+  ]
+}

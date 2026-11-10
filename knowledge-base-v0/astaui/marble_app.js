@@ -7,9 +7,8 @@
 // the default, so the page reads right before anything is set.
 //
 // One selection holds across the page. Anything with a data-pick attribute
-// (a row in the list, a point on the map, a cell in the grid, a name in the
-// inspector) picks the object it names, and every view follows. Back walks the
-// picks made in this tab.
+// (a row in the list, a point on the map, a name in the inspector) picks the
+// object it names, and every view follows. Back walks the picks made in this tab.
 //
 // Changing is a queued change. A press that would change the knowledge base adds
 // a row to the changes under the inspector, filed as an insert, with an inverse so
@@ -322,7 +321,7 @@
     }
   });
 
-  // ---- keys: Find, Escape, and arrows along the list, the grid and the switches.
+  // ---- keys: Find, Escape, and arrows along the list and the switches.
   document.addEventListener('keydown', (e) => {
     const typing = e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
     if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey) && !e.altKey) {
@@ -360,20 +359,6 @@
       next.focus();
       next.click();
       return;
-    }
-    if (t.classList?.contains('cell')) {
-      // The diagonal keeps the grid square; it is not a stop for the keyboard.
-      const rows = [...byId('kb-mx-grid').querySelectorAll('.mrow:not(.mhead)')];
-      const cells = (r) => [...r.querySelectorAll('.cell')];
-      let r = rows.indexOf(t.closest('.mrow'));
-      let c = cells(rows[r]).indexOf(t);
-      const [dr, dc] = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] }[e.key];
-      do { r += dr; c += dc; } while (rows[r] && cells(rows[r])[c]?.classList.contains('self'));
-      const target = rows[r] && cells(rows[r])[c];
-      if (target) {
-        e.preventDefault();
-        target.focus();
-      }
     }
   });
 

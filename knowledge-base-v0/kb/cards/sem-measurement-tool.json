@@ -1,0 +1,988 @@
+{
+  "schema": "astaui.card/1",
+  "id": "sem-measurement-tool",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T07:40:26Z"
+  },
+  "app": {
+    "title": "SEM measurement tool",
+    "summary": "A person opens a micrograph, along with the microscope's metadata file if it writes one, and checks or sets the calibration: pixel size, stage tilt correction, tilt axis, rotation and origin. They then trace contours and place rulers, angles and line profiles on the image, with clicks snapping to nearby edges. Each measurement goes into one list, where they can select, rename, delete or inspect it. They can fine-tune a contour's vertices in a table and read distances along a profile using two markers on its plot. They save the work as a session file and download the selected measurements as CSV tables, polygon files, profile plots or a GDSII layout.",
+    "task": {
+      "text": "Take calibrated, tilt-corrected dimensions, angles, areas and intensity profiles of features in a microscope image, and export them for analysis or layout tools.",
+      "verbs": [
+        "derive",
+        "annotate",
+        "locate"
+      ]
+    },
+    "data": {
+      "text": "One greyscale microscope image with its instrument metadata, and the geometric measurements a person draws on it. The measurements are contours, rulers, angles and banded line profiles, each kept as points in stored pixel coordinates.",
+      "item": "a measurement drawn on the image: a contour, a ruler, an angle or a line profile",
+      "shapes": [
+        "image",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "measuring features on micrographs after imaging, before modelling or reporting",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A large zoomable image canvas takes clicks from the active tool, snaps them to a precomputed edge map and draws every measurement through one calibration map. The side panel sets that map and lists the measurements, and the selected measurement drives floating windows: a vertex table for a contour, a profile plot with markers for a profile. Both windows are linked back to the image.",
+      "views": [
+        "image viewer",
+        "list",
+        "form",
+        "table view",
+        "line chart",
+        "bar chart",
+        "detail panel"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "zoom and pan",
+        "keyboard shortcuts",
+        "inline edit",
+        "hover for detail",
+        "toggle view",
+        "undo",
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "master-detail",
+        "linked views",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "dimensional metrology on scanning electron micrographs and FIB cross-sections in materials science",
+      "disciplines": [
+        "materials science"
+      ],
+      "terms": [
+        "electron microscopy",
+        "sem metrology",
+        "fib cross section"
+      ]
+    },
+    "workflow": {
+      "name": "measure features on a calibrated image and export the measurements",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Open image or a drop loads a TIFF, PNG or JPEG, together with a .txt or .hdr metadata file if there is one. Pixel size, tilt and microscope are read from the vendor metadata, and the edge map is computed. Open session reloads earlier work or a polygon CSV.",
+          "parts": [
+            "image-view",
+            "control-panel"
+          ]
+        },
+        {
+          "step": "set the scale and frame the measurements are taken in",
+          "here": "Pixel width and height in nm, stage tilt with a cross-section, tilted-surface or custom correction factor, tilt axis, rotation and origin. A selected ruler can level the image or set the tilt axis.",
+          "parts": [
+            "calibration-form"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Contour, ruler, angle and two-line tools (keys 1–4) place points that snap to the strongest nearby edge. Each measurement shows its length, angle, perimeter, area or bounding box in the calibrated frame.",
+          "parts": [
+            "tool-palette",
+            "image-view"
+          ]
+        },
+        {
+          "step": "read an intensity profile across a feature and measure along it",
+          "here": "The profile tool (5) draws a band-averaged grey-value profile that turns square to the edge it crosses. Markers A and B on the plot snap to the steepest slope and give an edge-to-edge distance.",
+          "parts": [
+            "profile-window",
+            "image-view"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The measurement list selects one or several items. A selected contour's vertices open in a table where they can be reordered, dropped, reversed or retyped in micrometres, and are highlighted on the image.",
+          "parts": [
+            "measurement-list",
+            "vertex-window"
+          ]
+        },
+        {
+          "step": "adjust how the image is shown",
+          "here": "A histogram without the info bar, with draggable black and white levels, brightness and contrast sliders, Auto and Full range. This changes the display only, never the measures.",
+          "parts": [
+            "display-histogram"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Save session writes JSON. Download writes, for the selection or for all, a measurements CSV, a polygon CSV, a profile CSV or PNG, or a GDSII file with a layer per contour.",
+          "parts": [
+            "measurement-list",
+            "control-panel"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every point is stored in raw pixel coordinates and mapped through one affine calibration (pixel size, tilt foreshortening correction, tilt axis, rotation, origin), so changing the calibration never moves a traced point",
+        "Clicks snap to sub-pixel edge crests found on a Gaussian-gradient edge map, with a noise threshold set as a multiple of the median gradient",
+        "Line profiles are averaged across a band of adjustable width, turned square to the edge they cross, and annotated with the contours they cross",
+        "Contours export as GDSII polygons or paths on per-contour layers for layout tools, and as polygon CSV files for a mode solver",
+        "Vendor metadata from several microscope makers is parsed, and the instrument's info bar is excluded from the histogram and edge detection"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "image-view",
+      "level": "view",
+      "parent": null,
+      "title": "Image canvas with edge snapping",
+      "summary": "Shows the micrograph through the calibration map, zoomable and pannable. It takes clicks from the active tool, snaps them to nearby edges and draws every measurement with its label.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "select",
+        "keyboard shortcuts",
+        "undo",
+        "import"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 189,
+          "end": 248,
+          "role": "markup",
+          "symbol": "#view-wrap",
+          "anchor": "fb397d0c666d",
+          "first": "<main id=\"view-wrap\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 312,
+          "end": 327,
+          "role": "markup",
+          "anchor": "57f013d00402",
+          "first": "<section>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 24,
+          "end": 24,
+          "role": "style",
+          "symbol": "#view",
+          "anchor": "5181a289e429",
+          "first": "#view { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 28,
+          "end": 29,
+          "role": "style",
+          "symbol": "#drop-hint",
+          "anchor": "88a7c56d54e8",
+          "first": "#drop-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #bbb;"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 690,
+          "end": 749,
+          "role": "logic",
+          "symbol": "draw",
+          "anchor": "74e374830bb2",
+          "first": "function draw() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 1250,
+          "end": 1288,
+          "role": "logic",
+          "symbol": "drawMeasurement",
+          "anchor": "7f8ba1b615d2",
+          "first": "function drawMeasurement(ms, color, toScreen, how) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 1703,
+          "end": 1730,
+          "role": "logic",
+          "symbol": "placePoint",
+          "anchor": "74ce4650a03d",
+          "first": "function placePoint(x, y, exact) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 4148,
+          "end": 4159,
+          "role": "logic",
+          "symbol": "clickAt",
+          "anchor": "be6b28ce35bc",
+          "first": "function clickAt(sx, sy, exact, insert) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 608,
+          "end": 614,
+          "role": "logic",
+          "symbol": "snapTarget",
+          "anchor": "7c21e3c4e721",
+          "first": "function snapTarget(x, y) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 560,
+          "end": 599,
+          "role": "logic",
+          "symbol": "refreshEdges",
+          "anchor": "26aab727f1aa",
+          "first": "async function refreshEdges() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 655,
+          "end": 662,
+          "role": "logic",
+          "symbol": "zoomAt",
+          "anchor": "1b520711c33d",
+          "first": "function zoomAt(factor, sx, sy) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2602,
+          "end": 2638,
+          "role": "logic",
+          "symbol": "openFiles",
+          "anchor": "340772cadd01",
+          "first": "async function openFiles(files) {"
+        },
+        {
+          "file": "code/js/edges.js",
+          "start": 295,
+          "end": 522,
+          "role": "logic",
+          "symbol": "EdgeMap",
+          "anchor": "c1683307e87b",
+          "first": "class EdgeMap {"
+        },
+        {
+          "file": "code/js/tiff.js",
+          "start": 460,
+          "end": 489,
+          "role": "logic",
+          "symbol": "decodeSEMImage",
+          "anchor": "c2001b704b5a",
+          "first": "function decodeSEMImage(buffer, name) {"
+        }
+      ]
+    },
+    {
+      "id": "control-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Side panel",
+      "summary": "Holds the file controls, tools, measurement list, calibration, snapping and display settings beside the image.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 250,
+          "end": 261,
+          "role": "markup",
+          "anchor": "7b94d343198b",
+          "first": "<aside id=\"panel\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 32,
+          "end": 32,
+          "role": "style",
+          "symbol": "#panel",
+          "anchor": "38d4c540597e",
+          "first": "#panel { grid-row: 1; grid-column: 2; overflow-y: auto; border-left: 1px solid var(--line); padding: 8px 12px 16px; }"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2427,
+          "end": 2434,
+          "role": "logic",
+          "symbol": "saveSession",
+          "anchor": "0bb8e82da25d",
+          "first": "function saveSession() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2546,
+          "end": 2580,
+          "role": "logic",
+          "symbol": "loadSessionText",
+          "anchor": "4183f0155cb2",
+          "first": "function loadSessionText(text, name) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2500,
+          "end": 2538,
+          "role": "logic",
+          "symbol": "loadPolygonText",
+          "anchor": "96c0d1b7cfe3",
+          "first": "function loadPolygonText(text, name) {"
+        },
+        {
+          "file": "code/js/session.js",
+          "start": 78,
+          "end": 104,
+          "role": "logic",
+          "symbol": "formatSession",
+          "anchor": "8a2038866b3a",
+          "first": "function formatSession(session, saved) {"
+        },
+        {
+          "file": "code/js/session.js",
+          "start": 261,
+          "end": 287,
+          "role": "logic",
+          "symbol": "parseSession",
+          "anchor": "df27e3a26d13",
+          "first": "function parseSession(text) {"
+        }
+      ]
+    },
+    {
+      "id": "tool-palette",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Measurement tools",
+      "summary": "Picks the active tool: pan, contour, ruler, angle, angle between two lines or line profile. Each tool has a number key and a hint.",
+      "views": [],
+      "interactions": [
+        "keyboard shortcuts",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 263,
+          "end": 274,
+          "role": "markup",
+          "anchor": "d354cf11faaa",
+          "first": "<section>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 48,
+          "end": 48,
+          "role": "style",
+          "symbol": ".row.tools button",
+          "anchor": "788d3b149b24",
+          "first": ".row.tools button { flex: 1 1 0; padding: 4px 4px; white-space: nowrap; }   /* each name on one line, in any font */"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 1668,
+          "end": 1680,
+          "role": "logic",
+          "symbol": "setTool",
+          "anchor": "f280e4b9d055",
+          "first": "function setTool(tool) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 60,
+          "end": 73,
+          "role": "data",
+          "symbol": "TOOL_HINTS",
+          "anchor": "8603b3241adf",
+          "first": "const TOOL_HINTS = {"
+        },
+        {
+          "file": "code/js/transform.js",
+          "start": 392,
+          "end": 420,
+          "role": "logic",
+          "symbol": "measureContour",
+          "anchor": "6b810e77e4aa",
+          "first": "function measureContour(contour, frame) {"
+        },
+        {
+          "file": "code/js/transform.js",
+          "start": 428,
+          "end": 435,
+          "role": "logic",
+          "symbol": "measureRuler",
+          "anchor": "c074b2c16c1d",
+          "first": "function measureRuler(points, frame) {"
+        },
+        {
+          "file": "code/js/transform.js",
+          "start": 444,
+          "end": 451,
+          "role": "logic",
+          "symbol": "measureAngle",
+          "anchor": "9bf59b4d0e4f",
+          "first": "function measureAngle(points, frame) {"
+        },
+        {
+          "file": "code/js/transform.js",
+          "start": 460,
+          "end": 469,
+          "role": "logic",
+          "symbol": "measureLineAngle",
+          "anchor": "59cb05f0be8f",
+          "first": "function measureLineAngle(points, frame) {"
+        }
+      ]
+    },
+    {
+      "id": "measurement-list",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Measurement list and downloads",
+      "summary": "Lists every measurement with its colour and brief value. Rows can be selected one at a time or several at once, and the selected item's details, rename, delete and the Download menu of CSV, PNG and GDS exports sit below.",
+      "views": [
+        "list",
+        "detail panel"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "keyboard shortcuts",
+        "export"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 276,
+          "end": 310,
+          "role": "markup",
+          "anchor": "960af827f9b9",
+          "first": "<section>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 444,
+          "end": 444,
+          "role": "markup",
+          "symbol": "#download-menu",
+          "anchor": "9cb526c60e9d",
+          "first": "<div id=\"download-menu\" role=\"menu\" aria-label=\"Download\" hidden></div>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 445,
+          "end": 461,
+          "role": "markup",
+          "symbol": "#gds-dialog",
+          "anchor": "05f0a054098a",
+          "first": "<dialog id=\"gds-dialog\" aria-labelledby=\"gds-heading\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 58,
+          "end": 58,
+          "role": "style",
+          "symbol": ".list",
+          "anchor": "7a23a2f6e77c",
+          "first": ".list { height: 112px; overflow-y: auto; border: 1px solid var(--line); border-radius: 3px; background: #fff; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 60,
+          "end": 60,
+          "role": "style",
+          "symbol": ".list .item",
+          "anchor": "38791cf64cfe",
+          "first": ".list .item { display: flex; align-items: center; gap: 6px; padding: 2px 6px; white-space: nowrap; cursor: default; }"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 1847,
+          "end": 1891,
+          "role": "logic",
+          "symbol": "fillMeasurementList",
+          "anchor": "9c153209361e",
+          "first": "function fillMeasurementList() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 1923,
+          "end": 1969,
+          "role": "logic",
+          "symbol": "describeMeasurement",
+          "anchor": "446ed5158315",
+          "first": "function describeMeasurement(ms) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 3958,
+          "end": 3989,
+          "role": "logic",
+          "symbol": "toggleDownloadMenu",
+          "anchor": "fe5c4c430bbe",
+          "first": "function toggleDownloadMenu() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 3913,
+          "end": 3936,
+          "role": "logic",
+          "symbol": "downloadItems",
+          "anchor": "876d9e48d183",
+          "first": "function downloadItems() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 3889,
+          "end": 3897,
+          "role": "logic",
+          "symbol": "exportGds",
+          "anchor": "6a601dfac52b",
+          "first": "function exportGds() {"
+        },
+        {
+          "file": "code/js/polygons.js",
+          "start": 356,
+          "end": 381,
+          "role": "logic",
+          "symbol": "formatMeasurementFile",
+          "anchor": "f6e7965a3500",
+          "first": "function formatMeasurementFile(image, frame, measurements, meanGrey = () => null) {"
+        },
+        {
+          "file": "code/js/polygons.js",
+          "start": 155,
+          "end": 175,
+          "role": "logic",
+          "symbol": "formatPolygonFile",
+          "anchor": "8c4c03f61054",
+          "first": "function formatPolygonFile(image, frame, contours, snap) {"
+        },
+        {
+          "file": "code/js/gds.js",
+          "start": 298,
+          "end": 318,
+          "role": "logic",
+          "symbol": "formatGds",
+          "anchor": "262b4335a156",
+          "first": "function formatGds(lib) {"
+        }
+      ]
+    },
+    {
+      "id": "calibration-form",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Scale, tilt and rotation",
+      "summary": "Sets the pixel size, stage tilt correction, tilt axis, rotation and origin that map stored pixels to micrometres. It warns about the microscope's own corrections, and a selected ruler can level the image or set the tilt axis.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "undo"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 329,
+          "end": 359,
+          "role": "markup",
+          "anchor": "ccdc62d66ace",
+          "first": "<section>"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2067,
+          "end": 2093,
+          "role": "logic",
+          "symbol": "frameInputsChanged",
+          "anchor": "d4fb1cd62a1a",
+          "first": "function frameInputsChanged() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2032,
+          "end": 2064,
+          "role": "logic",
+          "symbol": "refreshFrameNotes",
+          "anchor": "7079fc8fdf58",
+          "first": "function refreshFrameNotes() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 1787,
+          "end": 1802,
+          "role": "logic",
+          "symbol": "levelSelected",
+          "anchor": "6099ed5eacbc",
+          "first": "function levelSelected(target) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 1805,
+          "end": 1815,
+          "role": "logic",
+          "symbol": "axisFromSelected",
+          "anchor": "6d3e8a32dd04",
+          "first": "function axisFromSelected() {"
+        },
+        {
+          "file": "code/js/transform.js",
+          "start": 273,
+          "end": 280,
+          "role": "logic",
+          "symbol": "measurementMatrix",
+          "anchor": "4f51c9ad6da5",
+          "first": "function measurementMatrix(frame) {"
+        },
+        {
+          "file": "code/js/transform.js",
+          "start": 154,
+          "end": 181,
+          "role": "logic",
+          "symbol": "correctionFactor",
+          "anchor": "44978f2e120a",
+          "first": "function correctionFactor(frame) {"
+        }
+      ]
+    },
+    {
+      "id": "vertex-window",
+      "level": "view",
+      "parent": null,
+      "title": "Vertex window",
+      "summary": "A floating table of the selected contour's vertices in calibrated coordinates, where they can be selected, reordered, dropped, reversed, zoomed to or retyped. Its selection is linked to the vertices on the image.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "inline edit",
+        "keyboard shortcuts",
+        "undo"
+      ],
+      "patterns": [
+        "linked views",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 194,
+          "end": 211,
+          "role": "markup",
+          "symbol": "#vertex-window",
+          "anchor": "7c2bf542c548",
+          "first": "<section id=\"vertex-window\" class=\"floating\" aria-label=\"Vertices of the selected contour\" hidden>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 115,
+          "end": 115,
+          "role": "style",
+          "symbol": "#vertex-table",
+          "anchor": "d9aef9b4ccef",
+          "first": "#vertex-table { border-collapse: collapse; width: 100%; font: 12px ui-monospace, Consolas, monospace; }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 98,
+          "end": 101,
+          "role": "style",
+          "symbol": ".floating",
+          "anchor": "0bfa0797eead",
+          "first": ".floating { position: fixed; top: 12px; right: calc(var(--panel-width) + 12px); width: 300px; height: 360px; min-width: "
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2675,
+          "end": 2714,
+          "role": "logic",
+          "symbol": "refreshVertexWindow",
+          "anchor": "3408c2ea1f7c",
+          "first": "function refreshVertexWindow() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2721,
+          "end": 2739,
+          "role": "logic",
+          "symbol": "pickVertex",
+          "anchor": "336822e931b1",
+          "first": "function pickVertex(i, how) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2814,
+          "end": 2850,
+          "role": "logic",
+          "symbol": "editCoordinate",
+          "anchor": "54b2c3579f63",
+          "first": "function editCoordinate(cell) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2853,
+          "end": 2875,
+          "role": "logic",
+          "symbol": "zoomToPicked",
+          "anchor": "17372cc61692",
+          "first": "function zoomToPicked() {"
+        },
+        {
+          "file": "code/js/vertices.js",
+          "start": 18,
+          "end": 31,
+          "role": "logic",
+          "symbol": "moveSelected",
+          "anchor": "49c22d195500",
+          "first": "function moveSelected(points, selected, step) {"
+        },
+        {
+          "file": "code/js/vertices.js",
+          "start": 62,
+          "end": 72,
+          "role": "logic",
+          "symbol": "reverseContour",
+          "anchor": "789ae4411983",
+          "first": "function reverseContour(points, closed, selected) {"
+        }
+      ]
+    },
+    {
+      "id": "profile-window",
+      "level": "view",
+      "parent": null,
+      "title": "Line profile window",
+      "summary": "Plots the band-averaged grey values along the selected profile with their spread and the contours that cross it. Markers A and B snap to the steepest slope to give a distance, hovering marks the place on the image, and the profile exports as CSV or PNG.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select",
+        "inline edit",
+        "export",
+        "undo"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 220,
+          "end": 238,
+          "role": "markup",
+          "symbol": "#profile-window",
+          "anchor": "24ec8345eaed",
+          "first": "<section id=\"profile-window\" class=\"floating\" aria-label=\"Line profile\" hidden>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 126,
+          "end": 127,
+          "role": "style",
+          "symbol": "#profile-plot",
+          "anchor": "ce8214ffe72d",
+          "first": "#profile-plot { display: block; flex: 1 1 0; min-height: 0; height: 0; width: calc(100% - 12px); margin: 0 6px;"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 3018,
+          "end": 3039,
+          "role": "logic",
+          "symbol": "refreshProfileWindow",
+          "anchor": "54cd36a61f85",
+          "first": "function refreshProfileWindow() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 3193,
+          "end": 3298,
+          "role": "logic",
+          "symbol": "plotProfile",
+          "anchor": "e36b75d605b2",
+          "first": "function plotProfile(g, w, h, data, how) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 3531,
+          "end": 3548,
+          "role": "logic",
+          "symbol": "placeMarker",
+          "anchor": "219f0eab580c",
+          "first": "function placeMarker(t, exact) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 3678,
+          "end": 3716,
+          "role": "logic",
+          "symbol": "squareProfile",
+          "anchor": "7906127bd3f6",
+          "first": "function squareProfile(points, keep = null) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 3597,
+          "end": 3604,
+          "role": "logic",
+          "symbol": "exportProfile",
+          "anchor": "6d498ffd0524",
+          "first": "function exportProfile(ms = shownProfile()) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 3611,
+          "end": 3632,
+          "role": "logic",
+          "symbol": "exportProfilePng",
+          "anchor": "0c9185846f84",
+          "first": "function exportProfilePng(ms = shownProfile()) {"
+        },
+        {
+          "file": "code/js/profile.js",
+          "start": 214,
+          "end": 262,
+          "role": "logic",
+          "symbol": "sampleProfile",
+          "anchor": "e19f60ddd37f",
+          "first": "function sampleProfile(image, g) {"
+        },
+        {
+          "file": "code/js/profile.js",
+          "start": 472,
+          "end": 517,
+          "role": "logic",
+          "symbol": "snapToSlope",
+          "anchor": "2e5fbb506fb3",
+          "first": "function snapToSlope(mean, at, radius, sigma, minContrast) {"
+        },
+        {
+          "file": "code/js/polygons.js",
+          "start": 393,
+          "end": 427,
+          "role": "logic",
+          "symbol": "formatProfileFile",
+          "anchor": "130e04a5578a",
+          "first": "function formatProfileFile(image, frame, ms, profile, crossings) {"
+        }
+      ]
+    },
+    {
+      "id": "display-histogram",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Display levels and histogram",
+      "summary": "Shows a histogram of the image without its info bar, with draggable black and white levels, brightness and contrast sliders, Auto and Full range buttons, and a choice of overlay colours.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "brush",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 361,
+          "end": 391,
+          "role": "markup",
+          "anchor": "0a287bddcbf9",
+          "first": "<section>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 93,
+          "end": 94,
+          "role": "style",
+          "symbol": "#histogram",
+          "anchor": "5934435d4bd1",
+          "first": "#histogram { display: block; width: 100%; height: 96px; background: #fff; border: 1px solid var(--line); border-radius: "
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2209,
+          "end": 2252,
+          "role": "logic",
+          "symbol": "drawHistogram",
+          "anchor": "5d47a1ee0205",
+          "first": "function drawHistogram() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2106,
+          "end": 2119,
+          "role": "logic",
+          "symbol": "setLevels",
+          "anchor": "e5aef7aa9bb8",
+          "first": "function setLevels(lo, hi) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2269,
+          "end": 2275,
+          "role": "logic",
+          "symbol": "dragLevel",
+          "anchor": "8b3bb8f13f75",
+          "first": "function dragLevel(v) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 2159,
+          "end": 2182,
+          "role": "logic",
+          "symbol": "refreshDisplay",
+          "anchor": "055e5a133cff",
+          "first": "function refreshDisplay() {"
+        },
+        {
+          "file": "code/js/display.js",
+          "start": 129,
+          "end": 155,
+          "role": "logic",
+          "symbol": "histogramOf",
+          "anchor": "c25bc483faf6",
+          "first": "function histogramOf(data, fixed = null) {"
+        },
+        {
+          "file": "code/js/display.js",
+          "start": 162,
+          "end": 166,
+          "role": "logic",
+          "symbol": "autoLevels",
+          "anchor": "0880d19c0426",
+          "first": "function autoLevels(data) {"
+        }
+      ]
+    }
+  ]
+}

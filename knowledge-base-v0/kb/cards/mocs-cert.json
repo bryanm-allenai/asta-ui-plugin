@@ -1,0 +1,688 @@
+{
+  "schema": "astaui.card/1",
+  "id": "mocs-cert",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T21:51:36Z"
+  },
+  "app": {
+    "title": "MOCS-Cert Trajectory Verification Studio",
+    "summary": "A person picks a molecular structure or simulation trajectory and writes a declarative distance query, either typed or taken from presets that change with the dataset. Running the query compiles it into a staged execution plan. The interface then shows the trajectory as a strip of time blocks, each coloured true, false or unknown according to bounds on the distance. The person selects blocks and refines the uncertain ones into sub-blocks with tighter bounds. Finally they verify the hash-committed certificate against invariant checks and a reference oracle, then copy its hash or download it as JSON.",
+    "task": {
+      "text": "Find the stretches of a simulation where a distance condition between two atom selections holds, skip the stretches that provably cannot satisfy it, and produce a checkable certificate of the answer.",
+      "verbs": [
+        "derive",
+        "locate",
+        "identify",
+        "review"
+      ]
+    },
+    "data": {
+      "text": "Molecular structures and trajectories of sampled frames, split into fixed time blocks. Each block has lower and upper bounds on a distance and a three-valued verdict, and the run produces a certificate record with hashes.",
+      "item": "a block of consecutive trajectory frames with its distance bounds and true/false/unknown verdict",
+      "shapes": [
+        "time series",
+        "judgements",
+        "hierarchy",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "querying simulation trajectories for contact events and certifying the answer, after the simulations are run",
+      "terms": [
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "A query editor drives a compile-and-execute run. Its plan stages fill a table, its block verdicts colour a timeline lattice, and its evidence fills a tabbed certificate panel. Selecting a block on the timeline focuses its bounds in the detail rows, the 3D viewer and the proof panel, where it can be refined. Audit views re-verify the certificate against fixed checks and export it.",
+      "views": [
+        "sidebar list",
+        "text editor",
+        "3d viewer",
+        "table view",
+        "timeline",
+        "detail panel",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "keyboard shortcuts",
+        "search",
+        "toggle view",
+        "zoom and pan",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "rubric",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "certified distance-contact queries over molecular dynamics trajectories in computational biophysics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "molecular dynamics",
+        "computational biophysics",
+        "structural biology"
+      ]
+    },
+    "workflow": {
+      "name": "query a long record for when a condition holds, rule out stretches by bounds, refine the uncertain ones, and certify the answer",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pick a dataset (trajectory and topology) in the sidebar, or a structure from the catalog of experimental and predicted structures. Switching dataset clears the previous results and loads that dataset's preset queries.",
+          "parts": [
+            "dataset-sidebar",
+            "molecular-viewport"
+          ]
+        },
+        {
+          "step": "state the condition to look for",
+          "here": "Type a query of the form FIND [ALL] (selection) WITHIN distance OF (selection) [WHERE DURATION >= time], or choose a preset. Ctrl+Enter runs it, and errors come back with a code and a suggested fix.",
+          "parts": [
+            "query-editor"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The query compiles into a nine-stage plan: parse, resolve selections, set up periodic boundaries, look up the index, prune, refine, evaluate exact frames, build the certificate and verify. The plan table shows each stage's status.",
+          "parts": [
+            "query-editor",
+            "execution-plan"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A canvas strip shows every time block coloured True, False or Unknown. Click a block or use the arrow keys to select it and see its time range, lower and upper bounds, and verdict.",
+          "parts": [
+            "temporal-lattice"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Refine Block is enabled only for blocks whose bounds straddle the threshold. It splits the block in two and shows each sub-block's tighter bounds and verdict, while the 3D viewer shows the selected atoms with bounding boxes and a distance caliper.",
+          "parts": [
+            "temporal-lattice",
+            "molecular-viewport"
+          ]
+        },
+        {
+          "step": "check the result against criteria",
+          "here": "The certificate panel and Formal Audit view re-run verification. They show the certificate hash, source and index commitments, fixed invariant checks, and frame-by-frame agreement with a reference analysis library.",
+          "parts": [
+            "certificate-panel",
+            "formal-audit"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Copy the certificate hash, or download the certificate as a JSON file.",
+          "parts": [
+            "certificate-panel",
+            "formal-audit"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each interval gets a three-valued verdict. If the lower bound is above the threshold the block is ruled out without reading frames; if the upper bound is at or below it, the block is certified true; otherwise it is unknown.",
+        "Only unknown blocks can be refined. Refinement halves the block, and each child's bounds must stay inside its parent's bounds.",
+        "Distances use the minimum-image rule for periodic simulation boxes, and unsupported box shapes fail closed.",
+        "The result is a canonicalised, SHA-256-hashed certificate. It is re-verified independently and checked against a reference library rather than trusted as reported.",
+        "The query language has existential and universal quantifiers and a minimum-duration clause, and the preset queries change with the dataset."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "dataset-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Explorer sidebar",
+      "summary": "Lists the dataset, the observables (distance, contact, hydrogen bond), the index, verification, benchmarks and workflows. Selecting an entry switches what the main workspace shows.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/layout/LeftSidebar.tsx",
+          "start": 217,
+          "end": 306,
+          "role": "markup",
+          "anchor": "9ee1a0a5bca0",
+          "first": "export const LeftSidebar: React.FC<LeftSidebarProps> = ({"
+        },
+        {
+          "file": "code/frontend/src/components/layout/LeftSidebar.tsx",
+          "start": 261,
+          "end": 274,
+          "role": "logic",
+          "symbol": "handleSelect",
+          "anchor": "e6a056eb2ba6",
+          "first": "const handleSelect = (id: string, route: string, isModal?: boolean) => {"
+        },
+        {
+          "file": "code/frontend/src/components/layout/LeftSidebar.tsx",
+          "start": 276,
+          "end": 304,
+          "role": "logic",
+          "symbol": "getIconForId",
+          "anchor": "0ee6e523a7e8",
+          "first": "const getIconForId = (id: string) => {"
+        }
+      ]
+    },
+    {
+      "id": "query-editor",
+      "level": "component",
+      "parent": "workstation",
+      "title": "Query editor",
+      "summary": "The person writes or picks a distance query and runs it. Presets follow the active dataset, and errors are shown as structured messages.",
+      "views": [
+        "text editor"
+      ],
+      "interactions": [
+        "keyboard shortcuts",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/editor/MonacoQueryEditor.tsx",
+          "start": 180,
+          "end": 200,
+          "role": "markup",
+          "anchor": "1e30a3aef230",
+          "first": "return ("
+        },
+        {
+          "file": "code/frontend/src/index.css",
+          "start": 247,
+          "end": 254,
+          "role": "style",
+          "symbol": ".query-workspace-container",
+          "anchor": "4e9323088bff",
+          "first": ".query-workspace-container {"
+        },
+        {
+          "file": "code/frontend/src/index.css",
+          "start": 256,
+          "end": 265,
+          "role": "style",
+          "symbol": ".query-workspace-grid",
+          "anchor": "c3bef381aadb",
+          "first": ".query-workspace-grid {"
+        },
+        {
+          "file": "code/frontend/src/components/editor/MonacoQueryEditor.tsx",
+          "start": 13,
+          "end": 24,
+          "role": "data",
+          "symbol": "GOLDEN_PRESETS",
+          "anchor": "fddb23e44265",
+          "first": "const GOLDEN_PRESETS = ["
+        },
+        {
+          "file": "code/frontend/src/components/editor/MonacoQueryEditor.tsx",
+          "start": 35,
+          "end": 61,
+          "role": "logic",
+          "symbol": "getPresetsForDataset",
+          "anchor": "ab5514d4cebe",
+          "first": "export function getPresetsForDataset(trajectoryId?: string, topologyId?: string): QueryPreset[] {"
+        },
+        {
+          "file": "code/frontend/src/components/editor/MonacoQueryEditor.tsx",
+          "start": 124,
+          "end": 153,
+          "role": "logic",
+          "symbol": "handleExecute",
+          "anchor": "cf9907760cbd",
+          "first": "const handleExecute = async () => {"
+        },
+        {
+          "file": "code/frontend/src/components/editor/MonacoQueryEditor.tsx",
+          "start": 155,
+          "end": 160,
+          "role": "logic",
+          "symbol": "handleKeyDown",
+          "anchor": "015a932b82b9",
+          "first": "const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {"
+        },
+        {
+          "file": "code/frontend/src/components/editor/MonacoQueryEditor.tsx",
+          "start": 162,
+          "end": 166,
+          "role": "logic",
+          "symbol": "handlePresetSelect",
+          "anchor": "5ad58c939190",
+          "first": "const handlePresetSelect = (presetQuery: string) => {"
+        },
+        {
+          "file": "code/frontend/src/api/queryExecution.ts",
+          "start": 26,
+          "end": 286,
+          "role": "logic",
+          "symbol": "runCanonicalQuery",
+          "anchor": "ee30e323c56f",
+          "first": "export async function runCanonicalQuery("
+        }
+      ]
+    },
+    {
+      "id": "workstation",
+      "level": "view",
+      "parent": null,
+      "title": "Workstation",
+      "summary": "Stacks the query editor, the 3D viewer beside the execution plan, the temporal lattice and the certificate panel into one scrolling workspace, with a sticky header that keeps the structure and selection in view.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/views/WorkstationView.tsx",
+          "start": 86,
+          "end": 195,
+          "role": "markup",
+          "anchor": "50af0dcccd8c",
+          "first": "return ("
+        },
+        {
+          "file": "code/frontend/src/components/views/WorkstationView.tsx",
+          "start": 49,
+          "end": 52,
+          "role": "logic",
+          "symbol": "handleScroll",
+          "anchor": "221ee5530b33",
+          "first": "const handleScroll = () => {"
+        }
+      ]
+    },
+    {
+      "id": "execution-plan",
+      "level": "component",
+      "parent": "workstation",
+      "title": "Execution plan",
+      "summary": "Shows the compiled query's stages as table rows with a status for each, so the person can see how far the run got and where it stopped.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/plan/ExecutionPlanDAG.tsx",
+          "start": 53,
+          "end": 200,
+          "role": "markup",
+          "anchor": "6b860bea6690",
+          "first": "export const ExecutionPlanDAG: React.FC<ExecutionPlanDAGProps> = ({"
+        },
+        {
+          "file": "code/frontend/src/components/plan/ExecutionPlanDAG.tsx",
+          "start": 10,
+          "end": 51,
+          "role": "logic",
+          "symbol": "renderStatusCell",
+          "anchor": "0904d335fad0",
+          "first": "const renderStatusCell = (status: string) => {"
+        },
+        {
+          "file": "code/frontend/src/index.css",
+          "start": 647,
+          "end": 654,
+          "role": "style",
+          "symbol": ".exec-plan-container",
+          "anchor": "5eb003e973bc",
+          "first": ".exec-plan-container {"
+        },
+        {
+          "file": "code/frontend/src/index.css",
+          "start": 736,
+          "end": 743,
+          "role": "style",
+          "symbol": ".exec-plan-grid",
+          "anchor": "bbec3dd985bb",
+          "first": ".exec-plan-grid {"
+        }
+      ]
+    },
+    {
+      "id": "molecular-viewport",
+      "level": "component",
+      "parent": "workstation",
+      "title": "3D molecular viewer",
+      "summary": "Renders the structure with bounding boxes, a distance caliper and the current selection. The person switches structures here and can clear the focus with Escape.",
+      "views": [
+        "3d viewer"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "select",
+        "search",
+        "keyboard shortcuts"
+      ],
+      "patterns": [
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/index.css",
+          "start": 307,
+          "end": 310,
+          "role": "style",
+          "symbol": ".molecular-container",
+          "anchor": "1f5da6dc3e46",
+          "first": ".molecular-container {"
+        },
+        {
+          "file": "code/frontend/src/components/viewer/MolecularViewport.tsx",
+          "start": 324,
+          "end": 507,
+          "role": "logic",
+          "symbol": "loadStructureData",
+          "anchor": "79f2562a5627",
+          "first": "async function loadStructureData() {"
+        },
+        {
+          "file": "code/frontend/src/components/viewer/MolecularViewport.tsx",
+          "start": 572,
+          "end": 730,
+          "role": "logic",
+          "symbol": "syncProofScene",
+          "anchor": "5c304fe853c2",
+          "first": "async function syncProofScene() {"
+        },
+        {
+          "file": "code/frontend/src/components/viewer/MolecularViewport.tsx",
+          "start": 763,
+          "end": 790,
+          "role": "logic",
+          "symbol": "syncInspection",
+          "anchor": "433af38853af",
+          "first": "async function syncInspection() {"
+        },
+        {
+          "file": "code/frontend/src/components/viewer/MolecularViewport.tsx",
+          "start": 1171,
+          "end": 1179,
+          "role": "logic",
+          "symbol": "handleSelectStructure",
+          "anchor": "1e8c3453c62e",
+          "first": "const handleSelectStructure = (id: string) => {"
+        }
+      ]
+    },
+    {
+      "id": "temporal-lattice",
+      "level": "component",
+      "parent": "workstation",
+      "title": "Temporal lattice and block refinement",
+      "summary": "Draws every time block coloured by its verdict, lets the person select one by click or arrow key to read its bounds, and refines an uncertain block into sub-blocks with tighter bounds.",
+      "views": [
+        "timeline",
+        "detail panel"
+      ],
+      "interactions": [
+        "select",
+        "keyboard shortcuts",
+        "exclude and refit"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/timeline/TimelineLattice.tsx",
+          "start": 434,
+          "end": 690,
+          "role": "markup",
+          "anchor": "c33c0ada6834",
+          "first": "return ("
+        },
+        {
+          "file": "code/frontend/src/index.css",
+          "start": 465,
+          "end": 468,
+          "role": "style",
+          "symbol": ".temporal-lattice-container",
+          "anchor": "7fb3543f932b",
+          "first": ".temporal-lattice-container {"
+        },
+        {
+          "file": "code/frontend/src/index.css",
+          "start": 506,
+          "end": 512,
+          "role": "style",
+          "symbol": ".temporal-subdivision-grid",
+          "anchor": "1e9b0f719dc8",
+          "first": ".temporal-subdivision-grid {"
+        },
+        {
+          "file": "code/frontend/src/components/timeline/TimelineLattice.tsx",
+          "start": 221,
+          "end": 278,
+          "role": "logic",
+          "symbol": "render",
+          "anchor": "67e88070fdd0",
+          "first": "const render = () => {"
+        },
+        {
+          "file": "code/frontend/src/components/timeline/TimelineLattice.tsx",
+          "start": 292,
+          "end": 312,
+          "role": "logic",
+          "symbol": "applyBlockSelection",
+          "anchor": "83bf0567fa13",
+          "first": "const applyBlockSelection = (blockIdx: number) => {"
+        },
+        {
+          "file": "code/frontend/src/components/timeline/TimelineLattice.tsx",
+          "start": 315,
+          "end": 325,
+          "role": "logic",
+          "symbol": "handleCanvasClick",
+          "anchor": "7c4504b1648c",
+          "first": "const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {"
+        },
+        {
+          "file": "code/frontend/src/components/timeline/TimelineLattice.tsx",
+          "start": 328,
+          "end": 334,
+          "role": "logic",
+          "symbol": "handleKeyDown",
+          "anchor": "f4df6243c6bd",
+          "first": "const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {"
+        },
+        {
+          "file": "code/frontend/src/components/timeline/TimelineLattice.tsx",
+          "start": 337,
+          "end": 352,
+          "role": "logic",
+          "symbol": "handleRefine",
+          "anchor": "477fea5f8165",
+          "first": "const handleRefine = async () => {"
+        }
+      ]
+    },
+    {
+      "id": "certificate-panel",
+      "level": "component",
+      "parent": "workstation",
+      "title": "Certificate and evidence panel",
+      "summary": "Tabs show the certificate, index, bound formulas, workload, reference comparison and logs. From here the person re-verifies the certificate and copies its hash.",
+      "views": [
+        "detail panel",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/evidence/BottomAnalysisPanel.tsx",
+          "start": 153,
+          "end": 170,
+          "role": "markup",
+          "anchor": "8741063b3a1c",
+          "first": "return ("
+        },
+        {
+          "file": "code/frontend/src/index.css",
+          "start": 538,
+          "end": 543,
+          "role": "style",
+          "symbol": ".cert-workspace-container",
+          "anchor": "a7c4da801a27",
+          "first": ".cert-workspace-container {"
+        },
+        {
+          "file": "code/frontend/src/index.css",
+          "start": 562,
+          "end": 569,
+          "role": "style",
+          "symbol": ".cert-grid",
+          "anchor": "556886e9f6c4",
+          "first": ".cert-grid {"
+        },
+        {
+          "file": "code/frontend/src/components/evidence/BottomAnalysisPanel.tsx",
+          "start": 73,
+          "end": 76,
+          "role": "logic",
+          "symbol": "handleTabSelect",
+          "anchor": "910c597844da",
+          "first": "const handleTabSelect = (tab: 'cert' | 'mci' | 'geometry' | 'workload' | 'ref' | 'logs') => {"
+        },
+        {
+          "file": "code/frontend/src/components/evidence/BottomAnalysisPanel.tsx",
+          "start": 86,
+          "end": 99,
+          "role": "logic",
+          "symbol": "handleVerify",
+          "anchor": "094caa18fb1d",
+          "first": "const handleVerify = async () => {"
+        },
+        {
+          "file": "code/frontend/src/components/evidence/BottomAnalysisPanel.tsx",
+          "start": 101,
+          "end": 106,
+          "role": "logic",
+          "symbol": "handleCopyHash",
+          "anchor": "982f9dcb23fd",
+          "first": "const handleCopyHash = () => {"
+        }
+      ]
+    },
+    {
+      "id": "formal-audit",
+      "level": "view",
+      "parent": null,
+      "title": "Formal audit",
+      "summary": "Checks the certificate against a fixed list of integrity and invariant checks and a frame-by-frame comparison with a reference library, then copies or downloads the certificate as JSON.",
+      "views": [
+        "table view",
+        "detail panel"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "rubric"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/views/FormalAuditView.tsx",
+          "start": 221,
+          "end": 445,
+          "role": "markup",
+          "anchor": "0cdc039d8cfc",
+          "first": "return ("
+        },
+        {
+          "file": "code/frontend/src/components/views/FormalAuditView.tsx",
+          "start": 107,
+          "end": 113,
+          "role": "data",
+          "symbol": "FORMAL_CHECKS",
+          "anchor": "d61f43baaf4a",
+          "first": "const FORMAL_CHECKS = ["
+        },
+        {
+          "file": "code/frontend/src/components/views/FormalAuditView.tsx",
+          "start": 139,
+          "end": 151,
+          "role": "logic",
+          "symbol": "handleTabChange",
+          "anchor": "847260c2be14",
+          "first": "const handleTabChange = (tabId: 'certificate' | 'oracle' | 'invariants') => {"
+        },
+        {
+          "file": "code/frontend/src/components/views/FormalAuditView.tsx",
+          "start": 174,
+          "end": 185,
+          "role": "logic",
+          "symbol": "handleVerify",
+          "anchor": "116290922002",
+          "first": "const handleVerify = async () => {"
+        },
+        {
+          "file": "code/frontend/src/components/views/FormalAuditView.tsx",
+          "start": 187,
+          "end": 192,
+          "role": "logic",
+          "symbol": "handleCopy",
+          "anchor": "1035d6e0b68c",
+          "first": "const handleCopy = () => {"
+        },
+        {
+          "file": "code/frontend/src/components/views/FormalAuditView.tsx",
+          "start": 194,
+          "end": 203,
+          "role": "logic",
+          "symbol": "handleDownload",
+          "anchor": "11c6a1edf39b",
+          "first": "const handleDownload = () => {"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "3d viewer"
+    }
+  ]
+}

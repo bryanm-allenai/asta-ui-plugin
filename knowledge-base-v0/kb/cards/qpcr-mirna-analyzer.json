@@ -1,0 +1,656 @@
+{
+  "schema": "astaui.card/1",
+  "id": "qpcr-mirna-analyzer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T10:06:25Z"
+  },
+  "app": {
+    "title": "qPCR Fold-Change Analyzer",
+    "summary": "A person loads well-level Ct values from a table or a qPCR instrument export, matches the columns, and assigns samples to groups. They pick a control group, a normalisation strategy (reference genes, a spike-in, or the global mean of all assays), and QC thresholds. They then check technical replicates and sample quality, exclude bad samples, and confirm that the reference genes are stable. Finally they read fold changes and statistics against the control, tune a publication figure, and download it along with draft methods and results text and an Excel report. Two side tools estimate sample sizes for the next study and fit amplification efficiency from a dilution series.",
+    "task": {
+      "text": "Turn raw qPCR Ct values into quality-checked, normalised fold changes per group with statistics, a figure and draft write-up text.",
+      "verbs": [
+        "derive",
+        "clean",
+        "compare",
+        "write",
+        "plan"
+      ]
+    },
+    "data": {
+      "text": "Well-level qPCR cycle-threshold values, one row per well, with sample, group, target assay and technical replicate. The data arrives as a generic table or an instrument results export.",
+      "item": "a technical-replicate well: one sample measured for one target assay",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "analysing qPCR results after the run, from quality control through to fold changes ready for the manuscript",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "The page runs top to bottom: import and column matching, then settings, then a row of result tabs that all recompute from the same chosen normaliser, control group and exclusions. Quality-check tabs flag samples that the person then excludes in a multiselect, and every table, figure and paragraph downstream updates.",
+      "views": [
+        "table view",
+        "form",
+        "summary stats",
+        "bar chart",
+        "strip plot",
+        "scatter plot",
+        "text editor"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "inline edit",
+        "exclude and refit",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "relative quantification of qPCR (ΔΔCt) for miRNA in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "molecular biology",
+        "qpcr",
+        "mirna"
+      ]
+    },
+    "workflow": {
+      "name": "turn raw measurements into normalised group comparisons with quality checks and a written report",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Choose an example or upload a CSV, TXT or Excel instrument export. Header lines and NTC or standard wells are dropped automatically. Then match the Sample, Group, Target and Ct columns, or edit groups guessed from sample names.",
+          "parts": [
+            "data-import"
+          ]
+        },
+        {
+          "step": "set up the computation",
+          "here": "Pick the control group and the group order, choose reference-gene, spike-in or global-mean normalisation and its assays, and set the replicate SD, late-Ct, hemolysis and spike-in thresholds, the statistical test, the correction and per-assay efficiencies.",
+          "parts": [
+            "analysis-settings"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Replicate sets are flagged for high SD, late Ct or no amplification, and the outlying replicate is optionally dropped. Samples are flagged by a hemolysis ΔCq and by spike-in drift from the median. Flagged samples can be excluded, and every result recomputes.",
+          "parts": [
+            "quality-checks"
+          ]
+        },
+        {
+          "step": "check that the reference measure is sound",
+          "here": "geNorm M ranks the candidate reference genes by stepwise elimination, with a table and plot of raw Ct by group. The person is warned when the chosen references differ from the most stable pair.",
+          "parts": [
+            "reference-stability"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Efficiency-corrected ΔΔCt gives per-sample fold changes, then geometric-mean fold change with a 95% CI per group, then each group against the control on the log2 scale with multiple-testing correction.",
+          "parts": [
+            "results-statistics"
+          ]
+        },
+        {
+          "step": "write up the result",
+          "here": "Grouped bar figure with options for scale, error bars, points and stars, downloadable as PNG, SVG or PDF. The methods and results paragraphs and the reference list are drafted from the settings and the statistics.",
+          "parts": [
+            "figure",
+            "methods-export"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "One Excel workbook holds the settings, group summary, statistics, per-sample results, QC, hemolysis, spike-in, reference stability, the drafted text and the input data.",
+          "parts": [
+            "methods-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Three interchangeable normalisation strategies (reference genes, exogenous spike-in, global mean of the assays detected in every sample), and every result follows the one chosen",
+        "Sample-quality screens for circulating material: a hemolysis ratio between two marker assays with high-risk and borderline thresholds, and spike-in recovery against the median",
+        "Reference-gene stability ranking (geNorm M) that warns when the chosen normalisers are not the most stable pair",
+        "Methods and results paragraphs drafted in manuscript language from the actual settings and adjusted p-values, with citations",
+        "A sample-size planner that uses the variance in the person's own data, and a standard-curve calculator for assay efficiency that feeds the efficiency table"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-import",
+      "level": "view",
+      "parent": null,
+      "title": "Load your data",
+      "summary": "Reads an instrument export or a table, removes control wells, maps columns to Sample, Group, Target and Ct, lets the person edit groups guessed from sample names, and shows counts of samples, groups, targets and wells.",
+      "views": [
+        "table view",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 154,
+          "end": 256,
+          "role": "markup",
+          "anchor": "fdaf4b5b99b8",
+          "first": "st.header(\"1. Load your data\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 50,
+          "end": 64,
+          "role": "logic",
+          "symbol": "load_table",
+          "anchor": "f462fb587db0",
+          "first": "def load_table(raw_bytes: bytes, name: str):"
+        },
+        {
+          "file": "code/core.py",
+          "start": 668,
+          "end": 686,
+          "role": "logic",
+          "symbol": "find_table",
+          "anchor": "36ab3a5da66f",
+          "first": "def find_table(rows: list, max_scan: int = 300) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/core.py",
+          "start": 689,
+          "end": 713,
+          "role": "logic",
+          "symbol": "clean_instrument_table",
+          "anchor": "3c39f032691c",
+          "first": "def clean_instrument_table(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:"
+        },
+        {
+          "file": "code/core.py",
+          "start": 65,
+          "end": 73,
+          "role": "logic",
+          "symbol": "guess_columns",
+          "anchor": "5799a28e0802",
+          "first": "def guess_columns(df: pd.DataFrame) -> dict:"
+        },
+        {
+          "file": "code/core.py",
+          "start": 716,
+          "end": 722,
+          "role": "logic",
+          "symbol": "guess_group",
+          "anchor": "948330530727",
+          "first": "def guess_group(sample: str) -> str:"
+        },
+        {
+          "file": "code/core.py",
+          "start": 76,
+          "end": 108,
+          "role": "logic",
+          "symbol": "standardize",
+          "anchor": "9d875b71c169",
+          "first": "def standardize(df: pd.DataFrame, mapping: dict) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/data/template.csv",
+          "start": 1,
+          "end": 5,
+          "role": "data",
+          "anchor": "b645c8f4bcb0",
+          "first": "Sample,Group,Target,Ct"
+        }
+      ]
+    },
+    {
+      "id": "analysis-settings",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis settings",
+      "summary": "Sets the control group, the groups and their order, the normalisation strategy and its assays, the QC thresholds, the statistical test and correction, the targets to report, and per-assay amplification efficiencies.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 261,
+          "end": 330,
+          "role": "markup",
+          "anchor": "b0a65db945f2",
+          "first": "st.header(\"2. Analysis settings\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 368,
+          "end": 397,
+          "role": "logic",
+          "anchor": "6c1374c60add",
+          "first": "if normalisation == \"global_mean\":"
+        },
+        {
+          "file": "code/app.py",
+          "start": 67,
+          "end": 74,
+          "role": "logic",
+          "symbol": "guess_control",
+          "anchor": "e17e14c60d78",
+          "first": "def guess_control(groups):"
+        },
+        {
+          "file": "code/core.py",
+          "start": 111,
+          "end": 118,
+          "role": "logic",
+          "symbol": "suggest_references",
+          "anchor": "0ba89871a6d1",
+          "first": "def suggest_references(targets) -> list:"
+        },
+        {
+          "file": "code/core.py",
+          "start": 193,
+          "end": 202,
+          "role": "logic",
+          "symbol": "global_mean_genes",
+          "anchor": "b33e6483f10a",
+          "first": "def global_mean_genes(qc: pd.DataFrame, max_ct: float = 35.0, exclude=()) -> list:"
+        }
+      ]
+    },
+    {
+      "id": "quality-checks",
+      "level": "view",
+      "parent": null,
+      "title": "Replicate QC and sample quality",
+      "summary": "Flags replicate sets with high SD, late Ct or no amplification. Screens samples for hemolysis and spike-in drift, plots each sample against the thresholds, and lets the person exclude flagged samples so everything recomputes.",
+      "views": [
+        "table view",
+        "strip plot"
+      ],
+      "interactions": [
+        "multi-select",
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 335,
+          "end": 366,
+          "role": "logic",
+          "anchor": "91e76bd0b58f",
+          "first": "data_used = data[data[core.GROUP].isin(group_order)]"
+        },
+        {
+          "file": "code/app.py",
+          "start": 422,
+          "end": 475,
+          "role": "markup",
+          "anchor": "e412399a5237",
+          "first": "with tab_qc:"
+        },
+        {
+          "file": "code/core.py",
+          "start": 132,
+          "end": 136,
+          "role": "logic",
+          "symbol": "replicate_qc",
+          "anchor": "88c276adebe6",
+          "first": "def replicate_qc("
+        },
+        {
+          "file": "code/core.py",
+          "start": 598,
+          "end": 603,
+          "role": "logic",
+          "symbol": "hemolysis_check",
+          "anchor": "9c05327692d7",
+          "first": "def hemolysis_check("
+        },
+        {
+          "file": "code/core.py",
+          "start": 627,
+          "end": 641,
+          "role": "logic",
+          "symbol": "spike_in_qc",
+          "anchor": "7cfff7e315ee",
+          "first": "def spike_in_qc(qc: pd.DataFrame, spike: str, tolerance: float = 1.0) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/core.py",
+          "start": 589,
+          "end": 595,
+          "role": "logic",
+          "symbol": "find_assay",
+          "anchor": "8117a6736a94",
+          "first": "def find_assay(targets, patterns) -> str | None:"
+        },
+        {
+          "file": "code/plots.py",
+          "start": 174,
+          "end": 207,
+          "role": "logic",
+          "symbol": "sample_qc_plot",
+          "anchor": "072486fdc100",
+          "first": "def sample_qc_plot(table: pd.DataFrame, value_col: str, group_order: list, lines: dict,"
+        }
+      ]
+    },
+    {
+      "id": "reference-stability",
+      "level": "view",
+      "parent": null,
+      "title": "Normalisation and reference stability",
+      "summary": "Ranks the candidate reference genes by geNorm M with the elimination steps, shows how their raw Ct spreads by group, and says which assays make up a global mean.",
+      "views": [
+        "table view",
+        "strip plot"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 477,
+          "end": 514,
+          "role": "markup",
+          "anchor": "692a77536b1b",
+          "first": "genorm_final = genorm_steps = None"
+        },
+        {
+          "file": "code/core.py",
+          "start": 478,
+          "end": 481,
+          "role": "logic",
+          "symbol": "genorm_ranking",
+          "anchor": "4c5aeb93b413",
+          "first": "def genorm_ranking("
+        },
+        {
+          "file": "code/core.py",
+          "start": 456,
+          "end": 475,
+          "role": "logic",
+          "symbol": "genorm_m",
+          "anchor": "ea7774d14637",
+          "first": "def genorm_m(log2_quantities: pd.DataFrame) -> pd.Series:"
+        },
+        {
+          "file": "code/core.py",
+          "start": 526,
+          "end": 540,
+          "role": "logic",
+          "symbol": "reference_ct_spread",
+          "anchor": "6b71137ce990",
+          "first": "def reference_ct_spread(qc: pd.DataFrame, candidates: list) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/plots.py",
+          "start": 128,
+          "end": 151,
+          "role": "logic",
+          "symbol": "reference_ct_plot",
+          "anchor": "0a7f058c1e8a",
+          "first": "def reference_ct_plot(qc: pd.DataFrame, candidates: list, group_order: list):"
+        }
+      ]
+    },
+    {
+      "id": "results-statistics",
+      "level": "view",
+      "parent": null,
+      "title": "Fold changes and statistics",
+      "summary": "Shows fold change relative to the control, per group (geometric mean with a 95% CI) and per sample. Each group is tested against the control with adjusted p-values and significance stars.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 402,
+          "end": 410,
+          "role": "logic",
+          "anchor": "ece6dae7c2d3",
+          "first": "group_order_used = [g for g in group_order if g in set(qc[core.GROUP])]"
+        },
+        {
+          "file": "code/app.py",
+          "start": 516,
+          "end": 542,
+          "role": "markup",
+          "anchor": "803537994542",
+          "first": "with tab_res:"
+        },
+        {
+          "file": "code/core.py",
+          "start": 205,
+          "end": 210,
+          "role": "logic",
+          "symbol": "relative_quantities",
+          "anchor": "8e92480f6827",
+          "first": "def relative_quantities("
+        },
+        {
+          "file": "code/core.py",
+          "start": 281,
+          "end": 311,
+          "role": "logic",
+          "symbol": "group_summary",
+          "anchor": "ed65125a4976",
+          "first": "def group_summary(results: pd.DataFrame, group_order: list | None = None) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/core.py",
+          "start": 381,
+          "end": 385,
+          "role": "logic",
+          "symbol": "compare_groups",
+          "anchor": "4b0206f875e4",
+          "first": "def compare_groups("
+        },
+        {
+          "file": "code/core.py",
+          "start": 314,
+          "end": 344,
+          "role": "logic",
+          "symbol": "p_adjust",
+          "anchor": "00a2ebfd3bba",
+          "first": "def p_adjust(pvalues, method: str = \"holm\") -> np.ndarray:"
+        }
+      ]
+    },
+    {
+      "id": "figure",
+      "level": "component",
+      "parent": "results-statistics",
+      "title": "Publication figure",
+      "summary": "Draws grouped bars of fold change per target, with options for linear or log2 scale, CI or SEM error bars, individual points, significance stars and target order, and downloads the figure as PNG, SVG or PDF.",
+      "views": [
+        "bar chart",
+        "strip plot"
+      ],
+      "interactions": [
+        "toggle view",
+        "multi-select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 544,
+          "end": 567,
+          "role": "markup",
+          "anchor": "23a574b010a9",
+          "first": "with tab_fig:"
+        },
+        {
+          "file": "code/plots.py",
+          "start": 27,
+          "end": 38,
+          "role": "logic",
+          "symbol": "fold_change_plot",
+          "anchor": "e230e3d5cc61",
+          "first": "def fold_change_plot("
+        },
+        {
+          "file": "code/plots.py",
+          "start": 168,
+          "end": 171,
+          "role": "logic",
+          "symbol": "to_bytes",
+          "anchor": "2da83caf5546",
+          "first": "def to_bytes(fig, fmt: str = \"png\", dpi: int = 300) -> bytes:"
+        }
+      ]
+    },
+    {
+      "id": "methods-export",
+      "level": "view",
+      "parent": null,
+      "title": "Methods, results and export",
+      "summary": "Drafts editable methods and results paragraphs and a reference list from the settings and statistics, and packages every table and the text into an Excel workbook.",
+      "views": [
+        "text editor"
+      ],
+      "interactions": [
+        "inline edit",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 569,
+          "end": 610,
+          "role": "markup",
+          "anchor": "6007a125c2a7",
+          "first": "methods = core.methods_text(references, control, efficiencies, test, correction, sd_threshold, remove_outlier,"
+        },
+        {
+          "file": "code/core.py",
+          "start": 783,
+          "end": 794,
+          "role": "logic",
+          "symbol": "methods_text",
+          "anchor": "80aa4eaa1b96",
+          "first": "def methods_text("
+        },
+        {
+          "file": "code/core.py",
+          "start": 839,
+          "end": 866,
+          "role": "logic",
+          "symbol": "results_text",
+          "anchor": "c0ebe3912157",
+          "first": "def results_text(summary: pd.DataFrame, comparisons: pd.DataFrame, control_group: str,"
+        },
+        {
+          "file": "code/core.py",
+          "start": 881,
+          "end": 889,
+          "role": "logic",
+          "symbol": "references_for",
+          "anchor": "33910423ae53",
+          "first": "def references_for(normalisation: str, test: str, hemolysis_assessed: bool) -> list:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 89,
+          "end": 100,
+          "role": "logic",
+          "symbol": "build_excel",
+          "anchor": "450add63870a",
+          "first": "def build_excel(sheets: dict) -> bytes:"
+        }
+      ]
+    },
+    {
+      "id": "planning-tools",
+      "level": "view",
+      "parent": null,
+      "title": "Sample-size planner and efficiency calculator",
+      "summary": "Estimates the replicates per group needed to detect chosen fold changes, using the variance in the current data. Also fits a standard curve to a dilution series the person enters, giving efficiency, slope and R².",
+      "views": [
+        "table view",
+        "summary stats",
+        "scatter plot"
+      ],
+      "interactions": [
+        "select",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 612,
+          "end": 648,
+          "role": "markup",
+          "anchor": "04f446321ac2",
+          "first": "with tab_plan:"
+        },
+        {
+          "file": "code/core.py",
+          "start": 750,
+          "end": 769,
+          "role": "logic",
+          "symbol": "sample_size_table",
+          "anchor": "dcd3ad45f73c",
+          "first": "def sample_size_table(results: pd.DataFrame, fold_changes=(1.5, 2.0), alpha=0.05, power=0.8) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/core.py",
+          "start": 558,
+          "end": 582,
+          "role": "logic",
+          "symbol": "standard_curve",
+          "anchor": "cbc29c34338c",
+          "first": "def standard_curve(quantity, ct, log_input: bool = False) -> StandardCurve:"
+        },
+        {
+          "file": "code/plots.py",
+          "start": 154,
+          "end": 165,
+          "role": "logic",
+          "symbol": "standard_curve_plot",
+          "anchor": "d2e2969ffcef",
+          "first": "def standard_curve_plot(log_q, ct, curve):"
+        }
+      ]
+    }
+  ]
+}

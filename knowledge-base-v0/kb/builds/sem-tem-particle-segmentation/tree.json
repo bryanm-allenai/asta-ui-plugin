@@ -1,0 +1,741 @@
+{
+ "interface": {
+  "title": "Image Segmentation & Particle Analysis (Segmentation Studio, SEM/TEM particle workflow, v2.0)",
+  "field": "Electron microscopy / nanomaterials characterization (particle size distribution analysis)",
+  "stage_of_work": "Image analysis and quantification, from raw micrographs to exported size statistics",
+  "what_it_is_for": "Segment particles in SEM/TEM micrographs with a pretrained neural model, measure each particle in nanometres, show the size distributions, and export the measurements as CSV/ZIP."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "I uploaded coins.png (384×303) and nuclei-fluorescence.png through 'Upload files'. Folder mode with /work/app/assets returned 'No images found in the specified folder'. The model was the stock COCO-trained YOLOv8n-seg from /work/app/Models. With CLAHE (clip 3.0) and ×2 rebinning it found 0 particles. With no preprocessing it found 3 coins in coins.png and 0 in nuclei-fluorescence.png. With a 35 nm minimum size it found 2. These counts reflect the general-purpose model, not the tool. Pixel size stayed at the default 0.719 nm/px, so every nm value in this run comes from that default."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Turn microscopy images of many small objects into per-object size measurements and size distributions in physical units, ready for reporting",
+  "specific": "Segment particles in SEM/TEM micrographs with a pretrained model (the tool supports SAM, SAM2, MobileSAM, FastSAM and YOLOv8; this run used YOLOv8n-seg), review masks/crops/measurements, inspect nm size distributions, and export CSV/ZIP",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Bring the images in",
+    "specific": "Load tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load several images for one analysis batch",
+      "specific": "Upload coins.png and nuclei-fluorescence.png and press Load images → 'Loaded 2 images'",
+      "screens": [
+       "screens/015.webp",
+       "screens/017.webp"
+      ],
+      "branch": "one-of (upload files | specify folder path; the folder path was not confirmed in this run, see not_done)",
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose 'Upload files' loading method",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Upload and gave coins.png + nuclei-fluorescence.png",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Load images",
+        "screens": [
+         "screens/017.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Optionally enhance the images before analysis",
+    "specific": "Sidebar Preprocessing + Preprocess tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Apply local contrast enhancement and downsampling, then compare before/after",
+      "specific": "Enable CLAHE (clip limit 3.0, tile 8) and Rebinning ×2, Apply preprocessing, view Original vs Processed",
+      "screens": [
+       "screens/022.webp",
+       "screens/023.webp",
+       "screens/026.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "ticked Apply CLAHE",
+        "screens": [
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged CLAHE clip limit slider 2.00 → 3.00",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "ticked Rebinning (downscale), factor 2",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Apply preprocessing",
+        "screens": [
+         "screens/022.webp",
+         "screens/023.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "picked nuclei-fluorescence.png in 'Select image for comparison'",
+        "screens": [
+         "screens/024.webp",
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Turn enhancement off again so detection can be compared with and without it",
+      "specific": "Untick CLAHE and Rebinning and re-apply preprocessing (parameter table shows CLAHE Off, Rebinning Off)",
+      "screens": [
+       "screens/036.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "unticked Rebinning (downscale) and Apply CLAHE",
+        "screens": [
+         "screens/036.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Apply preprocessing",
+        "screens": [
+         "screens/037.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Detect and outline every object automatically",
+    "specific": "Segmentation tab (this run: YOLOv8n-seg on CPU)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Choose and load a pretrained segmentation model",
+      "specific": "Model source 'Use local folder' (/work/app/Models, 'Detected local models: 1'), Model YOLOv8n, Device cpu, press Load model → 'Model YOLOv8n loaded from local storage.'",
+      "screens": [
+       "screens/029.webp",
+       "check/screens/012.webp",
+       "screens/076.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Load model",
+        "screens": [
+         "screens/029.webp",
+         "check/screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Model dropdown: only YOLOv8n listed in local mode (captured at the end of the session)",
+        "screens": [
+         "screens/076.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Run segmentation on all loaded images and read the batch summary",
+      "specific": "Run segmentation → progress bar → 'Segmentation complete | Particles detected: N' + Results Overview",
+      "screens": [
+       "screens/033.webp",
+       "screens/034.webp",
+       "screens/035.webp",
+       "screens/039.webp"
+      ],
+      "branch": "repeat (with and without preprocessing: 0 particles with CLAHE+rebin, 3 without)",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Run segmentation (CLAHE+rebin on) → 0 particles",
+        "screens": [
+         "screens/033.webp",
+         "screens/035.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run segmentation (no preprocessing) → 3 particles",
+        "screens": [
+         "screens/039.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Drop objects outside a physical size range and re-run",
+      "specific": "Sidebar Result Filtering: Size metric Equivalent_diameter_nm, Min size value 35, then Run segmentation again",
+      "screens": [
+       "screens/058.webp",
+       "screens/060.webp",
+       "screens/063.webp"
+      ],
+      "branch": "optional (filter only takes effect on the next segmentation run)",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 35 in Min size value",
+        "screens": [
+         "screens/058.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered Min size help: 'Set 0 to disable the min size filter'",
+        "screens": [
+         "screens/060.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run segmentation → 2 particles",
+        "screens": [
+         "screens/063.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Check the segmentation before trusting the numbers",
+    "specific": "Results tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Review per-image summary stats, mask overlay, object crops and the measurement table, image by image",
+      "specific": "Select image coins.png: Summary Statistics (nm), native-resolution mask overlay with IDs, Particle Crops with d= labels, Measurements Table. After the size filter the dropdown still read 'coins.png (3 particles)' while the panels showed 2",
+      "screens": [
+       "screens/040.webp",
+       "screens/041.webp",
+       "screens/042.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Results tab",
+        "screens": [
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to Segmentation Masks and Particle Crops (Max particles to display 50)",
+        "screens": [
+         "screens/041.webp",
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "task",
+        "general": "Switch the review to another image in the batch",
+        "specific": "Select image → nuclei-fluorescence.png (0 particles)",
+        "screens": [
+         "screens/045.webp",
+         "screens/047.webp"
+        ],
+        "branch": "repeat (per image)",
+        "children": [
+         {
+          "kind": "action",
+          "label": "picked nuclei-fluorescence.png (0 particles) in Select image",
+          "screens": [
+           "screens/045.webp",
+           "screens/047.webp"
+          ]
+         }
+        ],
+        "id": "t10",
+        "check": "replayed"
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Trim the measurement table to the columns of interest",
+      "specific": "Measurements Table → Show/hide columns → untick Major/Minor axis px and Max/Min Feret px",
+      "screens": [
+       "screens/043.webp",
+       "screens/044.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Show/hide columns (eye icon)",
+        "screens": [
+         "screens/043.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "unticked four *_px columns and pressed Escape",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Inspect size distributions in physical units",
+    "specific": "Distributions tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "View a multi-panel histogram figure of all size properties with stats",
+      "specific": "View mode Per image, coins.png: Publication Figure (300 dpi) with Area/Major/Minor/Eq.Diameter/Max Feret/Min Feret + Summary Statistics",
+      "screens": [
+       "screens/048.webp",
+       "screens/049.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Distributions tab",
+        "screens": [
+         "screens/048.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Build a single-property histogram with a chosen bin count and read its stats",
+      "specific": "Interactive Histogram: Property Max Feret Diameter (nm), Number of bins 18→10, Histogram Figure, Histogram Stats",
+      "screens": [
+       "screens/050.webp",
+       "screens/052.webp",
+       "screens/053.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose Max Feret Diameter (nm) in Property",
+        "screens": [
+         "screens/050.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Number of bins slider 18 → 10",
+        "screens": [
+         "screens/052.webp",
+         "screens/056.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed '2) Histogram Figure' tab",
+        "screens": [
+         "screens/052.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed '3) Histogram Stats' tab",
+        "screens": [
+         "screens/053.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Pool all images and fix the plotted range",
+      "specific": "X min 30, X max 50, View mode All images → figure titled 'All images'",
+      "screens": [
+       "screens/055.webp",
+       "screens/056.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 30 in X min",
+        "screens": [
+         "screens/055.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 50 in X max",
+        "screens": [
+         "screens/055.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'All images' view mode",
+        "screens": [
+         "screens/056.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Export the results for reporting",
+    "specific": "Export tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Download per-image and combined measurement tables",
+      "specific": "coins_measurements.csv and combined_measurements.csv (px and nm columns, after the 35 nm filter: 2 rows; combined adds an Image column)",
+      "screens": [
+       "screens/064.webp",
+       "screens/066.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed coins_measurements.csv",
+        "screens": [
+         "screens/066.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed All measurements (combined_measurements.csv)",
+        "screens": [
+         "screens/066.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Package everything into an archive",
+      "specific": "Generate ZIP with results → 'Generating plots…' → Download ZIP archive (segmentation_results.zip, 1.79 MB)",
+      "screens": [
+       "screens/067.webp",
+       "screens/069.webp",
+       "screens/070.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Generate ZIP with results",
+        "screens": [
+         "screens/067.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download ZIP archive",
+        "screens": [
+         "screens/070.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Save the full result package to the server's disk",
+      "specific": "Save results → 'Results saved to /work/app/segmentation_results'",
+      "screens": [
+       "screens/074.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Save results",
+        "screens": [
+         "screens/074.webp"
+        ]
+       }
+      ],
+      "id": "t16",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Before/after preprocessing comparison",
+   "general": "Turn on optional image enhancements with parameters, apply them to the batch, then pick any image and compare original vs processed side by side with sizes",
+   "specific": "Sidebar Apply CLAHE (clip limit, tile size sliders) + Rebinning (factor slider) → Preprocess tab parameter table → Apply preprocessing → 'Select image for comparison' shows Original / Processed with pixel sizes (384×303 → 192×151, seen in the replay)",
+   "steps": [
+    "tick CLAHE and/or Rebinning in the sidebar",
+    "adjust clip limit / tile size / rebin factor sliders",
+    "check the parameter summary table",
+    "press Apply preprocessing",
+    "pick an image to compare Original vs Processed"
+   ],
+   "serves_tasks": [
+    "Apply local contrast enhancement and downsampling, then compare before/after",
+    "Turn enhancement off again so detection can be compared with and without it"
+   ],
+   "screens": [
+    "screens/021.webp",
+    "screens/022.webp",
+    "screens/023.webp",
+    "screens/026.webp",
+    "screens/036.webp",
+    "check/screens/007.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Model picker with load-then-run batch inference",
+   "general": "Choose where model weights come from, pick a model and compute device, load it once, then run it over the whole batch with a progress bar and a summary of objects found",
+   "specific": "Model source (local folder / auto-download), Models folder + 'Detected local models: 1', Model and Device dropdowns → Load model → Run segmentation → 'Segmenting: 2/2' progress → 'Particles detected: N' + Results Overview (total, avg per image, time)",
+   "steps": [
+    "choose model source and folder",
+    "pick model and device",
+    "press Load model",
+    "press Run segmentation",
+    "read the count and Results Overview"
+   ],
+   "serves_tasks": [
+    "Choose and load a pretrained segmentation model",
+    "Run segmentation on all loaded images and read the batch summary"
+   ],
+   "screens": [
+    "screens/029.webp",
+    "screens/033.webp",
+    "screens/035.webp",
+    "screens/039.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Physical-size filter on detected objects",
+   "general": "Pick a physical size measure (in nm) and min/max thresholds (0 = off) so objects outside the range are dropped from the results on the next run",
+   "specific": "Sidebar Result Filtering: Size metric (Equivalent_diameter_nm…), Min size value, Max size value; applied at Run segmentation (3 → 2 particles at 35 nm min; only Min was exercised)",
+   "steps": [
+    "choose a size metric",
+    "enter min and/or max value",
+    "re-run segmentation",
+    "check the new particle count"
+   ],
+   "serves_tasks": [
+    "Drop objects outside a physical size range and re-run"
+   ],
+   "screens": [
+    "screens/058.webp",
+    "screens/060.webp",
+    "screens/063.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Per-image segmentation review panel",
+   "general": "Pick one image from the batch and see its summary statistics, a labelled mask overlay, a gallery of per-object crops with size labels, and the per-object measurement table (whose columns can be trimmed with the generic table toolbar)",
+   "specific": "Results tab: Select image (with particle count; stale after filtering, showed 3 while panels showed 2) → Summary Statistics (nm) → Segmentation Masks overlay at native resolution with particle IDs → Particle Crops (Max particles to display slider, d= nm labels) → Measurements Table (Streamlit's built-in toolbar: Show/hide columns, Search, Fullscreen, Download as CSV)",
+   "steps": [
+    "choose an image in Select image",
+    "read Summary Statistics",
+    "inspect the labelled mask overlay",
+    "scan particle crops (limit with slider)",
+    "hide unneeded columns with Show/hide columns",
+    "check the measurement table rows"
+   ],
+   "serves_tasks": [
+    "Review per-image summary stats, mask overlay, object crops and the measurement table, image by image",
+    "Switch the review to another image in the batch",
+    "Trim the measurement table to the columns of interest"
+   ],
+   "screens": [
+    "screens/040.webp",
+    "screens/041.webp",
+    "screens/042.webp",
+    "screens/043.webp",
+    "screens/044.webp",
+    "screens/045.webp",
+    "screens/047.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Multi-property distribution figure with per-image/pooled mode and axis limits",
+   "general": "Show histograms of several size measures in one figure with mean/median lines and a stats table, for one image or the pooled batch, with a shared x-range",
+   "specific": "Distributions tab: View mode Per image / All images, X min / X max, Select image → Publication Figure (300 dpi) six panels (Area, Major, Minor, Eq. Diameter, Max Feret, Min Feret) + Summary Statistics",
+   "steps": [
+    "choose Per image or All images",
+    "pick the image (per-image mode)",
+    "set X min / X max",
+    "read the figure and the stats table"
+   ],
+   "serves_tasks": [
+    "View a multi-panel histogram figure of all size properties with stats",
+    "Pool all images and fix the plotted range"
+   ],
+   "screens": [
+    "screens/049.webp",
+    "screens/055.webp",
+    "screens/056.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Single-property interactive histogram (controls / figure / stats)",
+   "general": "Pick one measured property and a bin count, then see its histogram with mean/median and a small stats table",
+   "specific": "Interactive Histogram (300 dpi): 1) Histogram Controls (Property dropdown, Number of bins slider) → 2) Histogram Figure → 3) Histogram Stats (Count, Mean, Median, Std, Min, Max)",
+   "steps": [
+    "choose Property",
+    "drag Number of bins",
+    "open Histogram Figure",
+    "open Histogram Stats"
+   ],
+   "serves_tasks": [
+    "Build a single-property histogram with a chosen bin count and read its stats"
+   ],
+   "screens": [
+    "screens/050.webp",
+    "screens/052.webp",
+    "screens/053.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Tiered results export (CSV / ZIP / server save)",
+   "general": "Export results as per-item and combined tables, as a generated archive with figures, or save the full package to a folder on the server",
+   "specific": "Export tab: <image>_measurements.csv, combined_measurements.csv, Generate ZIP with results → Download ZIP archive, Save results to /work/app/segmentation_results",
+   "steps": [
+    "download per-image CSV",
+    "download combined CSV",
+    "press Generate ZIP, wait, then Download ZIP archive",
+    "press Save results for the on-disk package"
+   ],
+   "serves_tasks": [
+    "Download per-image and combined measurement tables",
+    "Package everything into an archive",
+    "Save the full result package to the server's disk"
+   ],
+   "screens": [
+    "screens/066.webp",
+    "screens/069.webp",
+    "screens/070.webp",
+    "screens/074.webp"
+   ],
+   "id": "f8",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Folder-loaded image batch: /work/app/assets had no TIFF/PNG/JPG/BMP images, and I couldn't list the server's folders to find one that did",
+  "Other models (SAM, SAM2, MobileSAM, FastSAM, other YOLOv8 sizes), which the README suggests trying when detection is poor: the Model dropdown in local-folder mode lists only YOLOv8n because only yolov8n-seg.pt is installed; the 'Auto-download official model' mode needs internet, so I didn't try it",
+  "Results/Distributions views with many particles: the COCO-trained YOLOv8n-seg found 0 nuclei and only 2–3 coins, so the dense-distribution states never appeared",
+  "Server-side Browse… dialogs (Models folder and image folder): these open native file dialogs on the server, which the browser can't show"
+ ],
+ "not_done": [
+  "Loading a batch from a folder on disk (Specify folder path → /work/app/assets → Load from folder, screens/008.webp, screens/010.webp, screens/012.webp; former task t2, check not_confirmed): the app answered 'No images found in the specified folder', so this path is a dead end in this run",
+  "Setting the image scale (Pixel size, nm/px) so measurements come out in physical units: a core step that every nm value, crop label, histogram and export depends on, but it stayed at the default 0.719 nm/px and was never changed before the ~100-action budget ran out",
+  "Device options other than cpu (CUDA/MPS): I didn't open the dropdown; there is no GPU here anyway",
+  "Max size value filter and other Size metric choices: I only tested Min size = 35 nm",
+  "Particle Crops 'Max particles to display' slider: I saw it but didn't drag it (only 3 particles)",
+  "Fullscreen on the mask overlay and figures, and the table's Search/Fullscreen/CSV toolbar buttons: not tried",
+  "I didn't inspect the ZIP's contents: browser_read_download reports binary files by size only (1,788,805 bytes)",
+  "Segmentation of nuclei-fluorescence.png: 0 particles every time. This is a limit of the general COCO-trained model, not a broken pipeline. The whole chain (segment → results → distributions → export) did run end to end on coins.png on CPU",
+  "Problem seen: after the size filter, the Results 'Select image' dropdown still read 'coins.png (3 particles)' while every panel showed 2 (check/screens/016.webp–018.webp); switching images also briefly left stale coins stats on screen (check/screens/021.webp)",
+  "The X-axis limits apply to all six panels, so the Area (nm²) panel went empty at 30–50. I noted this from screens/056.webp but didn't explore it further"
+ ],
+ "applied": [
+  "Goal's specific label now lists the supported models (SAM, SAM2, MobileSAM, FastSAM, YOLOv8) and says this run used YOLOv8n-seg",
+  "Segmentation phase specific label marks YOLOv8n-seg on CPU as this run's choice",
+  "Renamed t4's general label to a planned step (compare detection with and without enhancement) instead of 'after the enhanced run fails'",
+  "Folded t10 into t8 as a nested repeat-per-image task",
+  "Merged f5 (Streamlit's built-in table toolbar) into f4 and noted it as generic",
+  "Recorded the stale particle count in the Results dropdown after filtering in t8, f4 and not_done",
+  "Added the load-time replay screen check/screens/012.webp to t5 and labelled 076 as captured at session end",
+  "Moved the folder-path dead end (t2) out of the tree into not_done and updated t1's branch note",
+  "Listed pixel-size calibration in not_done as an unexercised core step, kept out of the tree",
+  "f3 general/name now say it filters on a physical-size metric; noted only Min was exercised",
+  "Added check/screens/007.webp to f1 for the 384×303 → 192×151 sizes that screens/026.webp doesn't show",
+  "Cited screens/052.webp alongside 056 for the bins-slider action in t12",
+  "Noted in screens_never_reached that the README suggests trying other models when detection is poor"
+ ],
+ "open_fixes": [
+  "Add a task and feature for setting Pixel size (nm/px), with values before and after a change; it was never touched in this run, so it needs a new exploration",
+  "Exercise the Max size value filter and other Size metric choices; only Min = 35 nm on Equivalent_diameter_nm was tried",
+  "Try other segmentation models (SAM, SAM2, MobileSAM, FastSAM, larger YOLOv8); this needs their weights installed or internet for Auto-download",
+  "Load a batch from a folder that actually contains images, to confirm the folder-path branch; /work/app/assets was empty",
+  "Run on real SEM/TEM particle images to reach dense-distribution states; the COCO model found at most 3 objects here"
+ ],
+ "screens_at": "pilot/public/runs/sem-tem-particle-segmentation/20261101-195224/",
+ "screens_filed": {
+  "screens/015.webp": "screens/015.webp",
+  "screens/022.webp": "screens/022.webp",
+  "screens/029.webp": "screens/029.webp",
+  "screens/040.webp": "screens/040.webp",
+  "screens/048.webp": "screens/048.webp",
+  "screens/064.webp": "screens/064.webp"
+ }
+}

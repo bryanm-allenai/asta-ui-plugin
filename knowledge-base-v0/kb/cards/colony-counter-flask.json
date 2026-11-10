@@ -1,0 +1,743 @@
+{
+  "schema": "astaui.card/1",
+  "id": "colony-counter-flask",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:20:47Z"
+  },
+  "app": {
+    "title": "Colony Counter (colony·counter)",
+    "summary": "A person drops in or takes a photo of an agar plate, and a detector marks each colony it finds with a ring. They correct the marks on the image: tapping an unmarked colony adds one that sizes itself to the colony, tapping a ring removes it, and sliding or scrolling on a ring resizes it. A sensitivity slider and an option to split merged colonies re-run detection and keep the person's own additions. They read the total, broken down into auto-detected, added and removed, with a warning when the plate is past the countable range. They can save the corrected plate as a training example. A companion labeller presents a folder of plates one at a time, pre-marked, to build a training dataset with keyboard save and skip.",
+    "task": {
+      "text": "Get a colony count for a plate photo that the analyst agrees with, by correcting an automatic detection one colony at a time.",
+      "verbs": [
+        "derive",
+        "identify",
+        "annotate",
+        "clean"
+      ]
+    },
+    "data": {
+      "text": "Photos of culture plates with colonies marked as circles, either detected automatically or placed by hand. The corrected marks are saved as object-detection labels.",
+      "item": "a photo of one agar plate, with a mark for each colony on it",
+      "shapes": [
+        "image",
+        "image collection",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "counting colonies on incubated plates and checking the automatic count, before reporting a quality-control result",
+      "terms": [
+        "analyze",
+        "annotate"
+      ]
+    },
+    "mechanism": {
+      "text": "An image viewer shows the plate with a ring over each detected colony. Clicks on the image add or remove rings, and a press-and-slide resizes one. A side panel keeps a running total with its breakdown, and holds the controls that re-run detection with new settings without losing hand-added marks. In the labeller, plates arrive one at a time with a progress bar and keyboard shortcuts.",
+      "views": [
+        "image viewer",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "accept or reject",
+        "inline edit",
+        "exclude and refit",
+        "undo",
+        "keyboard shortcuts",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "review queue",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "colony counting on culture plates with object detection, in microbiology quality control",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "microbiology",
+        "colony counting",
+        "food microbiology"
+      ]
+    },
+    "workflow": {
+      "name": "correct automatic detections on an image to reach a trusted count",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drop a plate photo on the dish-shaped target, take one with the phone camera, or browse for a JPG or PNG. The server detects colonies with the trained model, or with classical thresholding if no model is available.",
+          "parts": [
+            "upload-view"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Each detected colony is drawn as a green ring on the plate. Colonies recovered by the split pass are drawn dotted, and a header label shows which detection engine ran.",
+          "parts": [
+            "plate-stage"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Releasing the sensitivity slider or ticking 'Split merged colonies' re-runs detection and keeps the hand-added marks. 'Reset this plate' clears all edits and detects again from scratch.",
+          "parts": [
+            "detection-controls"
+          ]
+        },
+        {
+          "step": "decide keep or drop for each item, with a reason",
+          "here": "Tap a ring to remove a false detection. Tap an unmarked colony to add a mark, which measures its own size from the colony under it, or stays dashed if it can't. Press and slide, or scroll, on a ring to resize it.",
+          "parts": [
+            "plate-stage"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "The total count updates with each change, broken down into auto, added and removed. A banner warns when the plate is above the countable range, and another when nothing was detected.",
+          "parts": [
+            "count-readout"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Save this plate for training' writes the image and the final marks as YOLO labels, recording for each box whether its size was measured or a default guess.",
+          "parts": [
+            "save-for-training"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "In the labeller, plates from an inbox folder arrive pre-marked one at a time with a progress bar. S saves and moves on, K skips, Z undoes the last mark and C clears all marks. Number keys pick the class for new marks.",
+          "parts": [
+            "labeller-queue"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Counts above the plate's reliable range trigger a too-numerous-to-count advisory instead of a bare number.",
+        "A hand-placed mark sizes itself by segmenting the colony under the tap, and stays drawn dashed when the measurement fails, so unmeasured sizes stay visible.",
+        "Re-detecting at a new sensitivity keeps the analyst's own additions, so tuning the detector doesn't throw away corrections.",
+        "Corrected plates go back into the training set, so using the counter also improves the next model.",
+        "The count is broken down by where each mark came from (auto, added, removed), so the correction effort is visible."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "upload-view",
+      "level": "view",
+      "parent": null,
+      "title": "Plate photo upload",
+      "summary": "Takes a plate photo by drag-and-drop, camera capture or file browse, and sends it for detection.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 97,
+          "end": 109,
+          "role": "markup",
+          "symbol": "#uploadView",
+          "anchor": "c62773c51479",
+          "first": "<div id=\"uploadView\">"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 25,
+          "end": 25,
+          "role": "style",
+          "symbol": ".dish",
+          "anchor": "d9d02523fe6c",
+          "first": ".dish { width:300px; height:300px; border-radius:50%; border:2px dashed var(--agar-dim); background:radial-gradient(circ"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 27,
+          "end": 27,
+          "role": "style",
+          "symbol": ".dish.drag-over",
+          "anchor": "5afba24794e2",
+          "first": ".dish.drag-over { border-color:var(--phosphor); transform:scale(1.01); }"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 31,
+          "end": 31,
+          "role": "style",
+          "symbol": ".browse-link",
+          "anchor": "54b647be609f",
+          "first": ".browse-link { display:block; margin:14px auto 0; background:none; border:none; padding:0; font:inherit; font-size:13px;"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 163,
+          "end": 169,
+          "role": "logic",
+          "anchor": "726f60b7189e",
+          "first": "dropZone.addEventListener('click',()=>fileInput.click());"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 170,
+          "end": 170,
+          "role": "logic",
+          "symbol": "analyze",
+          "anchor": "98cd43a1e911",
+          "first": "async function analyze(preserveManual){clearFlash();if(!preserveManual){dropZone.style.display='none';browseLink.style.d"
+        },
+        {
+          "file": "code/app/main.py",
+          "start": 51,
+          "end": 95,
+          "role": "logic",
+          "symbol": "analyze",
+          "anchor": "ae6f6bd34605",
+          "first": "def analyze():"
+        }
+      ]
+    },
+    {
+      "id": "plate-stage",
+      "level": "view",
+      "parent": null,
+      "title": "Plate with colony rings",
+      "summary": "Shows the plate with a ring per colony. A tap on empty agar adds a self-sizing mark, a tap on a ring removes it, and a slide or scroll on a ring resizes it.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "select",
+        "accept or reject",
+        "inline edit",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 120,
+          "end": 120,
+          "role": "markup",
+          "symbol": "#stage",
+          "anchor": "3252f4bbcabd",
+          "first": "<div class=\"stage-wrap\"><div id=\"stage\"><img id=\"plateImg\" alt=\"Plate\"></div></div>"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 40,
+          "end": 40,
+          "role": "style",
+          "symbol": ".marker",
+          "anchor": "16d8bcdcfcb0",
+          "first": ".marker { position:absolute; border:2px solid var(--phosphor); border-radius:50%; transform:translate(-50%,-50%); box-sh"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 45,
+          "end": 45,
+          "role": "style",
+          "symbol": ".marker::after",
+          "anchor": "0170ae52ef03",
+          "first": ".marker::after { content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:max(100%,28px);"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 53,
+          "end": 53,
+          "role": "style",
+          "symbol": ".marker.manual",
+          "anchor": "acbd4db833a1",
+          "first": ".marker.manual { border-color:var(--agar); border-style:solid; }"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 57,
+          "end": 57,
+          "role": "style",
+          "symbol": ".marker.split",
+          "anchor": "83ab99f4b73c",
+          "first": ".marker.split { border-style:dotted; box-shadow:0 0 0 1px rgba(0,0,0,0.4), 0 0 8px rgba(127,230,168,0.35); }"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 62,
+          "end": 62,
+          "role": "style",
+          "symbol": ".marker.est",
+          "anchor": "20f21010652c",
+          "first": ".marker.est { border-style:dashed; }"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 288,
+          "end": 288,
+          "role": "logic",
+          "symbol": "renderMarkers",
+          "anchor": "4876b39919d8",
+          "first": "function renderMarkers(){stage.querySelectorAll('.marker').forEach(m=>m.remove());const rect=plateImg.getBoundingClientR"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 191,
+          "end": 199,
+          "role": "logic",
+          "symbol": "addMarkAt",
+          "anchor": "48a8196a8177",
+          "first": "function addMarkAt(clientX,clientY){"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 205,
+          "end": 220,
+          "role": "logic",
+          "symbol": "probeSize",
+          "anchor": "ded0d6d9a023",
+          "first": "async function probeSize(idx,x,y){"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 262,
+          "end": 287,
+          "role": "logic",
+          "symbol": "attachResize",
+          "anchor": "c27e14c183e5",
+          "first": "function attachResize(el,idx){"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 183,
+          "end": 190,
+          "role": "logic",
+          "symbol": "defaultRadius",
+          "anchor": "c5f7c15d0117",
+          "first": "function defaultRadius(){"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 231,
+          "end": 239,
+          "role": "logic",
+          "anchor": "5442f3be9e1e",
+          "first": "let bgTapId=null,resizeConsumedId=null;"
+        },
+        {
+          "file": "code/app/main.py",
+          "start": 99,
+          "end": 120,
+          "role": "logic",
+          "symbol": "probe_colony_size_route",
+          "anchor": "e68191f63afc",
+          "first": "def probe_colony_size_route():"
+        },
+        {
+          "file": "code/app/detector.py",
+          "start": 510,
+          "end": 540,
+          "role": "logic",
+          "symbol": "probe_colony_size",
+          "anchor": "727c9f3e16c4",
+          "first": "def probe_colony_size(image_crop_bgr, px, py, min_area=5, min_circularity=0.45):"
+        }
+      ]
+    },
+    {
+      "id": "review-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Review side panel",
+      "summary": "Sits beside the plate and holds the count, a legend of ring types, and the detection and save controls.",
+      "views": [
+        "summary stats",
+        "form"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 121,
+          "end": 150,
+          "role": "markup",
+          "anchor": "efc913f27d97",
+          "first": "<div>"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 35,
+          "end": 35,
+          "role": "style",
+          "symbol": ".bench",
+          "anchor": "ffddc859abd7",
+          "first": ".bench { display:grid; grid-template-columns:1fr 300px; gap:28px; align-items:start; }"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 70,
+          "end": 70,
+          "role": "style",
+          "symbol": ".howto",
+          "anchor": "57f9f674a7ef",
+          "first": ".howto { background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:18px 20px; margin-bo"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 75,
+          "end": 75,
+          "role": "style",
+          "symbol": ".controls",
+          "anchor": "bab655b8d8fc",
+          "first": ".controls { display:flex; flex-direction:column; gap:10px; }"
+        }
+      ]
+    },
+    {
+      "id": "count-readout",
+      "level": "component",
+      "parent": "review-sidebar",
+      "title": "Total count with breakdown and advisories",
+      "summary": "Shows the live total, split into auto-detected, added and removed, along with the engine used, a too-numerous-to-count warning and an empty-detection hint.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 122,
+          "end": 127,
+          "role": "markup",
+          "anchor": "511e3f63032e",
+          "first": "<div class=\"readout\">"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 113,
+          "end": 118,
+          "role": "markup",
+          "anchor": "73c94518e443",
+          "first": "<div id=\"emptyHint\" class=\"flash\" style=\"display:none; background:rgba(201,154,78,0.12); border-color:var(--agar); color"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 63,
+          "end": 63,
+          "role": "style",
+          "symbol": ".readout",
+          "anchor": "439a99ea9636",
+          "first": ".readout { background:#0d1a12; border:1px solid var(--phosphor-dim); border-radius:10px; padding:22px 24px; margin-botto"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 65,
+          "end": 65,
+          "role": "style",
+          "symbol": ".readout-count",
+          "anchor": "5cc823557845",
+          "first": ".readout-count { font-family:'IBM Plex Mono',monospace; font-size:58px; font-weight:500; color:var(--phosphor); line-hei"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 66,
+          "end": 66,
+          "role": "style",
+          "symbol": ".readout-break",
+          "anchor": "42569a1f4831",
+          "first": ".readout-break { margin-top:12px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); line-hei"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 289,
+          "end": 289,
+          "role": "logic",
+          "symbol": "updateCount",
+          "anchor": "7339ed9a8785",
+          "first": "function updateCount(){const auto=colonies.filter(c=>c.source==='auto'&&!c.removed).length;const manual=colonies.filter("
+        }
+      ]
+    },
+    {
+      "id": "detection-controls",
+      "level": "component",
+      "parent": "review-sidebar",
+      "title": "Sensitivity, split and reset controls",
+      "summary": "Re-runs detection on the same plate at a new sensitivity or with merged-colony splitting turned on, keeping hand-added marks, or resets the plate from scratch.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "exclude and refit",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 135,
+          "end": 145,
+          "role": "markup",
+          "anchor": "7695aedd42d5",
+          "first": "<label class=\"note\" style=\"display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer;\">"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 81,
+          "end": 81,
+          "role": "style",
+          "symbol": ".sens",
+          "anchor": "854fb6124604",
+          "first": ".sens { margin-top:6px; }"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 161,
+          "end": 161,
+          "role": "logic",
+          "symbol": "labelSensitivity",
+          "anchor": "14d1a8b3617e",
+          "first": "function labelSensitivity(v){if(v<=30)return'low';if(v>=70)return'high';return'standard';}"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 291,
+          "end": 293,
+          "role": "logic",
+          "anchor": "fc6a95324f8c",
+          "first": "document.getElementById('resetBtn').addEventListener('click',()=>{if(currentFile)analyze(false);});"
+        },
+        {
+          "file": "code/app/model_detect.py",
+          "start": 240,
+          "end": 278,
+          "role": "logic",
+          "symbol": "detect_colonies_model",
+          "anchor": "776cd4c27b5f",
+          "first": "def detect_colonies_model(image_bgr, conf=0.25, hybrid=None):"
+        },
+        {
+          "file": "code/app/detector.py",
+          "start": 543,
+          "end": 608,
+          "role": "logic",
+          "symbol": "detect_colonies",
+          "anchor": "7753f0e6d455",
+          "first": "def detect_colonies(image_bgr, min_area=90, max_area=8000,"
+        }
+      ]
+    },
+    {
+      "id": "save-for-training",
+      "level": "component",
+      "parent": "review-sidebar",
+      "title": "Save this plate for training",
+      "summary": "Writes the corrected plate and its final marks into the training dataset as YOLO labels, recording for each box whether its size was measured.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 146,
+          "end": 146,
+          "role": "markup",
+          "symbol": "#trainBtn",
+          "anchor": "fac11a58186a",
+          "first": "<button class=\"btn-ghost\" id=\"trainBtn\">Save this plate for training</button>"
+        },
+        {
+          "file": "code/templates/index.html",
+          "start": 295,
+          "end": 295,
+          "role": "logic",
+          "anchor": "fef382e86ca0",
+          "first": "document.getElementById('trainBtn').addEventListener('click',async()=>{if(!currentImageData){return;}const pts=colonies."
+        },
+        {
+          "file": "code/app/main.py",
+          "start": 124,
+          "end": 181,
+          "role": "logic",
+          "symbol": "save_for_training",
+          "anchor": "70d278fc30a7",
+          "first": "def save_for_training():"
+        }
+      ]
+    },
+    {
+      "id": "labeller-queue",
+      "level": "view",
+      "parent": null,
+      "title": "Plate labelling queue",
+      "summary": "Presents inbox plates one at a time with pre-filled marks and a progress bar. Keyboard keys save and move on, skip, undo or clear, and number keys pick the class for new marks.",
+      "views": [
+        "image viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "keyboard shortcuts",
+        "accept or reject",
+        "apply label",
+        "undo",
+        "zoom and pan",
+        "inline edit"
+      ],
+      "patterns": [
+        "review queue",
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/labeller/templates/label.html",
+          "start": 61,
+          "end": 74,
+          "role": "markup",
+          "symbol": "#main",
+          "anchor": "3cc69f9234df",
+          "first": "<div class=\"layout\" id=\"main\">"
+        },
+        {
+          "file": "code/labeller/templates/label.html",
+          "start": 57,
+          "end": 60,
+          "role": "markup",
+          "anchor": "345987eb6b6e",
+          "first": "<header>"
+        },
+        {
+          "file": "code/labeller/templates/label.html",
+          "start": 23,
+          "end": 23,
+          "role": "style",
+          "symbol": ".pt",
+          "anchor": "ba8ee00b404d",
+          "first": ".pt{position:absolute;width:18px;height:18px;border-radius:50%;border:2px solid var(--phos);transform:translate(-50%,-50"
+        },
+        {
+          "file": "code/labeller/templates/label.html",
+          "start": 18,
+          "end": 18,
+          "role": "style",
+          "symbol": ".bar-fill",
+          "anchor": "fd3b6aa803dd",
+          "first": ".bar-fill{height:100%;background:var(--phos);width:0%;transition:width 0.3s}"
+        },
+        {
+          "file": "code/labeller/templates/label.html",
+          "start": 83,
+          "end": 83,
+          "role": "logic",
+          "symbol": "refreshState",
+          "anchor": "6036330b7dfd",
+          "first": "async function refreshState(){const r=await fetch('/api/state');const s=await r.json();classes=s.classes||['colony'];pro"
+        },
+        {
+          "file": "code/labeller/templates/label.html",
+          "start": 122,
+          "end": 126,
+          "role": "logic",
+          "symbol": "loadPlate",
+          "anchor": "0f19dc9e3023",
+          "first": "async function loadPlate(name){const r=await fetch('/api/image/'+encodeURIComponent(name));const d=await r.json();if(d.e"
+        },
+        {
+          "file": "code/labeller/templates/label.html",
+          "start": 140,
+          "end": 155,
+          "role": "logic",
+          "symbol": "render",
+          "anchor": "e3d638fa74d3",
+          "first": "function render(){stage.querySelectorAll('.pt').forEach(e=>e.remove());const rect=plate.getBoundingClientRect();"
+        },
+        {
+          "file": "code/labeller/templates/label.html",
+          "start": 84,
+          "end": 84,
+          "role": "logic",
+          "symbol": "renderClasses",
+          "anchor": "487f7be09099",
+          "first": "function renderClasses(){if(classes.length<=1){clsWrap.style.display='none';return;}clsWrap.style.display='block';clsRow"
+        },
+        {
+          "file": "code/labeller/templates/label.html",
+          "start": 157,
+          "end": 157,
+          "role": "logic",
+          "symbol": "save",
+          "anchor": "c5f99d30cf6c",
+          "first": "async function save(){if(!cur)return;const name=cur.name;const r=await fetch('/api/save',{method:'POST',headers:{'Conten"
+        },
+        {
+          "file": "code/labeller/templates/label.html",
+          "start": 158,
+          "end": 158,
+          "role": "logic",
+          "symbol": "skip",
+          "anchor": "6920a002c3a8",
+          "first": "async function skip(){if(!cur)return;const name=cur.name;await fetch('/api/skip',{method:'POST',headers:{'Content-Type':"
+        },
+        {
+          "file": "code/labeller/templates/label.html",
+          "start": 156,
+          "end": 160,
+          "role": "logic",
+          "anchor": "287ffbaf415f",
+          "first": "stage.addEventListener('click',ev=>{if(!cur)return;if(ev.target!==plate&&ev.target!==stage)return;const rect=plate.getBo"
+        },
+        {
+          "file": "code/labeller/app.py",
+          "start": 97,
+          "end": 106,
+          "role": "logic",
+          "symbol": "state",
+          "anchor": "c6049a7ad9e9",
+          "first": "def state():"
+        },
+        {
+          "file": "code/labeller/app.py",
+          "start": 110,
+          "end": 165,
+          "role": "logic",
+          "symbol": "get_image",
+          "anchor": "072f631b0ba0",
+          "first": "def get_image(name):"
+        },
+        {
+          "file": "code/labeller/app.py",
+          "start": 207,
+          "end": 246,
+          "role": "logic",
+          "symbol": "save",
+          "anchor": "fe10e8d61d6f",
+          "first": "def save():"
+        },
+        {
+          "file": "code/labeller/app.py",
+          "start": 250,
+          "end": 257,
+          "role": "logic",
+          "symbol": "skip",
+          "anchor": "78e86a41bfbe",
+          "first": "def skip():"
+        }
+      ]
+    }
+  ]
+}

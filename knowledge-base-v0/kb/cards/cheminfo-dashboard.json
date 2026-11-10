@@ -1,0 +1,605 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cheminfo-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T11:16:28Z"
+  },
+  "app": {
+    "title": "ChemInfo Dashboard",
+    "summary": "A person enters one compound by name, CAS number or SMILES, or uploads a CSV or Excel file and picks the column that holds names or SMILES. The tool looks each compound up in PubChem to get its structure, then computes its descriptors, checks it against drug-likeness rules, detects functional groups and predicts mass-spectrometry adducts, fragment ions and MRM transitions with estimated collision energies. For a batch, a results table lists every compound that resolved and names the ones that failed. Any compound can be opened as a full report, with its structure, key metrics, classification and reference links, in tabs. The person downloads the properties and MRM transitions as CSV and the structure as a PNG.",
+    "task": {
+      "text": "Look up compounds from their identifiers and compute a property, drug-likeness and MRM transition profile for each one, ready to export.",
+      "verbs": [
+        "lookup",
+        "derive",
+        "identify",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Chemical compounds given as names, CAS registry numbers or SMILES strings, either one at a time or as a column in a spreadsheet. Each compound is enriched with computed descriptors and with records fetched from a public compound database.",
+      "item": "a chemical compound, identified by name, CAS number or SMILES",
+      "shapes": [
+        "table",
+        "image"
+      ]
+    },
+    "stage": {
+      "text": "profiling candidate compounds and drafting MRM transitions before LC-MS method development",
+      "terms": [
+        "explore",
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar form or file upload sends identifiers to a lookup and compute pipeline. Single compounds open straight into a report: a structure image and metric tiles, with tabs for properties, classification, drug-likeness, MRM, functional groups, references and export. In a batch, a summary table of every compound sits above a selector, and the selector opens any compound's report from cached results.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats",
+        "image viewer",
+        "detail panel",
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "master-detail",
+        "overview and detail",
+        "dashboard",
+        "rubric"
+      ]
+    },
+    "field": {
+      "text": "cheminformatics compound profiling and MRM transition prediction in analytical chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "cheminformatics",
+        "mass spectrometry",
+        "drug likeness"
+      ]
+    },
+    "workflow": {
+      "name": "resolve identifiers and compute a property profile for each item, then export",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A radio button picks the input method: Chemical Name, CAS Number or SMILES String, each with its own form and Analyze button, or Batch Upload of a CSV or Excel file. For a batch the person previews the file, picks the column and says whether it holds names or SMILES.",
+          "parts": [
+            "compound-input"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Each identifier is resolved through PubChem to a SMILES string. RDKit then computes 20+ descriptors, InChIKey, functional groups found by SMARTS patterns, positive and negative adducts, neutral-loss fragments and suggested transitions. A batch shows a progress bar and a status line naming each compound.",
+          "parts": [
+            "compound-input",
+            "batch-results"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The batch table gives one row per compound with its CAS number, SMILES, descriptors, classification, key adduct m/z values and its first three transitions with collision energies. A count of successes and a list of the compounds that failed sit with it.",
+          "parts": [
+            "batch-results"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "A selector under the batch table opens any compound's full report from cached results, without querying again. The report shows a 2D structure, SMILES, CAS and CID, a description, eight metric tiles and tabs for properties and classification.",
+          "parts": [
+            "batch-results",
+            "compound-report",
+            "properties-classification"
+          ]
+        },
+        {
+          "step": "score each item against criteria",
+          "here": "The Drug-Likeness tab checks Lipinski, Veber, Ghose and Egan rules. Each rule shows PASS or FAIL per criterion, and Lipinski also shows a count of violations.",
+          "parts": [
+            "drug-likeness"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The MRM / Mass Spec tab lists adduct m/z values for each ion mode and predicted fragment ions. It also lists suggested precursor-to-product transitions marked Quantifier or Qualifier, each with an estimated collision energy, plus notes on the isotope pattern.",
+          "parts": [
+            "mrm-panel"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download buttons save one compound's properties or MRM transitions as CSV and its structure as a PNG. For a batch they save the whole property table and every compound's transitions as CSV.",
+          "parts": [
+            "export-panel",
+            "batch-results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Neutral losses are chosen from the molecule's substructures (carbonyl, carboxyl, aromatic nitrogen, halogens, glycoside), so the predicted fragments depend on the structure.",
+        "Collision energy comes from a linear ramp on precursor m/z, with separate slopes for positive and negative mode, clamped to 5–80 eV. The first transition in each mode is marked as the quantifier and the rest as qualifiers.",
+        "A text box can take three kinds of identifier (name, CAS registry number, SMILES), and each is resolved through a public compound database before anything is computed.",
+        "Pharmacological and chemical classification (FDA class, mechanism of action, ATC codes, MeSH terms) is parsed from the database's record sections.",
+        "Batch results are cached in the session, so switching the detailed report between compounds does not query or compute again."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "compound-input",
+      "level": "view",
+      "parent": null,
+      "title": "Compound Input sidebar",
+      "summary": "Lets the person choose how to give compounds (name, CAS, SMILES or a spreadsheet) and start the analysis.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "search"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 342,
+          "end": 429,
+          "role": "markup",
+          "anchor": "3d4868861e9c",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 92,
+          "end": 94,
+          "role": "style",
+          "anchor": "bdd9a0897fc9",
+          "first": "/* --- Sidebar refinements --- */"
+        },
+        {
+          "file": "code/app.py",
+          "start": 126,
+          "end": 131,
+          "role": "style",
+          "anchor": "8948840df196",
+          "first": "/* --- Buttons --- */"
+        },
+        {
+          "file": "code/app.py",
+          "start": 905,
+          "end": 925,
+          "role": "logic",
+          "anchor": "277776d68567",
+          "first": "if analyze_btn:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 435,
+          "end": 528,
+          "role": "logic",
+          "symbol": "analyze_single_compound",
+          "anchor": "84fd8013e0dc",
+          "first": "def analyze_single_compound(name=None, smiles=None, cas=None):"
+        },
+        {
+          "file": "code/utils/pubchem_api.py",
+          "start": 22,
+          "end": 44,
+          "role": "logic",
+          "symbol": "search_compound_by_name",
+          "anchor": "8268bb68f8d9",
+          "first": "def search_compound_by_name(name: str):"
+        },
+        {
+          "file": "code/utils/pubchem_api.py",
+          "start": 226,
+          "end": 250,
+          "role": "logic",
+          "symbol": "search_compound_by_cas",
+          "anchor": "c761dbba89fa",
+          "first": "def search_compound_by_cas(cas_number: str):"
+        },
+        {
+          "file": "code/sample_compounds.csv",
+          "start": 1,
+          "end": 16,
+          "role": "data",
+          "anchor": "7365ffb3d687",
+          "first": "Compound Name"
+        }
+      ]
+    },
+    {
+      "id": "compound-report",
+      "level": "view",
+      "parent": null,
+      "title": "Compound report",
+      "summary": "Shows one compound's 2D structure, identifiers, description and key metric tiles, with tabs below for each kind of result.",
+      "views": [
+        "detail panel",
+        "image viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 531,
+          "end": 602,
+          "role": "markup",
+          "anchor": "cbcde04257f4",
+          "first": "def display_compound_report(result):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 89,
+          "end": 90,
+          "role": "style",
+          "anchor": "14957338dfdb",
+          "first": ".section-header { font-size: 1.3rem; font-weight: 600; color: #79c0ff !important;"
+        },
+        {
+          "file": "code/app.py",
+          "start": 96,
+          "end": 112,
+          "role": "style",
+          "anchor": "7ce5fcbccdd0",
+          "first": "/* --- Tabs --- */"
+        },
+        {
+          "file": "code/app.py",
+          "start": 148,
+          "end": 149,
+          "role": "style",
+          "anchor": "d962f6950c1f",
+          "first": "/* --- Images --- */"
+        },
+        {
+          "file": "code/utils/chem_properties.py",
+          "start": 22,
+          "end": 27,
+          "role": "logic",
+          "symbol": "generate_structure_image",
+          "anchor": "dac50cc896c8",
+          "first": "def generate_structure_image(mol, size=(450, 350)):"
+        },
+        {
+          "file": "code/utils/pubchem_api.py",
+          "start": 97,
+          "end": 116,
+          "role": "logic",
+          "symbol": "get_compound_description",
+          "anchor": "3d5e45503769",
+          "first": "def get_compound_description(cid: int):"
+        },
+        {
+          "file": "code/utils/pubchem_api.py",
+          "start": 119,
+          "end": 134,
+          "role": "logic",
+          "symbol": "get_compound_synonyms",
+          "anchor": "d2fcb378f7f5",
+          "first": "def get_compound_synonyms(cid: int, limit=15):"
+        }
+      ]
+    },
+    {
+      "id": "properties-classification",
+      "level": "component",
+      "parent": "compound-report",
+      "title": "Properties and Classification tabs",
+      "summary": "Lists every computed physicochemical descriptor and the compound's pharmacological and chemical classes, and lists the functional groups found.",
+      "views": [
+        "table view",
+        "summary stats",
+        "list"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 604,
+          "end": 686,
+          "role": "markup",
+          "anchor": "a0a03ec11bcc",
+          "first": "# ---- TAB 1: Properties ----"
+        },
+        {
+          "file": "code/app.py",
+          "start": 776,
+          "end": 784,
+          "role": "markup",
+          "anchor": "eb9b2a517783",
+          "first": "# ---- TAB 4: Functional Groups ----"
+        },
+        {
+          "file": "code/utils/chem_properties.py",
+          "start": 40,
+          "end": 106,
+          "role": "logic",
+          "symbol": "calculate_physicochemical_properties",
+          "anchor": "5e4b49523fff",
+          "first": "def calculate_physicochemical_properties(mol):"
+        },
+        {
+          "file": "code/utils/chem_properties.py",
+          "start": 163,
+          "end": 200,
+          "role": "logic",
+          "symbol": "get_functional_groups",
+          "anchor": "76c485702798",
+          "first": "def get_functional_groups(mol):"
+        },
+        {
+          "file": "code/utils/pubchem_api.py",
+          "start": 460,
+          "end": 516,
+          "role": "logic",
+          "symbol": "get_compound_classification",
+          "anchor": "fc0b81843ace",
+          "first": "def get_compound_classification(cid: int):"
+        }
+      ]
+    },
+    {
+      "id": "drug-likeness",
+      "level": "component",
+      "parent": "compound-report",
+      "title": "Drug-Likeness tab",
+      "summary": "Checks the compound against four drug-likeness rules and shows a pass or fail for each criterion.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "rubric"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 688,
+          "end": 703,
+          "role": "markup",
+          "anchor": "5f2d3ef32b39",
+          "first": "# ---- TAB 2: Drug-Likeness ----"
+        },
+        {
+          "file": "code/app.py",
+          "start": 151,
+          "end": 153,
+          "role": "style",
+          "anchor": "1c961f9b77e1",
+          "first": "/* --- Badges --- */"
+        },
+        {
+          "file": "code/utils/chem_properties.py",
+          "start": 109,
+          "end": 160,
+          "role": "logic",
+          "symbol": "evaluate_drug_likeness",
+          "anchor": "9c0bf307030d",
+          "first": "def evaluate_drug_likeness(props):"
+        }
+      ]
+    },
+    {
+      "id": "mrm-panel",
+      "level": "component",
+      "parent": "compound-report",
+      "title": "MRM / Mass Spec tab",
+      "summary": "Predicts adduct m/z values, neutral-loss fragment ions and suggested MRM transitions with estimated collision energies, for both ion modes.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 705,
+          "end": 774,
+          "role": "markup",
+          "anchor": "b31cac68e0f9",
+          "first": "# ---- TAB 3: MRM / Mass Spec ----"
+        },
+        {
+          "file": "code/utils/mrm_calculator.py",
+          "start": 11,
+          "end": 48,
+          "role": "data",
+          "anchor": "c03eafaa4433",
+          "first": "# Common adduct masses"
+        },
+        {
+          "file": "code/utils/mrm_calculator.py",
+          "start": 51,
+          "end": 113,
+          "role": "logic",
+          "symbol": "calculate_mrm_data",
+          "anchor": "99a05fe2c880",
+          "first": "def calculate_mrm_data(mol):"
+        },
+        {
+          "file": "code/utils/mrm_calculator.py",
+          "start": 116,
+          "end": 179,
+          "role": "logic",
+          "symbol": "get_relevant_neutral_losses",
+          "anchor": "d67e9cd6578c",
+          "first": "def get_relevant_neutral_losses(mol):"
+        },
+        {
+          "file": "code/utils/mrm_calculator.py",
+          "start": 182,
+          "end": 224,
+          "role": "logic",
+          "symbol": "suggest_mrm_transitions",
+          "anchor": "2f65fc50b2a2",
+          "first": "def suggest_mrm_transitions(mol, mrm_data):"
+        },
+        {
+          "file": "code/utils/mrm_calculator.py",
+          "start": 227,
+          "end": 240,
+          "role": "logic",
+          "symbol": "estimate_collision_energy",
+          "anchor": "634dc62f1e50",
+          "first": "def estimate_collision_energy(precursor_mz, product_mz, mode=\"positive\"):"
+        },
+        {
+          "file": "code/utils/mrm_calculator.py",
+          "start": 243,
+          "end": 268,
+          "role": "logic",
+          "symbol": "get_isotope_info",
+          "anchor": "ac49403d7b71",
+          "first": "def get_isotope_info(mol):"
+        }
+      ]
+    },
+    {
+      "id": "references-panel",
+      "level": "component",
+      "parent": "compound-report",
+      "title": "References tab",
+      "summary": "Gathers the compound's identifiers and links to its entries in external chemistry databases and to sections of its PubChem record.",
+      "views": [
+        "list"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 786,
+          "end": 838,
+          "role": "markup",
+          "anchor": "99e2b01b33a6",
+          "first": "# ---- TAB 5: References ----"
+        },
+        {
+          "file": "code/utils/pubchem_api.py",
+          "start": 167,
+          "end": 204,
+          "role": "logic",
+          "symbol": "get_external_references",
+          "anchor": "03e0beae192e",
+          "first": "def get_external_references(cid: int, inchikey: str = None, cas_number: str = None):"
+        },
+        {
+          "file": "code/utils/pubchem_api.py",
+          "start": 151,
+          "end": 164,
+          "role": "logic",
+          "symbol": "get_pubchem_links",
+          "anchor": "94078da67f09",
+          "first": "def get_pubchem_links(cid: int):"
+        },
+        {
+          "file": "code/utils/pubchem_api.py",
+          "start": 253,
+          "end": 266,
+          "role": "logic",
+          "symbol": "get_cas_number",
+          "anchor": "6006a1c5e178",
+          "first": "def get_cas_number(cid: int):"
+        }
+      ]
+    },
+    {
+      "id": "export-panel",
+      "level": "component",
+      "parent": "compound-report",
+      "title": "Export tab",
+      "summary": "Saves the compound's properties and MRM transitions as CSV files and its structure as a PNG image.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 840,
+          "end": 899,
+          "role": "markup",
+          "anchor": "9d887f75a005",
+          "first": "# ---- TAB 6: Export ----"
+        },
+        {
+          "file": "code/app.py",
+          "start": 132,
+          "end": 136,
+          "role": "style",
+          "anchor": "dd0040363f06",
+          "first": ".stDownloadButton > button {"
+        }
+      ]
+    },
+    {
+      "id": "batch-results",
+      "level": "view",
+      "parent": null,
+      "title": "Batch analysis results",
+      "summary": "Runs every compound in an uploaded column with a progress bar, then shows a table of all of them with downloads, and a selector that opens any one compound's report.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "master-detail",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 927,
+          "end": 1016,
+          "role": "logic",
+          "anchor": "34da96d5ee33",
+          "first": "# ---- BATCH PROCESSING (analysis & caching only) ----"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1019,
+          "end": 1081,
+          "role": "markup",
+          "anchor": "7fb9562e1bd3",
+          "first": "# ============================================================"
+        },
+        {
+          "file": "code/app.py",
+          "start": 138,
+          "end": 140,
+          "role": "style",
+          "anchor": "e8ca3b2312e1",
+          "first": "/* --- Progress bar --- */"
+        }
+      ]
+    }
+  ]
+}

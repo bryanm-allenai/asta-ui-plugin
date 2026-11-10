@@ -1,0 +1,699 @@
+{
+  "schema": "astaui.card/1",
+  "id": "medbench-clinical-workbench",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T19:05:22Z"
+  },
+  "app": {
+    "title": "医析台 MedBench — local clinical data analysis workbench",
+    "summary": "A person loads an Excel workbook of cases, picks a sheet and sets how its header and title rows are read, or opens a saved project. They check an overview of data quality, the structure it found and the analyses it recommends. They fix the table where needed: variable types, wide-to-long reshaping, missing-value imputation, outlier cleaning and joins across sheets, with undo. Then they run descriptive statistics, group comparisons, regression and survival models, and causal-inference methods across tabbed pages. They add only the results they want to the report, generate a methods paragraph from what was actually done, and export a Word report with journal-style tables, plus an Excel results file and a figure pack.",
+    "task": {
+      "text": "Take a table of clinical cases from raw spreadsheet to statistical results and a journal-ready analysis report.",
+      "verbs": [
+        "derive",
+        "compare",
+        "clean",
+        "summarize",
+        "write"
+      ]
+    },
+    "data": {
+      "text": "A spreadsheet of cases with one row per patient or observation and one column per variable. Variables can be numeric, categorical, binary, date or text. A workbook can hold several sheets, one per dimension, linked by an identifier.",
+      "item": "a patient or observation row in a case table",
+      "shapes": [
+        "table",
+        "time series",
+        "judgements",
+        "notes",
+        "events"
+      ]
+    },
+    "stage": {
+      "text": "analyzing a cleaned clinical case table and writing up the results for a paper",
+      "terms": [
+        "analyze",
+        "clean",
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar loads the data and sets how it is read, and shows the current dataset's summary. A row of tabs steps through overview, preparation, analysis families and report export. On each tab the person picks variables in forms, runs a method and sees its tables and figures, and an explicit 'add to report' button sends that result to a report cache that the export page orders, annotates and saves.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats",
+        "line chart",
+        "bar chart",
+        "scatter plot",
+        "heatmap",
+        "list",
+        "text editor"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "filter",
+        "search",
+        "toggle view",
+        "undo",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "dashboard",
+        "version history"
+      ]
+    },
+    "field": {
+      "text": "biostatistical analysis of clinical research and quality-control data in medicine",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "clinical research",
+        "biostatistics",
+        "quality control"
+      ]
+    },
+    "workflow": {
+      "name": "take a table from raw import to analyses and a written report",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload an Excel file, choose a sheet, and set the header rows, the title rows to skip and whether merged cells fill downward, with an 8-row preview. Alternatively, load the sample dataset or open a saved project file.",
+          "parts": [
+            "data-source-sidebar"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The overview shows sample size, variable counts, missing rate and duplicates. It lists the structural roles it detected (groups, outcomes, time, pairing) and recommends analyses with their criteria, each with an 'open' button that jumps to the page.",
+          "parts": [
+            "overview-insights",
+            "ai-advice"
+          ]
+        },
+        {
+          "step": "find and fix problems in the data",
+          "here": "The preparation page lets the person override variable types, reshape wide tables to long ones and impute missing values with single values or MICE. It also diagnoses table layout and applies chosen fix-up steps, and joins sheets by key with aggregation. Outliers can be kept, winsorized or dropped, and every change can be undone.",
+          "parts": [
+            "data-prep",
+            "data-source-sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "On the descriptive, inference, time-and-QC, modeling and paper-support tabs, the person picks variables and runs tests (t, ANOVA, chi-square), agreement measures, regressions (linear, logistic, Cox, LASSO), PSM/IPTW, subgroup analyses or Table 1. Each method has its own diagnostics and figures.",
+          "parts": [
+            "analysis-pages"
+          ]
+        },
+        {
+          "step": "pick which results to keep",
+          "here": "Results only display until the person presses 'add to report'. That section, or a group of related figures, then goes into the report cache.",
+          "parts": [
+            "report-include-button"
+          ]
+        },
+        {
+          "step": "write up the result",
+          "here": "The export page assembles a methods paragraph from what was actually done (sample, missing handling, outliers, methods used). It keeps an analysis ledger, and can optionally ask an AI to review the analyses or draft results and methods text.",
+          "parts": [
+            "report-export"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The person ticks the chapters, chooses Chinese or English and a journal table/figure template, and generates a Word report with three-line tables. Results can also go out as an Excel workbook or a 300 dpi PNG/TIFF image pack, and the whole session can be saved as a project file.",
+          "parts": [
+            "report-export",
+            "data-source-sidebar"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Results go into the report only when the person asks. Browsing tabs never adds chapters, and a model's result is kept only while its parameters are unchanged.",
+        "The methods paragraph is built only from operations actually performed, so the write-up cannot describe methods that do not appear in the results.",
+        "Joining one-to-many sheets requires an aggregation rule and is rolled back if the row count changes, which guards against inflating the sample size.",
+        "Optional AI help receives only a structural summary (field names, types, unique counts, missing rates) and never data rows. Its suggested methods are set against a local rule engine and marked where they agree or disagree.",
+        "Tables and figures follow journal conventions: three-line tables, p-value formatting, numbered captions, set figure widths and 300 dpi output."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-source-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Data source, import settings and project sidebar",
+      "summary": "Loads an Excel sheet with adjustable header and title-row handling, loads sample data, saves and opens project files, applies outlier cleaning and shows the current dataset's size and missing rate.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 6244,
+          "end": 6479,
+          "role": "markup",
+          "anchor": "7fc76c22b8a8",
+          "first": "# 数据上传区"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1085,
+          "end": 1100,
+          "role": "logic",
+          "symbol": "parse_uploaded_sheet",
+          "anchor": "1a5567cf66ea",
+          "first": "def parse_uploaded_sheet(uploaded, sheet_name: str, settings: dict) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 878,
+          "end": 928,
+          "role": "logic",
+          "symbol": "load_dataframe_into_session",
+          "anchor": "ac07a5329e53",
+          "first": "def load_dataframe_into_session(df: pd.DataFrame, sheet_name: str = '(当前数据)',"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1027,
+          "end": 1043,
+          "role": "logic",
+          "symbol": "build_project_bytes",
+          "anchor": "148fca64eb1c",
+          "first": "def build_project_bytes() -> bytes:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1046,
+          "end": 1082,
+          "role": "logic",
+          "symbol": "restore_project_state",
+          "anchor": "502e49cada57",
+          "first": "def restore_project_state(state) -> None:"
+        },
+        {
+          "file": "code/modules/data_loader.py",
+          "start": 185,
+          "end": 247,
+          "role": "logic",
+          "symbol": "read_sheet",
+          "anchor": "9460ae73fa2b",
+          "first": "def read_sheet(cls, file, sheet_name: Optional[str] = None, header_rows: int = 1,"
+        },
+        {
+          "file": "code/modules/project.py",
+          "start": 105,
+          "end": 153,
+          "role": "logic",
+          "symbol": "save_project",
+          "anchor": "2fdb96328da2",
+          "first": "def save_project(df, *, type_overrides: Optional[Dict] = None,"
+        }
+      ]
+    },
+    {
+      "id": "overview-insights",
+      "level": "view",
+      "parent": null,
+      "title": "Overview and insights",
+      "summary": "Shows data-quality metrics and the structural roles found in the variables, and lists which analyses the data supports or not, each with a button that jumps to the right page.",
+      "views": [
+        "summary stats",
+        "list",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3211,
+          "end": 3384,
+          "role": "logic",
+          "symbol": "render_overview_and_insights",
+          "anchor": "b882c36978b8",
+          "first": "def render_overview_and_insights() -> None:"
+        },
+        {
+          "file": "code/modules/data_loader.py",
+          "start": 563,
+          "end": 681,
+          "role": "logic",
+          "symbol": "profile_structure",
+          "anchor": "8705f6a7c71c",
+          "first": "def profile_structure(cls, df: pd.DataFrame,"
+        },
+        {
+          "file": "code/modules/data_loader.py",
+          "start": 433,
+          "end": 458,
+          "role": "logic",
+          "symbol": "get_quality_report",
+          "anchor": "9d64082adf9b",
+          "first": "def get_quality_report(cls, df: pd.DataFrame,"
+        }
+      ]
+    },
+    {
+      "id": "ai-advice",
+      "level": "component",
+      "parent": "overview-insights",
+      "title": "Optional AI analysis advice and exploration",
+      "summary": "Sends a previewable structural summary, with an optional research question, to a configured AI. It shows the suggested methods next to the rule engine's recommendations and can prefill a page or run a bounded multi-round exploratory analysis.",
+      "views": [
+        "list",
+        "text editor"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1865,
+          "end": 1982,
+          "role": "logic",
+          "symbol": "render_ai_insight_block",
+          "anchor": "a072f7f113e6",
+          "first": "def render_ai_insight_block(df, profile, report) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2770,
+          "end": 2828,
+          "role": "logic",
+          "symbol": "render_agent_panel",
+          "anchor": "07374819d36a",
+          "first": "def render_agent_panel(df, profile) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2831,
+          "end": 2910,
+          "role": "logic",
+          "symbol": "_run_agent_loop",
+          "anchor": "9600b2bb62e9",
+          "first": "def _run_agent_loop(df, profile, config, question, max_rounds) -> None:"
+        },
+        {
+          "file": "code/modules/ai_context.py",
+          "start": 177,
+          "end": 200,
+          "role": "logic",
+          "symbol": "build_advice_payload",
+          "anchor": "fb335c42c1e6",
+          "first": "def build_advice_payload(structure_payload: Dict, question: str = '',"
+        },
+        {
+          "file": "code/modules/ai_actions.py",
+          "start": 435,
+          "end": 482,
+          "role": "logic",
+          "symbol": "compare_with_local",
+          "anchor": "559820d1291f",
+          "first": "def compare_with_local(methods: List[Dict], recommendations: List[Dict]) -> Dict:"
+        },
+        {
+          "file": "code/modules/agent.py",
+          "start": 601,
+          "end": 633,
+          "role": "logic",
+          "symbol": "run_one_round",
+          "anchor": "cfd3aa57435a",
+          "first": "def run_one_round(kind: str, df: pd.DataFrame, params: Dict, fields: Dict,"
+        }
+      ]
+    },
+    {
+      "id": "data-prep",
+      "level": "view",
+      "parent": null,
+      "title": "Data preparation",
+      "summary": "Collects the operations that change the data: type overrides, wide-to-long reshaping, missing-value imputation, layout diagnosis with batch fix-up steps, multi-sheet joins and an undo history.",
+      "views": [
+        "form",
+        "table view",
+        "list",
+        "bar chart"
+      ],
+      "interactions": [
+        "multi-select",
+        "inline edit",
+        "undo",
+        "filter",
+        "search",
+        "export"
+      ],
+      "patterns": [
+        "version history"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3152,
+          "end": 3208,
+          "role": "logic",
+          "symbol": "render_data_prep",
+          "anchor": "3e4d71aa2eee",
+          "first": "def render_data_prep() -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1103,
+          "end": 1172,
+          "role": "logic",
+          "symbol": "render_type_editor",
+          "anchor": "273a672a3112",
+          "first": "def render_type_editor() -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1175,
+          "end": 1218,
+          "role": "logic",
+          "symbol": "render_reshape_panel",
+          "anchor": "7bd0ecd1a139",
+          "first": "def render_reshape_panel() -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1221,
+          "end": 1302,
+          "role": "logic",
+          "symbol": "render_missing_panel",
+          "anchor": "6fc3f365f5a8",
+          "first": "def render_missing_panel() -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 980,
+          "end": 1006,
+          "role": "logic",
+          "symbol": "render_history_panel",
+          "anchor": "a05cac777d76",
+          "first": "def render_history_panel() -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2311,
+          "end": 2407,
+          "role": "logic",
+          "symbol": "render_schema_doctor",
+          "anchor": "d3ce6ccc50d7",
+          "first": "def render_schema_doctor(df) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1572,
+          "end": 1809,
+          "role": "logic",
+          "symbol": "render_multi_sheet_panel",
+          "anchor": "272a0ea92589",
+          "first": "def render_multi_sheet_panel() -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3870,
+          "end": 4031,
+          "role": "logic",
+          "symbol": "render_data_extract",
+          "anchor": "3c2143a0e39e",
+          "first": "def render_data_extract():"
+        },
+        {
+          "file": "code/modules/history.py",
+          "start": 44,
+          "end": 48,
+          "role": "logic",
+          "symbol": "push",
+          "anchor": "908a9a93b844",
+          "first": "def push(stack, snapshot: Dict, limit: int = STACK_LIMIT) -> List[Dict]:"
+        },
+        {
+          "file": "code/modules/missing.py",
+          "start": 208,
+          "end": 283,
+          "role": "logic",
+          "symbol": "mice_impute",
+          "anchor": "87dd66d481fb",
+          "first": "def mice_impute(df: pd.DataFrame, columns: Optional[Sequence[str]] = None,"
+        }
+      ]
+    },
+    {
+      "id": "analysis-pages",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis tabs",
+      "summary": "A tab row of analysis families (descriptive, inference, time and quality control, predictive modeling, paper support). On each, the person picks variables, runs a method and reads its tables, diagnostics and figures.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats",
+        "line chart",
+        "bar chart",
+        "scatter plot",
+        "heatmap"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 6516,
+          "end": 6534,
+          "role": "markup",
+          "anchor": "e309ddf48193",
+          "first": "nav = st.radio(\"分析导航\", NAV_PAGES, horizontal=True,"
+        },
+        {
+          "file": "code/app.py",
+          "start": 4034,
+          "end": 4153,
+          "role": "logic",
+          "symbol": "render_descriptive",
+          "anchor": "647472f7fbe1",
+          "first": "def render_descriptive():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 4372,
+          "end": 4558,
+          "role": "logic",
+          "symbol": "render_inferential",
+          "anchor": "c57135475af6",
+          "first": "def render_inferential():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3387,
+          "end": 3654,
+          "role": "logic",
+          "symbol": "render_time_quality",
+          "anchor": "917674a1a7b7",
+          "first": "def render_time_quality() -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 4895,
+          "end": 5156,
+          "role": "logic",
+          "symbol": "render_modeling",
+          "anchor": "4892df1418a9",
+          "first": "def render_modeling():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 5355,
+          "end": 5539,
+          "role": "logic",
+          "symbol": "render_research",
+          "anchor": "94e9c1d9b737",
+          "first": "def render_research():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 202,
+          "end": 204,
+          "role": "logic",
+          "symbol": "method_help",
+          "anchor": "c3a860cb73de",
+          "first": "def method_help(method: str) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "report-include-button",
+      "level": "component",
+      "parent": "analysis-pages",
+      "title": "Add-to-report button with persistent panel results",
+      "summary": "Adds a displayed result, or a group of related figures, to the report only when pressed. A run result stays on screen until its parameters change.",
+      "views": [],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3007,
+          "end": 3046,
+          "role": "logic",
+          "symbol": "offer_report_section",
+          "anchor": "a0263e79c0d0",
+          "first": "def offer_report_section(key: str, title: str, text: str = '', *, table=None,"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3049,
+          "end": 3052,
+          "role": "logic",
+          "symbol": "store_panel_result",
+          "anchor": "d4aa1ed62944",
+          "first": "def store_panel_result(key: str, result, signature=None) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3055,
+          "end": 3072,
+          "role": "logic",
+          "symbol": "panel_result",
+          "anchor": "a896b13c0caf",
+          "first": "def panel_result(key: str, signature=None):"
+        },
+        {
+          "file": "code/modules/export.py",
+          "start": 392,
+          "end": 410,
+          "role": "logic",
+          "symbol": "add_section",
+          "anchor": "f140d39e41e4",
+          "first": "def add_section(self, title: str, content: str = '', table=None,"
+        }
+      ]
+    },
+    {
+      "id": "report-export",
+      "level": "view",
+      "parent": null,
+      "title": "Report export",
+      "summary": "Lists the collected chapters for selection or removal. Builds a methods paragraph from what was done, keeps an analysis ledger, can run optional AI review and writing, and exports Word, Excel or image packs in a chosen language and journal style.",
+      "views": [
+        "list",
+        "form",
+        "text editor",
+        "table view"
+      ],
+      "interactions": [
+        "multi-select",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "version history"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 5974,
+          "end": 6171,
+          "role": "logic",
+          "symbol": "render_export",
+          "anchor": "72968aff1e7f",
+          "first": "def render_export():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 5704,
+          "end": 5774,
+          "role": "logic",
+          "symbol": "render_methods_panel",
+          "anchor": "917f70903194",
+          "first": "def render_methods_panel(cache) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 5926,
+          "end": 5971,
+          "role": "logic",
+          "symbol": "render_ledger_panel",
+          "anchor": "e14b4a7e179f",
+          "first": "def render_ledger_panel() -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 5777,
+          "end": 5903,
+          "role": "logic",
+          "symbol": "render_report_ai_panel",
+          "anchor": "e96ec4fbc727",
+          "first": "def render_report_ai_panel(cache) -> None:"
+        },
+        {
+          "file": "code/modules/methods.py",
+          "start": 169,
+          "end": 245,
+          "role": "logic",
+          "symbol": "build_draft",
+          "anchor": "fbd31df1e8a4",
+          "first": "def build_draft(collected: Dict) -> str:"
+        },
+        {
+          "file": "code/modules/export.py",
+          "start": 153,
+          "end": 383,
+          "role": "logic",
+          "symbol": "ReportExporter",
+          "anchor": "cb54d48e53ca",
+          "first": "class ReportExporter:"
+        },
+        {
+          "file": "code/modules/journal.py",
+          "start": 107,
+          "end": 147,
+          "role": "logic",
+          "symbol": "format_value",
+          "anchor": "9eef25958346",
+          "first": "def format_value(value, column: str = '', style: Optional[TableStyle] = None) -> str:"
+        }
+      ]
+    }
+  ]
+}

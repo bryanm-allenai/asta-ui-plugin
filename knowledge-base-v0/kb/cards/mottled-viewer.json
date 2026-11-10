@@ -1,0 +1,643 @@
+{
+  "schema": "astaui.card/1",
+  "id": "mottled-viewer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T16:40:54Z"
+  },
+  "app": {
+    "title": "Mottled — latent trajectory scene viewer",
+    "summary": "A person opens a scene file of a language model's captured hidden states, or runs a small model in the page on prompts they type. Each prompt's tokens are drawn as paths that climb through the model's layers over a density terrain made from the states themselves. They switch runs on and off, scrub or play through the layers, and hover or click any point on a path to read the model's readout, nearest neighbours and attention/MLP split at that layer. Along the way they read a distance table between runs, a density-uncertainty overlay, and a panel saying how much of the picture survived the flattening to 2-D and what produced it. For a scene with one point per labelled prompt, they switch layouts, colour by a label, and read a held-out separability score at each layer. What they get is a hypothesis about where the model's states go, with an honest note of how far the picture can be trusted.",
+    "task": {
+      "text": "Explore how a model's hidden states move and gather layer by layer for one or more prompts, compare runs, and inspect any state, while seeing how faithful the 2-D projection is.",
+      "verbs": [
+        "explore",
+        "compare",
+        "identify",
+        "locate"
+      ]
+    },
+    "data": {
+      "text": "Hidden-state vectors from each layer of a model's forward pass, projected to 2-D, joined into one path per token, laid over a density field estimated from those same states. Each state carries readout predictions, a projection-fidelity score and, optionally, labels per prompt.",
+      "item": "one token's hidden state at one layer of a model's forward pass",
+      "shapes": [
+        "time series",
+        "sequence",
+        "field",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "exploring a model's hidden states layer by layer to form hypotheses, before testing them causally",
+      "terms": [
+        "explore",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A 3-D canvas draws the density terrain with token paths over it. A layer slider moves markers along every path at once, and a ray-picked hover or click opens a state's details in an inspector. Side panels toggle runs and overlays, list distances between runs, switch pellet layouts and colouring, and spell out projection fidelity and provenance.",
+      "views": [
+        "map",
+        "line chart",
+        "detail panel",
+        "summary stats",
+        "list",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "hover for detail",
+        "select",
+        "time slider",
+        "toggle view",
+        "filter"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "hidden-state trajectories and logit-lens readouts in language-model interpretability",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "interpretability",
+        "logit lens",
+        "residual stream"
+      ]
+    },
+    "workflow": {
+      "name": "follow items through ordered stages on one shared map and inspect any point",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Open a .mtj scene with the button, drag it onto the page, or pass ?file=. Alternatively, open 'Run a model in this page', pick or load a model, type one prompt per line (two lines compare them) and press Capture.",
+          "parts": [
+            "scene-loader",
+            "in-page-capture"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Every token's path is drawn over a density terrain built from all the projected states. Drag to orbit, shift- or right-drag to pan, and scroll or pinch to zoom.",
+          "parts": [
+            "scene-canvas"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Checkboxes in the runs panel hide or show each prompt's run. Separate toggles add the attention-flow lines and the density standard-error overlay.",
+          "parts": [
+            "runs-panel"
+          ]
+        },
+        {
+          "step": "step through the ordered stages",
+          "here": "The layer slider, or play at 0.5×, 1× or 2×, moves a marker along every path from the embedding layer to the last layer.",
+          "parts": [
+            "layer-scrubber",
+            "scene-canvas"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Hovering a path shows the state at that fractional layer: top-k readout labelled with its lens, nearest tokens, attention/MLP share and neighbourhood preservation. A click pins it and Escape clears the pin.",
+          "parts": [
+            "state-inspector",
+            "scene-canvas"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "A table gives the Hausdorff distance, normalised DTW and shared tokens between runs. In a pellet scene, a person switches between the monitor and open layouts, colours by any label, sees rings on pellets whose labels disagree, and reads the held-out AUROC against a shuffle band at the current layer.",
+          "parts": [
+            "runs-panel",
+            "pellet-panel"
+          ]
+        },
+        {
+          "step": "judge how far to trust the picture",
+          "here": "The 'Reading this scene' panel states the share of states that kept their neighbours through the projection (flagged amber when low), what the terrain does and does not mean, and the models, projection, seed and lens that produced the scene.",
+          "parts": [
+            "reading-panel"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every state carries a measured projection-fidelity score, and states whose local structure did not survive the flattening are marked, so the picture reports how much it distorts.",
+        "The terrain is a density field made from the run's own states. A standard-error overlay is on by default to show where that density rests on too few points.",
+        "Layers act as the time axis, and generated tokens add a second, decode axis drawn distinctly.",
+        "One-point-per-prompt scenes show a cross-fitted linear-monitor score with its AUROC per layer beside a label-shuffle null band.",
+        "A model can run entirely in the browser (GGUF or .mwt weights, with WebGPU or CPU) to capture new scenes without a server."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "scene-loader",
+      "level": "view",
+      "parent": null,
+      "title": "Scene loader",
+      "summary": "Loads a .mtj scene from a file picker, a drag-and-drop or a URL, and shows the scene's model and backend.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/viewer/index.html",
+          "start": 18,
+          "end": 61,
+          "role": "markup",
+          "symbol": "#hud-top",
+          "anchor": "07ac69200eb2",
+          "first": "<div id=\"hud-top\">"
+        },
+        {
+          "file": "code/viewer/style.css",
+          "start": 43,
+          "end": 47,
+          "role": "style",
+          "anchor": "8785b44c802b",
+          "first": "#hud-top { top: 12px; left: 12px; max-width: 380px; }"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1378,
+          "end": 1381,
+          "role": "logic",
+          "symbol": "loadBlob",
+          "anchor": "81e64520617a",
+          "first": "function loadBlob(blob, name) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1382,
+          "end": 1392,
+          "role": "logic",
+          "symbol": "loadURL",
+          "anchor": "f7bc2e137257",
+          "first": "async function loadURL(url, quiet) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1238,
+          "end": 1241,
+          "role": "logic",
+          "anchor": "7369839cfc19",
+          "first": "ui.openBtn.addEventListener(\"click\", () => ui.fileInput.click());"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1347,
+          "end": 1368,
+          "role": "logic",
+          "anchor": "ec6334dcc6de",
+          "first": "// drag & drop"
+        }
+      ]
+    },
+    {
+      "id": "in-page-capture",
+      "level": "component",
+      "parent": "scene-loader",
+      "title": "Run a model in this page",
+      "summary": "Lets the person pick or load a small model, type prompts one per line, and capture a new scene in the browser.",
+      "views": [
+        "form",
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/viewer/index.html",
+          "start": 26,
+          "end": 60,
+          "role": "markup",
+          "symbol": "#live",
+          "anchor": "95060642b31c",
+          "first": "<div id=\"live\">"
+        },
+        {
+          "file": "code/viewer/style.css",
+          "start": 59,
+          "end": 118,
+          "role": "style",
+          "anchor": "c8b688498a4c",
+          "first": "#capture-row { margin-top: 10px; border-top: 1px solid var(--color-border);"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1505,
+          "end": 1526,
+          "role": "logic",
+          "symbol": "renderModelList",
+          "anchor": "dbdce21e0920",
+          "first": "function renderModelList() {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1463,
+          "end": 1498,
+          "role": "logic",
+          "symbol": "loadModelFrom",
+          "anchor": "8cafb92f0340",
+          "first": "async function loadModelFrom(url, name) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1533,
+          "end": 1563,
+          "role": "logic",
+          "symbol": "captureLocally",
+          "anchor": "62194bbed56b",
+          "first": "async function captureLocally(prompts) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1565,
+          "end": 1568,
+          "role": "logic",
+          "symbol": "promptsFromBox",
+          "anchor": "3307c1044c9a",
+          "first": "function promptsFromBox() {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1570,
+          "end": 1615,
+          "role": "logic",
+          "anchor": "1e944f19a96c",
+          "first": "(function wireLocalCapture() {"
+        }
+      ]
+    },
+    {
+      "id": "scene-canvas",
+      "level": "view",
+      "parent": null,
+      "title": "Trajectory terrain",
+      "summary": "Draws the density terrain and every token's path through the layers in 3-D, with orbit, pan, zoom and ray-picking along the paths.",
+      "views": [
+        "map",
+        "line chart"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "hover for detail",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/viewer/index.html",
+          "start": 16,
+          "end": 16,
+          "role": "markup",
+          "symbol": "#gl",
+          "anchor": "adec09a33410",
+          "first": "<canvas id=\"gl\"></canvas>"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 236,
+          "end": 298,
+          "role": "logic",
+          "symbol": "buildTerrain",
+          "anchor": "102614c056d4",
+          "first": "function buildTerrain(t) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 313,
+          "end": 391,
+          "role": "logic",
+          "symbol": "buildRun",
+          "anchor": "5f027308ed6e",
+          "first": "function buildRun(run, runIdx, colorBase, dashUnit, look) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 409,
+          "end": 494,
+          "role": "logic",
+          "symbol": "setScene",
+          "anchor": "8d8d7876e68e",
+          "first": "function setScene(scene) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 555,
+          "end": 662,
+          "role": "logic",
+          "symbol": "frame",
+          "anchor": "914ceae76a6b",
+          "first": "function frame(now) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1251,
+          "end": 1345,
+          "role": "logic",
+          "anchor": "28cdb0175cb7",
+          "first": "let drag = null;"
+        }
+      ]
+    },
+    {
+      "id": "state-inspector",
+      "level": "component",
+      "parent": "scene-canvas",
+      "title": "State inspector",
+      "summary": "Shows the hovered or pinned state's top-k readout, nearest tokens, attention/MLP split and neighbourhood preservation.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/viewer/index.html",
+          "start": 82,
+          "end": 82,
+          "role": "markup",
+          "symbol": "#info-panel",
+          "anchor": "829077af0ffa",
+          "first": "<div id=\"info-panel\" hidden></div>"
+        },
+        {
+          "file": "code/viewer/style.css",
+          "start": 148,
+          "end": 176,
+          "role": "style",
+          "anchor": "ff0817d2e8a1",
+          "first": "#info-panel { left: 12px; bottom: 64px; min-width: 200px; max-width: 300px;"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 733,
+          "end": 751,
+          "role": "logic",
+          "symbol": "hoverPick",
+          "anchor": "c19b83abb9f9",
+          "first": "function hoverPick(mvp) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 761,
+          "end": 870,
+          "role": "logic",
+          "symbol": "setPickInfo",
+          "anchor": "01849d503cf4",
+          "first": "function setPickInfo(pick, pinned) {"
+        }
+      ]
+    },
+    {
+      "id": "runs-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Runs, comparisons and overlays",
+      "summary": "Lists each prompt's run with a toggle and decode or feature summaries, tabulates distances between runs, and switches the attention and uncertainty overlays.",
+      "views": [
+        "sidebar list",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/viewer/index.html",
+          "start": 63,
+          "end": 80,
+          "role": "markup",
+          "symbol": "#runs-panel",
+          "anchor": "a7b7ba299101",
+          "first": "<div id=\"runs-panel\" hidden>"
+        },
+        {
+          "file": "code/viewer/style.css",
+          "start": 120,
+          "end": 146,
+          "role": "style",
+          "anchor": "ddf7abcd466f",
+          "first": "#runs-panel { top: 12px; right: 12px; min-width: 220px; max-width: 320px; }"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 915,
+          "end": 987,
+          "role": "logic",
+          "symbol": "buildUI",
+          "anchor": "7beed46196e4",
+          "first": "function buildUI(scene) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1232,
+          "end": 1236,
+          "role": "logic",
+          "anchor": "25722113120f",
+          "first": "ui.attnToggle.addEventListener(\"change\", () => { state.showAttention = ui.attnToggle.checked; rebuildAttention(); });"
+        }
+      ]
+    },
+    {
+      "id": "pellet-panel",
+      "level": "component",
+      "parent": "runs-panel",
+      "title": "Pellet layouts and monitor readout",
+      "summary": "For one-point-per-prompt scenes, switches layouts, colours pellets by a label with a legend, and reads the held-out AUROC at the current layer.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/viewer/index.html",
+          "start": 66,
+          "end": 76,
+          "role": "markup",
+          "symbol": "#blast-panel",
+          "anchor": "e7d97451ee66",
+          "first": "<div id=\"blast-panel\" hidden>"
+        },
+        {
+          "file": "code/viewer/style.css",
+          "start": 287,
+          "end": 323,
+          "role": "style",
+          "anchor": "6bb6b209ac37",
+          "first": "#runs-panel.blast { max-width: 340px; max-height: calc(100vh - 150px); overflow-y: auto; }"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1169,
+          "end": 1201,
+          "role": "logic",
+          "symbol": "renderBlastPanel",
+          "anchor": "9fc2c91e22a0",
+          "first": "function renderBlastPanel() {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1151,
+          "end": 1158,
+          "role": "logic",
+          "symbol": "setBlastLayout",
+          "anchor": "623e1827219b",
+          "first": "function setBlastLayout(k) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1160,
+          "end": 1164,
+          "role": "logic",
+          "symbol": "setBlastColour",
+          "anchor": "12120d892bad",
+          "first": "function setBlastColour(name) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1205,
+          "end": 1216,
+          "role": "logic",
+          "symbol": "renderBlastReadout",
+          "anchor": "2dcc4aae3cd1",
+          "first": "function renderBlastReadout() {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1237,
+          "end": 1237,
+          "role": "logic",
+          "anchor": "415bc22da24e",
+          "first": "ui.blastColour.addEventListener(\"change\", () => setBlastColour(ui.blastColour.value));"
+        }
+      ]
+    },
+    {
+      "id": "layer-scrubber",
+      "level": "view",
+      "parent": null,
+      "title": "Layer scrubber",
+      "summary": "Scrubs or plays through the layers, moving the markers on every path together.",
+      "views": [],
+      "interactions": [
+        "time slider"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/viewer/index.html",
+          "start": 89,
+          "end": 98,
+          "role": "markup",
+          "symbol": "#hud-bottom",
+          "anchor": "844c5fd6c945",
+          "first": "<div id=\"hud-bottom\" hidden>"
+        },
+        {
+          "file": "code/viewer/style.css",
+          "start": 178,
+          "end": 182,
+          "role": "style",
+          "anchor": "62fe76af7b6c",
+          "first": "#hud-bottom { left: 50%; bottom: 12px; transform: translateX(-50%);"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1218,
+          "end": 1224,
+          "role": "logic",
+          "symbol": "onLayerChanged",
+          "anchor": "8d990a7c902c",
+          "first": "function onLayerChanged(fromSlider) {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 1226,
+          "end": 1231,
+          "role": "logic",
+          "anchor": "91b12e80f664",
+          "first": "ui.layerSlider.addEventListener(\"input\", () => { state.playing = false; ui.playBtn.innerHTML = \"&#9654;\"; onLayerChanged"
+        }
+      ]
+    },
+    {
+      "id": "reading-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Reading this scene",
+      "summary": "States how much of the scene survived the projection, what the terrain does and does not mean, and what produced the scene.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/viewer/index.html",
+          "start": 84,
+          "end": 87,
+          "role": "markup",
+          "symbol": "#reading-panel",
+          "anchor": "181d8215ee2e",
+          "first": "<details id=\"reading-panel\" hidden>"
+        },
+        {
+          "file": "code/viewer/style.css",
+          "start": 262,
+          "end": 277,
+          "role": "style",
+          "anchor": "9de949ccde20",
+          "first": "#reading-panel {"
+        },
+        {
+          "file": "code/viewer/main.js",
+          "start": 993,
+          "end": 1044,
+          "role": "logic",
+          "symbol": "renderReading",
+          "anchor": "ba2f9f2b75bb",
+          "first": "function renderReading(scene, keepOpen) {"
+        }
+      ]
+    }
+  ]
+}

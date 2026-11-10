@@ -1,0 +1,459 @@
+{
+  "schema": "astaui.card/1",
+  "id": "vnc-quant",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T14:37:36Z"
+  },
+  "app": {
+    "title": "VNC-Quant: neuron positions along the ventral nerve cord",
+    "summary": "The person uploads, for each specimen, a CSV of neuron coordinates marked in three classes and a PNG mask of the specimen's outline. Files are paired by filename. Pressing Process fits a spline to each outline, projects every marked cell onto it, and expresses each cell's position as a percentage of arc length between two reference landmarks. Each specimen gets a projection image and a table of relative distances, and everything can be downloaded as a ZIP. Further tabs then summarize and compare the pooled positions: a dot plot with means and confidence intervals, arrow plots of control against mutant groups with significance tests, violin-box plots, ranked cell-order bars, and QQ plots with Shapiro-Wilk tests that can be exported.",
+    "task": {
+      "text": "Measure where each marked cell lies along a curved body axis, normalized between two landmarks, and compare those positions across genotypes.",
+      "verbs": [
+        "derive",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A batch of specimens. Each has a table of marked cell coordinates in three classes and a binary outline mask image. These become per-specimen and pooled tables of normalized positions, one column per named cell.",
+      "item": "one specimen: its outline mask and the coordinates of its marked cells",
+      "shapes": [
+        "table",
+        "image collection"
+      ]
+    },
+    "stage": {
+      "text": "quantifying cell positions from annotated microscopy images, then comparing genotypes",
+      "terms": [
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar takes paired CSV and mask uploads and runs a batch computation. Its results appear as a two-column gallery, where each specimen's projection image sits beside its table of relative distances. Below that, tabs hold separate plots. Each plot either reads the pooled result or takes its own uploaded group CSVs with names for the groups, and draws a strip, arrow, violin-box, ranked-bar or QQ chart. Each cell or group gets its own small chart.",
+      "views": [
+        "form",
+        "thumbnail grid",
+        "image viewer",
+        "table view",
+        "strip plot",
+        "small multiples",
+        "bar chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "small multiples",
+        "side-by-side comparison",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "spline-based quantification of neuron position along the body axis in C. elegans neurodevelopment",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "neurodevelopment",
+        "c elegans",
+        "cell positioning"
+      ]
+    },
+    "workflow": {
+      "name": "measure positions of marked points along a curved outline and compare groups",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "The sidebar has 'Select all CSVs' for the marked coordinates and 'Select all PNGs' for the outline masks. A CSV and a mask are paired when their filenames match.",
+          "parts": [
+            "input-sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Process scales coordinates to image pixels and numbers the cells of each class from its counter. It fits a smoothing spline to the largest contour, projects each cell onto it, and integrates arc length. Positions become percentages between the first and last landmark of the reference class.",
+          "parts": [
+            "input-sidebar"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Each specimen's projection image (outline, spline, midline and projected cells colour-coded by class) is shown beside its relative-distance table, two specimens per row.",
+          "parts": [
+            "results-gallery"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Download Results as ZIP' bundles the projection images, the per-specimen RD CSVs and a combined table with one column per named cell.",
+          "parts": [
+            "results-gallery"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The Dot tab plots every specimen's position for each cell. The classes are on three stacked rows, with the mean, a 95% CI bar and reference lines at 0 and 100%.",
+          "parts": [
+            "dot-plot"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "In the Arrow tab, a control CSV and one or more mutant CSVs, each with a name, are tested cell by cell. Levene's test chooses a pooled or Welch t-test. Arrows from the control mean to the mutant mean are drawn where the effect size is large, and asterisks mark significance. The Violin-Box and Ranked position tabs compare the same groups per cell and by cell order.",
+          "parts": [
+            "arrow-plot",
+            "violin-box",
+            "ranked-position"
+          ]
+        },
+        {
+          "step": "check the assumptions behind the tests",
+          "here": "The QQ-Shapiro tab draws one QQ plot per cell with each group overlaid, and offers a download of a Shapiro-Wilk table that flags whether each group is normal.",
+          "parts": [
+            "qq-shapiro"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Position is the arc length along a spline fitted to the specimen's own outline, normalized between two anatomical landmarks set at 0% and 100%. This lets curled and straight specimens line up.",
+        "Marked points come in three cell classes from the counter column. They are numbered in order, and the first and last entries of one class are renamed as the reference landmarks.",
+        "Group comparison picks pooled or Welch t-tests from Levene's test. It draws a displacement arrow only when Cohen's d passes a large-effect threshold, and marks the other significant shifts with asterisks only.",
+        "A ranked-order plot shows how each specimen orders its cells of the three classes, not just their distances.",
+        "Normality is checked per cell and group with QQ plots and Shapiro-Wilk, which supports the choice of tests."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "input-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Input data and batch processing",
+      "summary": "Takes the coordinate CSVs and outline masks, pairs them by filename, and runs the spline projection and normalization for every specimen with a progress bar.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 1132,
+          "end": 1144,
+          "role": "markup",
+          "anchor": "7581a24ca120",
+          "first": "st.markdown("
+        },
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 1189,
+          "end": 1237,
+          "role": "logic",
+          "anchor": "4f39a6b63ea2",
+          "first": "if st.sidebar.button(\"Process\"):"
+        },
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 240,
+          "end": 521,
+          "role": "logic",
+          "symbol": "WormMeasure",
+          "anchor": "589f7cfc5689",
+          "first": "class WormMeasure:"
+        },
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 202,
+          "end": 228,
+          "role": "logic",
+          "symbol": "process_csv",
+          "anchor": "2f36e0d0d9ae",
+          "first": "def process_csv(input_path):"
+        },
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 57,
+          "end": 61,
+          "role": "data",
+          "anchor": "a6b16ee778cb",
+          "first": "neurons_of_interest = ["
+        }
+      ]
+    },
+    {
+      "id": "results-gallery",
+      "level": "view",
+      "parent": null,
+      "title": "Normalized relative distances",
+      "summary": "Shows each specimen's projection image next to its table of normalized positions, and offers all outputs as one ZIP download.",
+      "views": [
+        "thumbnail grid",
+        "image viewer",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 1238,
+          "end": 1283,
+          "role": "logic",
+          "anchor": "06136c5ff7ac",
+          "first": "zip_buffer = io.BytesIO()"
+        }
+      ]
+    },
+    {
+      "id": "analysis-tabs",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis tabs",
+      "summary": "Tabs for switching between the different summary and comparison plots of the normalized positions.",
+      "views": [
+        "small multiples"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 1296,
+          "end": 1300,
+          "role": "markup",
+          "anchor": "e59a320cd75c",
+          "first": "tabs = st.tabs([\"Relative distances\", \"Dot\", \"Arrow\", \"Violin-Box\", \"Ranked position\", \"QQ-Shapiro\"])"
+        }
+      ]
+    },
+    {
+      "id": "dot-plot",
+      "level": "component",
+      "parent": "analysis-tabs",
+      "title": "Dot",
+      "summary": "Plots every specimen's position for each cell on stacked rows by class, with the mean, a 95% confidence interval and lines at the 0% and 100% landmarks.",
+      "views": [
+        "strip plot"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 1302,
+          "end": 1319,
+          "role": "markup",
+          "anchor": "bcf8bcfc9625",
+          "first": "with tabs[1]:"
+        },
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 559,
+          "end": 607,
+          "role": "logic",
+          "symbol": "prepare_traces",
+          "anchor": "c927761450aa",
+          "first": "def prepare_traces(df_melted, fixed_y_value, fixed_y_value_db, fixed_y_value_da8, is_pry1, is_background=False):"
+        },
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 609,
+          "end": 673,
+          "role": "logic",
+          "symbol": "create_subplots",
+          "anchor": "1b2e3821fc75",
+          "first": "def create_subplots(traces, fixed_y_value, fixed_y_value_db, fixed_y_value_da8, plot_bgcolor):"
+        }
+      ]
+    },
+    {
+      "id": "arrow-plot",
+      "level": "component",
+      "parent": "analysis-tabs",
+      "title": "Arrow",
+      "summary": "Compares a control group against each mutant group cell by cell, using variance-checked t-tests and effect sizes, and draws arrows for large significant shifts in position.",
+      "views": [
+        "strip plot",
+        "small multiples"
+      ],
+      "interactions": [
+        "import",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 1321,
+          "end": 1347,
+          "role": "markup",
+          "anchor": "b2584522982d",
+          "first": "with tabs[2]:"
+        },
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 919,
+          "end": 1127,
+          "role": "logic",
+          "symbol": "main_multi",
+          "anchor": "8497a0bfcaf8",
+          "first": "def main_multi(wt_file, mt_files):"
+        },
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 735,
+          "end": 764,
+          "role": "logic",
+          "symbol": "da_perform_conditional_t_tests",
+          "anchor": "82aa137c8d1a",
+          "first": "def da_perform_conditional_t_tests(df1, df2):"
+        }
+      ]
+    },
+    {
+      "id": "violin-box",
+      "level": "component",
+      "parent": "analysis-tabs",
+      "title": "Violin-Box",
+      "summary": "Draws one violin, box and jittered-point chart per cell, with every named group overlaid so their position distributions can be compared.",
+      "views": [
+        "small multiples",
+        "strip plot"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "small multiples",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 1349,
+          "end": 1363,
+          "role": "markup",
+          "anchor": "092fc1edc03c",
+          "first": "with tabs[3]:"
+        },
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 135,
+          "end": 200,
+          "role": "logic",
+          "symbol": "violin_box_plot",
+          "anchor": "641169160aac",
+          "first": "def violin_box_plot(data_files, genotype_names):"
+        }
+      ]
+    },
+    {
+      "id": "ranked-position",
+      "level": "component",
+      "parent": "analysis-tabs",
+      "title": "Ranked position",
+      "summary": "Ranks each specimen's cells by position and draws colour-coded bars by class for each group, showing how the cell order varies.",
+      "views": [
+        "bar chart",
+        "small multiples"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 1365,
+          "end": 1399,
+          "role": "markup",
+          "anchor": "fc0b1739e6f2",
+          "first": "with tabs[4]:"
+        },
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 681,
+          "end": 684,
+          "role": "logic",
+          "symbol": "process_csv_file",
+          "anchor": "43f766e134f3",
+          "first": "def process_csv_file(input_file):"
+        },
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 686,
+          "end": 717,
+          "role": "logic",
+          "symbol": "create_bar_plot_on_ax",
+          "anchor": "ffaa675c5f0c",
+          "first": "def create_bar_plot_on_ax(df_ranked, plot_title, ax):"
+        }
+      ]
+    },
+    {
+      "id": "qq-shapiro",
+      "level": "component",
+      "parent": "analysis-tabs",
+      "title": "QQ-Shapiro",
+      "summary": "Draws one QQ plot per cell with each group overlaid, runs Shapiro-Wilk tests, and lets the results table be downloaded.",
+      "views": [
+        "scatter plot",
+        "small multiples"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 1401,
+          "end": 1424,
+          "role": "markup",
+          "anchor": "13911f9f5e3e",
+          "first": "with tabs[5]:"
+        },
+        {
+          "file": "code/VNC-Dist/VNC-Quant/VNC-Quant_GUI.py",
+          "start": 63,
+          "end": 133,
+          "role": "logic",
+          "symbol": "qq_shapiro_analysis",
+          "anchor": "b707f1dc479d",
+          "first": "def qq_shapiro_analysis(data_files, genotype_names):"
+        }
+      ]
+    }
+  ]
+}

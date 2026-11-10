@@ -1,0 +1,635 @@
+{
+  "schema": "astaui.card/1",
+  "id": "saed-diffraction-indexer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T15:01:49Z"
+  },
+  "app": {
+    "title": "SAEDscope",
+    "summary": "A person loads an electron diffraction pattern, either one file, a 4D-STEM scan reduced to one pattern, a simulated example or several files at once. They then add the elements present and a short description of the sample, and choose how the pattern is calibrated: from the file, from a standard ring pattern, from a scale bar burnt into the image, from typed values, or not at all. A checklist warns about missing elements or calibration and offers one-click fixes. After that, one press of Analyse classifies the pattern as rings, spots or a halo and matches it against candidate phases. The result is a headline verdict with its evidence and flags, an overlay that labels every reflection, ranked candidates, a check against the person's own CIF structures, and a suggested specimen tilt that would separate answers that look alike. The figure, caption, methods paragraph, tables, JSON results and best-matching structure can all be exported.",
+    "task": {
+      "text": "Identify which crystal phase and zone axis produced a diffraction pattern, show the evidence for the match, and say what to measure next when several answers fit.",
+      "verbs": [
+        "identify",
+        "derive",
+        "compare",
+        "plan"
+      ]
+    },
+    "data": {
+      "text": "Diffraction pattern images (one, or a batch) with an optional calibration, matched against a library of reference crystal structures that each predict a list of reflections.",
+      "item": "one diffraction pattern image",
+      "shapes": [
+        "image",
+        "image collection",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "indexing diffraction patterns after recording them on the microscope, and checking a phase hypothesis before writing up",
+      "terms": [
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar of numbered steps collects the pattern, the sample context, the calibration and the candidate sources, and a checklist gates the analysis. The result screen puts a verdict and flags above the pattern with labelled reflections, set next to a simulated zone pattern or a radial profile. Tabs below hold the evidence tables, ranked candidates, a per-structure CIF check, small multiples of what each candidate predicts after a tilt, and the exports.",
+      "views": [
+        "image viewer",
+        "line chart",
+        "scatter plot",
+        "side-by-side panes",
+        "table view",
+        "summary stats",
+        "form",
+        "small multiples"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "hover for detail",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "small multiples",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "selected-area electron diffraction indexing in materials science",
+      "disciplines": [
+        "materials science"
+      ],
+      "terms": [
+        "electron diffraction",
+        "phase identification",
+        "transmission electron microscopy"
+      ]
+    },
+    "workflow": {
+      "name": "identify what produced a measurement by matching it against reference candidates",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload one pattern (.dm3/.dm4/.tif/.png/.npy), reduce a 4D-STEM scan by max, mean or its brightest position, pick a simulated example whose answer is known, or load several files for a batch table",
+          "parts": [
+            "sidebar-inputs"
+          ]
+        },
+        {
+          "step": "narrow the candidates with what is already known",
+          "here": "Type the elements from EDS and a free-text description, then choose the built-in library, a Materials Project key or your own CIF files; 'Check against my CIF files' switches to testing only your structures",
+          "parts": [
+            "sidebar-inputs"
+          ]
+        },
+        {
+          "step": "set the measurement scale",
+          "here": "Calibrate from the file, from a standard ring pattern (camera constant and ellipticity are fitted, and a warning shows when the standard came from another camera), from a detected scale bar, from typed Å⁻¹ or nm⁻¹ per pixel, or from voltage and camera length; or leave it uncalibrated",
+          "parts": [
+            "calibration-control",
+            "pre-analysis-checklist"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Analyse pattern finds the centre, classifies the pattern as single crystal, polycrystal or amorphous, and matches rings or spots. The verdict names the phase and zone axis with errors, and the overlay labels each reflection",
+          "parts": [
+            "pre-analysis-checklist",
+            "results",
+            "pattern-figures"
+          ]
+        },
+        {
+          "step": "compare the result against the person's own references",
+          "here": "Each uploaded CIF gets a verdict (consistent, lattice change, scale mismatch, partly, not consistent), with predicted and measured reflections side by side and a refined cell; the Candidates tab ranks every phase",
+          "parts": [
+            "cif-check",
+            "results"
+          ]
+        },
+        {
+          "step": "plan the next measurement that would settle it",
+          "here": "Next step lists specimen tilts within ±35° and draws what each candidate would show after the tilt; for ring patterns it lists the rings one candidate has and the other lacks",
+          "parts": [
+            "tilt-advisor"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download the figure (PNG), results (JSON), reflection table (CSV) and best phase (CIF), with a drafted figure caption and methods paragraph; batch mode downloads one CSV row per file",
+          "parts": [
+            "report-export",
+            "sidebar-inputs"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The calibration is treated as suspect: the tool reports when the best match fits only at a scale several percent off, and when a standard was recorded on another camera, binning or camera length",
+        "Phases whose lattices are too close to separate are named together as a look-alike group rather than one being guessed, and the person is asked for elements or a calibration",
+        "When several answers fit, it simulates what each would show after the same specimen tilt, so the person knows which tilt will tell them apart",
+        "Pattern type (single crystal, polycrystal, amorphous, or one systematic row) is decided first and changes which right-hand view and evidence table appear",
+        "A language model only rewords the computed numbers into an explanation; the matching itself is diffraction physics"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar-inputs",
+      "level": "view",
+      "parent": null,
+      "title": "Numbered input steps",
+      "summary": "Collects the goal, the pattern source, the elements and sample description, the candidate sources and the advanced tolerances, and shows a status beside each numbered step.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 143,
+          "end": 183,
+          "role": "markup",
+          "anchor": "8e46999be832",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 220,
+          "end": 271,
+          "role": "markup",
+          "anchor": "df7feb4a6c5e",
+          "first": "h_cand = st.empty()"
+        },
+        {
+          "file": "code/app.py",
+          "start": 42,
+          "end": 47,
+          "role": "style",
+          "anchor": "a3f1e2fb84be",
+          "first": ".step { display: flex; align-items: center; gap: 0.5rem; margin: 1.0rem 0 0.35rem 0; font-weight: 700; font-size: 0.98re"
+        },
+        {
+          "file": "code/app.py",
+          "start": 335,
+          "end": 337,
+          "role": "logic",
+          "symbol": "_step",
+          "anchor": "08ca18346f67",
+          "first": "def _step(ph, n, title, state, note):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 344,
+          "end": 375,
+          "role": "logic",
+          "anchor": "f2855f067e32",
+          "first": "have_pattern = img is not None or bool(batch_files)"
+        },
+        {
+          "file": "code/app.py",
+          "start": 73,
+          "end": 84,
+          "role": "logic",
+          "symbol": "make_example",
+          "anchor": "53c55a7092a1",
+          "first": "def make_example(label: str):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 60,
+          "end": 69,
+          "role": "data",
+          "anchor": "76b9023057b7",
+          "first": "EXAMPLES = {"
+        }
+      ]
+    },
+    {
+      "id": "calibration-control",
+      "level": "component",
+      "parent": "sidebar-inputs",
+      "title": "Calibration chooser",
+      "summary": "Sets the pixel-to-reciprocal-space scale from the file, a standard pattern, a scale bar, typed values or the microscope settings, and warns when a standard does not match this camera.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 184,
+          "end": 219,
+          "role": "markup",
+          "anchor": "fbbe11c4e308",
+          "first": "h_cal = st.empty()"
+        },
+        {
+          "file": "code/app.py",
+          "start": 97,
+          "end": 102,
+          "role": "logic",
+          "symbol": "fit_standard",
+          "anchor": "dbca01ab122b",
+          "first": "def fit_standard(data: bytes, fname: str, material: str, volt, pix):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 105,
+          "end": 123,
+          "role": "logic",
+          "symbol": "camera_mismatch",
+          "anchor": "6450f364873c",
+          "first": "def camera_mismatch(std_cal, std_meta, file_meta):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 305,
+          "end": 332,
+          "role": "logic",
+          "anchor": "053e407335fb",
+          "first": "if cal_mode == \"nm⁻¹ per pixel\" and cal_value:"
+        },
+        {
+          "file": "code/saedscope/calibrate.py",
+          "start": 107,
+          "end": 144,
+          "role": "logic",
+          "symbol": "calibrate_from_standard",
+          "anchor": "465511db9a18",
+          "first": "def calibrate_from_standard(image: np.ndarray, standard: str | Phase = \"Au\", voltage_kV: float | None = None,"
+        },
+        {
+          "file": "code/saedscope/calibrate.py",
+          "start": 159,
+          "end": 186,
+          "role": "logic",
+          "symbol": "detect_scale_bars",
+          "anchor": "dd2cfd4019e3",
+          "first": "def detect_scale_bars(image: np.ndarray, max_candidates: int = 3) -> list[ScaleBar]:"
+        }
+      ]
+    },
+    {
+      "id": "pre-analysis-checklist",
+      "level": "view",
+      "parent": null,
+      "title": "Before you analyse",
+      "summary": "Shows the loaded pattern next to a checklist of pattern, elements, calibration and candidates, with one-click fixes, and keeps Analyse disabled until the required structures are given.",
+      "views": [
+        "image viewer",
+        "list"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 411,
+          "end": 475,
+          "role": "markup",
+          "anchor": "5bbe81dadaa6",
+          "first": "res = st.session_state.get(\"res\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 48,
+          "end": 50,
+          "role": "style",
+          "anchor": "cccfd07e6760",
+          "first": ".check { display: grid; grid-template-columns: 1.6rem 1fr; gap: 0.15rem 0.4rem; margin: 0.35rem 0; line-height: 1.45; }"
+        },
+        {
+          "file": "code/app.py",
+          "start": 421,
+          "end": 423,
+          "role": "logic",
+          "symbol": "item",
+          "anchor": "82adb06af097",
+          "first": "def item(state, title, text):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 340,
+          "end": 341,
+          "role": "logic",
+          "symbol": "_set_cal_mode",
+          "anchor": "16885d310d76",
+          "first": "def _set_cal_mode(mode):"
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "level": "view",
+      "parent": null,
+      "title": "Verdict, evidence and tabs",
+      "summary": "States the pattern type and best phase and zone axis with the evidence, flags calibration and look-alike problems, gives what to do next, and holds the evidence, candidate ranking and explanation tabs.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 477,
+          "end": 602,
+          "role": "markup",
+          "anchor": "6b37791907fc",
+          "first": "s = res.summary()"
+        },
+        {
+          "file": "code/app.py",
+          "start": 34,
+          "end": 39,
+          "role": "style",
+          "anchor": "459771f13b86",
+          "first": "div.verdict { font-size: 2.1rem !important; line-height: 1.2; font-weight: 700; color: #111827; margin: 0.1rem 0 0.4rem "
+        },
+        {
+          "file": "code/app.py",
+          "start": 51,
+          "end": 52,
+          "role": "style",
+          "anchor": "80c786eb3507",
+          "first": ".guide { background: #F3F5F2; border-left: 4px solid #3F6212; padding: 0.6rem 0.9rem; border-radius: 4px; margin: 0.2rem"
+        },
+        {
+          "file": "code/app.py",
+          "start": 614,
+          "end": 618,
+          "role": "markup",
+          "anchor": "94bb59dea49a",
+          "first": "tab_names = [\"Explanation\", \"Next step\", \"Evidence\", \"Candidates\", \"Report\", \"Diagnostics\"]"
+        },
+        {
+          "file": "code/app.py",
+          "start": 661,
+          "end": 664,
+          "role": "markup",
+          "anchor": "96712dc5e133",
+          "first": "with tab_expl:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 695,
+          "end": 707,
+          "role": "markup",
+          "anchor": "9b5994e1ffbc",
+          "first": "with tab_evidence:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 126,
+          "end": 137,
+          "role": "logic",
+          "symbol": "run_analysis",
+          "anchor": "4e266dec1eaa",
+          "first": "def run_analysis(img, name, cal_kwargs, opts_kwargs, cif_texts):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 394,
+          "end": 409,
+          "role": "logic",
+          "anchor": "63a9a271c7a2",
+          "first": "auto_run = \"example\" in st.query_params and \"run\" in st.query_params"
+        }
+      ]
+    },
+    {
+      "id": "pattern-figures",
+      "level": "component",
+      "parent": "results",
+      "title": "Pattern overlay and model view",
+      "summary": "Shows the pattern with every indexed ring or spot labelled, next to the simulated zone-axis pattern for spots or the radial intensity profile for rings.",
+      "views": [
+        "image viewer",
+        "scatter plot",
+        "line chart",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 604,
+          "end": 612,
+          "role": "markup",
+          "anchor": "ff53af154921",
+          "first": "# Views -----------------------------------------------------------------------"
+        },
+        {
+          "file": "code/saedscope/viz.py",
+          "start": 31,
+          "end": 94,
+          "role": "logic",
+          "symbol": "pattern_figure",
+          "anchor": "99a2e78c77fb",
+          "first": "def pattern_figure(res, show_overlay: bool = True, height: int = 560):"
+        },
+        {
+          "file": "code/saedscope/viz.py",
+          "start": 97,
+          "end": 132,
+          "role": "logic",
+          "symbol": "zone_figure",
+          "anchor": "449b0d4d035a",
+          "first": "def zone_figure(res, height: int = 560):"
+        },
+        {
+          "file": "code/saedscope/viz.py",
+          "start": 190,
+          "end": 226,
+          "role": "logic",
+          "symbol": "profile_figure",
+          "anchor": "e854539b5d41",
+          "first": "def profile_figure(res, height: int = 560):"
+        }
+      ]
+    },
+    {
+      "id": "tilt-advisor",
+      "level": "component",
+      "parent": "results",
+      "title": "Next step: discriminating tilt",
+      "summary": "Lists specimen tilts that separate the competing answers and draws, for the chosen tilt, the pattern each candidate would show, or lists the rings that only one look-alike has.",
+      "views": [
+        "small multiples",
+        "scatter plot",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "small multiples",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 665,
+          "end": 694,
+          "role": "markup",
+          "anchor": "b8610c2f185d",
+          "first": "with tab_next:"
+        },
+        {
+          "file": "code/saedscope/viz.py",
+          "start": 135,
+          "end": 187,
+          "role": "logic",
+          "symbol": "tilt_figure",
+          "anchor": "1eff51459347",
+          "first": "def tilt_figure(res, item: dict, height: int | None = None, width_hint: int = 1040):"
+        },
+        {
+          "file": "code/saedscope/advisor.py",
+          "start": 324,
+          "end": 387,
+          "role": "logic",
+          "symbol": "advise",
+          "anchor": "1b7858911040",
+          "first": "def advise(res) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "cif-check",
+      "level": "component",
+      "parent": "results",
+      "title": "CIF check",
+      "summary": "Compares each uploaded structure with the pattern, ranks them with a verdict badge, and shows predicted and measured reflections, unexplained features, refined lattice parameters and the best zone axes.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 619,
+          "end": 660,
+          "role": "markup",
+          "anchor": "2decf0445ce2",
+          "first": "if checks:"
+        },
+        {
+          "file": "code/saedscope/cifcheck.py",
+          "start": 280,
+          "end": 319,
+          "role": "logic",
+          "symbol": "check_cifs",
+          "anchor": "c323050be281",
+          "first": "def check_cifs(res, phases: list[Phase]) -> list[CifCheck]:"
+        }
+      ]
+    },
+    {
+      "id": "report-export",
+      "level": "component",
+      "parent": "results",
+      "title": "Report and downloads",
+      "summary": "Drafts a figure caption and methods paragraph, and downloads the annotated figure, the full results, the reflection table and the best-matching structure.",
+      "views": [
+        "text editor"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 708,
+          "end": 720,
+          "role": "markup",
+          "anchor": "31fb50c9b143",
+          "first": "with tab_report:"
+        },
+        {
+          "file": "code/saedscope/report.py",
+          "start": 18,
+          "end": 40,
+          "role": "logic",
+          "symbol": "caption",
+          "anchor": "1b144dddc978",
+          "first": "def caption(res) -> str:"
+        },
+        {
+          "file": "code/saedscope/report.py",
+          "start": 43,
+          "end": 70,
+          "role": "logic",
+          "symbol": "methods",
+          "anchor": "2bbc4c2ece11",
+          "first": "def methods(res, software_version: str = \"SAEDscope 0.1\") -> str:"
+        },
+        {
+          "file": "code/saedscope/report.py",
+          "start": 136,
+          "end": 146,
+          "role": "logic",
+          "symbol": "summary_json",
+          "anchor": "abb863260085",
+          "first": "def summary_json(res) -> str:"
+        },
+        {
+          "file": "code/saedscope/report.py",
+          "start": 149,
+          "end": 161,
+          "role": "logic",
+          "symbol": "best_phase_cif",
+          "anchor": "b78ab6591f0e",
+          "first": "def best_phase_cif(res) -> tuple[str, str] | None:"
+        },
+        {
+          "file": "code/saedscope/viz.py",
+          "start": 229,
+          "end": 297,
+          "role": "logic",
+          "symbol": "export_png",
+          "anchor": "d95f65d11147",
+          "first": "def export_png(res, dpi: int = 160) -> bytes:"
+        }
+      ]
+    }
+  ]
+}

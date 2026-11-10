@@ -5,8 +5,8 @@
 // in the queue) and none of it is filed: classes named marble-…, attributes the
 // page declared its own, and panels and drawings marked transient. Picking one
 // thing marks it in every view: its row in the list, its point and neighbours on
-// the map, its row and column in the grid, its column of words, its column in a
-// workflow family, and its card in the inspector. It runs again whenever one of
+// the map, its column of words, its column in a workflow family, and its card in
+// the inspector. It runs again whenever one of
 // those attributes changes, and after Marble lands an edit.
 (() => {
   const byId = (id) => document.querySelector(`[data-marble-id="${id}"]`);
@@ -86,7 +86,6 @@
       mark(p, 'marble-out', !on);
       if (on) ins.add(p.dataset.pick.slice(2));
     }
-    for (const r of document.querySelectorAll('#kb-mx-grid .mrow:not(.mhead)')) mark(r, 'marble-out', !!f && !ins.has(r.dataset.b));
     for (const b of document.querySelectorAll('[data-filter]')) if (b.dataset.filter) mark(b, 'marble-on', b.dataset.filter === f);
     const [k, v] = split(f, ':');
     const now = byId('kb-fnow');
@@ -132,12 +131,6 @@
       mark(r, 'marble-sel', r === wordRow);
       mark(r, 'marble-pending', w.terms.has(`t:${r.closest('.tlist')?.dataset.l}:${r.dataset.t}`));
     }
-    for (const c of document.querySelectorAll('#kb-mx-grid button.cell')) mark(c, 'marble-pending', w.pairs.has(c.dataset.pick));
-
-    // The grid: the picked build's row and column, or the picked pair's two.
-    const hl = new Set(kind === 't' ? withWord : builds);
-    for (const r of document.querySelectorAll('#kb-mx-grid .rh')) mark(r, 'marble-hl', hl.has(r.dataset.pick?.slice(2)));
-    for (const c of document.querySelectorAll('#kb-mx-grid .ch')) mark(c, 'marble-hl', hl.has(c.id.slice(5)));
     // Coverage: the picked build's column of words.
     for (const tl of document.querySelectorAll('.tlist')) {
       const cols = (byId(`kb-tc-${tl.dataset.l}`)?.dataset.bs || '').split(' ');
@@ -259,33 +252,15 @@
 
   function pairPanel(body, rest, w) {
     const [x, y] = rest.split('|');
-    const cell = document.querySelector(`#kb-mx-grid .cell[data-pick="p:${CSS.escape(rest)}"]`);
-    const rows = [];
-    const ch = byId('kb-mx-tools')?.getAttribute('data-channel') || 'w';
-    if (cell) {
-      const values = getComputedStyle(cell);
-      for (const lg of byId('kb-mx-legend')?.children ?? []) {
-        const k = lg.dataset.k;
-        const v = values.getPropertyValue(`--v${k}`).trim();
-        if (!v) continue;
-        const raw = Number(lg.dataset.lo) + Number(v) * (Number(lg.dataset.hi) - Number(lg.dataset.lo));
-        const label = lg.querySelector('span')?.textContent.split(':')[0] || k;
-        rows.push(`<span class="bl${k === ch ? ' on' : ''}">${esc(label)}</span><span class="bt"><i style="--v:${Math.max(0, Math.min(1, raw)).toFixed(3)}"></i></span><span class="num">${raw.toFixed(2)}</span>`);
-      }
-    }
-    const j = cell?.dataset.j;
-    const said = j ? `Judged ${j === 'same' ? 'the same' : j}${cell.dataset.jn ? `: ${esc(cell.dataset.jn)}` : '.'}` : 'Not judged by eye yet.';
     const n = w.pairs.get(`p:${rest}`);
     const judge = (to, label) => `<button type="button" class="run outline" data-queue="judge" data-a="${esc(x)}" data-b="${esc(y)}" data-judgment="${to}">${label}</button>`;
+    // What was said of them by eye, and Take it back, are in the pair's own block below.
     const html = `<header class="ih"><h2>${esc(title(x))} and ${esc(title(y))}</h2><p class="meta">Two builds, compared</p></header>`
       + `<div class="acts"><button type="button" class="link" data-pick="b:${esc(x)}">${esc(title(x))}</button><button type="button" class="link" data-pick="b:${esc(y)}">${esc(title(y))}</button></div>`
-      + (rows.length ? `<h3>How alike, by each representation</h3><div class="bars8">${rows.join('')}</div><p class="faint small">1 would be the same text.</p>` : '')
-      + `<h3>By eye</h3><p class="small">${said}</p>`
-      + `<div class="judge">${judge('same', 'The same')}${judge('related', 'Related')}${judge('different', 'Different')}`
-      + (j ? `<button type="button" class="run outline" data-queue="unjudge" data-a="${esc(x)}" data-b="${esc(y)}">Take it back</button>` : '') + '</div>'
+      + `<h3>By eye</h3><div class="judge">${judge('same', 'The same')}${judge('related', 'Related')}${judge('different', 'Different')}</div>`
       + (n ? `<p class="small muted">${plural(n, 'change')} to this pair ${n === 1 ? 'is' : 'are'} waiting below.</p>` : '');
     const p = panel(body, byId('kb-insp-b'), 'ppanel');
-    const key = `${rest}|${ch}|${n || 0}`;
+    const key = `${rest}|${n || 0}`;
     if (p.dataset.key !== key) {
       p.dataset.key = key;
       p.innerHTML = html;
@@ -298,16 +273,6 @@
     if (bar) say(bar, 'count', w.n ? `${plural(w.n, 'change')} waiting` : 'No changes waiting');
   }
 
-  // ---- the grid has one keyboard stop: the picked cell, or the first
-  function stops() {
-    const cells = [...document.querySelectorAll('#kb-mx-grid button.cell')];
-    const on = cells.find((c) => c.classList.contains('marble-on')) || cells[0];
-    for (const c of cells) {
-      const t = c === on ? '0' : '-1';
-      if (c.getAttribute('tabindex') !== t) c.setAttribute('tabindex', t);
-    }
-  }
-
   function derive() {
     const w = waiting();
     pressed();
@@ -315,7 +280,6 @@
     selection(w);
     inspector(w);
     counts(w);
-    stops();
   }
 
   let soon = 0;
@@ -328,7 +292,7 @@
     }
     const q = byId('kb-queue');
     if (q) watcher.observe(q, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-dropped'] });
-    for (const id of ['kb-map-pts', 'kb-mx-grid', 'kb-cat-builds', 'kb-insp-b', 'kb-mx-legend']) {
+    for (const id of ['kb-map-pts', 'kb-cat-builds', 'kb-insp-b']) {
       const el = byId(id);
       if (el) watcher.observe(el, { childList: true });
     }

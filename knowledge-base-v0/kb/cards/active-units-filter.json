@@ -1,0 +1,541 @@
+{
+  "schema": "astaui.card/1",
+  "id": "active-units-filter",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T22:22:27Z"
+  },
+  "app": {
+    "title": "Active Units (Unit Activity Filter)",
+    "summary": "The person points a launcher at spike-sorting output, a table of trial onset times and a set of time-window parameters, and the tool computes each unit's baseline and response firing rate per experiment from a random sample of trials. In the dashboard they choose which experiments the filters apply to, set ranges on baseline rate, response rate, difference, absolute difference and a p-value threshold, and apply them. Per-experiment histograms show the distribution that remains with the cut-offs drawn in, and a count shows how many units pass. They read the passing units in a table and click one to see its spike rasters in every experiment. They can save the thresholds as a rules file and load them again, and they export the list of passing units as a CSV.",
+    "task": {
+      "text": "Decide which spike-sorted units to keep for analysis by setting thresholds on their trial-based baseline and stimulus-response firing rates, checking single units against their rasters, and exporting the list that passes.",
+      "verbs": [
+        "clean",
+        "identify",
+        "derive",
+        "summarize",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "Spike times and cluster IDs from a spike sorter, trial onset samples grouped by experiment, and a computed table of baseline and response firing-rate statistics for each unit in each experiment",
+      "item": "a sorted unit (neuron cluster), with its firing-rate statistics in each experiment",
+      "shapes": [
+        "table",
+        "events"
+      ]
+    },
+    "stage": {
+      "text": "cleaning a sorted unit set after spike sorting and curation, before response analysis",
+      "terms": [
+        "clean",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "Range sliders and experiment checkboxes drive one filter that keeps a unit only if it passes every threshold in every checked experiment. The filter redraws a grid of per-experiment histograms with the cut-offs marked, a passing-count summary and a table of passing units. Selecting a row in the table opens per-experiment spike rasters for that unit.",
+      "views": [
+        "table view",
+        "bar chart",
+        "small multiples",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "select",
+        "zoom and pan",
+        "toggle view",
+        "export",
+        "import"
+      ],
+      "patterns": [
+        "linked views",
+        "master-detail",
+        "small multiples",
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "trial-based firing-rate filtering of spike-sorted units in extracellular electrophysiology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "neuroscience",
+        "extracellular electrophysiology",
+        "spike sorting"
+      ]
+    },
+    "workflow": {
+      "name": "filter a collection by thresholds on computed measures and export the items that pass",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A launcher takes the sorted-spikes folder, the trials CSV, an output folder and the window parameters. It then computes the activity summary and opens the dashboard.",
+          "parts": [
+            "launcher"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "For a random sample of trials per experiment, it computes mean and SD firing rates in a baseline window and a response window, their difference, and a paired t-test p-value.",
+          "parts": [
+            "launcher"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Checkboxes under 'Apply filters to' pick the experiments, and range sliders set baseline, response, difference and absolute difference. A discrete slider sets the p-value cut-off. Apply Filters reruns the filter and updates the passing count.",
+          "parts": [
+            "filters-panel"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A grid of histograms, one column per experiment and one row per metric, shows the units that remain, with dashed red lines at the slider limits.",
+          "parts": [
+            "histogram-grid"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The table lists the passing units, averaged over the experiments ticked under 'Show in table'. Clicking a row draws that unit's spike rasters around stimulus onset, one panel per experiment.",
+          "parts": [
+            "units-table",
+            "raster-panel"
+          ]
+        },
+        {
+          "step": "keep a record of changes",
+          "here": "Save Rules writes the slider ranges to a rules CSV, with open-ended limits stored as infinity. Load Rules reads them back onto the sliders.",
+          "parts": [
+            "rules-controls"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Export Units writes the passing unit IDs to a CSV at a chosen path and filename.",
+          "parts": [
+            "export-controls"
+          ]
+        }
+      ],
+      "distinctive": [
+        "A unit passes only if it passes every threshold in every checked experiment. Unchecked experiments let it through, so the person can filter on the one experiment that matters most.",
+        "Firing rates are estimated from a small random sample of trials in a baseline and a response window set relative to stimulus onset. A paired t-test compares the two windows.",
+        "The p-value filter uses fixed significance levels on a discrete slider rather than a continuous range.",
+        "Spike rasters for a selected unit are loaded from the raw spike times only on the first click, and they show a random subset of trials in each experiment with the stimulus marked."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "launcher",
+      "level": "view",
+      "parent": null,
+      "title": "Setup launcher",
+      "summary": "Picks and checks the sorted-spikes folder, the trials CSV and the output folder, and edits the window and sampling parameters. It computes the activity summary and opens the dashboard.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/active_units/gui_launcher.py",
+          "start": 82,
+          "end": 282,
+          "role": "markup",
+          "symbol": "init_ui",
+          "anchor": "62e3d80446b9",
+          "first": "def init_ui(self):"
+        },
+        {
+          "file": "code/active_units/gui_launcher.py",
+          "start": 380,
+          "end": 391,
+          "role": "logic",
+          "symbol": "validate_sorted_spikes",
+          "anchor": "d7412be90dfd",
+          "first": "def validate_sorted_spikes(self):"
+        },
+        {
+          "file": "code/active_units/gui_launcher.py",
+          "start": 402,
+          "end": 424,
+          "role": "logic",
+          "symbol": "validate_trials_csv",
+          "anchor": "1e6daffe9a87",
+          "first": "def validate_trials_csv(self):"
+        },
+        {
+          "file": "code/active_units/gui_launcher.py",
+          "start": 534,
+          "end": 606,
+          "role": "logic",
+          "symbol": "launch_dashboard",
+          "anchor": "3eccfeaee130",
+          "first": "def launch_dashboard(self):"
+        },
+        {
+          "file": "code/active_units/activity.py",
+          "start": 12,
+          "end": 17,
+          "role": "logic",
+          "symbol": "compute_activity",
+          "anchor": "da0e0cc9463b",
+          "first": "def compute_activity("
+        },
+        {
+          "file": "code/active_units/utils.py",
+          "start": 21,
+          "end": 89,
+          "role": "data",
+          "symbol": "load_config",
+          "anchor": "99ce34a9fe91",
+          "first": "def load_config(config_input: Union[str, Dict[str, Any]]) -> Dict[str, Any]:"
+        }
+      ]
+    },
+    {
+      "id": "filters-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Activity filters",
+      "summary": "Sets which experiments the filter applies to and the ranges on each firing-rate metric and the p-value, then applies them and shows how many units pass.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 211,
+          "end": 273,
+          "role": "markup",
+          "anchor": "d45cbda883d0",
+          "first": "# P-value thresholds for discrete slider (0 = no filtering)"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 302,
+          "end": 321,
+          "role": "logic",
+          "anchor": "14a75d7d711a",
+          "first": "# Recording selection checkboxes - TWO separate pickers"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 337,
+          "end": 344,
+          "role": "logic",
+          "anchor": "84f1a9c9495e",
+          "first": "def update_pvalue_label(attr, old, new):"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 482,
+          "end": 655,
+          "role": "logic",
+          "symbol": "update_filters_impl",
+          "anchor": "9128bada4fcc",
+          "first": "def update_filters_impl():"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 772,
+          "end": 774,
+          "role": "logic",
+          "anchor": "62ede92a8274",
+          "first": "# Apply button"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 982,
+          "end": 998,
+          "role": "markup",
+          "anchor": "512f9018ecf6",
+          "first": "# Filters section"
+        }
+      ]
+    },
+    {
+      "id": "histogram-grid",
+      "level": "view",
+      "parent": null,
+      "title": "Per-experiment metric histograms",
+      "summary": "Shows a histogram of each metric in each experiment for the units that pass, with the filter limits drawn as dashed lines.",
+      "views": [
+        "bar chart",
+        "small multiples"
+      ],
+      "interactions": [],
+      "patterns": [
+        "small multiples",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 346,
+          "end": 472,
+          "role": "logic",
+          "anchor": "10c746c2b8bd",
+          "first": "# Create histograms per experiment"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 541,
+          "end": 608,
+          "role": "logic",
+          "anchor": "612e1f1d1e1d",
+          "first": "# Update histograms"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 1000,
+          "end": 1007,
+          "role": "markup",
+          "anchor": "a9ff1363aa29",
+          "first": "histogram_rows = ["
+        }
+      ]
+    },
+    {
+      "id": "units-table",
+      "level": "view",
+      "parent": null,
+      "title": "Passing units table",
+      "summary": "Lists the units that pass, with their rates averaged over the experiments ticked under 'Show in table'. Selecting a row opens that unit's rasters.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 275,
+          "end": 300,
+          "role": "markup",
+          "anchor": "62e2e6cf7d53",
+          "first": "# Table of filtered units"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 323,
+          "end": 335,
+          "role": "logic",
+          "anchor": "2c0ed58cbf6e",
+          "first": "# Checkboxes for which experiments to show in table"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 622,
+          "end": 655,
+          "role": "logic",
+          "anchor": "4a32b95ccf5f",
+          "first": "# Update table with filtered units (aggregated by unit, only for checked experiments)"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 1009,
+          "end": 1025,
+          "role": "markup",
+          "anchor": "370050a30a8e",
+          "first": "# Left: Table with table recording selection"
+        }
+      ]
+    },
+    {
+      "id": "raster-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Unit raster plots",
+      "summary": "Draws the selected unit's spikes around stimulus onset for a random subset of trials, in one panel per experiment.",
+      "views": [
+        "small multiples"
+      ],
+      "interactions": [
+        "zoom and pan"
+      ],
+      "patterns": [
+        "master-detail",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 22,
+          "end": 30,
+          "role": "logic",
+          "symbol": "extract_raster_data",
+          "anchor": "45f7d3ee20b5",
+          "first": "def extract_raster_data("
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 75,
+          "end": 82,
+          "role": "logic",
+          "symbol": "create_raster_figure",
+          "anchor": "03637c7ed8c9",
+          "first": "def create_raster_figure("
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 657,
+          "end": 688,
+          "role": "markup",
+          "anchor": "e4d6835c97cf",
+          "first": "# Placeholder raster figure (shows until unit is clicked)"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 690,
+          "end": 767,
+          "role": "logic",
+          "symbol": "update_raster_on_table_selection",
+          "anchor": "eaf737416bde",
+          "first": "def update_raster_on_table_selection():"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 769,
+          "end": 770,
+          "role": "logic",
+          "anchor": "a8d1070b9ba5",
+          "first": "# Monitor table selection changes"
+        }
+      ]
+    },
+    {
+      "id": "rules-controls",
+      "level": "component",
+      "parent": "filters-panel",
+      "title": "Filter rules file",
+      "summary": "Saves the current slider ranges to a rules CSV and loads a saved set back onto the sliders.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 866,
+          "end": 874,
+          "role": "markup",
+          "anchor": "f3a7355b7188",
+          "first": "# Rules file controls"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 876,
+          "end": 907,
+          "role": "logic",
+          "symbol": "save_rules",
+          "anchor": "729f0cae7b9a",
+          "first": "def save_rules():"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 909,
+          "end": 945,
+          "role": "logic",
+          "symbol": "load_rules",
+          "anchor": "242b140760aa",
+          "first": "def load_rules():"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 947,
+          "end": 948,
+          "role": "logic",
+          "anchor": "5646a89d059a",
+          "first": "save_rules_button.on_click(lambda: save_rules())"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 968,
+          "end": 977,
+          "role": "markup",
+          "anchor": "cf7822a503d7",
+          "first": "# Rules controls row"
+        }
+      ]
+    },
+    {
+      "id": "export-controls",
+      "level": "component",
+      "parent": "units-table",
+      "title": "Export units",
+      "summary": "Writes the IDs of the passing units to a CSV at a chosen path and filename.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 776,
+          "end": 792,
+          "role": "markup",
+          "anchor": "e82f4a692a7f",
+          "first": "# Export path and filename controls"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 842,
+          "end": 862,
+          "role": "logic",
+          "symbol": "export_units",
+          "anchor": "7b4779f076bd",
+          "first": "def export_units():"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 864,
+          "end": 864,
+          "role": "logic",
+          "anchor": "d4ecf7807454",
+          "first": "export_button.on_click(lambda: export_units())"
+        },
+        {
+          "file": "code/active_units/dashboard.py",
+          "start": 954,
+          "end": 966,
+          "role": "markup",
+          "anchor": "f97e175117eb",
+          "first": "# Top buttons row: export path, filename, export button, exit button"
+        }
+      ]
+    }
+  ]
+}

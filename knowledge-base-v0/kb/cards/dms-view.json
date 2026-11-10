@@ -1,0 +1,659 @@
+{
+  "schema": "astaui.card/1",
+  "id": "dms-view",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T05:39:04Z"
+  },
+  "app": {
+    "title": "dms-view",
+    "summary": "A person loads a table of per-site and per-mutation measurements, a protein structure file and a markdown description, each from a URL. They pick an experimental condition, a site-level metric and a mutation-level metric. Then they select sites of interest on a site-by-site line plot by clicking, brushing or typing site labels. A zoom bar narrows the plot to one region. Selected sites appear as stacked letter logos showing each mutation's effect, and as coloured residues on the 3D structure. The view's state is kept in a shareable URL, and each panel can be downloaded as SVG or PNG.",
+    "task": {
+      "text": "Explore how every mutation at every site of a protein affects a measured function under different conditions, and see where the sites of interest sit on the protein's 3D structure.",
+      "verbs": [
+        "explore",
+        "identify",
+        "locate",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "A long-format table of mutational scanning results: for each site and condition, one or more site-level summary metrics and per-amino-acid mutation metrics, mapped to chains and residue numbers in a protein structure file, plus a markdown description of the experiment.",
+      "item": "a site (residue position) of a protein under one experimental condition, with its mutation-level values",
+      "shapes": [
+        "table",
+        "sequence",
+        "per element",
+        "document"
+      ]
+    },
+    "stage": {
+      "text": "exploring computed mutational scanning results, before writing figures for a paper",
+      "terms": [
+        "explore",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A focus line plot of a site metric along the protein, with a zoom bar below it, is the main view. Sites selected there by click, brush or typed labels are drawn in a logo plot of their mutation values and highlighted on the 3D structure in the same colours. Dropdowns switch the condition and metrics, and every view redraws.",
+      "views": [
+        "line chart",
+        "sequence track",
+        "bar chart",
+        "document reader"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "brush",
+        "zoom and pan",
+        "hover for detail",
+        "toggle view",
+        "search",
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail",
+        "focus and context"
+      ]
+    },
+    "field": {
+      "text": "deep mutational scanning of proteins in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "deep mutational scanning",
+        "protein structure",
+        "viral escape"
+      ]
+    },
+    "workflow": {
+      "name": "select positions along a sequence and see them in linked detail and structure views",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "URL fields load the metrics CSV, a PDB structure and a markdown description. A load error shows the server's message in an alert. URLs are read from and written back to the page's query string.",
+          "parts": [
+            "data-controls",
+            "protein-panel",
+            "description-panel"
+          ]
+        },
+        {
+          "step": "choose which condition and measure to view",
+          "here": "Dropdowns built from the CSV columns switch the condition, the site_* metric drawn on the line plot and the mut_* metric drawn in the logo plot",
+          "parts": [
+            "site-plot",
+            "logo-plot"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A line plot shows the chosen metric site by site, with tooltips for site, value and wildtype. An area zoom bar below it is brushed to narrow the plot to one region.",
+          "parts": [
+            "site-plot"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Sites are selected by clicking points, by brushing a box, or by typing comma-separated site labels. A select/deselect radio, or holding Shift, turns the brush into an eraser, and 'clear selections' resets everything. The site with the highest value is selected by default.",
+          "parts": [
+            "data-controls",
+            "site-plot"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The logo plot stacks one amino-acid letter per mutation at each selected site, sized by its value, above or below zero. The NGL structure viewer draws the selected residues as spacefill in the matching viridis colour.",
+          "parts": [
+            "logo-plot",
+            "protein-panel"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download SVG buttons save the line plot and the logo plot, and Download PNG saves the structure render. The URL captures the whole view so it can be shared.",
+          "parts": [
+            "site-plot",
+            "logo-plot",
+            "protein-panel"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Sequence positions in the data are mapped to chain and residue numbers in a structure file, so one selection lights up the same sites on several homologous chains in 3D",
+        "Mutation values are drawn as stacked letter logos, with positive values stacked up and negative ones down, coloured by amino-acid biochemical class or by a custom colour column",
+        "Gaps in site numbering are kept, so missing sites show as breaks in the zoom-bar area",
+        "The full view state (data URLs, condition, metrics, selected sites, structure colours) is written into the page URL, so the view can be shared or used to recreate a paper figure"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Data URL and site selection controls",
+      "summary": "Loads the metrics CSV from a URL and holds the select/deselect mode, the typed list of selected sites and the clear button.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 51,
+          "end": 59,
+          "role": "markup",
+          "symbol": "#dataFormFieldAlert",
+          "anchor": "900b1263785c",
+          "first": "<div class=\"alert alert-danger\" role=\"alert\" id=\"dataFormFieldAlert\" hidden>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 60,
+          "end": 60,
+          "role": "markup",
+          "symbol": "#data-url",
+          "anchor": "07c72bcbe58f",
+          "first": "<p><input id=\"data-url\" text=\"text\" class=\"form-control\" placeholder=\"Data URL (relative or absolute paths allowed)\" /><"
+        },
+        {
+          "file": "code/index.html",
+          "start": 62,
+          "end": 62,
+          "role": "markup",
+          "symbol": "#select",
+          "anchor": "4f43ca64688a",
+          "first": "<input type='radio' id=\"select\" name=\"mode\" value=\"select\" checked /> select"
+        },
+        {
+          "file": "code/index.html",
+          "start": 63,
+          "end": 63,
+          "role": "markup",
+          "symbol": "#deselect",
+          "anchor": "ee488c28d624",
+          "first": "<input type='radio' id=\"deselect\" name=\"mode\" value=\"deselect\" /> deselect"
+        },
+        {
+          "file": "code/index.html",
+          "start": 64,
+          "end": 64,
+          "role": "markup",
+          "symbol": "#selected_sites",
+          "anchor": "777ce64a2042",
+          "first": "<input id=\"selected_sites\" text=\"text\" class=\"form-control\" style=\"display: inline; width: 50%\" placeholder=\"Selected si"
+        },
+        {
+          "file": "code/index.html",
+          "start": 65,
+          "end": 65,
+          "role": "markup",
+          "symbol": "#clearButton",
+          "anchor": "ae4aa215e404",
+          "first": "<button id=\"clearButton\" type=\"button\" class=\"btn btn-light\">clear selections</button>"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 309,
+          "end": 368,
+          "role": "logic",
+          "symbol": "renderDataUrl",
+          "anchor": "fef6729ab752",
+          "first": "function renderDataUrl (dataUrl, dataFieldId, dataType) {"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 370,
+          "end": 389,
+          "role": "logic",
+          "symbol": "initializeDataUrl",
+          "anchor": "0fd614918f61",
+          "first": "function initializeDataUrl(dataFieldId, dataType, defaultDataUrl) {"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 116,
+          "end": 285,
+          "role": "logic",
+          "symbol": "renderCsv",
+          "anchor": "3290f1c187ca",
+          "first": "function renderCsv(data, dataUrl) {"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 228,
+          "end": 237,
+          "role": "logic",
+          "symbol": "selectedSitesChanged",
+          "anchor": "e72fa3382090",
+          "first": "function selectedSitesChanged() {"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 52,
+          "end": 86,
+          "role": "logic",
+          "symbol": "updateStateFromUrl",
+          "anchor": "83a5ff227d41",
+          "first": "function updateStateFromUrl(fieldIds) {"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 88,
+          "end": 100,
+          "role": "logic",
+          "symbol": "updateUrlFromFieldIds",
+          "anchor": "244c93faf606",
+          "first": "function updateUrlFromFieldIds(fieldIds) {"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 391,
+          "end": 416,
+          "role": "logic",
+          "anchor": "507cf3c171e5",
+          "first": "window.addEventListener('DOMContentLoaded', (event) => {"
+        }
+      ]
+    },
+    {
+      "id": "site-plot",
+      "level": "view",
+      "parent": null,
+      "title": "Site plot with zoom bar",
+      "summary": "Plots the chosen site metric along the protein with a brushable zoom bar, and lets the person select sites by clicking or brushing.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "brush",
+        "zoom and pan",
+        "hover for detail",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "focus and context",
+        "linked views",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 68,
+          "end": 70,
+          "role": "markup",
+          "symbol": "#line_plot",
+          "anchor": "b577704aa556",
+          "first": "<div id=\"line_plot\" class=\"row\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 69,
+          "end": 69,
+          "role": "markup",
+          "symbol": "#line_plot_download",
+          "anchor": "056ab2325d14",
+          "first": "<button id=\"line_plot_download\" type=\"button\" class=\"btn btn-light float-right\"><img src=\"/assets/images/download.svg\" /"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 6,
+          "end": 10,
+          "role": "style",
+          "symbol": ".line",
+          "anchor": "53101526ad61",
+          "first": ".line {"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 12,
+          "end": 15,
+          "role": "style",
+          "symbol": ".area",
+          "anchor": "e9122f235310",
+          "first": ".area {"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 17,
+          "end": 21,
+          "role": "style",
+          "symbol": ".zoom",
+          "anchor": "cfcbb056c293",
+          "first": ".zoom {"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 35,
+          "end": 39,
+          "role": "style",
+          "symbol": ".brush_select .selection",
+          "anchor": "6267e1fccd75",
+          "first": ".brush_select .selection {"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 41,
+          "end": 46,
+          "role": "style",
+          "symbol": ".brush_deselect .selection",
+          "anchor": "d151ac4de110",
+          "first": ".brush_deselect .selection {"
+        },
+        {
+          "file": "code/assets/css/styles.css",
+          "start": 48,
+          "end": 51,
+          "role": "style",
+          "symbol": ".brush_deselect .overlay",
+          "anchor": "9f56fc86aafc",
+          "first": ".brush_deselect .overlay {"
+        },
+        {
+          "file": "code/assets/js/line_plot_zoom.js",
+          "start": 24,
+          "end": 728,
+          "role": "logic",
+          "symbol": "genomeLineChart",
+          "anchor": "ce4413bb5fe5",
+          "first": "function genomeLineChart() {"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 27,
+          "end": 50,
+          "role": "logic",
+          "symbol": "downloadSVG",
+          "anchor": "3428570bfd6f",
+          "first": "const downloadSVG = (elementId, filename) => {"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 173,
+          "end": 209,
+          "role": "logic",
+          "anchor": "af8e9edec09a",
+          "first": "if (conditiondropdown === undefined) {"
+        }
+      ]
+    },
+    {
+      "id": "logo-plot",
+      "level": "view",
+      "parent": null,
+      "title": "Mutation logo plot",
+      "summary": "Shows the selected sites as stacked amino-acid letters sized by the chosen mutation metric, with tooltips for each letter's value.",
+      "views": [
+        "bar chart",
+        "sequence track"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 71,
+          "end": 73,
+          "role": "markup",
+          "symbol": "#logo_plot",
+          "anchor": "ec9cc8ac2217",
+          "first": "<div id=\"logo_plot\" class=\"row\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 72,
+          "end": 72,
+          "role": "markup",
+          "symbol": "#logo_plot_download",
+          "anchor": "e41745d7de91",
+          "first": "<button id=\"logo_plot_download\" type=\"button\" class=\"btn btn-light float-right\"><img src=\"/assets/images/download.svg\" /"
+        },
+        {
+          "file": "code/assets/js/logoplot.js",
+          "start": 1,
+          "end": 293,
+          "role": "logic",
+          "symbol": "logoplotChart",
+          "anchor": "9bcd05e90935",
+          "first": "function logoplotChart(selection) {"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 211,
+          "end": 226,
+          "role": "logic",
+          "anchor": "496b4ff3f057",
+          "first": "if (mutdropdown === undefined) {"
+        }
+      ]
+    },
+    {
+      "id": "protein-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Protein structure viewer",
+      "summary": "Loads a PDB file into a 3D viewer, highlights the selected sites in their plot colours, and lets the person change the representation and chain colours or save a PNG.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "hover for detail",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 76,
+          "end": 84,
+          "role": "markup",
+          "symbol": "#proteinFormFieldAlert",
+          "anchor": "0e1db899b345",
+          "first": "<div class=\"alert alert-danger\" role=\"alert\" id=\"proteinFormFieldAlert\" hidden>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 85,
+          "end": 90,
+          "role": "markup",
+          "symbol": "#proteinColorAlertForm",
+          "anchor": "ab6e6cdbd51a",
+          "first": "<div class=\"alert alert-danger\" role=\"alert\" id=\"proteinColorAlertForm\" hidden>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 92,
+          "end": 92,
+          "role": "markup",
+          "symbol": "#pdb-url",
+          "anchor": "5863aa52cead",
+          "first": "<p><input id=\"pdb-url\" text=\"text\" class=\"form-control\" placeholder=\"PDB URL\" /></p>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 95,
+          "end": 100,
+          "role": "markup",
+          "symbol": "#polymer-dropdown",
+          "anchor": "a8b2e66991f6",
+          "first": "<select id=\"polymer-dropdown\" name=\"polymerSelect\" class=\"btn btn-light dropdown-toggle\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 104,
+          "end": 104,
+          "role": "markup",
+          "symbol": "#protein-data-color",
+          "anchor": "e92c8c77c6c2",
+          "first": "<input id=\"protein-data-color\" name='protein-data-color' text=\"text\" class=\"form-control\" placeholder=\"data chains color"
+        },
+        {
+          "file": "code/index.html",
+          "start": 105,
+          "end": 105,
+          "role": "markup",
+          "symbol": "#protein-other-color",
+          "anchor": "4b3422dcdb11",
+          "first": "<input id=\"protein-other-color\" name='protein-other-color' text=\"text\" class=\"form-control\" placeholder=\"other chains co"
+        },
+        {
+          "file": "code/index.html",
+          "start": 108,
+          "end": 108,
+          "role": "markup",
+          "symbol": "#protein_plot_download",
+          "anchor": "c6b5e049b769",
+          "first": "<button id=\"protein_plot_download\" type=\"button\" class=\"btn btn-light float-right\"><img src=\"/assets/images/download.svg"
+        },
+        {
+          "file": "code/index.html",
+          "start": 110,
+          "end": 110,
+          "role": "markup",
+          "symbol": "#protein",
+          "anchor": "ded4180befac",
+          "first": "<div id=\"protein\" style=\"width: 400px; height: 550px;\"></div>"
+        },
+        {
+          "file": "code/assets/js/prot_struct.js",
+          "start": 10,
+          "end": 45,
+          "role": "logic",
+          "symbol": "createProteinColorScheme",
+          "anchor": "6f67c68c0530",
+          "first": "function createProteinColorScheme(targetChains){"
+        },
+        {
+          "file": "code/assets/js/prot_struct.js",
+          "start": 53,
+          "end": 69,
+          "role": "logic",
+          "symbol": "selectSiteOnProtein",
+          "anchor": "5462b303826e",
+          "first": "function selectSiteOnProtein(siteString, color) {"
+        },
+        {
+          "file": "code/assets/js/prot_struct.js",
+          "start": 81,
+          "end": 83,
+          "role": "logic",
+          "symbol": "deselectSiteOnProtein",
+          "anchor": "a67409788693",
+          "first": "function deselectSiteOnProtein(siteString) {"
+        },
+        {
+          "file": "code/assets/js/prot_struct.js",
+          "start": 91,
+          "end": 106,
+          "role": "logic",
+          "symbol": "colorWholeProtein",
+          "anchor": "3f3242cb5d00",
+          "first": "function colorWholeProtein(_protein, representation, colorChains){"
+        },
+        {
+          "file": "code/assets/js/prot_struct.js",
+          "start": 1,
+          "end": 8,
+          "role": "logic",
+          "anchor": "1126e192ba22",
+          "first": "// Code for example: interactive/simple-viewer"
+        },
+        {
+          "file": "code/assets/js/prot_struct.js",
+          "start": 108,
+          "end": 207,
+          "role": "logic",
+          "anchor": "344d5fab733e",
+          "first": "polymerSelect.addEventListener('change', function(e) {"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 287,
+          "end": 307,
+          "role": "logic",
+          "symbol": "renderPdb",
+          "anchor": "7e6902fa6ad9",
+          "first": "function renderPdb(data, dataUrl) {"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 158,
+          "end": 171,
+          "role": "logic",
+          "anchor": "e0a9924e9ed8",
+          "first": "var proteinPlotDownloadButton = d3.select(\"#protein_plot_download\")"
+        }
+      ]
+    },
+    {
+      "id": "description-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Experiment description",
+      "summary": "Loads a markdown file from a URL and renders it below the plots to explain the dataset.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 114,
+          "end": 128,
+          "role": "markup",
+          "symbol": "#description",
+          "anchor": "18a479d2f0dc",
+          "first": "<div id=\"description\" class=\"row mt-3\">"
+        },
+        {
+          "file": "code/assets/js/main.js",
+          "start": 105,
+          "end": 114,
+          "role": "logic",
+          "symbol": "renderMarkdown",
+          "anchor": "17cbbd394812",
+          "first": "function renderMarkdown (data, dataUrl) {"
+        },
+        {
+          "file": "code/data/IAV/lee2019mapping.md",
+          "start": 1,
+          "end": 15,
+          "role": "data",
+          "anchor": "025b19488629",
+          "first": "# [Mapping person-to-person variation in viral mutations that escape polyclonal serum targeting influenza hemagglutinin]"
+        }
+      ]
+    }
+  ]
+}

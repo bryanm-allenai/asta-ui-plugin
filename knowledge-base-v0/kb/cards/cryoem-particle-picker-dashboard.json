@@ -1,0 +1,585 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cryoem-particle-picker-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T20:53:32Z"
+  },
+  "app": {
+    "title": "Particle Picker Statistics Dashboard",
+    "summary": "A person drops in a particle-picking file in RELION .star, coordinate CSV or EMAN2 .box format. The interface reads the file, finds the column naming each micrograph and the coordinate columns, and shows the file's name, size and type. It then shows summary counts of particles per micrograph, a bar chart of micrographs ranked by how many particles each has, a histogram of those counts, and a scatter plot of where the particles sit. The person gets an overview of how evenly picking spread across the micrographs and the image area.",
+    "task": {
+      "text": "Summarise a particle-picking result by counting particles per micrograph and showing where the picks fall, so a person can judge whether picking went evenly.",
+      "verbs": [
+        "summarize",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A table of picked particles from one picking run. Each row has image coordinates and, where present, the micrograph it came from plus other per-particle metadata such as defocus.",
+      "item": "a picked particle: its x and y position on a micrograph, and the micrograph's name",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "checking particle picks after automated picking, before classification",
+      "terms": [
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "Loading a file reveals a single scrolling dashboard of stacked cards: summary number tiles, then a ranked bar chart, a histogram and a coordinate scatter plot, all drawn from the same per-micrograph grouping. Each chart can be hovered for values and zoomed with Plotly. A Python Dash version of the same dashboard adds a binned density heatmap and defocus histograms.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "scatter plot",
+        "heatmap"
+      ],
+      "interactions": [
+        "import",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "particle-picking quality statistics in cryo-EM",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "cryo em",
+        "particle picking",
+        "structural biology"
+      ]
+    },
+    "workflow": {
+      "name": "summarise a collection by counts per group and spatial spread",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drag a .star, .csv or .box file onto the drop area, or click to browse. Files over 50MB or with the wrong extension are refused, and the file's name, size and type are shown.",
+          "parts": [
+            "upload-panel"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Particles are grouped by an automatically found micrograph column into per-micrograph counts. From these come the total, mean, min, max and standard deviation, shown as tiles.",
+          "parts": [
+            "summary-tiles"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A bar chart ranks micrographs by particle count, showing the top 50. Hovering a bar gives the micrograph's name and count.",
+          "parts": [
+            "distribution-chart"
+          ]
+        },
+        {
+          "step": "summarise the spread of a quantity",
+          "here": "A 30-bin histogram shows how particles-per-micrograph counts are distributed across the whole run.",
+          "parts": [
+            "histogram-chart"
+          ]
+        },
+        {
+          "step": "see where items fall in space",
+          "here": "A WebGL scatter plots every particle's x and y coordinates, sampling down to 10,000 points for large files. The Dash version adds a binned density heatmap and defocus histograms.",
+          "parts": [
+            "scatter-chart",
+            "dash-dashboard"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Reads three community file formats (RELION .star data_particles loop, coordinate CSV, EMAN2 .box) and guesses the micrograph and coordinate columns from a list of known names",
+        "Spread of particles per micrograph is the quantity of interest, shown as ranked bars, a histogram and a standard deviation",
+        "Large pick sets are randomly sampled to 10,000 points before the coordinate scatter is drawn",
+        "The server version also bins picks into a 2D density heatmap and plots defocus distributions when those columns exist"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "upload-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Upload data file",
+      "summary": "A drop zone that takes a picking file, checks its size and type, parses it by format and reports the file details and load status.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/docs/index.html",
+          "start": 361,
+          "end": 370,
+          "role": "markup",
+          "symbol": "#uploadArea",
+          "anchor": "4beb7ce2b110",
+          "first": "<div class=\"upload-area\" id=\"uploadArea\">"
+        },
+        {
+          "file": "code/docs/index.html",
+          "start": 372,
+          "end": 385,
+          "role": "markup",
+          "symbol": "#fileInfo",
+          "anchor": "2635646dc7a2",
+          "first": "<div id=\"fileInfo\" class=\"file-info\" style=\"display: none;\">"
+        },
+        {
+          "file": "code/docs/index.html",
+          "start": 387,
+          "end": 387,
+          "role": "markup",
+          "symbol": "#alerts",
+          "anchor": "71b429120a2c",
+          "first": "<div id=\"alerts\"></div>"
+        },
+        {
+          "file": "code/docs/index.html",
+          "start": 147,
+          "end": 155,
+          "role": "style",
+          "symbol": ".upload-area",
+          "anchor": "a27c9012f65d",
+          "first": ".upload-area {"
+        },
+        {
+          "file": "code/docs/index.html",
+          "start": 162,
+          "end": 165,
+          "role": "style",
+          "symbol": ".upload-area.dragover",
+          "anchor": "6c090b7b6587",
+          "first": ".upload-area.dragover {"
+        },
+        {
+          "file": "code/docs/index.html",
+          "start": 200,
+          "end": 206,
+          "role": "style",
+          "symbol": ".file-info",
+          "anchor": "b0046f205297",
+          "first": ".file-info {"
+        },
+        {
+          "file": "code/docs/index.html",
+          "start": 258,
+          "end": 266,
+          "role": "style",
+          "symbol": ".alert",
+          "anchor": "9b7c259689a3",
+          "first": ".alert {"
+        },
+        {
+          "file": "code/docs/app.js",
+          "start": 10,
+          "end": 35,
+          "role": "logic",
+          "anchor": "379e4bfbae10",
+          "first": "uploadArea.addEventListener('click', () => fileInput.click());"
+        },
+        {
+          "file": "code/docs/app.js",
+          "start": 37,
+          "end": 68,
+          "role": "logic",
+          "symbol": "handleFile",
+          "anchor": "2c124ddf16fd",
+          "first": "function handleFile(file) {"
+        },
+        {
+          "file": "code/docs/app.js",
+          "start": 70,
+          "end": 102,
+          "role": "logic",
+          "symbol": "processFile",
+          "anchor": "1c1bf40d2982",
+          "first": "async function processFile(content, fileType) {"
+        },
+        {
+          "file": "code/docs/app.js",
+          "start": 254,
+          "end": 264,
+          "role": "logic",
+          "symbol": "showAlert",
+          "anchor": "5e8ea578d88e",
+          "first": "function showAlert(message, type) {"
+        },
+        {
+          "file": "code/docs/parser.js",
+          "start": 1,
+          "end": 125,
+          "role": "logic",
+          "symbol": "ParticleParser",
+          "anchor": "e3068be46ece",
+          "first": "class ParticleParser {"
+        }
+      ]
+    },
+    {
+      "id": "stats-section",
+      "level": "view",
+      "parent": null,
+      "title": "Statistics dashboard",
+      "summary": "A stack of cards that appears once a file loads. It holds the summary tiles and the three charts, all drawn from the same per-micrograph grouping.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "scatter plot"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/docs/index.html",
+          "start": 390,
+          "end": 422,
+          "role": "markup",
+          "symbol": "#statsSection",
+          "anchor": "4b0960668da6",
+          "first": "<div id=\"statsSection\" style=\"display: none;\">"
+        },
+        {
+          "file": "code/docs/index.html",
+          "start": 122,
+          "end": 129,
+          "role": "style",
+          "symbol": ".card",
+          "anchor": "3cbb7cb4b721",
+          "first": ".card {"
+        },
+        {
+          "file": "code/docs/index.html",
+          "start": 253,
+          "end": 256,
+          "role": "style",
+          "symbol": ".chart-container",
+          "anchor": "d8a6ad87d921",
+          "first": ".chart-container {"
+        },
+        {
+          "file": "code/docs/app.js",
+          "start": 136,
+          "end": 140,
+          "role": "logic",
+          "symbol": "createVisualizations",
+          "anchor": "b5f4dcec1aee",
+          "first": "function createVisualizations() {"
+        },
+        {
+          "file": "code/docs/parser.js",
+          "start": 134,
+          "end": 165,
+          "role": "logic",
+          "symbol": "findMicrographColumn",
+          "anchor": "56c38ac3cd02",
+          "first": "findMicrographColumn() {"
+        },
+        {
+          "file": "code/docs/parser.js",
+          "start": 167,
+          "end": 180,
+          "role": "logic",
+          "symbol": "getDistributionPerMicrograph",
+          "anchor": "6980308db3fc",
+          "first": "getDistributionPerMicrograph() {"
+        }
+      ]
+    },
+    {
+      "id": "summary-tiles",
+      "level": "component",
+      "parent": "stats-section",
+      "title": "Summary statistics",
+      "summary": "Tiles showing total particles, total micrographs, and the mean, min, max and standard deviation of particles per micrograph.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/docs/index.html",
+          "start": 396,
+          "end": 396,
+          "role": "markup",
+          "symbol": "#statsGrid",
+          "anchor": "d11e82e5b093",
+          "first": "<div class=\"stats-grid\" id=\"statsGrid\"></div>"
+        },
+        {
+          "file": "code/docs/index.html",
+          "start": 227,
+          "end": 231,
+          "role": "style",
+          "symbol": ".stats-grid",
+          "anchor": "73f5b2667547",
+          "first": ".stats-grid {"
+        },
+        {
+          "file": "code/docs/index.html",
+          "start": 233,
+          "end": 238,
+          "role": "style",
+          "symbol": ".stat-card",
+          "anchor": "7d27d3a40c07",
+          "first": ".stat-card {"
+        },
+        {
+          "file": "code/docs/index.html",
+          "start": 247,
+          "end": 251,
+          "role": "style",
+          "symbol": ".stat-value",
+          "anchor": "e83d4dd60b5c",
+          "first": ".stat-value {"
+        },
+        {
+          "file": "code/docs/app.js",
+          "start": 104,
+          "end": 134,
+          "role": "logic",
+          "symbol": "displayStatistics",
+          "anchor": "250e65635fdd",
+          "first": "function displayStatistics() {"
+        },
+        {
+          "file": "code/docs/parser.js",
+          "start": 182,
+          "end": 194,
+          "role": "logic",
+          "symbol": "getSummaryStatistics",
+          "anchor": "14b08162b40c",
+          "first": "getSummaryStatistics() {"
+        },
+        {
+          "file": "code/docs/parser.js",
+          "start": 196,
+          "end": 202,
+          "role": "logic",
+          "symbol": "calculateStd",
+          "anchor": "2635f032352e",
+          "first": "calculateStd(values) {"
+        }
+      ]
+    },
+    {
+      "id": "distribution-chart",
+      "level": "component",
+      "parent": "stats-section",
+      "title": "Particle distribution per micrograph",
+      "summary": "A bar chart of micrographs ranked by particle count, top 50, coloured by count, with each micrograph's name shown on hover.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/docs/index.html",
+          "start": 404,
+          "end": 404,
+          "role": "markup",
+          "symbol": "#distributionChart",
+          "anchor": "d3ea59638e8d",
+          "first": "<div class=\"chart-container\" id=\"distributionChart\"></div>"
+        },
+        {
+          "file": "code/docs/app.js",
+          "start": 142,
+          "end": 181,
+          "role": "logic",
+          "symbol": "createDistributionChart",
+          "anchor": "06319737161a",
+          "first": "function createDistributionChart() {"
+        }
+      ]
+    },
+    {
+      "id": "histogram-chart",
+      "level": "component",
+      "parent": "stats-section",
+      "title": "Distribution histogram",
+      "summary": "A histogram of particles-per-micrograph counts, showing how evenly picking spread across micrographs.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/docs/index.html",
+          "start": 412,
+          "end": 412,
+          "role": "markup",
+          "symbol": "#histogramChart",
+          "anchor": "fdfb1ee151b7",
+          "first": "<div class=\"chart-container\" id=\"histogramChart\"></div>"
+        },
+        {
+          "file": "code/docs/app.js",
+          "start": 183,
+          "end": 208,
+          "role": "logic",
+          "symbol": "createHistogramChart",
+          "anchor": "06ae1660a7a5",
+          "first": "function createHistogramChart() {"
+        }
+      ]
+    },
+    {
+      "id": "scatter-chart",
+      "level": "component",
+      "parent": "stats-section",
+      "title": "Coordinate scatter plot",
+      "summary": "Plots every particle's x and y position, sampling down to 10,000 points for large files, so a person can see how picks spread across the image area.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/docs/index.html",
+          "start": 420,
+          "end": 420,
+          "role": "markup",
+          "symbol": "#scatterChart",
+          "anchor": "1fffe844e359",
+          "first": "<div class=\"chart-container\" id=\"scatterChart\"></div>"
+        },
+        {
+          "file": "code/docs/app.js",
+          "start": 210,
+          "end": 252,
+          "role": "logic",
+          "symbol": "createScatterChart",
+          "anchor": "3d3959e677c7",
+          "first": "function createScatterChart() {"
+        },
+        {
+          "file": "code/docs/parser.js",
+          "start": 204,
+          "end": 272,
+          "role": "logic",
+          "symbol": "getCoordinates",
+          "anchor": "c692971dbb72",
+          "first": "getCoordinates() {"
+        }
+      ]
+    },
+    {
+      "id": "dash-dashboard",
+      "level": "view",
+      "parent": null,
+      "title": "Dash dashboard with density heatmap and defocus",
+      "summary": "A server-side version that loads a file by path and type. It adds a summary table, a binned 2D particle density heatmap and per-column defocus histograms to the same charts.",
+      "views": [
+        "heatmap",
+        "bar chart",
+        "scatter plot",
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/particle_picker/dashboard/app.py",
+          "start": 18,
+          "end": 57,
+          "role": "markup",
+          "anchor": "f9600b345937",
+          "first": "app.layout = dbc.Container(["
+        },
+        {
+          "file": "code/particle_picker/dashboard/app.py",
+          "start": 67,
+          "end": 171,
+          "role": "logic",
+          "symbol": "load_and_analyze",
+          "anchor": "92b015f2a357",
+          "first": "def load_and_analyze(n_clicks, filepath, file_type):"
+        },
+        {
+          "file": "code/particle_picker/visualization/plots.py",
+          "start": 111,
+          "end": 132,
+          "role": "logic",
+          "symbol": "create_heatmap",
+          "anchor": "3822641288ff",
+          "first": "def create_heatmap(self, bin_size=100):"
+        },
+        {
+          "file": "code/particle_picker/visualization/plots.py",
+          "start": 134,
+          "end": 168,
+          "role": "logic",
+          "symbol": "create_defocus_distribution",
+          "anchor": "a2c0635ea480",
+          "first": "def create_defocus_distribution(self):"
+        },
+        {
+          "file": "code/particle_picker/visualization/plots.py",
+          "start": 170,
+          "end": 203,
+          "role": "logic",
+          "symbol": "create_summary_table",
+          "anchor": "a8845a46d964",
+          "first": "def create_summary_table(self):"
+        },
+        {
+          "file": "code/particle_picker/analysis/statistics.py",
+          "start": 77,
+          "end": 104,
+          "role": "logic",
+          "symbol": "get_heatmap_data",
+          "anchor": "fed2fb1e25bb",
+          "first": "def get_heatmap_data(self, bin_size=100):"
+        },
+        {
+          "file": "code/particle_picker/analysis/statistics.py",
+          "start": 41,
+          "end": 55,
+          "role": "logic",
+          "symbol": "get_defocus_statistics",
+          "anchor": "088ecab82801",
+          "first": "def get_defocus_statistics(self):"
+        }
+      ]
+    }
+  ]
+}

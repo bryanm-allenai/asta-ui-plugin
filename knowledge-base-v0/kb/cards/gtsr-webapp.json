@@ -1,0 +1,313 @@
+{
+  "schema": "astaui.card/1",
+  "id": "gtsr-webapp",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T06:42:55Z"
+  },
+  "app": {
+    "title": "GTsR: solvent removal from MOF crystal structures, with a stability check",
+    "summary": "A person uploads a crystal structure file and looks at the raw structure in a 3D viewer, along with its formula and atom count. They choose which solvents to remove (free only, or all) and a probability threshold, then run a graph neural network that splits the structure into framework and solvent. They look at the cleaned framework or the removed solvent in a second viewer, which also lists the solvent molecules as SMILES strings. They download the cleaned structure file and can run a model that predicts whether the framework stays stable once activated.",
+    "task": {
+      "text": "Strip solvent molecules from a porous framework crystal structure with a learned model, check that the cleaned framework will stay stable once activated, and save it for simulation.",
+      "verbs": [
+        "clean",
+        "derive",
+        "identify",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "A single crystal structure in CIF format: the atoms and the unit cell of a porous framework, possibly with guest solvent molecules inside",
+      "item": "one crystal structure file (CIF) of a metal-organic framework",
+      "shapes": [
+        "field"
+      ]
+    },
+    "stage": {
+      "text": "cleaning experimental crystal structures before molecular simulation or screening",
+      "terms": [
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "An uploaded structure is drawn in an interactive 3D molecular viewer with display options. Running the model shows a second viewer of the result that toggles between framework and removed solvent. The result is kept only while the input file and model choice stay the same.",
+      "views": [
+        "molecular 3d viewer",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "machine-learned structure cleaning of metal-organic frameworks in computational materials chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "metal organic frameworks",
+        "crystal structure cleaning",
+        "graph neural networks"
+      ]
+    },
+    "workflow": {
+      "name": "clean a single structure with a model and check the result",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload one CIF file (up to the uploader limit). It is parsed with ASE and rewritten as a normalized unit cell.",
+          "parts": [
+            "raw-structure"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "A 3D viewer with the unit cell drawn, options for style (ball and stick, stick, space filling, line), element labels and rotation, and metric cards for chemical formula and atom count",
+          "parts": [
+            "raw-structure",
+            "structure-viewer"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Choose the solvent type (Free Only or All, which picks the model checkpoint) and a threshold from 0 to 1, then press Start Cleaning Your MOF to split the structure into framework and solvent",
+          "parts": [
+            "cleaning-controls"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "The Cleaned Structure section shows either the framework or the removed solvent in a second viewer, with formula, atom count and solvent SMILES, which can be checked against the raw view above",
+          "parts": [
+            "cleaned-structure",
+            "structure-viewer"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download Cleaned MOF saves the framework as <name>_gtsr.cif",
+          "parts": [
+            "cleaned-structure"
+          ]
+        },
+        {
+          "step": "decide whether the result can be used",
+          "here": "Want to check stability? runs a stability model on the framework and reports stable or not stable",
+          "parts": [
+            "stability-check"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Two model checkpoints: one removes only free solvent, the other removes all solvent including bound solvent. The choice is made before running.",
+        "A threshold for the probability that an atom is solvent controls how aggressively the structure is cleaned",
+        "After cleaning, a separate model predicts whether the framework stays stable once activated",
+        "The result is cleared if the uploaded file (checked by hash) or the checkpoint changes, and the person is asked to run it again",
+        "The removed solvent molecules are listed as SMILES strings"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "raw-structure",
+      "level": "view",
+      "parent": null,
+      "title": "Raw Structure",
+      "summary": "Takes the uploaded CIF and shows it in 3D with its formula and atom count, with display options.",
+      "views": [
+        "molecular 3d viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/PM/0-GTsR.py",
+          "start": 167,
+          "end": 217,
+          "role": "markup",
+          "anchor": "59ebe5fda450",
+          "first": "uploaded_file = st.file_uploader(label=\"Upload Your **C**rystallographic **I**nformation **F**ile\", type=[\"cif\"], help=\""
+        },
+        {
+          "file": "code/pages/PM/0-GTsR.py",
+          "start": 57,
+          "end": 58,
+          "role": "logic",
+          "symbol": "read_cif",
+          "anchor": "37554a390480",
+          "first": "def read_cif(cif_data: bytes):"
+        },
+        {
+          "file": "code/pages/PM/0-GTsR.py",
+          "start": 62,
+          "end": 69,
+          "role": "logic",
+          "symbol": "normalize_cif",
+          "anchor": "5d3381dbcaa5",
+          "first": "def normalize_cif(cif_data: bytes) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "structure-viewer",
+      "level": "component",
+      "parent": "raw-structure",
+      "title": "3D crystal viewer with metrics",
+      "summary": "Draws a crystal structure in py3Dmol with a choice of style, element labels, the unit cell and rotation, along with metric cards for formula and atom count.",
+      "views": [
+        "molecular 3d viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/PM/0-GTsR.py",
+          "start": 72,
+          "end": 78,
+          "role": "logic",
+          "symbol": "cif_viewer",
+          "anchor": "847696967e55",
+          "first": "def cif_viewer("
+        },
+        {
+          "file": "code/pages/PM/0-GTsR.py",
+          "start": 116,
+          "end": 130,
+          "role": "logic",
+          "symbol": "show_structure_metrics",
+          "anchor": "2067639703b0",
+          "first": "def show_structure_metrics(structure, key: str) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "cleaning-controls",
+      "level": "component",
+      "parent": "raw-structure",
+      "title": "Solvent removal controls",
+      "summary": "Picks the solvent model and threshold and runs the GNN cleaner, keeping the result tied to this input and model.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/PM/0-GTsR.py",
+          "start": 219,
+          "end": 259,
+          "role": "logic",
+          "anchor": "d8e7db8b3ecb",
+          "first": "sol_type_col, cutoff_col = st.columns(2)"
+        },
+        {
+          "file": "code/pages/PM/0-GTsR.py",
+          "start": 44,
+          "end": 45,
+          "role": "logic",
+          "symbol": "get_runner",
+          "anchor": "f3db7118de22",
+          "first": "def get_runner(checkpoint: str) -> GTsRunner:"
+        }
+      ]
+    },
+    {
+      "id": "cleaned-structure",
+      "level": "view",
+      "parent": null,
+      "title": "Cleaned Structure",
+      "summary": "Shows the cleaned framework or the removed solvent with its SMILES, and offers the cleaned CIF for download.",
+      "views": [
+        "molecular 3d viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/PM/0-GTsR.py",
+          "start": 261,
+          "end": 330,
+          "role": "markup",
+          "anchor": "e2e5e8bef30a",
+          "first": "if result_matches_input:"
+        },
+        {
+          "file": "code/pages/PM/0-GTsR.py",
+          "start": 133,
+          "end": 138,
+          "role": "logic",
+          "symbol": "show_cleaned_structure",
+          "anchor": "e913defe1547",
+          "first": "def show_cleaned_structure("
+        },
+        {
+          "file": "code/pages/PM/0-GTsR.py",
+          "start": 351,
+          "end": 352,
+          "role": "logic",
+          "anchor": "afa301a30cc1",
+          "first": "elif result is not None:"
+        }
+      ]
+    },
+    {
+      "id": "stability-check",
+      "level": "component",
+      "parent": "cleaned-structure",
+      "title": "Activation Stability Prediction",
+      "summary": "Runs a stability model on the cleaned framework and reports whether it is stable.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/PM/0-GTsR.py",
+          "start": 332,
+          "end": 348,
+          "role": "logic",
+          "anchor": "e6497a53c37a",
+          "first": "colored_header("
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "molecular 3d viewer"
+    }
+  ]
+}

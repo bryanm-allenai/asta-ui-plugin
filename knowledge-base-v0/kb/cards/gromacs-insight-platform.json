@@ -1,0 +1,539 @@
+{
+  "schema": "astaui.card/1",
+  "id": "gromacs-insight-platform",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:05:38Z"
+  },
+  "app": {
+    "title": "GROMACS Insight Platform",
+    "summary": "A person uploads one or more analysis output files from a simulation run, and each is classified by the quantity it holds. They plot the traces, overlay several files on one chart, smooth or rescale them, and for per-residue files rank the most flexible positions. Pressing Analyze gives each trace descriptive statistics, an estimated equilibration point and a heuristic stability score with warnings, and runs a two-sample test on pairs of files of the same type. They leave with a Markdown or PDF report, chart images and the parsed data as CSV.",
+    "task": {
+      "text": "Check whether simulation output traces have settled and look stable, compare runs, and produce a report of the checks.",
+      "verbs": [
+        "derive",
+        "explore",
+        "compare",
+        "summarize",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Text analysis output from molecular dynamics runs: time series of structural, energetic and thermodynamic quantities, plus per-residue fluctuation profiles.",
+      "item": "one output file holding a single quantity over simulation time (or over residue index)",
+      "shapes": [
+        "time series",
+        "table",
+        "per element"
+      ]
+    },
+    "stage": {
+      "text": "checking finished simulation runs for equilibration and stability, before publication-grade analysis",
+      "terms": [
+        "explore",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar takes the uploads and the chart options that every plot below obeys; a quick-view chart overlays chosen files and a bar chart ranks per-residue values, while an Analyze button opens per-file metric cards, pairwise comparisons and a report built from the same computed numbers. A file picker at the bottom shows any file's parsed table and summary statistics for CSV export.",
+      "views": [
+        "line chart",
+        "scatter plot",
+        "bar chart",
+        "summary stats",
+        "table view",
+        "sidebar list"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "search",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "trajectory analysis of molecular dynamics simulations in computational chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "molecular dynamics",
+        "equilibration analysis",
+        "gromacs"
+      ]
+    },
+    "workflow": {
+      "name": "check whether measured traces have settled, compare runs, and report",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload several .xvg or md.log files; each is parsed and auto-classified (RMSD, RMSF, Rg, SASA, H-bonds, energy, temperature, pressure) and shown as a badge with its row count",
+          "parts": [
+            "sidebar-controls",
+            "detected-files"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Pick files and a shared column to overlay on one line, scatter or area chart, with frame downsampling, ps/ns axis, log Y and an optional moving-average overlay; save the chart as PNG, SVG or PDF",
+          "parts": [
+            "sidebar-controls",
+            "quick-view"
+          ]
+        },
+        {
+          "step": "identify the positions that stand out",
+          "here": "For per-residue fluctuation files, a slider sets N and the top-N most flexible residues are highlighted in a bar chart and listed in a table",
+          "parts": [
+            "rmsf-ranking"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Analyze gives each trace mean, std, 95% CI, a block-based equilibration estimate and a 0-100 stability score with warnings and recommendations; a text box answers questions using only those computed numbers",
+          "parts": [
+            "analysis-cards"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "When exactly two files share a detected type, a Welch t-test reports mean difference, t and p with an autocorrelation caveat",
+          "parts": [
+            "comparisons"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download a Markdown or PDF report of overview, stability, statistics, comparisons and flagged issues, and any file's parsed table as CSV",
+          "parts": [
+            "report",
+            "raw-data-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The quantity in each file is guessed from its filename, then from its header text, and that guess decides how it is scored and whether it is treated as a time series or a per-residue profile",
+        "Stability is scored differently per quantity: coefficient of variation after equilibration for plateauing quantities, variation around the setpoint for temperature, and back-half drift slope for noisy pressure and energy",
+        "Equilibration is the first block whose mean falls within tolerance of the final quarter of the run and stays there for every later block",
+        "The question box is a rule-based explainer that only quotes numbers already computed, never free-generated text",
+        "Statistical outputs carry explicit caveats that consecutive frames are autocorrelated, so CIs and p-values are rough signals"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Input files and chart options",
+      "summary": "Takes multiple output-file uploads and holds the chart type, marker, downsampling, time unit, moving-average and log-scale settings used by every plot.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 157,
+          "end": 211,
+          "role": "markup",
+          "anchor": "1a3347d60850",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 43,
+          "end": 53,
+          "role": "style",
+          "anchor": "5f1cdf99b717",
+          "first": "[data-testid=\"stSidebar\"] {"
+        },
+        {
+          "file": "code/app.py",
+          "start": 142,
+          "end": 150,
+          "role": "logic",
+          "symbol": "parse_uploaded_files",
+          "anchor": "e61d98473fac",
+          "first": "def parse_uploaded_files(files):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 132,
+          "end": 139,
+          "role": "logic",
+          "symbol": "_cached_parse",
+          "anchor": "ff33a123d811",
+          "first": "def _cached_parse(filename: str, file_bytes: bytes):"
+        },
+        {
+          "file": "code/src/parser.py",
+          "start": 199,
+          "end": 212,
+          "role": "logic",
+          "symbol": "detect_filetype",
+          "anchor": "12d203afd550",
+          "first": "def detect_filetype(filename: str, title: str, x_label: str, y_label: str) -> str:"
+        },
+        {
+          "file": "code/src/parser.py",
+          "start": 36,
+          "end": 78,
+          "role": "data",
+          "anchor": "a36189b82694",
+          "first": "# filename hints -> file type. checked as substrings against the lowercased"
+        }
+      ]
+    },
+    {
+      "id": "detected-files",
+      "level": "view",
+      "parent": null,
+      "title": "Detected files",
+      "summary": "Shows a badge per parsed file with its detected quantity and row count, and warns about files with no usable numbers.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 250,
+          "end": 268,
+          "role": "markup",
+          "anchor": "e69f3760566f",
+          "first": "with st.spinner(\"Parsing file(s)…\"):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 98,
+          "end": 108,
+          "role": "style",
+          "anchor": "e326713802dc",
+          "first": ".filetype-badge {"
+        }
+      ]
+    },
+    {
+      "id": "quick-view",
+      "level": "view",
+      "parent": null,
+      "title": "Quick View",
+      "summary": "Plots one chosen column for one or several files on a shared time axis, with optional moving-average overlays and image export.",
+      "views": [
+        "line chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "multi-select",
+        "select",
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 278,
+          "end": 346,
+          "role": "markup",
+          "anchor": "e094d93f6d7c",
+          "first": "st.markdown('<div class=\"section-header\">Quick View</div>', unsafe_allow_html=True)"
+        },
+        {
+          "file": "code/src/visualization.py",
+          "start": 51,
+          "end": 68,
+          "role": "logic",
+          "symbol": "timeseries_figure",
+          "anchor": "981c886540ea",
+          "first": "def timeseries_figure(df, x_col: str, y_cols: list[str], chart_type: str,"
+        },
+        {
+          "file": "code/src/visualization.py",
+          "start": 71,
+          "end": 83,
+          "role": "logic",
+          "symbol": "comparison_figure",
+          "anchor": "94d6c99712e4",
+          "first": "def comparison_figure(long_df, x_col: str, y_col: str, color_col: str,"
+        },
+        {
+          "file": "code/src/visualization.py",
+          "start": 86,
+          "end": 89,
+          "role": "logic",
+          "symbol": "add_moving_average_trace",
+          "anchor": "9d3d3a7f74c9",
+          "first": "def add_moving_average_trace(fig: go.Figure, x, y, name: str, color: str) -> go.Figure:"
+        },
+        {
+          "file": "code/src/visualization.py",
+          "start": 103,
+          "end": 107,
+          "role": "logic",
+          "symbol": "export_figure_bytes",
+          "anchor": "a6ccb1e2a7c7",
+          "first": "def export_figure_bytes(fig: go.Figure, fmt: str = \"png\", scale: int = 2) -> bytes:"
+        },
+        {
+          "file": "code/src/statistics.py",
+          "start": 60,
+          "end": 66,
+          "role": "logic",
+          "symbol": "moving_average",
+          "anchor": "aff43c0a52bf",
+          "first": "def moving_average(values, window: int):"
+        }
+      ]
+    },
+    {
+      "id": "rmsf-ranking",
+      "level": "view",
+      "parent": null,
+      "title": "Per-residue RMSF",
+      "summary": "Draws per-residue fluctuation as bars, highlights the top-N most flexible residues chosen with a slider, and lists them in a table.",
+      "views": [
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "sort"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 348,
+          "end": 362,
+          "role": "markup",
+          "anchor": "626d925c81b0",
+          "first": "if rmsf_files:"
+        },
+        {
+          "file": "code/src/analysis.py",
+          "start": 264,
+          "end": 271,
+          "role": "logic",
+          "symbol": "top_flexible_residues",
+          "anchor": "76e10e663f9b",
+          "first": "def top_flexible_residues(residue_ids, rmsf_values, top_n: int = 10):"
+        },
+        {
+          "file": "code/src/visualization.py",
+          "start": 92,
+          "end": 100,
+          "role": "logic",
+          "symbol": "rmsf_figure",
+          "anchor": "ebeb1034e39d",
+          "first": "def rmsf_figure(residue_ids, rmsf_values, highlight_ids=None,"
+        }
+      ]
+    },
+    {
+      "id": "analysis-cards",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis",
+      "summary": "After Analyze, shows per-file cards with mean, std, 95% CI and a quality score, an equilibration note, warnings and recommendations, and a question box answered from the computed values.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "search"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 369,
+          "end": 433,
+          "role": "markup",
+          "anchor": "8040d1deb0ec",
+          "first": "st.markdown('<div class=\"section-header\">Analysis</div>', unsafe_allow_html=True)"
+        },
+        {
+          "file": "code/app.py",
+          "start": 68,
+          "end": 87,
+          "role": "style",
+          "anchor": "0b785e3822e9",
+          "first": ".metric-card {"
+        },
+        {
+          "file": "code/src/statistics.py",
+          "start": 16,
+          "end": 40,
+          "role": "logic",
+          "symbol": "descriptive_stats",
+          "anchor": "e09eef6e9d5f",
+          "first": "def descriptive_stats(values) -> dict:"
+        },
+        {
+          "file": "code/src/analysis.py",
+          "start": 23,
+          "end": 85,
+          "role": "logic",
+          "symbol": "estimate_equilibration",
+          "anchor": "a8d221b0cd25",
+          "first": "def estimate_equilibration(time_arr, values, n_blocks: int = 20,"
+        },
+        {
+          "file": "code/src/analysis.py",
+          "start": 153,
+          "end": 176,
+          "role": "logic",
+          "symbol": "compute_stability_component",
+          "anchor": "99b13fda5712",
+          "first": "def compute_stability_component(filetype: str, time_arr, values) -> tuple[str, float | None, dict]:"
+        },
+        {
+          "file": "code/src/analysis.py",
+          "start": 179,
+          "end": 216,
+          "role": "logic",
+          "symbol": "quality_score",
+          "anchor": "cc49495c4144",
+          "first": "def quality_score(component_scores: dict[str, float]) -> dict:"
+        },
+        {
+          "file": "code/src/analysis.py",
+          "start": 219,
+          "end": 261,
+          "role": "logic",
+          "symbol": "explain_metric",
+          "anchor": "ab71d2419034",
+          "first": "def explain_metric(question: str, filetype: str, stats: dict, equilibration: dict | None,"
+        }
+      ]
+    },
+    {
+      "id": "comparisons",
+      "level": "component",
+      "parent": "analysis-cards",
+      "title": "Comparisons",
+      "summary": "For each detected type with exactly two files, reports a Welch t-test (mean difference, t, p) with a caveat about autocorrelated frames.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 435,
+          "end": 452,
+          "role": "markup",
+          "anchor": "0537f96106a3",
+          "first": "# ---- comparisons across files sharing a detected type -----------------"
+        },
+        {
+          "file": "code/src/statistics.py",
+          "start": 82,
+          "end": 123,
+          "role": "logic",
+          "symbol": "compare_two_samples",
+          "anchor": "718f1953ff8c",
+          "first": "def compare_two_samples(a, label_a: str, b, label_b: str) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "report",
+      "level": "component",
+      "parent": "analysis-cards",
+      "title": "Report",
+      "summary": "Builds a Markdown report of overview, stability, statistics, comparisons and flagged issues, offers it and a PDF version for download, and previews it.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 454,
+          "end": 476,
+          "role": "markup",
+          "anchor": "691d94653828",
+          "first": "# ---- report -------------------------------------------------------------"
+        },
+        {
+          "file": "code/src/report.py",
+          "start": 15,
+          "end": 82,
+          "role": "logic",
+          "symbol": "build_markdown_report",
+          "anchor": "b6f8bd66a3fb",
+          "first": "def build_markdown_report(files_summary: list[dict], comparisons: list[dict] | None = None) -> str:"
+        },
+        {
+          "file": "code/src/report.py",
+          "start": 100,
+          "end": 147,
+          "role": "logic",
+          "symbol": "build_pdf_report",
+          "anchor": "fdb9f80beb01",
+          "first": "def build_pdf_report(markdown_text: str, figures: list[tuple[str, bytes]] | None = None) -> bytes:"
+        }
+      ]
+    },
+    {
+      "id": "raw-data-export",
+      "level": "view",
+      "parent": null,
+      "title": "Raw data and export",
+      "summary": "Picks one file to show its parsed table beside describe-style statistics and header metadata, and downloads it as CSV.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 483,
+          "end": 507,
+          "role": "markup",
+          "anchor": "ce1c13d0ca8d",
+          "first": "st.markdown('<div class=\"section-header\">Raw Data & Export</div>', unsafe_allow_html=True)"
+        }
+      ]
+    }
+  ]
+}

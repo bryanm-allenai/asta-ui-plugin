@@ -1,0 +1,490 @@
+{
+  "schema": "astaui.card/1",
+  "id": "gelannotate",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T15:39:25Z"
+  },
+  "app": {
+    "title": "GelAnnotate",
+    "summary": "A person uploads a gel image, and the interface finds the lanes automatically or fits a regular comb when they type in the number of lanes they loaded. They correct lane centres in a table and type a label above and below each lane, with up to three more label rows underneath. They pick the molecular-weight standard they ran and the lane it is in; the interface finds that lane's bands and fits them to the stated sizes, and any band the gel did not resolve is placed from the fit. They adjust the title, fonts and display, then save or download the annotated figure at the format and resolution they choose.",
+    "task": {
+      "text": "Turn a raw gel image into a labelled, size-calibrated figure ready for publication.",
+      "verbs": [
+        "annotate",
+        "locate",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "One photographed or scanned image of a gel, a table of labels for each lane, and a preset list of reference sizes for the standard that was run.",
+      "item": "a lane on a gel image",
+      "shapes": [
+        "image",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "labelling a finished gel image for a publication figure, after the gel is run and imaged",
+      "terms": [
+        "annotate",
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar sections set the image, the lane detection, the standard and the appearance. Four tabs then hold editable tables (lane labels, lane centres, marker band rows) next to a figure preview, which redraws on every edit without detecting the lanes again. Two buttons run the automatic steps (detect lanes, find bands in the standard lane), and every value they produce can still be changed by hand.",
+      "views": [
+        "image viewer",
+        "table view",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "lane and band annotation of electrophoresis gels in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "gel electrophoresis",
+        "sds page",
+        "molecular weight ladder"
+      ]
+    },
+    "workflow": {
+      "name": "find the regions of an image, label each, calibrate a scale and export the figure",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a gel image (PNG, JPEG, TIFF, BMP, or HEIC if available; 8- or 16-bit). Loading a new image clears the lanes, labels and markers.",
+          "parts": [
+            "sidebar-image-lanes"
+          ]
+        },
+        {
+          "step": "find the regions to annotate, then correct them by hand",
+          "here": "Lanes are found by picking peaks in the image's column profile. Entering the lane count fits a regular comb instead, and sliders crop the rows and columns searched. In the Lanes tab, centres can be nudged, added or deleted, and the changes applied.",
+          "parts": [
+            "sidebar-image-lanes",
+            "lanes-tab"
+          ]
+        },
+        {
+          "step": "attach labels to each region",
+          "here": "A table with one row per lane has 'above' and 'below' text fields and up to three more rows for further tiers, with a live preview of the figure beside it.",
+          "parts": [
+            "annotation-tab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Choose a standard from the presets (protein kDa, DNA bp, RNA nt, or custom) and the lane it was loaded into. 'Find bands in this lane' detects that lane's bands and fits them to the stated sizes with a log-linear mobility model, then reports how many bands matched and the r².",
+          "parts": [
+            "standard-picker",
+            "markers-tab"
+          ]
+        },
+        {
+          "step": "correct the computed positions by hand",
+          "here": "The marker table lets each band's row be edited or hidden, and 'Place bands by hand' spreads every band between a top and a bottom anchor row.",
+          "parts": [
+            "markers-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Choose the title, caption, font size, label rotation and display options, then save to a path as PNG, TIFF, PDF, SVG or JPEG at a chosen dpi, or download a PNG.",
+          "parts": [
+            "appearance-settings",
+            "save-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Typing the lane count fits a regular comb, so lanes with no sample still get a position, which the image alone cannot give.",
+        "Standard bands are matched to stated sizes by a robust pairwise fit, linear in log10(size). Extra peaks are ignored, unresolved bands are placed from the model and drawn dashed, and fewer than three matches or r² ≤ 0.99 triggers a warning.",
+        "Ladder presets carry a 'verified' flag, and the interface warns when a ladder's band values have not been checked against the vendor's documentation.",
+        "Labels come in tiers: one row above each lane and several rows below, for treatment, genotype or time point.",
+        "The input can be a phone photograph: sliders crop out the tray and background, and options set the band polarity, flatten uneven lighting and correct rotation."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar settings",
+      "summary": "Numbered sections (image, lanes, standard, appearance) that set up everything the tabs show.",
+      "views": [
+        "form"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 331,
+          "end": 352,
+          "role": "logic",
+          "anchor": "24eabeb3a080",
+          "first": "def main() -> None:"
+        }
+      ]
+    },
+    {
+      "id": "sidebar-image-lanes",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Image upload and lane detection",
+      "summary": "Loads the gel image and runs lane detection, either automatically or as a comb fitted to a given lane count, with crop, polarity, flattening and deskew settings.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 128,
+          "end": 145,
+          "role": "logic",
+          "symbol": "sidebar_upload",
+          "anchor": "656c1ff6b946",
+          "first": "def sidebar_upload() -> None:"
+        },
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 115,
+          "end": 122,
+          "role": "logic",
+          "symbol": "reset_for_new_image",
+          "anchor": "e1c01a25fd8a",
+          "first": "def reset_for_new_image(image: np.ndarray, name: str) -> None:"
+        },
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 148,
+          "end": 206,
+          "role": "logic",
+          "symbol": "sidebar_detection",
+          "anchor": "8a9b56bb1cca",
+          "first": "def sidebar_detection() -> dict:"
+        },
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 357,
+          "end": 374,
+          "role": "logic",
+          "anchor": "ec6bf08bee64",
+          "first": "# ---- detection -------------------------------------------------------- #"
+        },
+        {
+          "file": "code/src/gelannotate/detect.py",
+          "start": 615,
+          "end": 629,
+          "role": "logic",
+          "symbol": "detect_lanes",
+          "anchor": "14b62c6c0d56",
+          "first": "def detect_lanes("
+        },
+        {
+          "file": "code/src/gelannotate/detect.py",
+          "start": 195,
+          "end": 239,
+          "role": "logic",
+          "symbol": "load_image",
+          "anchor": "48445bd71aad",
+          "first": "def load_image(source, *, as_gray: bool = False) -> np.ndarray:"
+        }
+      ]
+    },
+    {
+      "id": "standard-picker",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Molecular-weight standard",
+      "summary": "Picks a preset ladder by type (protein, DNA, RNA) or a custom one with a set number of fields, warns when its band values are unverified, and sets how the markers are drawn.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 209,
+          "end": 250,
+          "role": "logic",
+          "symbol": "sidebar_marker",
+          "anchor": "c4e68918950e",
+          "first": "def sidebar_marker() -> tuple[object | None, dict]:"
+        },
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 93,
+          "end": 112,
+          "role": "logic",
+          "symbol": "mark_frame",
+          "anchor": "17925793c009",
+          "first": "def mark_frame(ladder, height: int, previous: pd.DataFrame | None = None) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 376,
+          "end": 381,
+          "role": "logic",
+          "anchor": "faa1e4a5578a",
+          "first": "# ---- marker fields follow the chosen ladder --------------------------- #"
+        },
+        {
+          "file": "code/src/gelannotate/data/ladders.yaml",
+          "start": 22,
+          "end": 260,
+          "role": "data",
+          "anchor": "4a916fb6cb25",
+          "first": "ladders:"
+        }
+      ]
+    },
+    {
+      "id": "appearance-settings",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Appearance",
+      "summary": "Sets the figure's title, caption, font size, width and label rotation, and the display options: invert, contrast stretch, lane shading and border.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 253,
+          "end": 278,
+          "role": "logic",
+          "symbol": "sidebar_style",
+          "anchor": "093a86255c51",
+          "first": "def sidebar_style() -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "annotation-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Annotation",
+      "summary": "An editable table with one row per lane (above, below and extra label rows) next to a live preview of the annotated figure.",
+      "views": [
+        "table view",
+        "image viewer"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 383,
+          "end": 416,
+          "role": "markup",
+          "anchor": "f6d8a1b9ce41",
+          "first": "tab_annot, tab_lanes, tab_marks, tab_save = st.tabs("
+        },
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 79,
+          "end": 90,
+          "role": "logic",
+          "symbol": "label_frame",
+          "anchor": "18a63ae35227",
+          "first": "def label_frame(n_lanes: int, previous: pd.DataFrame | None = None) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 284,
+          "end": 285,
+          "role": "logic",
+          "symbol": "build_spec",
+          "anchor": "f0c7536e5580",
+          "first": "def build_spec("
+        },
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 322,
+          "end": 325,
+          "role": "logic",
+          "symbol": "figure_bytes",
+          "anchor": "2357a4cca062",
+          "first": "def figure_bytes(fig, fmt: str = \"png\", dpi: int = 200) -> bytes:"
+        },
+        {
+          "file": "code/src/gelannotate/render.py",
+          "start": 296,
+          "end": 305,
+          "role": "logic",
+          "symbol": "render_annotation",
+          "anchor": "9fc5f5f68ce8",
+          "first": "def render_annotation("
+        }
+      ]
+    },
+    {
+      "id": "lanes-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Detected lanes",
+      "summary": "Draws the detected lane centres and extents over the image, with an editable table of centres in which lanes can be nudged, added or deleted and then applied.",
+      "views": [
+        "image viewer",
+        "table view"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 418,
+          "end": 446,
+          "role": "logic",
+          "anchor": "c5cf8cfb9d51",
+          "first": "# ---- lanes ------------------------------------------------------------ #"
+        },
+        {
+          "file": "code/src/gelannotate/diagnostics.py",
+          "start": 18,
+          "end": 24,
+          "role": "logic",
+          "symbol": "detection_figure",
+          "anchor": "cc72c11b6522",
+          "first": "def detection_figure("
+        },
+        {
+          "file": "code/src/gelannotate/detect.py",
+          "start": 845,
+          "end": 850,
+          "role": "logic",
+          "symbol": "lanes_from_positions",
+          "anchor": "58f513d31282",
+          "first": "def lanes_from_positions("
+        }
+      ]
+    },
+    {
+      "id": "markers-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Markers",
+      "summary": "Finds the bands in the chosen standard lane and fits them to the stated sizes, reports how many matched and the r², and shows the fit. A table of band rows can be edited or hidden, or placed by hand from two anchors, next to the figure preview.",
+      "views": [
+        "table view",
+        "image viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "inline edit"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 448,
+          "end": 558,
+          "role": "logic",
+          "anchor": "af4b274d7d52",
+          "first": "# ---- markers ---------------------------------------------------------- #"
+        },
+        {
+          "file": "code/src/gelannotate/bands.py",
+          "start": 356,
+          "end": 366,
+          "role": "logic",
+          "symbol": "place_ladder",
+          "anchor": "a716026fd714",
+          "first": "def place_ladder("
+        },
+        {
+          "file": "code/src/gelannotate/diagnostics.py",
+          "start": 95,
+          "end": 102,
+          "role": "logic",
+          "symbol": "ladder_figure",
+          "anchor": "bcd265758cab",
+          "first": "def ladder_figure("
+        },
+        {
+          "file": "code/src/gelannotate/render.py",
+          "start": 177,
+          "end": 178,
+          "role": "logic",
+          "symbol": "log_interpolate_positions",
+          "anchor": "2735eb465c09",
+          "first": "def log_interpolate_positions("
+        }
+      ]
+    },
+    {
+      "id": "save-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Save",
+      "summary": "Writes the annotated figure to a chosen path, format and dpi, creating any missing folders, or offers it as a PNG download, with a final preview.",
+      "views": [
+        "form",
+        "image viewer"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/gelannotate/app.py",
+          "start": 560,
+          "end": 595,
+          "role": "logic",
+          "anchor": "5872aebc064c",
+          "first": "# ---- save ------------------------------------------------------------- #"
+        },
+        {
+          "file": "code/src/gelannotate/render.py",
+          "start": 631,
+          "end": 638,
+          "role": "logic",
+          "symbol": "save_annotation",
+          "anchor": "10babaef638e",
+          "first": "def save_annotation("
+        }
+      ]
+    }
+  ]
+}

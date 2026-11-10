@@ -1,0 +1,730 @@
+{
+  "schema": "astaui.card/1",
+  "id": "kana-scrna-browser",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:17:45Z"
+  },
+  "app": {
+    "title": "kana: single-cell analysis in the browser",
+    "summary": "A person loads a count matrix (or a saved analysis, or a demo dataset), picks the modalities and an optional batch or subset column, and runs a standard pipeline whose steps they can tune in a parameter panel. The results screen shows a t-SNE or UMAP embedding coloured by cluster, gene expression or any annotation, next to a ranked marker table for the chosen cluster that can be searched, filtered by statistic sliders and set against another cluster. They can lasso cells into a custom selection to get its markers, switch to gene set enrichment or reference-based cell type labels for the cluster, and keep snapshots of plots in a gallery of diagnostic plots. The analysis is saved to the browser or downloaded as a state file or a ZIP of results, and marker or gene set tables are downloaded as CSV.",
+    "task": {
+      "text": "Run a standard single-cell analysis on a count matrix and explore its clusters to find the marker genes and likely cell types of each.",
+      "verbs": [
+        "derive",
+        "explore",
+        "identify",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A cells-by-features count matrix, optionally with RNA, protein-tag (ADT) and CRISPR modalities and per-cell annotation columns, from which embeddings, clusters, marker statistics, gene set scores and cell type labels are computed.",
+      "item": "a cell, grouped into a cluster or a hand-made selection",
+      "shapes": [
+        "table",
+        "categories",
+        "network"
+      ]
+    },
+    "stage": {
+      "text": "exploring a new single-cell dataset after quantification, from quality control through clustering to marker and cell type calls",
+      "terms": [
+        "explore",
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "An embedding scatter plot sits beside a marker table and a gallery of diagnostic plots; choosing a cluster in the table, a gene's colour icon, or a lasso selection on the plot updates the others, and the same cluster choice syncs across the marker, gene set and cell type panels. A sidebar switches between the input form, parameter form, results and logs.",
+      "views": [
+        "scatter plot",
+        "table view",
+        "bar chart",
+        "summary stats",
+        "form",
+        "thumbnail grid",
+        "heatmap",
+        "sidebar list"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "brush",
+        "search",
+        "filter",
+        "sort",
+        "hover for detail",
+        "toggle view",
+        "drag to arrange",
+        "export",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail",
+        "dashboard",
+        "small multiples"
+      ]
+    },
+    "field": {
+      "text": "single-cell RNA-seq clustering and marker detection in bioinformatics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "single cell rna seq",
+        "bioinformatics",
+        "cell type annotation"
+      ]
+    },
+    "workflow": {
+      "name": "run a computational pipeline on a dataset, then explore the groups it finds and what distinguishes them",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Add one or more datasets as Matrix Market, 10x HDF5, H5AD, RDS SummarizedExperiment, zipped ArtifactDB or an ExperimentHub id; choose modalities, a batch column for MNN correction or a subset filter; or load a saved .kana analysis.",
+          "parts": [
+            "new-analysis"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run the pipeline (QC filtering, normalisation, variable genes, PCA, graph clustering, t-SNE/UMAP, markers, gene set enrichment, reference cell type labels), adjusting each step's parameters in the PARAMS panel and rerunning.",
+          "parts": [
+            "param-selection",
+            "gallery"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The embedding plot shows every cell coloured by cluster, by any annotation or by a gene's expression; legend clicks highlight one cluster, and the embedding can be animated through its iterations.",
+          "parts": [
+            "dim-plot"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Pick a cluster to rank its marker genes by effect size, optionally against one other cluster (vs mode); search for a gene and narrow by statistic sliders, and click a gene to colour the plot by it.",
+          "parts": [
+            "marker-table",
+            "dim-plot"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Lasso cells on the embedding to save a custom selection, which then gets its own marker list like any cluster.",
+          "parts": [
+            "dim-plot",
+            "marker-table"
+          ]
+        },
+        {
+          "step": "identify what each group is",
+          "here": "Switch the side panel to gene set enrichment for the cluster's top markers, or to cell type scores against selected human or mouse reference datasets.",
+          "parts": [
+            "feature-sets",
+            "cell-annotation"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Save the analysis to the browser, download parameters as a .kana file or results as a ZIP, download marker or gene set tables as CSV, and save plot snapshots or PNGs to the gallery.",
+          "parts": [
+            "marker-table",
+            "feature-sets",
+            "gallery",
+            "results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "all computation runs client-side in WebAssembly workers, so data never leaves the machine",
+        "multi-modal data (RNA, protein tags, CRISPR guides) are processed in parallel and combined with weights before clustering",
+        "markers can be ranked for a cluster against all others or against one chosen cluster, by several effect-size summaries",
+        "hand-drawn lasso selections become groups with their own markers, alongside computed clusters and any supplied annotation",
+        "a saved analysis file restores the full state, so a run can be reopened and reanalysed with new parameters"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "new-analysis",
+      "level": "view",
+      "parent": null,
+      "title": "New analysis inputs",
+      "summary": "Lets the person add datasets in several formats, set modalities, a batch column or a cell subset, and start the analysis.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/components/NewAnalysis/index.js",
+          "start": 44,
+          "end": 44,
+          "role": "logic",
+          "symbol": "NewAnalysis",
+          "anchor": "cefb994eca62",
+          "first": "export function NewAnalysis({ setShowPanel, setStateIndeterminate, ...props }) {"
+        },
+        {
+          "file": "code/src/components/NewAnalysis/index.js",
+          "start": 313,
+          "end": 716,
+          "role": "markup",
+          "symbol": "render_inputs",
+          "anchor": "04bee4a5f994",
+          "first": "const render_inputs = () => {"
+        },
+        {
+          "file": "code/src/components/NewAnalysis/index.js",
+          "start": 126,
+          "end": 169,
+          "role": "logic",
+          "symbol": "handleRunAnalysis",
+          "anchor": "681d57ac7226",
+          "first": "const handleRunAnalysis = () => {"
+        },
+        {
+          "file": "code/src/components/NewAnalysis/index.js",
+          "start": 750,
+          "end": 1054,
+          "role": "markup",
+          "symbol": "render_batch_correction",
+          "anchor": "a298b7f8aef6",
+          "first": "const render_batch_correction = () => {"
+        },
+        {
+          "file": "code/src/components/NewAnalysis/MatrixMarketCard.js",
+          "start": 22,
+          "end": 31,
+          "role": "markup",
+          "symbol": "MatrixMarket",
+          "anchor": "d7bd547a601e",
+          "first": "export function MatrixMarket({"
+        },
+        {
+          "file": "code/src/components/NewAnalysis/utils.js",
+          "start": 3,
+          "end": 26,
+          "role": "logic",
+          "symbol": "guessModalitiesFromFeatureTypes",
+          "anchor": "4d8d2909040b",
+          "first": "export function guessModalitiesFromFeatureTypes(preflight) {"
+        },
+        {
+          "file": "code/src/components/NewAnalysis/index.css",
+          "start": 1,
+          "end": 5,
+          "role": "style",
+          "symbol": ".section",
+          "anchor": "34385eccb8e7",
+          "first": ".section {"
+        }
+      ]
+    },
+    {
+      "id": "param-selection",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis parameters",
+      "summary": "A form with a section per pipeline step (QC, feature selection, PCA, clustering, t-SNE, UMAP, markers, gene sets, cell type references, batch correction) to tune and rerun the analysis.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/components/ParamSelection/index.js",
+          "start": 28,
+          "end": 33,
+          "role": "logic",
+          "symbol": "ParameterSelection",
+          "anchor": "7e8ff536ab2a",
+          "first": "export function ParameterSelection({"
+        },
+        {
+          "file": "code/src/components/ParamSelection/index.js",
+          "start": 589,
+          "end": 682,
+          "role": "markup",
+          "symbol": "render_rna_qc",
+          "anchor": "5d753cbc1919",
+          "first": "const render_rna_qc = () => {"
+        },
+        {
+          "file": "code/src/components/ParamSelection/index.js",
+          "start": 754,
+          "end": 934,
+          "role": "markup",
+          "symbol": "render_clus",
+          "anchor": "a50b30156c29",
+          "first": "const render_clus = () => {"
+        },
+        {
+          "file": "code/src/components/ParamSelection/index.js",
+          "start": 1265,
+          "end": 1413,
+          "role": "markup",
+          "symbol": "render_cellann",
+          "anchor": "c3644d66ff17",
+          "first": "const render_cellann = () => {"
+        },
+        {
+          "file": "code/src/components/ParamSelection/index.js",
+          "start": 60,
+          "end": 64,
+          "role": "logic",
+          "symbol": "handleRunAnalysis",
+          "anchor": "2eb7fdf69af5",
+          "first": "const handleRunAnalysis = () => {"
+        },
+        {
+          "file": "code/src/components/ParamSelection/index.css",
+          "start": 1,
+          "end": 5,
+          "role": "style",
+          "symbol": ".param-section",
+          "anchor": "a7d03c435bd4",
+          "first": ".param-section {"
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "level": "view",
+      "parent": null,
+      "title": "Results workspace and save menu",
+      "summary": "Lays out the embedding, the marker / gene set / cell type panel and the gallery, keeps their cluster choice in sync, and offers save-to-browser and download of the analysis.",
+      "views": [
+        "side-by-side panes",
+        "sidebar list",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/components/AnalysisMode/index.js",
+          "start": 1815,
+          "end": 2036,
+          "role": "markup",
+          "anchor": "73e5024378fa",
+          "first": "{showPanel === \"results\" && ("
+        },
+        {
+          "file": "code/src/components/AnalysisMode/index.js",
+          "start": 1533,
+          "end": 1595,
+          "role": "markup",
+          "anchor": "bd61af54605f",
+          "first": "<div className=\"item-sidebar\">"
+        },
+        {
+          "file": "code/src/components/AnalysisMode/index.js",
+          "start": 774,
+          "end": 826,
+          "role": "logic",
+          "anchor": "35a3a76686f0",
+          "first": "useEffect(() => {"
+        },
+        {
+          "file": "code/src/components/AnalysisMode/index.js",
+          "start": 549,
+          "end": 633,
+          "role": "logic",
+          "anchor": "f27369d840f5",
+          "first": "useEffect(() => {"
+        },
+        {
+          "file": "code/src/App.css",
+          "start": 134,
+          "end": 138,
+          "role": "style",
+          "symbol": ".results-gallery",
+          "anchor": "c84da9ea1d2f",
+          "first": ".results-gallery {"
+        }
+      ]
+    },
+    {
+      "id": "dim-plot",
+      "level": "component",
+      "parent": "results",
+      "title": "Embedding plot",
+      "summary": "Draws every cell on a t-SNE or UMAP embedding coloured by cluster, annotation or gene expression, with legend highlighting, animation, lasso selection into custom groups and saving to the gallery or PNG.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "brush",
+        "select",
+        "zoom and pan",
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/components/Plots/DimPlot.js",
+          "start": 34,
+          "end": 1449,
+          "role": "logic",
+          "symbol": "DimPlot",
+          "anchor": "be102f7b37d9",
+          "first": "const DimPlot = (props) => {"
+        },
+        {
+          "file": "code/src/components/Plots/DimPlot.js",
+          "start": 616,
+          "end": 638,
+          "role": "logic",
+          "symbol": "savePoints",
+          "anchor": "d52fdfff018f",
+          "first": "const savePoints = () => {"
+        },
+        {
+          "file": "code/src/components/Plots/DimPlot.js",
+          "start": 685,
+          "end": 748,
+          "role": "logic",
+          "symbol": "handleSaveEmbedding",
+          "anchor": "86261228dd28",
+          "first": "function handleSaveEmbedding() {"
+        },
+        {
+          "file": "code/src/components/Plots/DimPlot.js",
+          "start": 750,
+          "end": 826,
+          "role": "logic",
+          "symbol": "handleSavePNG",
+          "anchor": "2a43500c8a29",
+          "first": "function handleSavePNG() {"
+        },
+        {
+          "file": "code/src/components/Plots/DimPlot.css",
+          "start": 1,
+          "end": 10,
+          "role": "style",
+          "symbol": ".scatter-plot",
+          "anchor": "2cc756e332d2",
+          "first": ".scatter-plot {"
+        },
+        {
+          "file": "code/src/components/Plots/DimPlot.css",
+          "start": 33,
+          "end": 39,
+          "role": "style",
+          "symbol": ".dimplot-right-sidebar",
+          "anchor": "05a65b804975",
+          "first": ".dimplot-right-sidebar {"
+        }
+      ]
+    },
+    {
+      "id": "marker-table",
+      "level": "component",
+      "parent": "results",
+      "title": "Marker genes",
+      "summary": "Ranks genes for the selected cluster or selection, alone or against another cluster, with search, statistic sliders, expression bars, a per-gene histogram, a colour-by-gene button and CSV download.",
+      "views": [
+        "table view",
+        "bar chart"
+      ],
+      "interactions": [
+        "select",
+        "search",
+        "filter",
+        "sort",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/components/Markers/index.js",
+          "start": 42,
+          "end": 1693,
+          "role": "logic",
+          "symbol": "MarkerPlot",
+          "anchor": "12d2d39c0cfa",
+          "first": "const MarkerPlot = (props) => {"
+        },
+        {
+          "file": "code/src/components/Markers/index.js",
+          "start": 316,
+          "end": 320,
+          "role": "logic",
+          "symbol": "handleMarkerFilter",
+          "anchor": "759fc1f25a08",
+          "first": "const handleMarkerFilter = (val, key) => {"
+        },
+        {
+          "file": "code/src/components/Markers/index.js",
+          "start": 387,
+          "end": 420,
+          "role": "logic",
+          "symbol": "render_download_link",
+          "anchor": "e99a20d69eb7",
+          "first": "const render_download_link = () => {"
+        },
+        {
+          "file": "code/src/components/Markers/markers.css",
+          "start": 1,
+          "end": 6,
+          "role": "style",
+          "symbol": ".marker-container",
+          "anchor": "9f113c3f0f7a",
+          "first": ".marker-container {"
+        },
+        {
+          "file": "code/src/components/Markers/markers.css",
+          "start": 55,
+          "end": 64,
+          "role": "style",
+          "symbol": ".marker-filter-container",
+          "anchor": "811591921bd1",
+          "first": ".marker-filter-container {"
+        },
+        {
+          "file": "code/src/components/AnalysisMode/index.js",
+          "start": 397,
+          "end": 432,
+          "role": "logic",
+          "anchor": "1c01c1630e5f",
+          "first": "useEffect(() => {"
+        }
+      ]
+    },
+    {
+      "id": "feature-sets",
+      "level": "component",
+      "parent": "results",
+      "title": "Gene set enrichment",
+      "summary": "Lists gene sets enriched among the cluster's top markers, with filters, per-set cell scores shown on the embedding, the set's genes, and CSV download.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "search",
+        "filter",
+        "sort",
+        "export"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/components/FeatureSets/index.js",
+          "start": 41,
+          "end": 1741,
+          "role": "logic",
+          "symbol": "FeatureSetEnrichment",
+          "anchor": "a2bde0a921a3",
+          "first": "const FeatureSetEnrichment = (props) => {"
+        },
+        {
+          "file": "code/src/components/FeatureSets/index.js",
+          "start": 355,
+          "end": 479,
+          "role": "markup",
+          "symbol": "render_row_info",
+          "anchor": "41233c4a4af0",
+          "first": "const render_row_info = (row) => {"
+        },
+        {
+          "file": "code/src/components/FeatureSets/index.js",
+          "start": 481,
+          "end": 547,
+          "role": "logic",
+          "symbol": "render_download_link",
+          "anchor": "68e3f2142151",
+          "first": "const render_download_link = () => {"
+        },
+        {
+          "file": "code/src/components/FeatureSets/fsea.css",
+          "start": 1,
+          "end": 6,
+          "role": "style",
+          "symbol": ".fsetenrich-container",
+          "anchor": "6486705065d8",
+          "first": ".fsetenrich-container {"
+        },
+        {
+          "file": "code/src/components/AnalysisMode/index.js",
+          "start": 652,
+          "end": 682,
+          "role": "logic",
+          "anchor": "e04f0425d6f3",
+          "first": "useEffect(() => {"
+        }
+      ]
+    },
+    {
+      "id": "cell-annotation",
+      "level": "component",
+      "parent": "results",
+      "title": "Cell type annotation",
+      "summary": "Shows, for the chosen cluster, scores for each cell type in the selected reference datasets so the person can name the cluster.",
+      "views": [
+        "table view",
+        "heatmap"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/components/CellAnnotation/index.js",
+          "start": 31,
+          "end": 562,
+          "role": "logic",
+          "symbol": "CellAnnotation",
+          "anchor": "b01766952b31",
+          "first": "const CellAnnotation = (props) => {"
+        },
+        {
+          "file": "code/src/components/CellAnnotation/index.js",
+          "start": 162,
+          "end": 219,
+          "role": "markup",
+          "symbol": "render_all_celltypes",
+          "anchor": "22de37e60a74",
+          "first": "const render_all_celltypes = (allCellTypes, best) => {"
+        },
+        {
+          "file": "code/src/components/CellAnnotation/index.js",
+          "start": 221,
+          "end": 339,
+          "role": "markup",
+          "symbol": "render_references",
+          "anchor": "23972e4e330f",
+          "first": "const render_references = () => {"
+        },
+        {
+          "file": "code/src/components/CellAnnotation/cellanno.css",
+          "start": 1,
+          "end": 6,
+          "role": "style",
+          "symbol": ".cellanno-container",
+          "anchor": "fca8a548212b",
+          "first": ".cellanno-container {"
+        },
+        {
+          "file": "code/src/components/AnalysisMode/index.js",
+          "start": 828,
+          "end": 851,
+          "role": "logic",
+          "anchor": "989c2594ecaa",
+          "first": "useEffect(() => {"
+        }
+      ]
+    },
+    {
+      "id": "gallery",
+      "level": "component",
+      "parent": "results",
+      "title": "Gallery of diagnostic plots",
+      "summary": "Holds QC metric plots, PCA variance explained, cluster sizes, cell type summaries and saved embedding snapshots, reorderable by drag and restorable to the main plot.",
+      "views": [
+        "thumbnail grid",
+        "bar chart",
+        "small multiples"
+      ],
+      "interactions": [
+        "drag to arrange",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "small multiples",
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/components/Gallery/index.js",
+          "start": 28,
+          "end": 389,
+          "role": "logic",
+          "symbol": "Gallery",
+          "anchor": "8b581a1e361a",
+          "first": "const Gallery = (props) => {"
+        },
+        {
+          "file": "code/src/components/Gallery/index.js",
+          "start": 150,
+          "end": 343,
+          "role": "markup",
+          "symbol": "get_children",
+          "anchor": "693e3882f339",
+          "first": "function get_children() {"
+        },
+        {
+          "file": "code/src/components/Gallery/index.js",
+          "start": 345,
+          "end": 357,
+          "role": "logic",
+          "symbol": "handleDragEnd",
+          "anchor": "7e637f5e8769",
+          "first": "function handleDragEnd(event) {"
+        },
+        {
+          "file": "code/src/components/Gallery/SortableItem.js",
+          "start": 15,
+          "end": 136,
+          "role": "markup",
+          "symbol": "SortableItem",
+          "anchor": "504e620e7c51",
+          "first": "export function SortableItem(props) {"
+        },
+        {
+          "file": "code/src/components/Gallery/Gallery.css",
+          "start": 36,
+          "end": 46,
+          "role": "style",
+          "symbol": ".gitem",
+          "anchor": "0a642d7283bd",
+          "first": ".gitem {"
+        },
+        {
+          "file": "code/src/components/Plots/QCPlotMgr.js",
+          "start": 8,
+          "end": 62,
+          "role": "logic",
+          "symbol": "QCPlotMgr",
+          "anchor": "30f0858467fd",
+          "first": "const QCPlotMgr = (props) => {"
+        }
+      ]
+    }
+  ]
+}

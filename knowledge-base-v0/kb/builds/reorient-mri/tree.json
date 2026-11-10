@@ -1,0 +1,496 @@
+{
+ "interface": {
+  "title": "Reorient (neuroanatomy/reorient, Heuer & Toro 2020, JOSS 5(53) 2670)",
+  "field": "Neuroimaging / comparative neuroanatomy (MRI)",
+  "stage_of_work": "Data preprocessing: putting a raw MRI volume into a standard orientation and cropping it before scripted analysis",
+  "what_it_is_for": "Rotate and translate an MRI NIfTI volume by hand in three orthogonal views until it lines up with the anatomical axes. Draw a crop box around the brain. Export the affine matrix, the crop box and the reoriented, cropped NIfTI. The browser tool is the interactive half of the workflow. The downstream half is the companion script reorient.py, which takes the input file, the saved matrix, the saved selection and an output file and repeats the same transform outside the browser. This run did not exercise reorient.py."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "bear_uchar.nii.gz (a bear brain, volume shape 225x328x210, 0.33 voxel size) was loaded with the Choose link on the drop box. Downloads I read: reorient.mat (a 4x4 voxel-to-world matrix as text), selection.txt ('-103 -156 -98 / 105 153 99'), and two reoriented.nii.gz files: 41,390,087 bytes with the whole-brain crop box and 217,192 bytes with the default 40-unit box. The size difference shows that the crop box sets the extent of the exported volume. The only uploadable file was the NIfTI, so the load and append buttons were tested only with that wrong file type."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Put a raw 3D scan into a standard orientation, trim it to the region of interest, and record the transform so a script can repeat it",
+  "specific": "Reorient a bear brain MRI toward stereotaxic planes (this run made partial pitch and yaw corrections), crop away the background, and save the rotation matrix, the selection box and the NIfTI",
+  "screens": [
+   "screens/021.webp"
+  ],
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Load and inspect the scan",
+    "specific": "Load the NIfTI and inspect its orientation in the three viewers",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load a 3D volume from a local file",
+      "specific": "Choose a .nii.gz in the drop box so it opens in the stereotaxic viewer",
+      "screens": [
+       "screens/005.webp",
+       "screens/007.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Choose in the drop box",
+        "screens": [
+         "screens/001.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "uploaded bear_uchar.nii.gz in the file picker",
+        "screens": [
+         "screens/005.webp",
+         "screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check how the scan's voxel axes relate to world axes",
+      "specific": "Read Volume shape, the World to voxel and Voxel to world matrices, and the P/A/S/I/L/R labels in the sagittal (LR), coronal (PA) and axial (IS) views",
+      "screens": [
+       "screens/007.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "read Volume shape 225x328x210 and the identity-like matrices in the left panel",
+        "screens": [
+         "screens/007.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Step through slices along each axis",
+      "specific": "Drag the slider under a viewer to change the slice (LR: 62, IS: 45)",
+      "screens": [
+       "screens/008.webp",
+       "screens/026.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged sagittal slider right (LR: 0 → 62)",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged sagittal slider back to the middle (LR: -1)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged axial slider right (IS: 0 → 45)",
+        "screens": [
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Align the scan with the anatomical axes",
+    "specific": "Rotate and translate the volume until the AP, SI and LR axes line up",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Rotate the volume about the axis normal to a view",
+      "specific": "Pick the Rotate tool and drag in a viewer to rotate the volume clockwise or counterclockwise. All three views and both matrices update",
+      "screens": [
+       "screens/010.webp",
+       "screens/015.webp",
+       "screens/016.webp",
+       "screens/026.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Rotate",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged in the sagittal view (pitch); matrix gained ±0.40 terms",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "after Reset Matrix, made a smaller sagittal drag so the corpus callosum is level (±0.18 terms)",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged in the coronal view (roll); matrix showed -0.021 terms, which were missing from later readouts and from reorient.mat",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged in the axial view (yaw); matrix gained ±0.24 terms on top of the earlier pitch",
+        "screens": [
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Shift the volume so the region of interest is centred",
+      "specific": "With the Translate tool (the default) drag the image. The translation column of the matrices changes",
+      "screens": [
+       "screens/009.webp",
+       "screens/018.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged in the coronal view (translation 1.1e+2 → 76)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Translate and dragged the sagittal view up to centre the brain on the crosshair",
+        "screens": [
+         "screens/018.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Undo all orientation changes",
+      "specific": "Reset Matrix puts the affine back to the file's original",
+      "screens": [
+       "screens/014.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Reset Matrix",
+        "screens": [
+         "screens/014.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Trim away the background",
+    "specific": "Fit the selection box to the brain",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Draw a 3D crop box around the region of interest",
+      "specific": "With the Select tool, drag the four edge handles in the sagittal, coronal and axial views. The Crop box readout and the other views update",
+      "screens": [
+       "screens/011.webp",
+       "screens/012.webp",
+       "screens/020.webp",
+       "screens/021.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Select (a small box appears in all three views)",
+        "screens": [
+         "screens/011.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged the sagittal top handle up and the bottom handle down (Crop box z −98…99)",
+        "screens": [
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged the sagittal P and A handles out to the brain edges",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged the axial L and R handles out (Crop box (-103,-156,-98)(105,153,99))",
+        "screens": [
+         "screens/021.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Return the crop box to its default",
+      "specific": "Reset Selection sets the box back to (-20,-20,-20)(20,20,20)",
+      "screens": [
+       "screens/013.webp",
+       "screens/025.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Reset Selection",
+        "screens": [
+         "screens/013.webp",
+         "screens/025.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Export a reproducible record and the processed scan",
+    "specific": "Save Rotation Matrix, Save Selection Box, Save Nifti",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Save the transform matrix as text for a script",
+      "specific": "Save Rotation Matrix writes the voxel-to-world 4x4 matrix to reorient.mat",
+      "screens": [
+       "screens/019.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Save Rotation Matrix and accepted the 'Save Voxel To World Matrix … As…' prompt (reorient.mat downloaded)",
+        "screens": [
+         "screens/019.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Save the crop region as text",
+      "specific": "Save Selection Box writes the min and max corners to selection.txt",
+      "screens": [
+       "screens/022.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Save Selection Box and accepted the 'Save Selection As…' prompt (selection.txt = '-103 -156 -98 / 105 153 99')",
+        "screens": [
+         "screens/022.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the transformed, cropped volume",
+      "specific": "Save Nifti resamples into the crop box and downloads reoriented.nii.gz",
+      "screens": [
+       "screens/023.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Save Nifti with the whole-brain box and accepted 'Save selection as…' (41 MB reoriented.nii.gz)",
+        "screens": [
+         "screens/023.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Save Nifti with the default box. The confirm 'Did you remember to adapt the selection box?' was accepted (217 KB file; known from the download, no screenshot kept)",
+        "screens": []
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Tri-planar volume viewer with slice sliders",
+   "general": "Show a 3D image as three perpendicular slices with orientation labels, and step through each axis with its own slider",
+   "specific": "LR (sagittal), PA (coronal) and IS (axial) viewers with P/A/S/I/L/R labels, a crosshair, and a slice slider under each showing the slice index. Moving one slider does not move the crosshair in the other views",
+   "steps": [
+    "Load a volume into the drop box",
+    "Read the orientation labels and crosshair in each view",
+    "Drag a view's slider to change its slice index",
+    "Read the index shown in the view's corner (e.g. LR: 62, IS: 45)"
+   ],
+   "serves_tasks": [
+    "Check how the scan's voxel axes relate to world axes",
+    "Step through slices along each axis"
+   ],
+   "screens": [
+    "screens/007.webp",
+    "screens/008.webp",
+    "screens/026.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Drag-to-transform rigid registration with live affine readout",
+   "general": "Choose a translate or rotate mode, drag directly on any of three views to move or turn the 3D object, see the forward and inverse transform matrices update as you go, and reset when needed",
+   "specific": "The Translate/Rotate tool buttons plus dragging in a viewer change the MRI affine. World to voxel and Voxel to world refresh in the left panel. Reset Matrix restores the original",
+   "steps": [
+    "Pick Translate or Rotate",
+    "Drag inside the sagittal, coronal or axial view",
+    "Watch all three views and both matrices update",
+    "Repeat in other views to build up rotations about all three axes",
+    "Press Reset Matrix to start over"
+   ],
+   "serves_tasks": [
+    "Rotate the volume about the axis normal to a view",
+    "Shift the volume so the region of interest is centred",
+    "Undo all orientation changes"
+   ],
+   "screens": [
+    "screens/009.webp",
+    "screens/010.webp",
+    "screens/014.webp",
+    "screens/015.webp",
+    "screens/018.webp",
+    "screens/026.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "3D bounding box edited from orthogonal views",
+   "general": "Fit a 3D crop box by dragging edge handles on 2D slice views, with the box's corner coordinates shown as text and a reset to the default",
+   "specific": "The Select tool shows a box with four handles in each view. Dragging a handle moves that face, and the box is drawn in all three views. The Crop box readout shows the min and max corners. Reset Selection restores (-20,-20,-20)(20,20,20). Dragging inside the box does not move it",
+   "steps": [
+    "Click Select so the box appears",
+    "Drag the top/bottom handles (S/I) in the sagittal or coronal view",
+    "Drag the P/A handles in the sagittal view",
+    "Drag the L/R handles in the axial or coronal view",
+    "Check the Crop box readout",
+    "Press Reset Selection if needed"
+   ],
+   "serves_tasks": [
+    "Draw a 3D crop box around the region of interest",
+    "Return the crop box to its default"
+   ],
+   "screens": [
+    "screens/011.webp",
+    "screens/012.webp",
+    "screens/020.webp",
+    "screens/021.webp",
+    "screens/027.webp",
+    "screens/028.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Reproducible export of transform, region and resampled volume",
+   "general": "Write the current transform and crop region to plain-text files a script can read, and export the transformed, cropped data. You are warned if the crop region was never changed from the default",
+   "specific": "Save Rotation Matrix → reorient.mat (4x4 voxel-to-world, space-separated). Save Selection Box → selection.txt (min corner row, max corner row). Save Nifti → reoriented.nii.gz resampled inside the crop box, with a confirm if the box is still the default. All three are meant for use with reorient.py",
+   "steps": [
+    "Finish the alignment and the crop box",
+    "Press Save Rotation Matrix and name the file",
+    "Press Save Selection Box and name the file",
+    "Press Save Nifti, answer the default-box warning if it appears, and name the file"
+   ],
+   "serves_tasks": [
+    "Save the transform matrix as text for a script",
+    "Save the crop region as text",
+    "Export the transformed, cropped volume"
+   ],
+   "screens": [
+    "screens/019.webp",
+    "screens/022.webp",
+    "screens/023.webp",
+    "screens/025.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "A successfully loaded rotation matrix (Load New Rotation Matrix) or appended one (Append Rotation Matrix): only the NIfTI could be uploaded, so no .mat file could be given",
+  "A successfully loaded selection box from a text file: same reason"
+ ],
+ "not_done": [
+  "Goal 'continue earlier work: reload a previously saved rotation matrix (Load New Rotation Matrix), compose one onto the current affine (Append Rotation Matrix), or reload a saved selection box (Load Selection Box)' was not reached. The browser only lets the page receive bear_uchar.nii.gz, not the downloaded reorient.mat or selection.txt. Giving the NIfTI to Load Selection Box turned the Crop box readout into (NaN,undefined,undefined)(NaN,NaN,undefined) with no error (screens/024.webp); Reset Selection fixed it (screens/025.webp). Giving it to Append Rotation Matrix (screens/025.webp) and Load New Rotation Matrix (screens/029.webp) left the matrix silently unchanged. All three controls fail silently on a wrong file type",
+  "Re-running the transform outside the browser with reorient.py (input file, reorient.mat, selection.txt, output file) was not tried. It is not confirmed that the exports reproduce the reoriented NIfTI",
+  "Drag-and-drop loading onto the drop box was not tried; only the Choose file picker was used",
+  "The reoriented.nii.gz files are binary, so only their sizes were checked; their content and header were not, and they were not reloaded into the viewer",
+  "The small roll rotation made in the coronal view (screens/016.webp, matrix term -0.021) was not in the matrix after the next translate (screens/018.webp) or in the saved reorient.mat, which has no LR-coupling terms. Either the app dropped it or it was below display precision; I did not find out which. Full alignment to stereotaxic planes was therefore not shown",
+  "Rotating in the coronal view made the layout stack the views vertically at 1280 px width (screens/016.webp). Widening the window to 1400 px brought back the 2x2 grid (screens/017.webp)",
+  "Moving one view's slice slider did not move the crosshair in the other views (seen in the replay), so slicing is not linked across views. Only rotate and translate update all views",
+  "Report-a-bug and GitHub links go off-site and were not followed. The documentation page (doc.html) was read (screens/003.webp, screens/004.webp)"
+ ],
+ "applied": [
+  "Softened the goal's specific label to 'toward stereotaxic planes (partial pitch and yaw corrections)'",
+  "Removed the miscited screens/025.webp from t11's second action. No kept screen shows that Save Nifti, so its screens list is now empty and the label says the result comes from the download",
+  "Removed 'Linked' from f1's name and 'while the other views stay in step' from its general text, and stated in its specific text that sliders do not move other crosshairs",
+  "Stated in the interface that reorient.py is the downstream half of the workflow, and added a not_done entry saying it was not run",
+  "Expanded the not_done entry for load/append matrix and load selection box into a 'continue earlier work' goal that cites 024, 025 and 029 for the silent failures. It stays out of the tree because no load succeeded",
+  "Dropped the harness window-resize action from t1 and the layout remark from t4's coronal roll action. The layout issue stays in not_done, and the roll action now notes the roll was lost",
+  "Added the unlinked-slicing observation to not_done"
+ ],
+ "open_fixes": [
+  "Add tasks and a feature for loading or composing a saved transform and loading a saved region (Load New Rotation Matrix, Append Rotation Matrix, Load Selection Box). This needs a run whose browser can upload reorient.mat and selection.txt, because no successful load was ever shown",
+  "Add a task for re-running the export with reorient.py. This needs a run outside the browser that executes the script on the saved files and compares the output with reoriented.nii.gz",
+  "Cite a screen for the default-box Save Nifti confirm in t11. This needs a new run that takes a screenshot while the 'Did you remember to adapt the selection box?' dialog is open",
+  "Try drag-and-drop loading onto the drop box. This needs a new run, because only the Choose picker was used"
+ ],
+ "screens_at": "pilot/public/runs/reorient-mri/20261029-101113/",
+ "screens_filed": {
+  "screens/005.webp": "screens/005.webp",
+  "screens/010.webp": "screens/010.webp",
+  "screens/011.webp": "screens/011.webp",
+  "screens/019.webp": "screens/019.webp"
+ }
+}

@@ -1,0 +1,588 @@
+{
+  "schema": "astaui.card/1",
+  "id": "tm-junction-web",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T11:01:00Z"
+  },
+  "app": {
+    "title": "TransPrimer — Tm-guided exon–exon junction primer design for isoform-specific RT-PCR/qPCR",
+    "summary": "The person names a gene and species, a RefSeq transcript accession, or pastes their own transcripts exon by exon. They can pick one variant from an exon-structure alignment of the gene's transcripts. The tool fetches every sibling isoform and checks whether the target has a stretch of sequence that no sibling carries. It then classifies the target as needing an ordinary primer pair, a primer that spans an exon–exon junction, or neither. The person tunes and checks primers in a designer: they drag-select a window across the junction and watch its melting temperature and the melting temperature of each arm update. They can also set the Tm range, product size and reaction conditions, and leave chosen transcripts out of the comparison. They come away with a copied primer pair that is checked to amplify only the target, or one pair that amplifies every variant for a total-expression assay.",
+    "task": {
+      "text": "Decide whether one transcript isoform can be amplified apart from its siblings, and design primers that do it.",
+      "verbs": [
+        "decide",
+        "derive",
+        "compare",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Curated transcript sequences of one gene, each with its exon structure on the reference genome, compared against each other by sequence.",
+      "item": "a transcript isoform of a gene, with its exons and mRNA sequence",
+      "shapes": [
+        "sequence",
+        "spans",
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "planning an isoform-specific RT-PCR/qPCR assay, before ordering primers",
+      "terms": [
+        "plan",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "A search box loads a gene, and a picker lays out its transcripts on one genomic axis. Analysing a target fills a verdict banner, an exon-track graph of every isoform that marks the unique regions and junctions, and a per-isoform verdict table. Clicking an accession in the graph re-targets the design. The junction workbench shows the junction sequence, where a dragged selection is evaluated live against Tm rules set in a side rail, and the chosen pair is copied out.",
+      "views": [
+        "sequence track",
+        "table view",
+        "detail panel",
+        "form",
+        "summary stats",
+        "list"
+      ],
+      "interactions": [
+        "search",
+        "select",
+        "select text span",
+        "filter",
+        "inline edit",
+        "hover for detail",
+        "toggle view",
+        "export",
+        "import"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "master-detail"
+      ]
+    },
+    "field": {
+      "text": "isoform-specific primer design for RT-PCR/qPCR in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "primer design",
+        "alternative splicing",
+        "rt qpcr"
+      ]
+    },
+    "workflow": {
+      "name": "check whether a target can be told apart from its siblings, then design a probe that does it",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Search by species and gene symbol or by RefSeq accession, with typeahead. Or paste custom transcripts with exon boundaries marked by '|', or by numbers that are split for you.",
+          "parts": [
+            "search-hero"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The gene's transcripts are drawn on one genomic axis, with identical accessions folded into one row. Clicking one picks it as the target.",
+          "parts": [
+            "transcript-picker"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A 20-nt sliding window finds sequence absent from every sibling. Each transcript is classified as EEJ-independent, EEJ-dependent or infeasible, and the graph and verdict table show the unique regions and junctions.",
+          "parts": [
+            "exon-graph",
+            "verdict-table"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Transcript chips take siblings out of the comparison, and every tier and design is recomputed against the transcripts that remain.",
+          "parts": [
+            "transcript-filter"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "In the junction workbench the person drag-selects a window over the splice junction. The whole oligo's Tm and each arm's Tm update live against the Tm range, ΔTm and salt/Mg²⁺/dNTP conditions set in the rail.",
+          "parts": [
+            "junction-workbench"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "A partner primer is chosen within a product-size range and QC-checked for hairpin and dimer. The forward and reverse pair is copied to the clipboard.",
+          "parts": [
+            "junction-workbench",
+            "pan-variant-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "a junction primer must melt inside the chosen Tm range while each arm alone stays at least 15 °C below it, so it primes only across that exact splice",
+        "Tm is computed by nearest-neighbour thermodynamics with editable salt, Mg²⁺, dNTP and primer concentrations, and short arms fall back to the Wallace rule",
+        "accessions with identical sequence and exon structure are folded into one transcript, so a transcript is not compared against its own twin",
+        "every amplicon must span at least two exons, so it cannot be confused with product amplified from genomic DNA",
+        "a separate tab designs one pair that amplifies as many variants as possible at one product size, for total-expression assays"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "search-hero",
+      "level": "view",
+      "parent": null,
+      "title": "Search and custom input",
+      "summary": "Takes a gene symbol with a species, a RefSeq accession, or pasted custom transcripts, and starts the analysis.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "search",
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/src/components/Hero.tsx",
+          "start": 29,
+          "end": 32,
+          "role": "markup",
+          "symbol": "Hero",
+          "anchor": "63cc8ce0a63e",
+          "first": "export default function Hero({"
+        },
+        {
+          "file": "code/web/src/styles/app.css",
+          "start": 109,
+          "end": 109,
+          "role": "style",
+          "symbol": ".hero",
+          "anchor": "13ed1ec36560",
+          "first": ".hero{background:var(--hero);border-bottom:1px solid var(--border)}"
+        },
+        {
+          "file": "code/web/src/styles/app.css",
+          "start": 110,
+          "end": 110,
+          "role": "style",
+          "symbol": ".hero-in",
+          "anchor": "6b0d214ab3f7",
+          "first": ".hero-in{padding:72px 0 60px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:22px}"
+        },
+        {
+          "file": "code/web/src/components/Hero.tsx",
+          "start": 92,
+          "end": 97,
+          "role": "logic",
+          "symbol": "submit",
+          "anchor": "b63b74f5c2b2",
+          "first": "function submit() {"
+        },
+        {
+          "file": "code/web/src/components/CustomTranscripts.tsx",
+          "start": 37,
+          "end": 37,
+          "role": "markup",
+          "symbol": "CustomTranscriptsInput",
+          "anchor": "097909454287",
+          "first": "export default function CustomTranscriptsInput({ input, onChange, onCompare, busy, defaultSpecies }: {"
+        },
+        {
+          "file": "code/web/src/lib/customInput.ts",
+          "start": 308,
+          "end": 386,
+          "role": "logic",
+          "symbol": "parseCustomInput",
+          "anchor": "bbe59097fdd7",
+          "first": "export function parseCustomInput(input: CustomInput): ParsedInput {"
+        },
+        {
+          "file": "code/web/src/lib/api.ts",
+          "start": 21,
+          "end": 30,
+          "role": "logic",
+          "symbol": "suggest",
+          "anchor": "b9fc346e5cd0",
+          "first": "export async function suggest(q: string, signal?: AbortSignal): Promise<RemoteSuggestion[]> {"
+        }
+      ]
+    },
+    {
+      "id": "transcript-picker",
+      "level": "view",
+      "parent": null,
+      "title": "Gene transcript picker",
+      "summary": "Draws every curated transcript of the gene on one genomic axis so the person can pick the variant to design for.",
+      "views": [
+        "sequence track",
+        "list"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/web/src/components/GeneTranscriptPicker.tsx",
+          "start": 11,
+          "end": 13,
+          "role": "markup",
+          "symbol": "GeneTranscriptPicker",
+          "anchor": "c7c2f6354960",
+          "first": "export default function GeneTranscriptPicker({"
+        },
+        {
+          "file": "code/web/src/lib/api.ts",
+          "start": 33,
+          "end": 60,
+          "role": "logic",
+          "symbol": "lookupGene",
+          "anchor": "af615d59bf64",
+          "first": "export async function lookupGene("
+        }
+      ]
+    },
+    {
+      "id": "exon-graph",
+      "level": "component",
+      "parent": "results",
+      "title": "Exon structure graph",
+      "summary": "Shows every isoform's exons with unique regions and junctions coloured by tier; clicking an accession re-targets the design.",
+      "views": [
+        "sequence track"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/web/src/components/GraphCard.tsx",
+          "start": 73,
+          "end": 73,
+          "role": "markup",
+          "symbol": "GraphCard",
+          "anchor": "8da566d9d0cd",
+          "first": "export default function GraphCard({ result, onSelect }: {"
+        },
+        {
+          "file": "code/web/src/components/ExonTrackGraph.tsx",
+          "start": 65,
+          "end": 67,
+          "role": "markup",
+          "symbol": "ExonTrackGraph",
+          "anchor": "cd8476c2471c",
+          "first": "export default function ExonTrackGraph({"
+        },
+        {
+          "file": "code/web/src/components/ExonTrackGraph.tsx",
+          "start": 373,
+          "end": 373,
+          "role": "markup",
+          "symbol": "Tooltip",
+          "anchor": "4a495d90436e",
+          "first": "function Tooltip({ tip, chromosome, mrna = \"\", pinned = false, panelRef, onClose }: {"
+        }
+      ]
+    },
+    {
+      "id": "verdict-table",
+      "level": "component",
+      "parent": "results",
+      "title": "Per-isoform verdict",
+      "summary": "Lists each transcript's tier, its unique regions or junctions, and the strategy that would isolate it.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/src/components/VerdictTable.tsx",
+          "start": 7,
+          "end": 9,
+          "role": "markup",
+          "symbol": "VerdictTable",
+          "anchor": "3cf2e6b812cc",
+          "first": "export default function VerdictTable({"
+        },
+        {
+          "file": "code/web/src/components/VerdictBanner.tsx",
+          "start": 6,
+          "end": 6,
+          "role": "markup",
+          "symbol": "VerdictBanner",
+          "anchor": "0b125bcbf6ae",
+          "first": "export default function VerdictBanner({ v }: { v: TranscriptVerdict }) {"
+        },
+        {
+          "file": "code/engine/app/amplify.py",
+          "start": 296,
+          "end": 301,
+          "role": "logic",
+          "symbol": "analyze_amplifiability",
+          "anchor": "fdc1a8de2778",
+          "first": "def analyze_amplifiability("
+        }
+      ]
+    },
+    {
+      "id": "transcript-filter",
+      "level": "component",
+      "parent": "results",
+      "title": "Transcript filter",
+      "summary": "Chips that leave transcripts out of the comparison, or bring them back, so the verdicts and designs are redone without them.",
+      "views": [],
+      "interactions": [
+        "filter",
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/src/components/TranscriptFilter.tsx",
+          "start": 20,
+          "end": 20,
+          "role": "markup",
+          "symbol": "TranscriptFilter",
+          "anchor": "12fe473d739b",
+          "first": "export default function TranscriptFilter({ result, busy, onChange }: {"
+        },
+        {
+          "file": "code/web/src/App.tsx",
+          "start": 337,
+          "end": 340,
+          "role": "logic",
+          "symbol": "setExclusion",
+          "anchor": "f9f6afc7112d",
+          "first": "const setExclusion = (exclude: string[]) => {"
+        },
+        {
+          "file": "code/engine/app/analyze.py",
+          "start": 468,
+          "end": 504,
+          "role": "logic",
+          "symbol": "_apply_exclusion",
+          "anchor": "b25889e82955",
+          "first": "def _apply_exclusion(reps: list[str], same_seq: dict[str, list[str]], accs: dict,"
+        }
+      ]
+    },
+    {
+      "id": "junction-workbench",
+      "level": "component",
+      "parent": "results",
+      "title": "Junction designer workbench",
+      "summary": "Shows the junction sequence. A dragged window is evaluated live for whole-primer and arm Tm against the settings rail, a partner primer is chosen, and the pair is copied.",
+      "views": [
+        "sequence track",
+        "form",
+        "detail panel"
+      ],
+      "interactions": [
+        "select text span",
+        "inline edit",
+        "export"
+      ],
+      "patterns": [
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/web/src/components/JunctionWorkbench.tsx",
+          "start": 384,
+          "end": 384,
+          "role": "markup",
+          "symbol": "JunctionWorkbench",
+          "anchor": "ab9beb68732f",
+          "first": "export function JunctionWorkbench({ geom, s, reseedKey, intro, legendExtra, onEval, role = null }: {"
+        },
+        {
+          "file": "code/web/src/components/JunctionWorkbench.tsx",
+          "start": 366,
+          "end": 366,
+          "role": "markup",
+          "symbol": "TmSettingsRail",
+          "anchor": "f95f862815fb",
+          "first": "export function TmSettingsRail({ s, note }: {"
+        },
+        {
+          "file": "code/web/src/components/JunctionWorkbench.tsx",
+          "start": 133,
+          "end": 214,
+          "role": "logic",
+          "symbol": "useJunctionSettings",
+          "anchor": "5db64baecd2b",
+          "first": "export function useJunctionSettings() {"
+        },
+        {
+          "file": "code/web/src/components/JunctionWorkbench.tsx",
+          "start": 587,
+          "end": 587,
+          "role": "markup",
+          "symbol": "Readout",
+          "anchor": "8a03ce78df20",
+          "first": "function Readout({ ev, tmMin, tmMax, leftLabel, rightLabel, role }: {"
+        },
+        {
+          "file": "code/web/src/components/JunctionDesigner.tsx",
+          "start": 89,
+          "end": 89,
+          "role": "markup",
+          "symbol": "JunctionDesigner",
+          "anchor": "e1ec087a7cf0",
+          "first": "export default function JunctionDesigner({ mrna, verdict, onPair }: {"
+        },
+        {
+          "file": "code/web/src/components/JunctionDesigner.tsx",
+          "start": 385,
+          "end": 385,
+          "role": "markup",
+          "symbol": "PartnerPanel",
+          "anchor": "46e3d7405b83",
+          "first": "function PartnerPanel({ mrna, verdict, ev, cond, tmMin, tmMax, force, showCdna, onPair }: {"
+        },
+        {
+          "file": "code/web/src/lib/tm.ts",
+          "start": 270,
+          "end": 272,
+          "role": "logic",
+          "symbol": "tm",
+          "anchor": "16d2e887fa90",
+          "first": "export function tm(seq: string, cond: TmConditions = DEFAULT_CONDITIONS): number {"
+        },
+        {
+          "file": "code/web/src/lib/tm.ts",
+          "start": 298,
+          "end": 300,
+          "role": "logic",
+          "symbol": "armTm",
+          "anchor": "adb8cd33ab85",
+          "first": "export function armTm(seq: string, cond: TmConditions = DEFAULT_CONDITIONS): number {"
+        },
+        {
+          "file": "code/web/src/lib/partner.ts",
+          "start": 329,
+          "end": 339,
+          "role": "logic",
+          "symbol": "findPartnerOptions",
+          "anchor": "dd166db1c839",
+          "first": "export function findPartnerOptions(a: PartnerArgs): PartnerSearch {"
+        }
+      ]
+    },
+    {
+      "id": "pan-variant-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Multiple-transcript amplification",
+      "summary": "Designs one primer pair that amplifies as many variants as possible at a single product size, and shows which transcripts it covers.",
+      "views": [
+        "sequence track",
+        "form",
+        "list"
+      ],
+      "interactions": [
+        "select",
+        "inline edit",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/src/components/PanVariantTab.tsx",
+          "start": 18,
+          "end": 18,
+          "role": "markup",
+          "symbol": "PanVariantTab",
+          "anchor": "9f0343616113",
+          "first": "export default function PanVariantTab({ result, busy, filter }: {"
+        },
+        {
+          "file": "code/web/src/components/PanVariantDesigner.tsx",
+          "start": 48,
+          "end": 48,
+          "role": "markup",
+          "symbol": "PanVariantDesigner",
+          "anchor": "08e91007f851",
+          "first": "export default function PanVariantDesigner({ result, seqs, filter }: {"
+        },
+        {
+          "file": "code/web/src/components/PanTrackGraph.tsx",
+          "start": 36,
+          "end": 39,
+          "role": "markup",
+          "symbol": "PanTrackGraph",
+          "anchor": "c28dbf757ee2",
+          "first": "export default function PanTrackGraph({"
+        },
+        {
+          "file": "code/web/src/lib/panvariant.ts",
+          "start": 62,
+          "end": 82,
+          "role": "logic",
+          "symbol": "coverage",
+          "anchor": "30e85e994d38",
+          "first": "export function coverage("
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "level": "view",
+      "parent": null,
+      "title": "Transcript-specific amplification",
+      "summary": "The results tab, which gathers the target's verdict, its designers, the gene graph and the verdict table.",
+      "views": [
+        "detail panel",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail",
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/web/src/components/Summary.tsx",
+          "start": 11,
+          "end": 13,
+          "role": "markup",
+          "symbol": "Summary",
+          "anchor": "f4cca2772c72",
+          "first": "export default function Summary({"
+        },
+        {
+          "file": "code/web/src/App.tsx",
+          "start": 447,
+          "end": 447,
+          "role": "markup",
+          "symbol": "Result",
+          "anchor": "5aad0000e8c5",
+          "first": "function Result({ result, tab, setTab, busy, onSelect, onInspect, backToVariants, onExclude }: {"
+        }
+      ]
+    }
+  ]
+}

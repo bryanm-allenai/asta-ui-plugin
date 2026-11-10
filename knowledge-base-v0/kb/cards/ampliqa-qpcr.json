@@ -1,0 +1,622 @@
+{
+  "schema": "astaui.card/1",
+  "id": "ampliqa-qpcr",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:32:35Z"
+  },
+  "app": {
+    "title": "AmpliQA",
+    "summary": "A person enters or imports RNA spectrophotometer readings, checks each sample's purity and concentration against protocol limits, and gets the reverse-transcription volumes and a pipetting list. They then plan the qPCR plate and per-gene mix, import the instrument's run files, omit faulty wells, and assign samples to groups with reference genes, a control group and optional primer efficiencies. The interface computes normalized relative expression per sample with blank, replicate and reference-stability checks, recommends and runs the group comparison test, and draws publication bar charts and a heatmap. It ends with a drafted methods-and-results text in two languages, exported as Word files with the figures, and an experiment spreadsheet that carries all inputs to the next session.",
+    "task": {
+      "text": "Take a relative gene-expression experiment from RNA quality check through quantification, statistics and figures to a drafted methods-and-results text.",
+      "verbs": [
+        "derive",
+        "clean",
+        "compare",
+        "write",
+        "plan",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Per-sample RNA absorbance readings, then per-well threshold cycle values from qPCR instrument exports, tied to samples, genes and experimental groups, with a sample-to-group table and analysis settings.",
+      "item": "a well on a qPCR plate: one sample, one gene, one cycle value",
+      "shapes": [
+        "table",
+        "per element",
+        "categories",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "analysing a qPCR run after the bench work, from raw cycle values through to the write-up",
+      "terms": [
+        "analyze",
+        "clean",
+        "compare",
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "A multi-page workflow where each screen reads the shared experiment state left by the previous one: editable tables feed computed status tables, a coloured plate grid and mix tables, then imported wells are curated in an editable table whose omissions and group assignments flow into the expression results, statistics tabs, configurable figures and a live-updating draft text. Everything is saved to and reloaded from one spreadsheet file.",
+      "views": [
+        "table view",
+        "fixed-layout grid",
+        "summary stats",
+        "bar chart",
+        "heatmap",
+        "form",
+        "text editor",
+        "strip plot"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "exclude and refit",
+        "multi-select",
+        "select",
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline",
+        "dashboard",
+        "small multiples"
+      ]
+    },
+    "field": {
+      "text": "relative quantification of gene expression by RT-qPCR in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "molecular biology",
+        "rt qpcr",
+        "gene expression"
+      ]
+    },
+    "workflow": {
+      "name": "compute normalized relative quantities from instrument runs, test groups, and write up",
+      "steps": [
+        {
+          "step": "check input material against quality criteria and prepare it",
+          "here": "NanoDrop readings typed or imported; each sample gets a quality and status (ready, dilute, do not use) from A260/280, A260/230 and minimum concentration, plus common-mix totals and a per-tube pipetting list",
+          "parts": [
+            "quant-cdna"
+          ]
+        },
+        {
+          "step": "lay out the plate",
+          "here": "genes and samples listed one per line become a colour-coded 96-well map with duplicates and blanks per gene block, split across plates if needed, with a per-gene reaction mix",
+          "parts": [
+            "plate-planner"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "several result files at once, auto-detected as QuantStudio, Rotor-Gene Q or a long/wide table; Rotor-Gene blocks get a suggested gene to confirm and a sample list in well order",
+          "parts": [
+            "run-import"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "tick Omit on faulty wells; optionally drop outlying technical replicates automatically; blanks over a Ct limit and replicate spreads over a max difference are flagged",
+          "parts": [
+            "run-import",
+            "qpcr-results"
+          ]
+        },
+        {
+          "step": "assign items to groups and set the baseline",
+          "here": "groups from the leading letters of sample codes, editable, with a blank flag and an optional second factor; choose 1–5 reference genes, the control group, group order and per-gene efficiencies",
+          "parts": [
+            "groups-config"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "efficiency-weighted ΔCt, ΔΔCt and fold change normalized to the geometric mean of references, reference stability (geNorm M, CV), then a recommended test after assumption checks with post hoc and Grubbs outliers",
+          "parts": [
+            "qpcr-results",
+            "stats-figures"
+          ]
+        },
+        {
+          "step": "write up the result",
+          "here": "methods, statistics, results and figure legend drafted in English and Portuguese with test values filled in, exported as .docx or a zip with PNG/SVG figures; Prism-ready tables from the results tab",
+          "parts": [
+            "methods-text",
+            "stats-figures",
+            "qpcr-results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "normalization to several reference genes by geometric mean, with each reference's stability judged against fixed thresholds",
+        "the statistical test is chosen automatically from residual normality and variance checks and the reason is shown, with manual override",
+        "blank wells are recognised by name and checked against a cycle limit for contamination",
+        "a second experimental factor is normalized per level to its own control, or analysed by two-way ANOVA",
+        "the whole experiment round-trips through one spreadsheet file the person keeps, with nothing stored on the server"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "quant-cdna",
+      "level": "view",
+      "parent": null,
+      "title": "RNA quantification → cDNA",
+      "summary": "Takes typed or imported absorbance readings, grades each sample's purity and concentration, and gives mix totals and a per-tube pipetting list.",
+      "views": [
+        "table view",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "import"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/views/quant_cdna.py",
+          "start": 1,
+          "end": 114,
+          "role": "markup",
+          "anchor": "2ffd04f2d96d",
+          "first": "import streamlit as st"
+        },
+        {
+          "file": "code/ampliqa/quant.py",
+          "start": 58,
+          "end": 101,
+          "role": "logic",
+          "symbol": "compute",
+          "anchor": "945e4d8e54f4",
+          "first": "def compute(df: pd.DataFrame, p: dict | None = None) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/ampliqa/quant.py",
+          "start": 104,
+          "end": 119,
+          "role": "logic",
+          "symbol": "mix_summary",
+          "anchor": "040220d397eb",
+          "first": "def mix_summary(res: pd.DataFrame, p: dict | None = None) -> dict:"
+        },
+        {
+          "file": "code/ampliqa/quant.py",
+          "start": 122,
+          "end": 140,
+          "role": "logic",
+          "symbol": "pipetting_list",
+          "anchor": "01875d809103",
+          "first": "def pipetting_list(res: pd.DataFrame, p: dict | None = None) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/ampliqa/nanodrop.py",
+          "start": 28,
+          "end": 62,
+          "role": "logic",
+          "symbol": "read_nanodrop",
+          "anchor": "3d2f36d44231",
+          "first": "def read_nanodrop(data: bytes, filename: str) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "plate-planner",
+      "level": "view",
+      "parent": null,
+      "title": "Plan plate",
+      "summary": "Turns lists of genes and samples into a colour-coded 96-well plate map with blanks per gene block and a per-gene reaction mix.",
+      "views": [
+        "fixed-layout grid",
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/qpcr.py",
+          "start": 19,
+          "end": 69,
+          "role": "markup",
+          "anchor": "8cd9a7b87e04",
+          "first": "# ------------------------------------------------------------------ 1. placa"
+        },
+        {
+          "file": "code/ampliqa/qpcr.py",
+          "start": 288,
+          "end": 306,
+          "role": "logic",
+          "symbol": "plan_plate",
+          "anchor": "a38cfd753a38",
+          "first": "def plan_plate(samples, genes, blanks=(\"NTC\", \"BcDNA\"), reps=2):"
+        },
+        {
+          "file": "code/ampliqa/qpcr.py",
+          "start": 316,
+          "end": 325,
+          "role": "logic",
+          "symbol": "mix_per_gene",
+          "anchor": "54fd886f14cc",
+          "first": "def mix_per_gene(plan: pd.DataFrame, protocol: str, margin=0.10) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "run-import",
+      "level": "view",
+      "parent": null,
+      "title": "Import run",
+      "summary": "Reads several instrument result files, lets the person confirm genes for unlabelled well blocks, and shows the wells in use with an Omit checkbox per well.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/qpcr.py",
+          "start": 71,
+          "end": 207,
+          "role": "markup",
+          "anchor": "f4422d972151",
+          "first": "# ------------------------------------------------------------------ 2. importar"
+        },
+        {
+          "file": "code/views/qpcr.py",
+          "start": 77,
+          "end": 88,
+          "role": "logic",
+          "symbol": "load_run",
+          "anchor": "4dc922fb0f45",
+          "first": "def load_run(raw, known_groups=None):"
+        },
+        {
+          "file": "code/ampliqa/importers.py",
+          "start": 307,
+          "end": 320,
+          "role": "logic",
+          "symbol": "read_file",
+          "anchor": "e10244caacd9",
+          "first": "def read_file(data: bytes, filename: str) -> dict:"
+        },
+        {
+          "file": "code/ampliqa/importers.py",
+          "start": 211,
+          "end": 232,
+          "role": "logic",
+          "symbol": "build_rotorgene_raw",
+          "anchor": "78728511e454",
+          "first": "def build_rotorgene_raw(wells: pd.DataFrame, blocks: pd.DataFrame, sample_list=None, reps=2,"
+        }
+      ]
+    },
+    {
+      "id": "groups-config",
+      "level": "view",
+      "parent": null,
+      "title": "Groups",
+      "summary": "Assigns samples to groups and an optional second factor, marks blanks, and sets reference genes, control group, group order, efficiencies and replicate thresholds.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "multi-select",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/qpcr.py",
+          "start": 209,
+          "end": 291,
+          "role": "markup",
+          "anchor": "b79c5ef9f450",
+          "first": "# ------------------------------------------------------------------ 3. grupos"
+        },
+        {
+          "file": "code/ampliqa/qpcr.py",
+          "start": 23,
+          "end": 40,
+          "role": "logic",
+          "symbol": "default_groups",
+          "anchor": "694d51259ab0",
+          "first": "def default_groups(samples, n_letters=1, blanks=None, known: pd.DataFrame | None = None) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/ampliqa/qpcr.py",
+          "start": 143,
+          "end": 157,
+          "role": "logic",
+          "symbol": "eff_map",
+          "anchor": "9934f0dd6cea",
+          "first": "def eff_map(effs) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "qpcr-results",
+      "level": "view",
+      "parent": null,
+      "title": "Results",
+      "summary": "Shows blank and replicate alerts, auto-removed replicates and reference stability, then per-gene fold-change bars with sample dots and summary tables, with Prism-ready export.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "strip plot",
+        "table view",
+        "small multiples"
+      ],
+      "interactions": [
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/views/qpcr.py",
+          "start": 293,
+          "end": 379,
+          "role": "markup",
+          "anchor": "ac0adb6ccefb",
+          "first": "# ------------------------------------------------------------------ 4. resultados"
+        },
+        {
+          "file": "code/ampliqa/experiment.py",
+          "start": 49,
+          "end": 71,
+          "role": "logic",
+          "symbol": "results_tables",
+          "anchor": "3345ae0b0234",
+          "first": "def results_tables(exp: dict) -> dict:"
+        },
+        {
+          "file": "code/ampliqa/qpcr.py",
+          "start": 160,
+          "end": 191,
+          "role": "logic",
+          "symbol": "ddct",
+          "anchor": "54aa9dab7e04",
+          "first": "def ddct(summary: pd.DataFrame, groups: pd.DataFrame, ref_gene, control: str, efficiencies=None) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/ampliqa/qpcr.py",
+          "start": 194,
+          "end": 223,
+          "role": "logic",
+          "symbol": "ref_stability",
+          "anchor": "d85815926e64",
+          "first": "def ref_stability(summary: pd.DataFrame, groups: pd.DataFrame, refs, efficiencies=None) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/ampliqa/qpcr.py",
+          "start": 67,
+          "end": 90,
+          "role": "logic",
+          "symbol": "auto_outliers",
+          "anchor": "b14d13bcc52e",
+          "first": "def auto_outliers(raw: pd.DataFrame, sd_cut=0.3, max_prop=0.5, preserve=True) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/ampliqa/qpcr.py",
+          "start": 114,
+          "end": 133,
+          "role": "logic",
+          "symbol": "blanks_check",
+          "anchor": "2081465f6bdb",
+          "first": "def blanks_check(raw: pd.DataFrame, blanks=None, limit=None) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/ampliqa/qpcr.py",
+          "start": 243,
+          "end": 253,
+          "role": "logic",
+          "symbol": "flags",
+          "anchor": "5ac8ed95caf6",
+          "first": "def flags(summary: pd.DataFrame, dup_max: float) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/ampliqa/analysis.py",
+          "start": 99,
+          "end": 125,
+          "role": "logic",
+          "symbol": "prism_xlsx",
+          "anchor": "6908caae073f",
+          "first": "def prism_xlsx(an: dict, metric: str = \"Fold change\") -> bytes:"
+        }
+      ]
+    },
+    {
+      "id": "stats-figures",
+      "level": "view",
+      "parent": null,
+      "title": "Statistics and figures",
+      "summary": "Runs the recommended or chosen test per gene with assumptions, post hoc and outliers explained, and draws customisable bar-chart panels and a fold-change heatmap for export.",
+      "views": [
+        "table view",
+        "bar chart",
+        "heatmap",
+        "small multiples"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/views/estatistica.py",
+          "start": 1,
+          "end": 205,
+          "role": "markup",
+          "anchor": "9bccb6ff4737",
+          "first": "import math"
+        },
+        {
+          "file": "code/ampliqa/analysis.py",
+          "start": 31,
+          "end": 77,
+          "role": "logic",
+          "symbol": "run",
+          "anchor": "5f881231e6f7",
+          "first": "def run(exp: dict, scfg: dict | None = None) -> dict:"
+        },
+        {
+          "file": "code/ampliqa/analysis.py",
+          "start": 80,
+          "end": 96,
+          "role": "logic",
+          "symbol": "overview",
+          "anchor": "c61d90ba2d87",
+          "first": "def overview(an: dict) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/ampliqa/stats.py",
+          "start": 292,
+          "end": 325,
+          "role": "logic",
+          "symbol": "analyze",
+          "anchor": "ea46ea589d56",
+          "first": "def analyze(df, order, control, comparison=\"controle\", test=None, post=None, alpha=ALPHA):"
+        },
+        {
+          "file": "code/ampliqa/stats.py",
+          "start": 72,
+          "end": 122,
+          "role": "logic",
+          "symbol": "recommend",
+          "anchor": "a3b1c5e173a3",
+          "first": "def recommend(assump, comparison=\"controle\", alpha=ALPHA):"
+        },
+        {
+          "file": "code/ampliqa/figures.py",
+          "start": 66,
+          "end": 152,
+          "role": "logic",
+          "symbol": "bar_figure",
+          "anchor": "ea0c2abcd2db",
+          "first": "def bar_figure(res, panels, order, control, results, labels=None, opts=None):"
+        },
+        {
+          "file": "code/ampliqa/figures.py",
+          "start": 159,
+          "end": 230,
+          "role": "logic",
+          "symbol": "heatmap_figure",
+          "anchor": "7fe46519d51c",
+          "first": "def heatmap_figure(summary, genes, order, levels, control, pvals, labels=None, opts=None):"
+        }
+      ]
+    },
+    {
+      "id": "methods-text",
+      "level": "view",
+      "parent": null,
+      "title": "Methods and results",
+      "summary": "Drafts methods, statistics, results and legends in two languages from the current analysis and protocol fields, and exports Word files with the chosen figures.",
+      "views": [
+        "form",
+        "text editor"
+      ],
+      "interactions": [
+        "inline edit",
+        "multi-select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/textos.py",
+          "start": 1,
+          "end": 130,
+          "role": "markup",
+          "anchor": "03a7e1cca8ca",
+          "first": "import io"
+        },
+        {
+          "file": "code/views/textos.py",
+          "start": 85,
+          "end": 92,
+          "role": "logic",
+          "symbol": "captions",
+          "anchor": "9b1c4e8d3323",
+          "first": "def captions(lang):"
+        },
+        {
+          "file": "code/ampliqa/texts.py",
+          "start": 116,
+          "end": 159,
+          "role": "logic",
+          "symbol": "methods",
+          "anchor": "5bb90038465b",
+          "first": "def methods(cfg, ref_gene, n_por_grupo, lang, eff=False):"
+        },
+        {
+          "file": "code/ampliqa/texts.py",
+          "start": 186,
+          "end": 219,
+          "role": "logic",
+          "symbol": "statistics",
+          "anchor": "ad420d067bea",
+          "first": "def statistics(analyses, metric, comparison, lang):"
+        },
+        {
+          "file": "code/ampliqa/texts.py",
+          "start": 222,
+          "end": 283,
+          "role": "logic",
+          "symbol": "results",
+          "anchor": "4e239effe5bf",
+          "first": "def results(analyses, summary, control, labels, lang, alpha=0.05):"
+        },
+        {
+          "file": "code/ampliqa/texts.py",
+          "start": 324,
+          "end": 347,
+          "role": "logic",
+          "symbol": "to_docx",
+          "anchor": "beca433a564e",
+          "first": "def to_docx(sections: dict, title: str, figures=None, lang=\"pt\") -> bytes:"
+        },
+        {
+          "file": "code/ampliqa/analysis.py",
+          "start": 134,
+          "end": 155,
+          "role": "logic",
+          "symbol": "report_figures",
+          "anchor": "d63260fcf476",
+          "first": "def report_figures(an: dict, scfg: dict | None = None) -> list:"
+        }
+      ]
+    }
+  ]
+}

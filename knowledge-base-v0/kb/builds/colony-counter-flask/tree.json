@@ -1,0 +1,622 @@
+{
+ "interface": {
+  "title": "Colony Counter (colony·counter)",
+  "field": "Microbiology",
+  "stage_of_work": "Measuring results: counting colonies (CFU) on incubated agar plates, then checking the count",
+  "what_it_is_for": "Upload a photo of an agar plate, get an automatic colony count drawn as rings on the photo, then click to add missed colonies, remove false ones and resize rings until the count can be trusted, and optionally save the corrected plate for training."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "Uploaded agar-plate-colonies.jpg (two blood-agar plates held in gloved hands), agar-plate-staph.jpg (a figure with panels A–J showing staph plates and a micrograph, so not a real bench plate photo) and yeast-colonies-plate.jpg (a clear plate with many tiny specks). No gridded counting-plate photo was among the test files. No trained model is bundled, so /status returned {\"model_available\": false} and every detection ran on the classical computer-vision engine (header and count card say CLASSICAL CV)."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Get a trustworthy count of discrete objects in a photo by combining automatic detection with manual correction",
+  "specific": "Get a CFU count from an agar plate photo: auto-detect colonies, then fix misses and false positives by clicking",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Load an image for analysis",
+    "specific": "Upload a plate photo",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load an image and get an automatic first detection",
+      "specific": "Choose a JPG/PNG plate photo and let the app analyse it (Analysing plate…, then Review the count)",
+      "screens": [
+       "screens/001.webp",
+       "screens/002.webp",
+       "screens/019.webp",
+       "screens/020.webp",
+       "screens/028.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 'click to browse (JPG or PNG)' and uploaded agar-plate-colonies.jpg",
+        "screens": [
+         "screens/002.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the round drop zone and uploaded agar-plate-staph.jpg",
+        "screens": [
+         "screens/019.webp",
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'click to browse' and uploaded yeast-colonies-plate.jpg",
+        "screens": [
+         "screens/028.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Confirm whether the trained model or the fallback method is running",
+      "specific": "Read the CLASSICAL CV header badge and 'ENGINE: CLASSICAL CV' on the count card; optionally open /status",
+      "screens": [
+       "screens/031.webp",
+       "screens/002.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened http://127.0.0.1:5000/status in a new tab (model_available: false)",
+        "screens": [
+         "screens/031.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Tune the automatic detection",
+    "specific": "Re-run detection with other settings",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Change the detector's sensitivity and re-run it",
+      "specific": "Move the Sensitivity slider (low/standard/high); detection re-runs on release, though one mouse release did not trigger it",
+      "screens": [
+       "screens/004.webp",
+       "screens/005.webp",
+       "screens/006.webp",
+       "screens/016.webp",
+       "screens/022.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged sensitivity from standard to high (0 → 2 colonies)",
+        "screens": [
+         "screens/004.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged sensitivity to the far right; the slider moved but letting go did not re-detect, so the count stayed at 2 (the replay got 44 at high)",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the Split merged colonies box, which re-ran detection at the far-right sensitivity (2 → 44). The rise came from sensitivity, not from splitting",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged sensitivity to the far left, 'low' (0 colonies)",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed End on the focused slider (staph figure 0 → 38)",
+        "screens": [
+         "screens/021.webp",
+         "screens/022.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Turn on the step that splits touching objects",
+      "specific": "Tick 'Split merged colonies' to look beside each detection for a touching neighbour. Splitting acts only on the trained model's detections (main.py:83-88), so on classical CV it changed no count and drew no Recovered rings",
+      "screens": [
+       "screens/024.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "unticked Split merged colonies on the staph figure (stayed 38, no effect)",
+        "screens": [
+         "screens/023.webp",
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "ticked Split merged colonies on the yeast plate (stayed 3, no effect)",
+        "screens": [
+         "screens/030.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Review and correct the detections by hand",
+    "specific": "Fix the rings on the plate image",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Remove false detections",
+      "specific": "Tap a green ring to remove it (glove reflections, rim glare)",
+      "screens": [
+       "screens/007.webp",
+       "screens/008.webp",
+       "screens/032.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked a ring on the glove (44 → 43, removed 1)",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked a second glove ring",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the auto ring near the rim of the yeast plate",
+        "screens": [
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Add objects the detector missed, and take back a mistaken addition",
+      "specific": "Click unmarked colonies to place amber 'Added' rings; click an amber ring again to take it away",
+      "screens": [
+       "screens/008.webp",
+       "screens/009.webp",
+       "screens/026.webp",
+       "screens/027.webp",
+       "screens/032.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 3 unmarked colonies on the left plate (total 45)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked 3 unmarked colonies in panel D of the staph figure (38 → 41)",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked an added ring in panel D to take it away (41 → 40, added 3 → 2)",
+        "screens": [
+         "screens/027.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked 2 specks on the yeast plate (total 4)",
+        "screens": [
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Change the size of a detection marker",
+      "specific": "Scroll on a ring, or press and slide up/down on it, to resize it",
+      "screens": [
+       "screens/010.webp",
+       "screens/012.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled down on the large ring on the left plate (it shrank)",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled up on the same ring (back to full size)",
+        "screens": [
+         "screens/011.webp",
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed and dragged upward on the large ring on the right plate (it grew)",
+        "screens": [
+         "screens/012.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Throw away manual edits and start over from a fresh detection",
+      "specific": "Press Reset this plate",
+      "screens": [
+       "screens/015.webp",
+       "screens/025.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Reset this plate (45 with edits → 44 auto, added 0, removed 0)",
+        "screens": [
+         "screens/014.webp",
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Reset this plate on the staph figure",
+        "screens": [
+         "screens/025.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Record the corrected result",
+    "specific": "Read the trusted count off the Total Count card",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Read off the final count and how it was reached",
+      "specific": "Read the Total Count card: the total plus its auto · added · removed breakdown",
+      "screens": [
+       "screens/013.webp",
+       "screens/034.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "read Total Count 45 (auto 42 · added 3 · removed 2) on the corrected two-plate photo",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "read a total of 4 on the corrected yeast plate",
+        "screens": [
+         "screens/034.webp"
+        ]
+       }
+      ],
+      "id": "n1"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Contribute the corrected annotation to a training set",
+    "specific": "Save the plate for the toolkit's label, train and reuse loop",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Save the corrected annotations as training data",
+      "specific": "Press Save this plate for training. Per the README, this feeds the separate labeller/training loop, but this run did not verify that the plate arrived",
+      "screens": [
+       "screens/013.webp",
+       "screens/034.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Save this plate for training ('Saved 45 colonies ✓')",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Save this plate for training on the yeast plate ('Saved 4 colonies ✓')",
+        "screens": [
+         "screens/034.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Move on to the next sample",
+    "specific": "Return to the upload screen",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Move on to the next sample",
+      "specific": "Press Count another plate to return to the upload screen; the sensitivity and split settings carry over",
+      "screens": [
+       "screens/018.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Count another plate",
+        "screens": [
+         "screens/017.webp",
+         "screens/018.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Click-to-correct detection overlay with running tally",
+   "general": "Draw automatic detections as markers on an image. The user clicks empty spots to add objects and clicks markers to remove them, while a panel keeps a live total split into auto / added / removed. A legend says where each kind of mark came from.",
+   "specific": "Green rings for auto-detected colonies and amber rings for colonies you add; the legend also lists a dotted 'Recovered' style that never appeared on classical CV. Tap empty agar to add, tap a ring to remove. The Total Count card shows auto · added · removed.",
+   "steps": [
+    "Look over the green auto rings on the plate photo",
+    "Tap a false ring (e.g. glove glare) to remove it; 'removed' goes up",
+    "Tap an unmarked colony to place an amber Added ring; 'added' goes up",
+    "Tap an amber ring again to take it away; 'added' goes down, 'removed' does not change",
+    "Read the Total Count"
+   ],
+   "serves_tasks": [
+    "Remove false detections",
+    "Add objects the detector missed, and take back a mistaken addition",
+    "Read off the final count and how it was reached"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/007.webp",
+    "screens/009.webp",
+    "screens/026.webp",
+    "screens/027.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Resizable markers by wheel or vertical drag",
+   "general": "Change the size of a circular marker on an image by scrolling over it or by pressing and sliding up/down, so the marker matches the object's real size.",
+   "specific": "Scroll on a ring, or press and slide up/down on it, to shrink or grow it to fit the colony. Each scroll changes the size only a little; dragging changes it a lot.",
+   "steps": [
+    "Point at a ring",
+    "Scroll down to shrink it, or up to grow it",
+    "Or press on the ring and drag upward to enlarge it"
+   ],
+   "serves_tasks": [
+    "Change the size of a detection marker"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/011.webp",
+    "screens/012.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Detection sensitivity that re-runs when released",
+   "general": "A strict-to-lenient threshold slider that re-runs detection on the current image when released, so the user can try settings until the first pass looks right. The setting carries over to the next image. A split-touching-objects toggle sits beside it, but it acts only on a trained model's detections and does nothing with the fallback method.",
+   "specific": "Sensitivity slider (low / standard / high) re-detects on release; it also responds to the End key. The 'Split merged colonies' checkbox needs the trained model; on CLASSICAL CV it left every count unchanged.",
+   "steps": [
+    "Drag the Sensitivity slider (or press End on it) and let go",
+    "Watch the rings and the auto count update",
+    "Compare counts at low, standard and high and keep the setting that fits the plate",
+    "Only with the trained model: tick Split merged colonies to separate touching colonies"
+   ],
+   "serves_tasks": [
+    "Change the detector's sensitivity and re-run it",
+    "Turn on the step that splits touching objects"
+   ],
+   "screens": [
+    "screens/004.webp",
+    "screens/016.webp",
+    "screens/022.webp",
+    "screens/024.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Reset and next-sample controls",
+   "general": "Per-image session controls: throw away manual edits and re-detect from scratch, or move on to the next image while keeping the detection settings.",
+   "specific": "Reset this plate clears edits and re-detects. Count another plate returns to the upload circle.",
+   "steps": [
+    "Press Reset this plate to clear edits and get a fresh detection",
+    "Check that the card shows added 0 · removed 0",
+    "Press Count another plate to load the next photo"
+   ],
+   "serves_tasks": [
+    "Throw away manual edits and start over from a fresh detection",
+    "Move on to the next sample"
+   ],
+   "screens": [
+    "screens/015.webp",
+    "screens/018.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Save corrected annotation to a training set",
+   "general": "Human-in-the-loop data capture: after correcting an image, one button stores the corrected annotation for future model training and confirms with the number of objects saved.",
+   "specific": "Save this plate for training changes to 'Saved N colonies ✓'. The README says this feeds the separate labeller/training loop; no dataset view is visible in the app.",
+   "steps": [
+    "Correct the plate",
+    "Press Save this plate for training",
+    "See 'Saved N colonies ✓' match the Total Count"
+   ],
+   "serves_tasks": [
+    "Save the corrected annotations as training data"
+   ],
+   "screens": [
+    "screens/013.webp",
+    "screens/034.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Empty-result notice with suggested remedy",
+   "general": "When automatic detection finds nothing, show a banner saying so and suggesting what to do: mark objects by hand or raise the sensitivity and re-run.",
+   "specific": "Amber banner: 'Auto-detection found nothing to count here. Tap each colony to count it manually, or raise the sensitivity and re-run.'",
+   "steps": [
+    "Upload a plate; detection returns 0",
+    "Read the banner",
+    "Raise the sensitivity or tap colonies by hand"
+   ],
+   "serves_tasks": [
+    "Load an image and get an automatic first detection",
+    "Change the detector's sensitivity and re-run it"
+   ],
+   "screens": [
+    "screens/002.webp",
+    "screens/020.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Detection-engine indicator",
+   "general": "Show the user which method produced the detections (trained model or fallback), so a reviewer knows how much to trust the first pass. A machine-readable status endpoint reports the same thing.",
+   "specific": "Header badge and 'ENGINE: CLASSICAL CV' line on the count card; /status returns {\"model_available\": false}.",
+   "steps": [
+    "Read the engine badge in the header",
+    "Read the ENGINE line on the Total Count card",
+    "Optionally open /status to confirm model_available"
+   ],
+   "serves_tasks": [
+    "Confirm whether the trained model or the fallback method is running"
+   ],
+   "screens": [
+    "screens/002.webp",
+    "screens/031.webp"
+   ],
+   "id": "f7"
+  }
+ ],
+ "screens_never_reached": [
+  "Trained-model (YOLO) engine: no best.pt is bundled; /status reports model_available: false and the UI only ever showed CLASSICAL CV",
+  "TNTC / too-numerous-to-count advisory (tntcHint; README threshold >250, 'report as TNTC, plate next dilution'): never appeared, even on the yeast plate covered in specks",
+  "Gridded counting-plate (grid-removal) path: none of the three test images is a gridded plate",
+  "'Recovered' (dotted) ring style from the legend: Split has no effect on classical CV, so all rings showed as plain Auto in the tally",
+  "A camera or 'take a photo' capture view: clicking the drop circle opened a file picker"
+ ],
+ "not_done": [
+  "Comparing the trained model with the classical CV engine on the same plate: only the classical engine is available offline",
+  "Getting a count on a gridded counting plate: no gridded plate was among the test files. The grid-removal path runs offline, so this was a choice of test data, not a blocked path",
+  "Recognising a too-dense (TNTC) plate: no count came near the >250 threshold and no warning appeared",
+  "Confirming that Split merged colonies does anything: it changed no count on any plate under classical CV, and the 2 → 44 jump seen when it was first ticked came from a pending sensitivity re-detect",
+  "Checking that saved plates reach the training dataset or a retrain: the app only shows 'Saved N colonies ✓'; there is no visible dataset view and nothing was downloaded",
+  "Dropping a file by drag-and-drop onto the circle: the browser can only give files through the picker, so I used click-to-browse and the drop zone's picker instead",
+  "Exporting the count (CSV or report): no export control exists in the interface"
+ ],
+ "applied": [
+  "Rewrote the t2 'far right (still 2)' action to say the release did not re-detect",
+  "Moved the 2 → 44 action (screens/006) from t3 to t2 and credited the jump to sensitivity, not Split",
+  "Removed screens/006 from t3's screens and added it to t2; t3 kept not_confirmed and now says splitting needs the trained model (main.py:83-88)",
+  "Relabelled the remaining t3 actions as 'no effect'",
+  "Rewrote f3 around the sensitivity slider, dropped its 006 citation and said Split needs the trained model",
+  "Added task n1 for reading the final total and its auto · added · removed breakdown, citing screens/013 and screens/034",
+  "Gave the 'Record the corrected result' phase only the count-reading task",
+  "Moved save-for-training into its own 'contribute to a training set' phase and said it feeds the README's label/train loop (unverified)",
+  "Moved next-sample into its own phase",
+  "Turned the engine-check phase into task t11 under loading",
+  "Merged 'Undo a manual addition' (t6) into the add task t5",
+  "Split f4: reset/next-sample stays in f4; save-for-training is the new f6",
+  "Added the engine indicator as feature f7 (seen on screens/002 and screens/031)",
+  "Mentioned the ring legend (Auto / Added / unused Recovered) in f1",
+  "Named the TNTC advisory and its remedy under screens_never_reached",
+  "Noted in not_done that the gridded plate was a test-data choice, and gave the TNTC threshold",
+  "Added the Split no-effect finding to not_done",
+  "Noted in data that the staph image is a figure, not a bench photo"
+ ],
+ "open_fixes": [
+  "Re-run with a gridded counting-plate photo to cover the README's headline case and the grid-removal path (detector.py:552). It works offline, but no gridded image was in the test data",
+  "Re-run the upload, tuning and correction tasks on a real bench plate photo instead of the multi-panel staph figure and the gloved two-plate photo, so the evidence reflects real use",
+  "Try a very dense plate (>250 colonies) or the trained model to reach the TNTC advisory; then add it as a feature with its 'report as TNTC, plate next dilution' remedy. It was never shown in this run",
+  "Confirm Split merged colonies and the dotted Recovered rings with the trained model loaded (best.pt). Classical CV ignores the flag",
+  "Re-test whether a mouse drag on the Sensitivity slider reliably re-detects on release. In screens/005 a release left the count stale",
+  "Check that saved plates reach the labeller/training dataset. This needs access to the dataset or the training app, which the run never opened"
+ ],
+ "screens_at": "pilot/public/runs/colony-counter-flask/20261029-220808/",
+ "screens_filed": {
+  "screens/001.webp": "screens/001.webp",
+  "screens/004.webp": "screens/004.webp",
+  "screens/007.webp": "screens/007.webp",
+  "screens/013.webp": "screens/013.webp",
+  "screens/018.webp": "screens/018.webp"
+ }
+}

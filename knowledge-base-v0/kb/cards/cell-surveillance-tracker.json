@@ -1,0 +1,681 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cell-surveillance-tracker",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:18:54Z"
+  },
+  "app": {
+    "title": "Cell Surveillance — single-cell tracking",
+    "summary": "A person loads a time-lapse movie by dropping it, browsing for it or pasting its path, and previews a frame with the detected nuclei outlined. They enter the time between frames and confirm a scale (the scale bar found in the movie, or the pixel size). They pick which measurements to run, then start the analysis. Every nucleus is tracked, and the tool calls nuclear ruptures, divisions and deaths cell by cell. They read the totals and plots, adjust what counts as a rupture without tracking again, open single cells to check their image strips and traces, and export tables, an annotated movie and a PDF report, either for the whole field or for a region they draw.",
+    "task": {
+      "text": "Track every cell in a live-cell movie, find nuclear rupture, division and death events for each cell, and export per-cell and population measurements.",
+      "verbs": [
+        "derive",
+        "identify",
+        "summarize",
+        "explore",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "A time-lapse fluorescence movie of a nuclear reporter. It is turned into per-cell tracks, one row per cell per frame with position, intensity and shape, plus tables of detected events and population time courses.",
+      "item": "a tracked cell: one nucleus followed across the frames of a time-lapse movie",
+      "shapes": [
+        "image collection",
+        "time series",
+        "table",
+        "events"
+      ]
+    },
+    "stage": {
+      "text": "quantifying cell events from raw time-lapse movies after imaging, before writing up",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Setup is a four-step panel (movie, calibrate, measure, run) with a frame preview. The Run button stays disabled until the calibration is complete. Once the analysis has run, a menu opens result views: an overview dashboard, a rupture view where a threshold slider and a sweep curve re-call events without re-tracking, movement and fate charts, a sortable cell table that opens one cell's image strip and traces, a region view where a box dragged on the frame selects cells for export, and an export page.",
+      "views": [
+        "form",
+        "image viewer",
+        "summary stats",
+        "line chart",
+        "bar chart",
+        "scatter plot",
+        "table view",
+        "detail panel",
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "sort",
+        "search",
+        "brush",
+        "time slider",
+        "toggle view",
+        "hover for detail",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "master-detail",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "single-cell tracking and event detection in live-cell fluorescence imaging in cell biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "live cell imaging",
+        "cell tracking",
+        "nuclear envelope rupture"
+      ]
+    },
+    "workflow": {
+      "name": "track objects through a movie, call events per object, and export per-object measurements",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drop a MOV/MP4/AVI/TIFF movie, choose one with the native file dialog or paste a path. A frame slider previews the movie with the detected nuclei outlined. Earlier analyses can be reopened from History.",
+          "parts": [
+            "setup",
+            "history"
+          ]
+        },
+        {
+          "step": "enter the calibration and choose what to measure",
+          "here": "Enter the minutes between frames. For scale, tick to confirm the auto-detected scale bar and give its length, or enter µm per pixel. Tick rupture, movement, division, death, shape or crowding, and set the rupture mode and threshold. 'Analyse movie' stays disabled until everything is entered.",
+          "parts": [
+            "calibration",
+            "setup"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Analysing the movie runs segmentation, tracking and event calling in a subprocess, with a progress bar. It then opens the results.",
+          "parts": [
+            "setup"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The overview shows tiles for cells tracked, ruptures, divisions, deaths and speed, next to the looping annotated movie, cumulative-event curves and the fraction of cells ruptured over time.",
+          "parts": [
+            "overview"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Change the rupture mode or threshold with a slider shown against a sweep of how many ruptures each threshold gives. 'Apply' re-calls the events without tracking again. Image strips of the largest, smallest or longest ruptures help check the calls. A wrong calibration can be corrected the same way.",
+          "parts": [
+            "ruptures",
+            "calibration"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Sort the cell table by ruptures, time observed, path length or speed, and pick a row. That cell's image strip, reporter trace with ruptures shaded, speed trace and every measurement appear beside the table.",
+          "parts": [
+            "cells"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Drag a box on the frame, or type its coordinates, and choose a rule for which cells count as inside, then export the cropped movie, tables and report for that region. The export page has download buttons for each file, a zip of all tables, and buttons to rebuild the movie or the report.",
+          "parts": [
+            "region",
+            "export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The frame interval and the scale are never assumed. Each must be entered for every movie before the analysis can run, and a detected scale bar is shown outlined for the person to confirm.",
+        "The event threshold can be changed after tracking. A sweep curve shows how many ruptures each threshold would call, and applying it re-calls events without tracking again.",
+        "Finished results can be recalibrated: every time, speed, distance and area is recomputed, and a warning stays up until the calibration is confirmed.",
+        "Each track ends in a fate (divided, death, left the field, hidden by a neighbour, lost), and death calls carry a confidence level and the evidence behind them.",
+        "A region can be exported with a rule for which cells belong to it (inside most of the time, at any time, at the start, or always)."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "setup",
+      "level": "view",
+      "parent": null,
+      "title": "Setup: movie, calibrate, measure, run",
+      "summary": "Four side-by-side steps with a progress stepper take a movie in, collect its calibration and the measurements to run, preview the detected nuclei on any frame, and start the analysis.",
+      "views": [
+        "form",
+        "image viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "time slider",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 559,
+          "end": 602,
+          "role": "markup",
+          "anchor": "099fca84d48d",
+          "first": "if view == \"Setup\":"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 649,
+          "end": 742,
+          "role": "markup",
+          "anchor": "cfe4da1746f8",
+          "first": "with c3.container(border=True):"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 123,
+          "end": 135,
+          "role": "style",
+          "anchor": "4c76e500a21b",
+          "first": "/* ---- setup steps */"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 147,
+          "end": 152,
+          "role": "style",
+          "anchor": "0410dc99df56",
+          "first": "[data-testid=\"stFileUploaderDropzone\"] { border:1.5px dashed rgba(131,207,210,.5) !important; border-radius:14px !import"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 229,
+          "end": 236,
+          "role": "data",
+          "anchor": "4ab02db7339f",
+          "first": "MEASURE_OPTIONS = ["
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 277,
+          "end": 287,
+          "role": "logic",
+          "symbol": "choose_file",
+          "anchor": "32c454d7aa55",
+          "first": "def choose_file(folder: bool = False) -> str:"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 312,
+          "end": 323,
+          "role": "logic",
+          "symbol": "read_frame",
+          "anchor": "468b8a708089",
+          "first": "def read_frame(path: str, index: int, mtime: float, crop: tuple = None) -> np.ndarray:"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 327,
+          "end": 339,
+          "role": "logic",
+          "symbol": "preview_outlines",
+          "anchor": "bf5f6261fd6d",
+          "first": "def preview_outlines(path: str, index: int, mtime: float, cfg_dict: dict):"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 389,
+          "end": 399,
+          "role": "logic",
+          "symbol": "draw_frame",
+          "anchor": "4788f51064d8",
+          "first": "def draw_frame(rgb, outline=None, roi=None, max_w=1100):"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 402,
+          "end": 417,
+          "role": "logic",
+          "symbol": "current_config",
+          "anchor": "47664a05db33",
+          "first": "def current_config() -> Config:"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 420,
+          "end": 460,
+          "role": "logic",
+          "symbol": "run_analysis",
+          "anchor": "dd0044e01dc9",
+          "first": "def run_analysis(path: str, outdir: str, cfg: Config):"
+        }
+      ]
+    },
+    {
+      "id": "calibration",
+      "level": "component",
+      "parent": "setup",
+      "title": "Calibration entry and correction",
+      "summary": "Asks for the minutes between frames and a confirmed scale (detected scale bar or pixel size) for each movie, and lets finished results be recalibrated without tracking again.",
+      "views": [
+        "form",
+        "image viewer"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 603,
+          "end": 647,
+          "role": "markup",
+          "anchor": "1da077cee99a",
+          "first": "# Nothing in the calibration is pre-filled, and every widget is tied to the movie, so a value entered for one"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 759,
+          "end": 811,
+          "role": "markup",
+          "anchor": "de9b7a8907aa",
+          "first": "# ----- calibration of these results: shown loudly until the user has supplied both values"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 291,
+          "end": 308,
+          "role": "logic",
+          "symbol": "movie_info",
+          "anchor": "92d9cecfabca",
+          "first": "def movie_info(path: str, mtime: float) -> dict:"
+        },
+        {
+          "file": "code/cellsurveillance/io.py",
+          "start": 149,
+          "end": 162,
+          "role": "logic",
+          "symbol": "find_scale_bar",
+          "anchor": "c098c499dce8",
+          "first": "def find_scale_bar(frame: np.ndarray) -> Optional[tuple]:"
+        },
+        {
+          "file": "code/cellsurveillance/pipeline.py",
+          "start": 337,
+          "end": 377,
+          "role": "logic",
+          "symbol": "recalibrate",
+          "anchor": "b119ce54257a",
+          "first": "def recalibrate(outdir: str, interval_min: Optional[float] = None, pixel_size_um: Optional[float] = None,"
+        }
+      ]
+    },
+    {
+      "id": "overview",
+      "level": "view",
+      "parent": null,
+      "title": "Overview dashboard",
+      "summary": "Shows totals as tiles, the looping annotated movie with a colour key for each cell state, cumulative events over time and the fraction of cells ruptured at each time.",
+      "views": [
+        "summary stats",
+        "line chart",
+        "image viewer",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 813,
+          "end": 863,
+          "role": "markup",
+          "anchor": "e821a2a26bb8",
+          "first": "if view == \"Overview\":"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 154,
+          "end": 169,
+          "role": "style",
+          "anchor": "10cbf76714fb",
+          "first": "/* ---- readouts */"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 266,
+          "end": 274,
+          "role": "logic",
+          "symbol": "tiles",
+          "anchor": "4dcaf81d8b72",
+          "first": "def tiles(items):"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 362,
+          "end": 375,
+          "role": "logic",
+          "symbol": "base_layout",
+          "anchor": "6b5e191275cc",
+          "first": "def base_layout(fig, height=300, title=None, x=None, y=None, legend=False):"
+        },
+        {
+          "file": "code/cellsurveillance/metrics.py",
+          "start": 216,
+          "end": 240,
+          "role": "logic",
+          "symbol": "population_timecourse",
+          "anchor": "5433263b5bb5",
+          "first": "def population_timecourse(frames: pd.DataFrame, events: pd.DataFrame, cells: pd.DataFrame, divisions: pd.DataFrame,"
+        }
+      ]
+    },
+    {
+      "id": "ruptures",
+      "level": "view",
+      "parent": null,
+      "title": "Rupture threshold and individual ruptures",
+      "summary": "Lets the person choose what counts as a rupture, with a threshold slider set against a sweep of how many ruptures each threshold gives. Applying it re-calls the events. Histograms of duration and size, and sorted image strips with traces of single ruptures, help check the calls.",
+      "views": [
+        "line chart",
+        "bar chart",
+        "image viewer"
+      ],
+      "interactions": [
+        "exclude and refit",
+        "sort",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 865,
+          "end": 948,
+          "role": "markup",
+          "anchor": "d00e29263114",
+          "first": "if an.rupture:"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 378,
+          "end": 386,
+          "role": "logic",
+          "symbol": "hist",
+          "anchor": "8cdeae49ec34",
+          "first": "def hist(values, color, title, x, nbins=24, hover=\"%{y} at %{x}\"):"
+        },
+        {
+          "file": "code/cellsurveillance/pipeline.py",
+          "start": 384,
+          "end": 392,
+          "role": "logic",
+          "symbol": "recall",
+          "anchor": "678014020b67",
+          "first": "def recall(outdir: str, threshold: Optional[float] = None, mode: Optional[str] = None, log=print, **rupture) -> Results:"
+        },
+        {
+          "file": "code/cellsurveillance/rupture.py",
+          "start": 237,
+          "end": 254,
+          "role": "logic",
+          "symbol": "threshold_sweep",
+          "anchor": "eb06342c9bed",
+          "first": "def threshold_sweep(frames: pd.DataFrame, cfg: Rupture, interval_min: float, n: int = 25) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/cellsurveillance/viz.py",
+          "start": 208,
+          "end": 241,
+          "role": "logic",
+          "symbol": "cell_strip",
+          "anchor": "ecc42c711de4",
+          "first": "def cell_strip(signal: np.ndarray, labels: np.ndarray, rows: pd.DataFrame, frame_list, half: int = 48,"
+        }
+      ]
+    },
+    {
+      "id": "cells",
+      "level": "view",
+      "parent": null,
+      "title": "Cells: one cell in detail",
+      "summary": "A sortable table of tracked cells. Selecting a row opens that cell's image strip across the movie, its reporter trace with ruptures shaded, its speed trace and all its measurements.",
+      "views": [
+        "table view",
+        "detail panel",
+        "line chart",
+        "image viewer"
+      ],
+      "interactions": [
+        "sort",
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 1000,
+          "end": 1038,
+          "role": "markup",
+          "anchor": "202b95e107d6",
+          "first": "if view == \"Cells\":"
+        },
+        {
+          "file": "code/cellsurveillance/viz.py",
+          "start": 208,
+          "end": 241,
+          "role": "logic",
+          "symbol": "cell_strip",
+          "anchor": "ecc42c711de4",
+          "first": "def cell_strip(signal: np.ndarray, labels: np.ndarray, rows: pd.DataFrame, frame_list, half: int = 48,"
+        },
+        {
+          "file": "code/cellsurveillance/metrics.py",
+          "start": 121,
+          "end": 192,
+          "role": "logic",
+          "symbol": "summarize_cells",
+          "anchor": "358d0b294eb5",
+          "first": "def summarize_cells(frames: pd.DataFrame, events: pd.DataFrame, fates: pd.DataFrame, divisions: pd.DataFrame,"
+        }
+      ]
+    },
+    {
+      "id": "region",
+      "level": "view",
+      "parent": null,
+      "title": "Region export",
+      "summary": "A box dragged on an outlined frame, or typed coordinates, picks a region. The person chooses a rule for which cells count as inside, sees how many cells are in it, and exports the cropped movie, tables and report for those cells.",
+      "views": [
+        "image viewer",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "brush",
+        "time slider",
+        "filter",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 1040,
+          "end": 1101,
+          "role": "markup",
+          "anchor": "6a4fe5ea07f2",
+          "first": "if view == \"Region\":"
+        },
+        {
+          "file": "code/cellsurveillance/roi.py",
+          "start": 22,
+          "end": 37,
+          "role": "logic",
+          "symbol": "cells_in_roi",
+          "anchor": "8be89d8aac92",
+          "first": "def cells_in_roi(frames: pd.DataFrame, roi: tuple, membership: str = \"inside_most\") -> set:"
+        },
+        {
+          "file": "code/cellsurveillance/roi.py",
+          "start": 40,
+          "end": 68,
+          "role": "logic",
+          "symbol": "subset",
+          "anchor": "52c31aa82fd1",
+          "first": "def subset(res: Results, cells: set, roi: Optional[tuple] = None, with_sweep: bool = False) -> Results:"
+        },
+        {
+          "file": "code/cellsurveillance/roi.py",
+          "start": 71,
+          "end": 91,
+          "role": "logic",
+          "symbol": "export_roi",
+          "anchor": "5357bc8d5968",
+          "first": "def export_roi(res: Results, roi: tuple, outdir: str, membership: str = \"inside_most\", video: bool = True,"
+        }
+      ]
+    },
+    {
+      "id": "export",
+      "level": "view",
+      "parent": null,
+      "title": "Export files",
+      "summary": "Download buttons for the report, the annotated movie and each measurement table, a zip of all tables, and buttons to rebuild the movie or the report after changes.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 1103,
+          "end": 1143,
+          "role": "markup",
+          "anchor": "540c4b232d42",
+          "first": "if view == \"Export\":"
+        },
+        {
+          "file": "code/cellsurveillance/pipeline.py",
+          "start": 275,
+          "end": 298,
+          "role": "logic",
+          "symbol": "write_tables",
+          "anchor": "74d5273904d6",
+          "first": "def write_tables(res: Results, outdir: str, prefix: str = \"\") -> list[str]:"
+        },
+        {
+          "file": "code/cellsurveillance/report.py",
+          "start": 559,
+          "end": 589,
+          "role": "logic",
+          "symbol": "write_pdf",
+          "anchor": "aeeb22f8fbab",
+          "first": "def write_pdf(res, path: str, signal: Optional[np.ndarray] = None, labels: Optional[np.ndarray] = None,"
+        },
+        {
+          "file": "code/cellsurveillance/viz.py",
+          "start": 54,
+          "end": 205,
+          "role": "logic",
+          "symbol": "render_overlay",
+          "anchor": "019ceaeb0308",
+          "first": "def render_overlay(res, out_path: str, roi: Optional[tuple] = None, cells: Optional[set] = None,"
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "level": "view",
+      "parent": null,
+      "title": "Earlier analyses",
+      "summary": "A searchable grid of cards for past analyses. Each card has a thumbnail, its totals and chips showing whether the calibration was confirmed, and can be opened again or hidden.",
+      "views": [
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "search",
+        "select",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 513,
+          "end": 556,
+          "role": "markup",
+          "anchor": "afb0760bf392",
+          "first": "# ----------------------------------------------------------------------------- history"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 182,
+          "end": 190,
+          "role": "style",
+          "anchor": "d6d36c3d9aef",
+          "first": "/* ---- history */"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 244,
+          "end": 252,
+          "role": "logic",
+          "symbol": "open_results",
+          "anchor": "0ccfa5a29cee",
+          "first": "def open_results(folder: str, view: str = \"Overview\") -> bool:"
+        },
+        {
+          "file": "code/cellsurveillance/app.py",
+          "start": 354,
+          "end": 359,
+          "role": "logic",
+          "symbol": "thumbnail",
+          "anchor": "b65fa3275b73",
+          "first": "def thumbnail(outdir: str, stamp: float) -> str:"
+        },
+        {
+          "file": "code/cellsurveillance/history.py",
+          "start": 98,
+          "end": 109,
+          "role": "logic",
+          "symbol": "entries",
+          "anchor": "cff6d6df7a77",
+          "first": "def entries() -> list:"
+        },
+        {
+          "file": "code/cellsurveillance/history.py",
+          "start": 93,
+          "end": 95,
+          "role": "logic",
+          "symbol": "forget",
+          "anchor": "f512896de8e2",
+          "first": "def forget(outdir: str) -> None:"
+        }
+      ]
+    }
+  ]
+}

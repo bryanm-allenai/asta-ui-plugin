@@ -1,0 +1,584 @@
+{
+  "schema": "astaui.card/1",
+  "id": "equakevis-indonesia-catalog",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T03:31:35Z"
+  },
+  "app": {
+    "title": "E-QuakeVis (Database Gempa)",
+    "summary": "A person loads an earthquake catalogue: the bundled archive, or their own CSV or Excel file after matching its columns. They pick a date range and narrow the events by depth, magnitude, administrative region, distance to coast, faults or volcanoes, and an optional box drawn on the map or typed as coordinates. The filtered events are shown as epicentres on a layered map, as hypocentres in 3D with slab surfaces and a cross-section along a profile they draw, and as summary charts and a table. The person leaves with a CSV of the filtered events or a print-ready PNG/PDF map sheet. A hazard tab also shows probabilistic hazard grids with a hazard curve for each site, and can launch new hazard runs.",
+    "task": {
+      "text": "Narrow an earthquake catalogue to the events in a region, depth and magnitude range of interest, look at them in map, 3D and statistical views, and export the subset as a table or a publication map.",
+      "verbs": [
+        "explore",
+        "locate",
+        "summarize",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "A catalogue of earthquake events with time, coordinates, depth and magnitude, joined with reference geography: fault traces, trenches, slab depth contours and grids, volcano hazard areas, administrative boundaries, population density, seismic stations, and gridded hazard results with hazard curves.",
+      "item": "one earthquake event (a hypocentre with time, latitude, longitude, depth and magnitude)",
+      "shapes": [
+        "table",
+        "events",
+        "geospatial",
+        "field"
+      ]
+    },
+    "stage": {
+      "text": "exploring and subsetting an earthquake catalogue, then mapping it for a report",
+      "terms": [
+        "explore",
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar filters and a drawn bounding box set one filtered event set. That set feeds every tab: the layered epicentre map, the 3D hypocentre and cross-section workspace, the statistics charts, the event table, and the publication-map renderer. Clicks on the map hide single events or focus a volcano, and picks in the 3D view and the cross-section highlight the same event in each other.",
+      "views": [
+        "map",
+        "summary stats",
+        "bar chart",
+        "scatter plot",
+        "table view",
+        "form",
+        "detail panel",
+        "line chart"
+      ],
+      "interactions": [
+        "filter",
+        "brush",
+        "zoom and pan",
+        "select",
+        "hover for detail",
+        "toggle view",
+        "import",
+        "export",
+        "time slider"
+      ],
+      "patterns": [
+        "linked views",
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "earthquake catalogue analysis and probabilistic seismic hazard in seismology",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "seismology",
+        "earthquake catalogue",
+        "psha"
+      ]
+    },
+    "workflow": {
+      "name": "filter an event catalogue on a map and export the subset or a print map",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "The catalogue comes from a local indexed archive by date range (the last 90 days by default). Extra CSV or Excel files can be added: pick the sheet, match columns to the required fields, preview, then append them to the database.",
+          "parts": [
+            "import-panel",
+            "sidebar-filters"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Sliders for depth and magnitude, multiselects for province, district and epicentre location type, and maximum distance to the coast, to chosen fault segments and to chosen volcanoes. A rectangle drawn on the map or typed coordinates keep only the events inside the box.",
+          "parts": [
+            "sidebar-filters",
+            "distribution-map"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Epicentres are drawn on a basemap that can be switched, with optional layers for faults, trenches, slab contours, volcano hazard areas, stations and population density, plus headline counts. Clicking a point can hide that event.",
+          "parts": [
+            "distribution-map"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "In 3D, hypocentres sit with Slab2 surfaces. The person draws a profile A–A′ with a corridor width to get a depth cross-section, and an event picked in one plot is marked in the other. The events in the slice export as CSV.",
+          "parts": [
+            "hypocenter-3d"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Summary counts and depth histogram, magnitude against depth, top provinces and largest events. The hazard tab classifies PGA/SA grids by return period, and a click on a land site shows its hazard curve.",
+          "parts": [
+            "statistics",
+            "psha-hazard"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The filtered events download as a dated CSV. A publication sheet (template, page size, DPI, scale, logos, layers, inset) is rendered to PNG and PDF for download.",
+          "parts": [
+            "event-table",
+            "publication-map"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each event gets precomputed spatial context, including province or district, land or sea, nearest fault segment and distance to it, so the person can filter by distance to a fault, volcano or coast.",
+        "Hypocentres are viewed against subduction slab geometry, with a cross-section along a profile the person draws, to see dipping seismicity zones.",
+        "The publication sheet follows cartographic conventions: a representative scale, north arrow, locator inset, source lines, and a spatial-planning layout template.",
+        "Probabilistic hazard runs in a separate engine process and come back as classified grids by intensity measure and return period, with hazard curves for each site."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar-filters",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar filters and map layers",
+      "summary": "Sets the date range, depth, magnitude, region, coast, fault and volcano distance filters, and which map layers are drawn.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "time slider",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 785,
+          "end": 787,
+          "role": "logic",
+          "symbol": "render_catalog_date_query",
+          "anchor": "5824261df95b",
+          "first": "def render_catalog_date_query("
+        },
+        {
+          "file": "code/app.py",
+          "start": 983,
+          "end": 1544,
+          "role": "logic",
+          "anchor": "3d96af07f50e",
+          "first": "def render_sidebar_filters("
+        },
+        {
+          "file": "code/app.py",
+          "start": 879,
+          "end": 921,
+          "role": "logic",
+          "symbol": "render_coordinate_bbox_filter",
+          "anchor": "7a2980dee267",
+          "first": "def render_coordinate_bbox_filter() -> None:"
+        },
+        {
+          "file": "code/utils/data_loader.py",
+          "start": 675,
+          "end": 688,
+          "role": "logic",
+          "symbol": "filter_earthquake_data",
+          "anchor": "fd161822abb6",
+          "first": "def filter_earthquake_data("
+        },
+        {
+          "file": "code/app.py",
+          "start": 4104,
+          "end": 4127,
+          "role": "logic",
+          "anchor": "f54c39d0acfc",
+          "first": "filtered_df = filter_hidden_earthquakes("
+        }
+      ]
+    },
+    {
+      "id": "import-panel",
+      "level": "component",
+      "parent": "sidebar-filters",
+      "title": "Import own catalogue",
+      "summary": "Uploads a CSV or Excel file, picks the sheet and header row, maps its columns to the required fields, previews it and appends it to the database.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1545,
+          "end": 1763,
+          "role": "logic",
+          "symbol": "render_import_panel",
+          "anchor": "eb113fd0e702",
+          "first": "def render_import_panel() -> None:"
+        },
+        {
+          "file": "code/utils/data_loader.py",
+          "start": 232,
+          "end": 298,
+          "role": "logic",
+          "symbol": "inspect_uploaded_file",
+          "anchor": "ba112fbeea72",
+          "first": "def inspect_uploaded_file(uploaded_file: BinaryIO) -> dict[str, Any]:"
+        },
+        {
+          "file": "code/utils/data_loader.py",
+          "start": 106,
+          "end": 145,
+          "role": "logic",
+          "symbol": "suggest_column_mapping",
+          "anchor": "0e23363d8f5e",
+          "first": "def suggest_column_mapping(columns: Sequence[object]) -> dict[str, str | None]:"
+        },
+        {
+          "file": "code/utils/data_loader.py",
+          "start": 650,
+          "end": 653,
+          "role": "logic",
+          "symbol": "append_to_master_database",
+          "anchor": "79356a5f91c0",
+          "first": "def append_to_master_database("
+        }
+      ]
+    },
+    {
+      "id": "distribution-map",
+      "level": "view",
+      "parent": null,
+      "title": "Epicentre map (Peta Sebaran)",
+      "summary": "Shows the filtered epicentres with tectonic and administrative layers. A box drawn here narrows the selection, and clicking a point hides that event.",
+      "views": [
+        "map",
+        "summary stats"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "brush",
+        "hover for detail",
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3597,
+          "end": 3829,
+          "role": "logic",
+          "anchor": "a909cc998ff3",
+          "first": "map_extent_df = all_earthquakes_df"
+        },
+        {
+          "file": "code/utils/map_builder.py",
+          "start": 3007,
+          "end": 3047,
+          "role": "logic",
+          "symbol": "build_indonesia_map",
+          "anchor": "9b64a4b900b7",
+          "first": "def build_indonesia_map("
+        },
+        {
+          "file": "code/utils/map_builder.py",
+          "start": 926,
+          "end": 928,
+          "role": "logic",
+          "symbol": "build_earthquake_feature_group",
+          "anchor": "eefa18a5c3ef",
+          "first": "def build_earthquake_feature_group("
+        },
+        {
+          "file": "code/utils/bbox_selection.py",
+          "start": 81,
+          "end": 89,
+          "role": "logic",
+          "symbol": "latest_drawing_bounds",
+          "anchor": "798fb9295910",
+          "first": "def latest_drawing_bounds(drawings: Any) -> Bounds | None:"
+        },
+        {
+          "file": "code/utils/bbox_selection.py",
+          "start": 92,
+          "end": 100,
+          "role": "logic",
+          "symbol": "filter_by_bounds",
+          "anchor": "c596d2f017b2",
+          "first": "def filter_by_bounds(df: pd.DataFrame, bounds: Bounds | None) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "hypocenter-3d",
+      "level": "view",
+      "parent": null,
+      "title": "3D hypocentres and cross-section",
+      "summary": "Places hypocentres in 3D with slab surfaces and cuts a depth cross-section along a drawn profile, with picks linked between the two plots and the slice exportable.",
+      "views": [
+        "scatter plot",
+        "map",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "select",
+        "brush",
+        "export"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 2799,
+          "end": 2807,
+          "role": "logic",
+          "symbol": "render_hypocenter_3d",
+          "anchor": "8081b8a9573d",
+          "first": "def render_hypocenter_3d("
+        },
+        {
+          "file": "code/app.py",
+          "start": 2779,
+          "end": 2796,
+          "role": "logic",
+          "symbol": "render_depth_legend",
+          "anchor": "11cd5447fdfe",
+          "first": "def render_depth_legend() -> None:"
+        },
+        {
+          "file": "code/utils/seismic_view/controller.js",
+          "start": 121,
+          "end": 139,
+          "role": "logic",
+          "symbol": "applyProfile",
+          "anchor": "c3279f198b48",
+          "first": "function applyProfile(a,b,widthKm=state.widthKm,modelChoice=state.modelChoice) {"
+        },
+        {
+          "file": "code/utils/seismic_view/controller.js",
+          "start": 94,
+          "end": 94,
+          "role": "logic",
+          "symbol": "selectEvent",
+          "anchor": "caba550a88e5",
+          "first": "function selectEvent(id) {state={...state,selectedId:id};render();}"
+        },
+        {
+          "file": "code/utils/seismic_view/controller.js",
+          "start": 163,
+          "end": 169,
+          "role": "logic",
+          "symbol": "exportCsv",
+          "anchor": "9c6c751ce548",
+          "first": "function exportCsv() {"
+        },
+        {
+          "file": "code/utils/seismic_view/plots.js",
+          "start": 197,
+          "end": 217,
+          "role": "logic",
+          "symbol": "build3D",
+          "anchor": "470f4898f830",
+          "first": "function build3D(data, state, geometry) {"
+        },
+        {
+          "file": "code/utils/seismic_view/plots.js",
+          "start": 229,
+          "end": 249,
+          "role": "logic",
+          "symbol": "buildSection",
+          "anchor": "9575b21dfcad",
+          "first": "function buildSection(data, state) {"
+        },
+        {
+          "file": "code/utils/seismic_view/geometry.js",
+          "start": 90,
+          "end": 101,
+          "role": "logic",
+          "symbol": "sliceEvents",
+          "anchor": "4f86f8926fdf",
+          "first": "function sliceEvents(events, a, b, widthKm) {"
+        }
+      ]
+    },
+    {
+      "id": "psha-hazard",
+      "level": "view",
+      "parent": null,
+      "title": "Seismic hazard (PSHA) map",
+      "summary": "Picks a finished hazard run, intensity measure and return period, then shows the classified hazard grid with summary values, and a hazard curve for the site clicked on the map.",
+      "views": [
+        "map",
+        "summary stats",
+        "line chart",
+        "detail panel"
+      ],
+      "interactions": [
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3191,
+          "end": 3384,
+          "role": "logic",
+          "anchor": "bc719823027b",
+          "first": "def render_psha_hazard("
+        },
+        {
+          "file": "code/app.py",
+          "start": 2943,
+          "end": 3002,
+          "role": "logic",
+          "symbol": "render_psha_site_detail",
+          "anchor": "cc3d1e47fb63",
+          "first": "def render_psha_site_detail(run: PSHARun, hazard_df: pd.DataFrame, site_index: int) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2832,
+          "end": 2837,
+          "role": "logic",
+          "symbol": "build_psha_raster",
+          "anchor": "a1e33dd4bc0f",
+          "first": "def build_psha_raster("
+        },
+        {
+          "file": "code/app.py",
+          "start": 3047,
+          "end": 3063,
+          "role": "logic",
+          "symbol": "render_psha_runner",
+          "anchor": "f60e1126b584",
+          "first": "def render_psha_runner(expanded: bool) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "statistics",
+      "level": "view",
+      "parent": null,
+      "title": "Statistics",
+      "summary": "Summarises the filtered events: counts, depth histogram, magnitude against depth, top provinces and largest events.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "scatter plot",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3387,
+          "end": 3499,
+          "role": "logic",
+          "symbol": "render_statistics",
+          "anchor": "4e486d15adac",
+          "first": "def render_statistics(filtered_df: pd.DataFrame) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "event-table",
+      "level": "view",
+      "parent": null,
+      "title": "Event table (Data Kejadian)",
+      "summary": "Lists the filtered events with their derived region and fault-distance columns, and downloads the full filtered set as CSV.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3502,
+          "end": 3563,
+          "role": "logic",
+          "symbol": "render_event_table",
+          "anchor": "bfaad22d9d8c",
+          "first": "def render_event_table(filtered_df: pd.DataFrame) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "publication-map",
+      "level": "view",
+      "parent": null,
+      "title": "Publication map builder",
+      "summary": "Sets the template, page size, resolution, scale, logos and layers, renders a snapshot and a full map sheet, and downloads them as PNG and PDF.",
+      "views": [
+        "form",
+        "image viewer"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1766,
+          "end": 1790,
+          "role": "logic",
+          "symbol": "render_publication_builder",
+          "anchor": "cbcc732174a4",
+          "first": "def render_publication_builder("
+        },
+        {
+          "file": "code/app.py",
+          "start": 1791,
+          "end": 2410,
+          "role": "logic",
+          "anchor": "de1d4b5f94dd",
+          "first": ") -> None:"
+        },
+        {
+          "file": "code/utils/publication_map.py",
+          "start": 352,
+          "end": 388,
+          "role": "logic",
+          "symbol": "capture_filtered_map",
+          "anchor": "72c9c61a0a4e",
+          "first": "def capture_filtered_map("
+        },
+        {
+          "file": "code/utils/publication_map.py",
+          "start": 3058,
+          "end": 3105,
+          "role": "logic",
+          "symbol": "render_publication_map",
+          "anchor": "6735db0416f0",
+          "first": "def render_publication_map("
+        }
+      ]
+    }
+  ]
+}

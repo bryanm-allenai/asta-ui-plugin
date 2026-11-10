@@ -1,0 +1,378 @@
+{
+  "schema": "astaui.card/1",
+  "id": "gc-ei-ms-annotation",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T11:41:55Z"
+  },
+  "app": {
+    "title": "GC–EI–MS Annotation Tool",
+    "summary": "A person chooses whether to analyse one spectrum or a batch, downloads a CSV template, and pastes or uploads peak lists of mass-to-charge and intensity. They can pick a stricter or looser confidence-screening rule before they submit. The tool compares each spectrum against a fixed reference library, ranks the closest library candidates by weighted cosine similarity, and adds a model score for how reliable the top match is. It then says whether the top match meets the chosen rule. The person reads the ranked candidates, or a one-line summary per spectrum for a batch, and downloads the results as CSV files that record which library and model were used.",
+    "task": {
+      "text": "Find tentative compound matches for unknown mass spectra in a reference library, and flag which top matches are reliable enough to report.",
+      "verbs": [
+        "identify",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "Mass spectra already extracted from an instrument, each a list of ion peaks (m/z and intensity), searched against a fixed reference library of spectra with compound identities.",
+      "item": "one mass spectrum: its ion peaks, identified by a spectrum ID in a batch",
+      "shapes": [
+        "spectrum",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "annotating unknown compounds from extracted spectra, before confirming them with standards",
+      "terms": [
+        "annotate",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A mode switch decides whether a paste or upload form takes one spectrum or a batch CSV, with a screening-rule selector beside it. When the form is submitted, the engine runs and the results appear below the form: three headline numbers and a top-10 candidate table for one spectrum, or a table with one row per spectrum for a batch. Each result view has CSV downloads.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "import",
+        "select",
+        "export"
+      ],
+      "patterns": []
+    },
+    "field": {
+      "text": "EI mass-spectral library matching for GC–MS compound annotation in analytical chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "gc ms",
+        "spectral library matching",
+        "compound annotation"
+      ]
+    },
+    "workflow": {
+      "name": "match unknown items against a reference library and flag the confident matches",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "choose Single spectrum or Batch spectra, download the matching CSV template, then paste an m/z,intensity peak list or upload a CSV (spectrum_id,mz,intensity for a batch)",
+          "parts": [
+            "input-setup",
+            "single-input",
+            "batch-input"
+          ]
+        },
+        {
+          "step": "set the rule that decides which results count as confident",
+          "here": "an optional selector picks Standard (score ≥0.87) or Strict (score ≥0.94 and top-two margin ≥0.20); this changes which results are flagged, not the ranking",
+          "parts": [
+            "screening-rule"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "the peaks are binned to nominal mass and weighted by m/z × √intensity, then compared by cosine with every reference entry and ranked; a 12-feature gradient-boosting model scores how likely the top hit agrees with its library label",
+          "parts": [
+            "single-input",
+            "batch-input"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "for one spectrum, the top candidate's similarity, agreement score and top-two difference are shown as metrics, along with a pass/fail screening status and a top-10 table of candidates with their formulas and connectivity IDs",
+          "parts": [
+            "single-results"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "for a batch, a table gives each spectrum's top candidate, formula, similarity, reliability score and whether it meets the screening rule",
+          "parts": [
+            "batch-results"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "download the result summary, the top-10 candidate table or the batch results as CSV files, each carrying the software version and the SHA-256 checksums of the library and model",
+          "parts": [
+            "single-results",
+            "batch-results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Ranking and confidence are kept apart: similarity sets the order, and a separate model only scores whether the top hit is reliable, so the confidence score never reorders candidates.",
+        "Two preset screening rules flag results for follow-up. One uses a score threshold alone; the other also requires a minimum gap between the first and second matches.",
+        "Every export records the checksums of the source library, the reference index and the model, so a result can be traced to the exact assets that produced it.",
+        "Matches are made only at the connectivity level (the first 14 characters of the InChIKey) and are labelled tentative throughout. Retention-index data are refused rather than used."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "input-setup",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis type and data template",
+      "summary": "Switches between analysing one spectrum and a batch, and shows and offers to download the CSV template for that mode.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 22,
+          "end": 28,
+          "role": "data",
+          "anchor": "d917629499c5",
+          "first": "APP_VERSION = \"2.1.0\""
+        },
+        {
+          "file": "code/app.py",
+          "start": 162,
+          "end": 191,
+          "role": "markup",
+          "anchor": "9d97b0e17af1",
+          "first": "analysis_mode = st.radio("
+        }
+      ]
+    },
+    {
+      "id": "screening-rule",
+      "level": "component",
+      "parent": "input-setup",
+      "title": "Confidence screening selector",
+      "summary": "Chooses the standard or strict rule used to flag whether the top match is confident enough.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 193,
+          "end": 205,
+          "role": "markup",
+          "anchor": "d9b27f59d571",
+          "first": "st.subheader(\"2. Analyze\")"
+        },
+        {
+          "file": "code/gcei/v2_engine.py",
+          "start": 190,
+          "end": 192,
+          "role": "logic",
+          "anchor": "5a84c45d1b2d",
+          "first": "margin = float(features[1])"
+        }
+      ]
+    },
+    {
+      "id": "single-input",
+      "level": "component",
+      "parent": "input-setup",
+      "title": "Single-spectrum form",
+      "summary": "Takes one spectrum as pasted peaks or an uploaded CSV, then ranks library candidates and scores the top hit.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 207,
+          "end": 250,
+          "role": "markup",
+          "anchor": "f0bce08a0a80",
+          "first": "if analysis_mode == \"Single spectrum\":"
+        },
+        {
+          "file": "code/gcei/engine.py",
+          "start": 7,
+          "end": 22,
+          "role": "logic",
+          "symbol": "parse_single_spectrum_text",
+          "anchor": "922853aa15ee",
+          "first": "def parse_single_spectrum_text(text: str) -> list[tuple[float, float]]:"
+        },
+        {
+          "file": "code/gcei/engine.py",
+          "start": 25,
+          "end": 34,
+          "role": "logic",
+          "symbol": "read_spectrum_csv",
+          "anchor": "22637e163758",
+          "first": "def read_spectrum_csv(data: bytes | str) -> list[tuple[float, float]]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 50,
+          "end": 52,
+          "role": "logic",
+          "symbol": "load_engine",
+          "anchor": "db823e454e9d",
+          "first": "def load_engine():"
+        },
+        {
+          "file": "code/gcei/v2_engine.py",
+          "start": 169,
+          "end": 228,
+          "role": "logic",
+          "symbol": "analyze",
+          "anchor": "3af597db4e88",
+          "first": "def analyze(self, peaks, kovats_ri=None, risk_target=0.10, top_n=10):"
+        }
+      ]
+    },
+    {
+      "id": "batch-input",
+      "level": "component",
+      "parent": "input-setup",
+      "title": "Batch upload form",
+      "summary": "Takes a CSV of many spectra grouped by spectrum ID and analyses each one separately.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 251,
+          "end": 279,
+          "role": "markup",
+          "anchor": "2efa89633541",
+          "first": "else:"
+        },
+        {
+          "file": "code/gcei/v2_engine.py",
+          "start": 240,
+          "end": 272,
+          "role": "logic",
+          "symbol": "analyze_batch",
+          "anchor": "6fbe91b6288f",
+          "first": "def analyze_batch(self, df: pd.DataFrame, risk_target=0.10):"
+        }
+      ]
+    },
+    {
+      "id": "single-results",
+      "level": "view",
+      "parent": null,
+      "title": "Annotation results for one spectrum",
+      "summary": "Shows the top candidate's similarity, agreement score and top-two difference, whether it meets the screening rule, and the top-10 candidate table, with CSV downloads.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 94,
+          "end": 147,
+          "role": "markup",
+          "symbol": "render_results",
+          "anchor": "e87874517786",
+          "first": "def render_results(result) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 64,
+          "end": 70,
+          "role": "logic",
+          "symbol": "top_candidates",
+          "anchor": "03f8d40361c7",
+          "first": "def top_candidates(table: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 73,
+          "end": 91,
+          "role": "logic",
+          "symbol": "summary_row",
+          "anchor": "041568487de7",
+          "first": "def summary_row(result) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "batch-results",
+      "level": "view",
+      "parent": null,
+      "title": "Batch annotation results",
+      "summary": "Lists one row per spectrum with its top candidate, scores and screening outcome, and downloads the full results as CSV.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 281,
+          "end": 301,
+          "role": "markup",
+          "anchor": "0cffeaa22a10",
+          "first": "prior = st.session_state.get(\"batch_annotation\")"
+        }
+      ]
+    },
+    {
+      "id": "method-provenance",
+      "level": "view",
+      "parent": null,
+      "title": "Method, limitations and provenance",
+      "summary": "Explains what the match and score mean and do not mean, and lists the version and checksums of the library and model in use.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 303,
+          "end": 330,
+          "role": "markup",
+          "anchor": "cc0874c3a275",
+          "first": "with st.expander(\"About the method and its limitations\"):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "data",
+      "list": "shapes",
+      "term": "spectrum"
+    }
+  ]
+}

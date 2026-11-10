@@ -1,0 +1,608 @@
+{
+  "schema": "astaui.card/1",
+  "id": "platemaster",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:59:27Z"
+  },
+  "app": {
+    "title": "PlateMaster - Dashboard for Plate Analysis",
+    "summary": "A person loads one or more plate-reader workbooks, from a folder, by upload or as a ZIP. They choose the worksheet, header row and expected plate size, and each file's time is taken from its filename. They preview each parsed plate. Then they choose rows and columns and decide how wells are pooled: by column, by row, or by named groups typed into a plate-map grid or loaded from a CSV. They also choose an aggregation and an optional outlier rule. After pressing Run they get one aggregated table across all files, with descriptive statistics, a Welch t-test between two chosen groups, an optional pairwise p-value matrix, a log of removed outliers and a cross-file chart with error bars. Finally they export an Excel report that records provenance, along with the plate map and a reloadable settings file.",
+    "task": {
+      "text": "Pool replicate wells from multi-well plate readouts across time-point files into group values, test differences between groups, and export a reproducible report.",
+      "verbs": [
+        "derive",
+        "compare",
+        "summarize",
+        "clean",
+        "organize"
+      ]
+    },
+    "data": {
+      "text": "Plate-reader measurement matrices, one spreadsheet per time point, with lettered rows and numbered columns of numeric readings, plus an optional map that assigns wells to named groups.",
+      "item": "a well on a multi-well plate, read once in each time-point file",
+      "shapes": [
+        "grid of series",
+        "per element",
+        "table",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "analyzing plate-reader readouts after the run, before writing up",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls set the source, selection, pooling layout, aggregation and outlier rule, and Run recomputes everything below them. In the main area, the colour-graded preview, plate-map grid, aggregated table, statistics selectors, outlier log and chart all read from the same pooled values. Settings and plate maps can be saved and reloaded so the analysis can be replayed.",
+      "views": [
+        "table view",
+        "heatmap",
+        "fixed-layout grid",
+        "summary stats",
+        "line chart",
+        "bar chart",
+        "scatter plot",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "inline edit",
+        "exclude and refit",
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "multi-well plate-reader assays in biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "plate reader",
+        "microplate assay",
+        "time course"
+      ]
+    },
+    "workflow": {
+      "name": "pool replicates into groups and test differences between groups",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Load a server folder, uploaded workbooks or a ZIP. Import options set the worksheet, the header row, an expected plate size (6 to 1536 wells) and an opt-in for custom labels. Each file is validated, and its time is the last number in its filename.",
+          "parts": [
+            "data-source"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A Preview file selector shows each parsed plate as a colour-graded table, along with import warnings and the plate dimensions.",
+          "parts": [
+            "input-preview"
+          ]
+        },
+        {
+          "step": "group items into clusters",
+          "here": "Pick rows and columns and an aggregation layout: by original columns, by original rows, or by plate groups. In plate-group mode, wells are labelled with group names in an editable plate grid, or a row_id,column,group CSV is applied, and the map can be downloaded.",
+          "parts": [
+            "analysis-settings",
+            "plate-template"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Choose Mean, Median, Min, Max, Std or Sum, plus an optional IQR, Z-score or MAD filter with a strictness slider, then press Run. Removed wells are logged by file, row and column, with removal percentages.",
+          "parts": [
+            "analysis-settings",
+            "results"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Pick a time and a column to get n, mean, SD, SEM, a Student-t 95% CI and a one-sample test. Pick Group A and Group B (time and column) for a Welch t-test. Optionally, choose 2 to 20 time and metric groups for a lower-triangle matrix of unadjusted pairwise p-values.",
+          "parts": [
+            "results",
+            "pairwise-matrix"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The cross-file chart plots the pooled values against time or by column, as line, scatter, bar, box or violin. Error bars can show SD, SEM, 95% CI, IQR/2 or MAD; SEM and CI are offered only with Mean.",
+          "parts": [
+            "cross-file-plot"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Export report.xlsx writes the aggregated, statistics, t-test, outlier and plot sheets, plus the settings, plate groups, input checksums and software versions. Download settings.json saves a replayable configuration.",
+          "parts": [
+            "report-export",
+            "analysis-settings"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each file's time point comes from the last number in its filename, so a folder of plate exports becomes a time course.",
+        "Plates are validated against a chosen plate format with lettered rows and numbered columns. Non-standard labels are rejected unless the person explicitly allows them.",
+        "Wells can be pooled by column, by row, or by named groups from a plate map that can be typed into a grid or round-tripped as CSV.",
+        "Statistics follow fixed rules: Welch tests, Student-t intervals, and pairwise p-values flagged as unadjusted with a warning that technical wells are not independent replicates.",
+        "Settings JSON and the report record file checksums and software versions. Reloading settings warns when the inputs or environment differ from the original run."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-source",
+      "level": "view",
+      "parent": null,
+      "title": "Data source and import options",
+      "summary": "Loads plate workbooks from a folder, uploaded files or a ZIP, validating each one against the chosen worksheet, header row and plate format.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 883,
+          "end": 978,
+          "role": "markup",
+          "anchor": "34c25a8047a5",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 220,
+          "end": 228,
+          "role": "logic",
+          "symbol": "load_table_from_bytes",
+          "anchor": "46dc9585d852",
+          "first": "def load_table_from_bytes(content: bytes, filename: str = \"\", sheet_name: str | int = 0,"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 145,
+          "end": 212,
+          "role": "logic",
+          "symbol": "sanitize_table",
+          "anchor": "c842bd9dc3c8",
+          "first": "def sanitize_table(frame: pd.DataFrame, allow_custom: bool = False,"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 99,
+          "end": 137,
+          "role": "logic",
+          "symbol": "_read_spreadsheet_flexible_from_bytes",
+          "anchor": "8e512aeaa511",
+          "first": "def _read_spreadsheet_flexible_from_bytes(content: bytes, filename: str = \"\", sheet_name: str | int = 0, header: int = 0"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 85,
+          "end": 94,
+          "role": "logic",
+          "symbol": "discover_excel_files",
+          "anchor": "72794c58a072",
+          "first": "def discover_excel_files(folder: str) -> list[Path]:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 246,
+          "end": 258,
+          "role": "logic",
+          "symbol": "_extract_time_from_filename",
+          "anchor": "31726c643b39",
+          "first": "def _extract_time_from_filename(filename: str) -> float | None:"
+        }
+      ]
+    },
+    {
+      "id": "input-preview",
+      "level": "view",
+      "parent": null,
+      "title": "Input preview",
+      "summary": "Shows one loaded plate at a time as a colour-graded table with its import warnings, so the person can check that the measurements were read correctly.",
+      "views": [
+        "table view",
+        "heatmap"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 985,
+          "end": 994,
+          "role": "markup",
+          "anchor": "73b02ff9967c",
+          "first": "st.header(\"Input preview\")"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 604,
+          "end": 662,
+          "role": "logic",
+          "symbol": "_gradient_style",
+          "anchor": "3e68059c7894",
+          "first": "def _gradient_style(df: pd.DataFrame, mode: str = \"Global scale\", palette: str = \"Rose\"):"
+        }
+      ]
+    },
+    {
+      "id": "analysis-settings",
+      "level": "view",
+      "parent": null,
+      "title": "Selection, aggregation and presets",
+      "summary": "Sidebar controls that set the rows, columns, pooling layout, aggregation, outlier rule and colour scale, and that save, load or import settings before Run.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "multi-select",
+        "select",
+        "exclude and refit",
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 1028,
+          "end": 1097,
+          "role": "markup",
+          "anchor": "aee7b26a297c",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 697,
+          "end": 704,
+          "role": "logic",
+          "symbol": "_save_named_preset",
+          "anchor": "9e6d614b77db",
+          "first": "def _save_named_preset() -> None:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 707,
+          "end": 713,
+          "role": "logic",
+          "symbol": "_queue_named_preset",
+          "anchor": "c89404c98639",
+          "first": "def _queue_named_preset() -> None:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 716,
+          "end": 725,
+          "role": "logic",
+          "symbol": "_queue_settings_upload",
+          "anchor": "ce30a6f2d79e",
+          "first": "def _queue_settings_upload() -> None:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 728,
+          "end": 753,
+          "role": "logic",
+          "symbol": "_apply_pending_config",
+          "anchor": "392492e1f5dc",
+          "first": "def _apply_pending_config(all_rows: list[str], all_columns: list[str]) -> None:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 672,
+          "end": 694,
+          "role": "logic",
+          "symbol": "_capture_analysis_config",
+          "anchor": "930449c53093",
+          "first": "def _capture_analysis_config() -> dict:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 845,
+          "end": 857,
+          "role": "logic",
+          "symbol": "_render_settings_download",
+          "anchor": "178658efeef7",
+          "first": "def _render_settings_download(slot) -> None:"
+        },
+        {
+          "file": "code/analysis_settings.py",
+          "start": 51,
+          "end": 130,
+          "role": "logic",
+          "symbol": "validate_config",
+          "anchor": "15e6913fa947",
+          "first": "def validate_config(config: Any) -> dict:"
+        },
+        {
+          "file": "code/analysis_settings.py",
+          "start": 200,
+          "end": 224,
+          "role": "logic",
+          "symbol": "replay_warnings",
+          "anchor": "258dbf03bd8e",
+          "first": "def replay_warnings(saved: dict, current_inputs: list[dict], current_software: dict) -> list[str]:"
+        }
+      ]
+    },
+    {
+      "id": "plate-template",
+      "level": "view",
+      "parent": null,
+      "title": "Plate template grouping",
+      "summary": "An editable plate grid where typing the same group name in several wells pools them into one group. The map can also be loaded from a CSV or downloaded as one.",
+      "views": [
+        "fixed-layout grid",
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 1108,
+          "end": 1149,
+          "role": "markup",
+          "anchor": "a25fb80933c8",
+          "first": "elif layout_mode == \"By plate groups (template)\":"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 819,
+          "end": 842,
+          "role": "logic",
+          "symbol": "_edit_plate_groups",
+          "anchor": "07da93dd19d3",
+          "first": "def _edit_plate_groups(rows: list[str], columns: list[str]) -> dict[str, list[tuple[str, str]]]:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 762,
+          "end": 770,
+          "role": "logic",
+          "symbol": "_plate_template_csv",
+          "anchor": "5bae03c12c18",
+          "first": "def _plate_template_csv(rows: list[str], columns: list[str], cells: list[dict]) -> bytes:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 773,
+          "end": 801,
+          "role": "logic",
+          "symbol": "_load_plate_template_csv",
+          "anchor": "4599ef1b6ac8",
+          "first": "def _load_plate_template_csv(content: bytes, rows: list[str], columns: list[str]) -> list[dict]:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 804,
+          "end": 816,
+          "role": "logic",
+          "symbol": "_apply_plate_template_upload",
+          "anchor": "b23e6d63424a",
+          "first": "def _apply_plate_template_upload(rows: list[str], columns: list[str]) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "level": "view",
+      "parent": null,
+      "title": "Aggregated table, statistics and outlier log",
+      "summary": "Pools the selected wells in every file into one table indexed by time. Descriptive statistics and a Welch two-group test are computed for chosen cells, and removed outliers are listed with their removal rates.",
+      "views": [
+        "table view",
+        "heatmap",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "exclude and refit"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 1151,
+          "end": 1310,
+          "role": "logic",
+          "anchor": "a246f7630620",
+          "first": "if not st.session_state.analysis_ready:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 1344,
+          "end": 1386,
+          "role": "markup",
+          "anchor": "5d3e3ff27b01",
+          "first": "removed_df_export = pd.DataFrame(removed_outliers_log)"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 331,
+          "end": 337,
+          "role": "logic",
+          "symbol": "aggregate_rows",
+          "anchor": "37ceb6b7b3ce",
+          "first": "def aggregate_rows("
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 384,
+          "end": 389,
+          "role": "logic",
+          "symbol": "aggregate_by_groups",
+          "anchor": "90d371004be9",
+          "first": "def aggregate_by_groups("
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 436,
+          "end": 442,
+          "role": "logic",
+          "symbol": "aggregate_columns_by_row",
+          "anchor": "456927a395e4",
+          "first": "def aggregate_columns_by_row("
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 274,
+          "end": 309,
+          "role": "logic",
+          "symbol": "_remove_outliers",
+          "anchor": "df4d303f61ab",
+          "first": "def _remove_outliers(series: pd.Series, method: str, strictness: float) -> pd.Series:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 482,
+          "end": 513,
+          "role": "logic",
+          "symbol": "_basic_stat_metrics",
+          "anchor": "320689f713a6",
+          "first": "def _basic_stat_metrics(values: list[float]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 531,
+          "end": 540,
+          "role": "logic",
+          "symbol": "_welch_t_test",
+          "anchor": "bc5e0abf8959",
+          "first": "def _welch_t_test(values_a: list[float], values_b: list[float]) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "pairwise-matrix",
+      "level": "component",
+      "parent": "results",
+      "title": "Optional pairwise comparisons",
+      "summary": "After the person switches it on and picks 2 to 20 time and metric groups, it shows a lower-triangle matrix of unadjusted Welch p-values with a multiple-comparison warning.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "multi-select",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 1312,
+          "end": 1342,
+          "role": "markup",
+          "anchor": "79b0764b30c5",
+          "first": "st.subheader(\"Optional pairwise comparisons\")"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 548,
+          "end": 570,
+          "role": "logic",
+          "symbol": "_pairwise_p_values",
+          "anchor": "4a420890c949",
+          "first": "def _pairwise_p_values(group_values: dict[str, list[float]]) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "cross-file-plot",
+      "level": "view",
+      "parent": null,
+      "title": "Cross-file plot",
+      "summary": "Plots the pooled values of the chosen columns across time-point files, as line, scatter, bar, box or violin charts, with the chosen error bars and a matching data table.",
+      "views": [
+        "line chart",
+        "scatter plot",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "multi-select",
+        "toggle view",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 1388,
+          "end": 1635,
+          "role": "logic",
+          "anchor": "95e4a8c083a1",
+          "first": "st.header(\"Cross-file plot\")"
+        }
+      ]
+    },
+    {
+      "id": "report-export",
+      "level": "component",
+      "parent": "cross-file-plot",
+      "title": "Excel report export",
+      "summary": "Builds a multi-sheet Excel report of every result table, with settings, the plate map, input checksums and software versions for provenance.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 1637,
+          "end": 1661,
+          "role": "logic",
+          "anchor": "715e1ff46702",
+          "first": "st.subheader(\"Export\")"
+        },
+        {
+          "file": "code/PlateMaster1.2.py",
+          "start": 573,
+          "end": 584,
+          "role": "logic",
+          "symbol": "_build_excel_report",
+          "anchor": "9baf20279ab8",
+          "first": "def _build_excel_report(sheets: dict[str, pd.DataFrame]) -> bytes:"
+        },
+        {
+          "file": "code/analysis_settings.py",
+          "start": 227,
+          "end": 244,
+          "role": "logic",
+          "symbol": "provenance_sheets",
+          "anchor": "40fb2e8d6b43",
+          "first": "def provenance_sheets(config: dict) -> dict[str, pd.DataFrame]:"
+        }
+      ]
+    }
+  ]
+}

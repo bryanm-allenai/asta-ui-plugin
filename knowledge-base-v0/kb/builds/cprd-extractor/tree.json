@@ -1,0 +1,1024 @@
+{
+ "interface": {
+  "title": "CPRD Extractor v1.0 (University of Oxford)",
+  "field": "Epidemiology / UK electronic health record research (CPRD Aurum primary care with linked HES and ONS data)",
+  "stage_of_work": "Study set-up and data preparation: defining code lists, extracting records, building a cohort, and exporting for analysis",
+  "what_it_is_for": "Turning a clinical concept into reviewed code lists, pulling the matching primary-care, hospital and death records for a patient population, narrowing them to a cohort with an attrition funnel, and exporting the result as CSV or Parquet."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "The app started in '🧪 Mock Data (Testing)' mode by itself: 500 synthetic patients, 2,000 observations, 1,500 drug issues and 800 HES APC records (screens/004.webp). The uploaded test file snomed_codes.csv (5 codes in column snomed_code) was also used. Because the data are synthetic, some lookups come back empty. Heart failure SNOMED codes are not in the mock EMIS dictionary. SGLT2 drugs are not in the mock product dictionary. The Stage 5 medcodeids (1000000/1000001) and the manual ONS I50 codes matched no records. One mistake in the test file: it labels 60573004 as 'Essential hypertension', but that code is aortic stenosis."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Assemble a disease-defined patient population from routine health records and export it for analysis",
+  "specific": "In Mock Data mode: attempt a heart-failure code list (only the aortic-stenosis control code 60573004 matched the mock dictionary, so the matched list and review workbook hold aortic-stenosis codes), extract heart-failure records with the built-in disease libraries, extract antihypertensive prescriptions (SGLT2 drugs are absent from the mock product dictionary), pull HES/ONS records, apply age, registration and linkage criteria in the Cohort Builder, and export as CSV/Parquet",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Check the data environment",
+    "specific": "Home dashboard confirms Mock Data mode and the size of the synthetic tables",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Confirm which data source is active and how large it is",
+      "specific": "Read the Data Environment cards (Mode: Mock Data, 500 patients, 2,000 observations, 1,500 drug issues, 800 HES APC) and the Data Paths",
+      "screens": [
+       "screens/004.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened http://127.0.0.1:8501/ and waited for mock data generation",
+        "screens": [
+         "screens/003.webp",
+         "screens/004.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Define the clinical concept as a code list",
+    "specific": "📋 Code List Development six-stage pipeline (Stages 1–4 are method guidance; Stages 5–6 do the matching and clinical review)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Read the method guidance for defining the clinical concept",
+      "specific": "Stage 1 — Define tab: guidance text on defining the concept. Stages 2–4 (Synonyms & Existing Lists; Search Code Browsers; Review & Classify) exist as tabs, but no screen of their contents was kept",
+      "branch": "optional",
+      "screens": [
+       "screens/005.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked tab Stage 1 — Define",
+        "screens": [
+         "screens/005.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Load a reference dictionary that maps concept codes to database identifiers",
+      "specific": "Stage 5 Step A: choose 'Use mock dictionary (testing)' and press Generate Mock Dictionary (245 rows, 235 SNOMED concepts)",
+      "screens": [
+       "screens/007.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked tab Stage 5 — Dictionary Matching",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose radio 'Use mock dictionary (testing)'",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Generate Mock Dictionary",
+        "screens": [
+         "screens/007.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Enter the candidate concept codes",
+      "specific": "Step B › SNOMED CT Codes tab › Paste CSV/table: pasted 3 heart-failure codes plus 1 aortic-stenosis code, then pressed Parse SNOMED codes",
+      "screens": [
+       "screens/011.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked tab 🧬 SNOMED CT Codes",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed SnomedCTConceptId,category,Severity,Source rows for 84114007, 42343007, 85232009, 60573004",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Parse SNOMED codes",
+        "screens": [
+         "screens/011.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Match the candidate codes to the dictionary and review what matched and what did not",
+      "specific": "Step C: Run SNOMED → medcodeid Matching. 1/4 concepts matched to 2 medcodeids (25%), all aortic stenosis. Results tabs: Matched, Unmatched (the 3 heart-failure codes), Expansion, Master File, Audit Log",
+      "screens": [
+       "screens/013.webp",
+       "screens/014.webp",
+       "screens/015.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 🚀 Run SNOMED → medcodeid Matching",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked tab ❌ Unmatched",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked tab 📋 Master File",
+        "screens": [
+         "screens/015.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Save the matched code list and pass it on to extraction",
+      "specific": "Step E: download the Master code list (master_code_list_stage5.csv). Step F: Send to Aurum Extraction page (2 medcodeids stored)",
+      "branch": "optional",
+      "screens": [
+       "screens/016.webp",
+       "screens/017.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 📥 Master code list (downloaded master_code_list_stage5.csv)",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🚀 Send to Aurum Extraction page",
+        "screens": [
+         "screens/017.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Produce a reviewer questionnaire for a clinician to accept or reject each code",
+      "specific": "Stage 6 Clinical Review: enter study details, keep the workbook options, Generate Clinical Review Workbook, then Download (.xlsx). In this run the workbook holds the matched aortic-stenosis codes, not heart-failure codes",
+      "screens": [
+       "screens/018.webp",
+       "screens/019.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked tab 🩺 Stage 6 — Clinical Review",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 'Heart Failure Code List' as study name and 'Dr. Jane Smith' as clinician reviewer",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 📋 Generate Clinical Review Workbook",
+        "screens": [
+         "screens/019.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 📥 Download Clinical Review Workbook (.xlsx) (downloaded Clinical_Review_20261030.xlsx)",
+        "screens": [
+         "screens/019.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Define the medication exposure as a product code list",
+    "specific": "💊 Drug Lookup",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Search a product dictionary by drug name",
+      "specific": "Search Product Dictionary › Free text search: 'dapagliflozin' returned no products; 'amlodipine' returned 135 ProdCodeIds",
+      "branch": "one-of",
+      "screens": [
+       "screens/020.webp",
+       "screens/021.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 'dapagliflozin' and pressed Enter",
+        "screens": [
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 'amlodipine' and pressed Enter",
+        "screens": [
+         "screens/021.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Pick drugs from a curated library by therapeutic class, then pharmacological class, then drug",
+      "specific": "Built-in Drug Libraries › CV/Metabolic Drug Library: Glucose-Lowering › SGLT2 Inhibitor › 4 drugs (8 search terms) found 0 products. Antihypertensives (103 drugs, 254 terms) found 638 products across 5 drugs",
+      "branch": "one-of",
+      "screens": [
+       "screens/026.webp",
+       "screens/027.webp",
+       "screens/030.webp",
+       "screens/031.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Clear all on therapeutic classes and chose 'Glucose-Lowering'",
+        "screens": [
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "cleared pharmacological classes and chose 'SGLT2 Inhibitor'",
+        "screens": [
+         "screens/025.webp",
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🚀 Search Product Dictionary (0 products)",
+        "screens": [
+         "screens/027.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "changed therapeutic class to 'Antihypertensives'",
+        "screens": [
+         "screens/028.webp",
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🚀 Search Product Dictionary (638 products, auto-saved parquet)",
+        "screens": [
+         "screens/030.webp",
+         "screens/031.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Collect the found products into a working list and send it to extraction",
+      "specific": "Add to My Drug Code List (638 ProdCodeIds), view it in the My Drug Code List tab, then Push to Drug Extraction",
+      "screens": [
+       "screens/032.webp",
+       "screens/034.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed ➕ Add to My Drug Code List",
+        "screens": [
+         "screens/032.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked tab 📋 My Drug Code List",
+        "screens": [
+         "screens/033.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🚀 Push to Drug Extraction",
+        "screens": [
+         "screens/034.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Extract matching records from the primary-care database",
+    "specific": "🔬 CPRD Aurum Extraction",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Extract diagnosis records using a built-in disease library",
+      "specific": "Observation (SNOMED) › Built-in Disease Library: disease group Heart Failure (49 SNOMED codes) › Run SNOMED Extraction. Found 173 records across 126 patients, with CSV/Parquet download",
+      "branch": "one-of",
+      "screens": [
+       "screens/036.webp",
+       "screens/037.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked tab 📋 Observation (SNOMED)",
+        "screens": [
+         "screens/035.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "cleared disease groups and chose 'Heart Failure'",
+        "screens": [
+         "screens/036.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🚀 Run SNOMED Extraction",
+        "screens": [
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 📥 CSV (173 rows) (downloaded snomed_extraction.csv)",
+        "screens": [
+         "screens/037.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Extract diagnosis records using the code list handed over from the matching step",
+      "specific": "MedCode Extraction › Use Stage 5 medcodeids › Run MedCode Extraction. The run worked but found no matching records in the mock data",
+      "branch": "one-of",
+      "screens": [
+       "screens/039.webp",
+       "screens/040.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed ✅ Use Stage 5 medcodeids",
+        "screens": [
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🚀 Run MedCode Extraction",
+        "screens": [
+         "screens/040.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Restrict a later extraction to the patients found by an earlier one",
+      "specific": "Patient Scope: switch from 'All patients' to 'Same patients from previous extraction (126 patients)'. A Linked mode banner appears",
+      "screens": [
+       "screens/041.webp",
+       "screens/042.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose radio '🔗 Same patients from previous extraction (126 patients)'",
+        "screens": [
+         "screens/042.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Extract prescription records for the chosen medication list",
+      "specific": "Drug Issue › Use Drug Lookup codes (638 ProdCodeIds) › Run Drug Extraction. Found 257 drug records across 107 patients",
+      "screens": [
+       "screens/044.webp",
+       "screens/045.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked tab 💊 Drug Issue",
+        "screens": [
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed ✅ Use Drug Lookup codes",
+        "screens": [
+         "screens/043.webp",
+         "screens/044.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🚀 Run Drug Extraction",
+        "screens": [
+         "screens/045.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Extract diagnosis records from an uploaded code list file",
+      "specific": "Observation (SNOMED) › Upload Code List: upload snomed_codes.csv, choose column snomed_code (5 codes loaded), Run SNOMED Extraction. Found 19 records across 18 patients (scope: previous)",
+      "branch": "one-of",
+      "screens": [
+       "screens/048.webp",
+       "screens/049.webp",
+       "screens/051.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose radio 'Upload Code List'",
+        "screens": [
+         "screens/047.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Upload and gave snomed_codes.csv",
+        "screens": [
+         "screens/048.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🚀 Run SNOMED Extraction",
+        "screens": [
+         "screens/050.webp",
+         "screens/051.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Extract records from linked hospital and death registries",
+    "specific": "🏥 Linkage Extraction",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Extract hospital admission diagnoses for the same condition",
+      "specific": "HES APC (Hospital) › scope All patients › Built-in Disease Library: Heart Failure (20 ICD-10 codes) › Extract HES APC. 80 records, 71 patients",
+      "branch": "optional",
+      "screens": [
+       "screens/052.webp",
+       "screens/053.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose radio '🌍 All patients (whole population)'",
+        "screens": [
+         "screens/052.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "cleared disease groups and chose 'Heart Failure'",
+        "screens": [
+         "screens/052.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🚀 Extract HES APC",
+        "screens": [
+         "screens/053.webp"
+        ]
+       }
+      ],
+      "id": "t16",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Extract death-certificate causes using codes typed by hand",
+      "specific": "ONS Death › Enter Manually: I50, I50.0, I50.1, I50.9, I11.0 › Extract Death Records. The run worked but found no matching records in the mock data",
+      "branch": "optional",
+      "screens": [
+       "screens/055.webp",
+       "screens/056.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked tab 💀 ONS Death",
+        "screens": [
+         "screens/054.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose radio 'Enter Manually'",
+        "screens": [
+         "screens/054.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed I50, I50.0, I50.1, I50.9, I11.0",
+        "screens": [
+         "screens/055.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🚀 Extract Death Records",
+        "screens": [
+         "screens/056.webp"
+        ]
+       }
+      ],
+      "id": "t17",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Search every data source at once with one code list",
+      "specific": "🔗 Multi-Source Search: default Ischaemic Heart Disease (79 SNOMED, 48 ICD-10) across CPRD Aurum, HES APC, HES OP and ONS Death. Results summary table and 'Patients by Source' bar chart (1,785 unique records)",
+      "branch": "optional",
+      "screens": [
+       "screens/063.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 🚀 Run Multi-Source Extraction",
+        "screens": [
+         "screens/063.webp"
+        ]
+       }
+      ],
+      "id": "t18",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Narrow the population to a study cohort and export it",
+    "specific": "👥 Cohort Builder",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Apply inclusion criteria one after another and watch the attrition",
+      "specific": "Starting population All patients (500). Age Range 40–100 (ref 2024) left 384. Registration Period 2000-01-01 to 2020-12-31 left 341. Linkage Eligible left 276. Each step is added to the Attrition Funnel chart",
+      "screens": [
+       "screens/057.webp",
+       "screens/060.webp",
+       "screens/061.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 40 as Minimum Age and pressed Apply Age Filter",
+        "screens": [
+         "screens/057.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'Registration Period' in Add Criterion and pressed Apply Registration Filter",
+        "screens": [
+         "screens/058.webp",
+         "screens/060.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'Linkage Eligible' in Add Criterion and pressed Apply Linkage Eligibility",
+        "screens": [
+         "screens/059.webp",
+         "screens/061.webp"
+        ]
+       }
+      ],
+      "id": "t19",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the final cohort for downstream analysis",
+      "specific": "Export Cohort: final size 276 patients. Downloaded cohort_patients.csv and cohort_patients.parquet",
+      "screens": [
+       "screens/062.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 📥 Parquet (276 rows)",
+        "screens": [
+         "screens/062.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 📥 CSV (276 rows)",
+        "screens": [
+         "screens/062.webp"
+        ]
+       }
+      ],
+      "id": "t20",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Describe the population",
+    "specific": "📊 Analytics (run here on freshly generated mock data, not on the 276-patient cohort)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Summarise baseline characteristics",
+      "specific": "📊 Analytics › Generate Mock Data (500 patients) › Table 1 (Baseline) › Generate Table 1, with Download Table 1. The table describes the newly generated 500-patient mock set, not the exported cohort",
+      "branch": "optional",
+      "screens": [
+       "screens/064.webp",
+       "screens/066.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Generate Mock Data",
+        "screens": [
+         "screens/064.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Generate Table 1",
+        "screens": [
+         "screens/066.webp"
+        ]
+       }
+      ],
+      "id": "t21",
+      "check": "not_confirmed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Code-to-dictionary matcher with matched/unmatched review and master list",
+   "general": "Load a reference dictionary, enter candidate concept codes, match them, review what matched and what did not, then download a unified list or send it to the next step",
+   "specific": "Stage 5 Dictionary Matching: load the EMIS dictionary (auto-detect, upload or mock), enter SNOMED codes (paste, upload, built-in VHD or master CSV), run SNOMED → medcodeid matching, look at the Matched/Unmatched/Expansion/Master File/Audit Log tabs, download outputs, or Send to Aurum Extraction",
+   "steps": [
+    "choose a dictionary source and load it",
+    "paste or upload candidate codes and parse them",
+    "run matching",
+    "review the Matched and Unmatched tabs and the Master File (filtering by code system or category untested)",
+    "download the master list (medcodeid .txt download untested) or push to extraction"
+   ],
+   "serves_tasks": [
+    "Load a reference dictionary that maps concept codes to database identifiers",
+    "Match the candidate codes to the dictionary and review what matched and what did not",
+    "Save the matched code list and pass it on to extraction"
+   ],
+   "screens": [
+    "screens/007.webp",
+    "screens/011.webp",
+    "screens/013.webp",
+    "screens/014.webp",
+    "screens/015.webp",
+    "screens/016.webp",
+    "screens/017.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Clinician review workbook generator",
+   "general": "Turn a draft code list into a spreadsheet questionnaire for an expert to mark each item include, exclude or uncertain, then import their decisions",
+   "specific": "Stage 6 Clinical Review: study details (name, researcher, reviewer, deadline, database), workbook options (instructions sheet, summary sheet, pre-flag decisions, group by category), Generate, Download .xlsx, then Import Completed Review uploader (present but untested)",
+   "steps": [
+    "fill in study and reviewer details",
+    "toggle workbook options",
+    "generate the workbook",
+    "download the .xlsx",
+    "upload the completed review to apply decisions (untested: no completed review file was available)"
+   ],
+   "serves_tasks": [
+    "Produce a reviewer questionnaire for a clinician to accept or reject each code"
+   ],
+   "screens": [
+    "screens/018.webp",
+    "screens/019.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Cascading class → subclass → item picker for curated code libraries",
+   "general": "Narrow a large curated library with linked multi-selects (top class, then subclass, then individual items), see how many search terms that gives, and run the search",
+   "specific": "Built-in Drug Libraries (CV/Metabolic, 315 drugs, 18 classes): therapeutic class › pharmacological class › drugs, giving N drugs → M search terms (generic + brand), then Search Product Dictionary. The same pattern is used for disease group › diseases in the disease library",
+   "steps": [
+    "choose library type",
+    "select therapeutic classes",
+    "narrow pharmacological classes",
+    "prune individual drugs (untested)",
+    "search the dictionary and view or download the matching products"
+   ],
+   "serves_tasks": [
+    "Pick drugs from a curated library by therapeutic class, then pharmacological class, then drug",
+    "Extract diagnosis records using a built-in disease library"
+   ],
+   "screens": [
+    "screens/022.webp",
+    "screens/026.webp",
+    "screens/027.webp",
+    "screens/029.webp",
+    "screens/030.webp",
+    "screens/036.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Working code list basket with hand-off to extraction",
+   "general": "Collect search results into a persistent list, filter it by type, download it, and push it to another module that offers a one-click 'use these codes'",
+   "specific": "Add to My Drug Code List, then the My Drug Code List tab (filter by drug type, Download Full List / ProdCodeIds only, Push to Drug Extraction, Clear). The Drug Issue tab then shows '638 ProdCodeIds received from Drug Lookup' with a Use Drug Lookup codes button",
+   "steps": [
+    "add search results to the list",
+    "review and filter the list",
+    "download it or push it to extraction",
+    "accept the handed-over codes in the extraction tab"
+   ],
+   "serves_tasks": [
+    "Collect the found products into a working list and send it to extraction",
+    "Extract prescription records for the chosen medication list"
+   ],
+   "screens": [
+    "screens/032.webp",
+    "screens/033.webp",
+    "screens/034.webp",
+    "screens/042.webp",
+    "screens/044.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Code-source switch (library / manual / upload) feeding an extraction run",
+   "general": "Give a code list one of three ways (curated library, typed by hand, uploaded file with a column picker), run a scan with a progress bar, and get a results table with CSV/Parquet export",
+   "specific": "SNOMED Code Source or ICD-10 Code Source radio (Built-in Disease Library / Enter Manually / Upload Code List), Run SNOMED Extraction or Extract HES APC / Death Records, progress ('File 10 of 20'), 'Found N records across M patients', Include code descriptions toggle, CSV/Parquet buttons, auto-saved parquet",
+   "steps": [
+    "choose the code source",
+    "select diseases, type codes, or upload a file and pick the code column",
+    "run the extraction and watch progress",
+    "inspect the result table",
+    "download CSV or Parquet"
+   ],
+   "serves_tasks": [
+    "Extract diagnosis records using a built-in disease library",
+    "Extract diagnosis records from an uploaded code list file",
+    "Extract hospital admission diagnoses for the same condition",
+    "Extract death-certificate causes using codes typed by hand"
+   ],
+   "screens": [
+    "screens/037.webp",
+    "screens/048.webp",
+    "screens/049.webp",
+    "screens/050.webp",
+    "screens/051.webp",
+    "screens/053.webp",
+    "screens/055.webp",
+    "screens/056.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Patient scope chaining across extractions",
+   "general": "Limit each new query to the people found by the previous one, to the whole population, or to a custom list, with a banner saying which earlier result is being used",
+   "specific": "🎯 Patient Scope radio: Same patients from previous extraction (N) / All patients / Custom patient list. The Linked mode banner names the source extraction and time, and the sidebar shows 'Last Extraction' records and patients",
+   "steps": [
+    "run a first extraction",
+    "choose 'Same patients from previous extraction'",
+    "run the next extraction (results are tagged scope: previous)",
+    "switch back to All patients when needed"
+   ],
+   "serves_tasks": [
+    "Restrict a later extraction to the patients found by an earlier one",
+    "Extract prescription records for the chosen medication list",
+    "Extract diagnosis records from an uploaded code list file"
+   ],
+   "screens": [
+    "screens/041.webp",
+    "screens/042.webp",
+    "screens/051.webp",
+    "screens/054.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Stepwise inclusion criteria with attrition funnel",
+   "general": "Start from a population, add filters one at a time from a criterion menu, see each step's count in a funnel chart, then export the survivors",
+   "specific": "Cohort Builder: Starting population (All / previous extraction / upload). Add Criterion menu (Age Range, Gender, Registration Period, Has Diagnosis, Has Drug, Has HES APC Record, Linkage Eligible) with an Apply button for each; only Age Range, Registration Period and Linkage Eligible were used. Plotly Attrition Funnel (500→384→341→276). Reset Cohort Filters / Reset Everything. Export Cohort CSV/Parquet",
+   "steps": [
+    "choose the starting population",
+    "choose a criterion and set its parameters",
+    "apply it (status shows kept and removed)",
+    "repeat for more criteria while the funnel grows",
+    "export the final cohort"
+   ],
+   "serves_tasks": [
+    "Apply inclusion criteria one after another and watch the attrition",
+    "Export the final cohort for downstream analysis"
+   ],
+   "screens": [
+    "screens/057.webp",
+    "screens/058.webp",
+    "screens/059.webp",
+    "screens/060.webp",
+    "screens/061.webp",
+    "screens/062.webp"
+   ],
+   "id": "f7",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "One code list searched across several sources",
+   "general": "Run one code list against several linked data sources at once and compare records and patients per source in a table and bar chart",
+   "specific": "Multi-Source Search: code list (library, upload or manual) mapped to SNOMED + ICD-10, checkboxes for CPRD Aurum / HES APC / HES OP / ONS Death, Run Multi-Source Extraction, Results Summary table and 'Patients by Source' bar chart",
+   "steps": [
+    "provide the code list",
+    "tick the data sources",
+    "run the extraction",
+    "compare per-source counts in the table and chart"
+   ],
+   "serves_tasks": [
+    "Search every data source at once with one code list"
+   ],
+   "screens": [
+    "screens/063.webp"
+   ],
+   "id": "f8",
+   "check": "replayed"
+  },
+  {
+   "name": "Baseline characteristics table (Table 1)",
+   "general": "Pick continuous and categorical variables and an optional grouping, generate a descriptive summary table, and download it",
+   "specific": "Analytics › Data Source (mock / last extraction / upload) › Table 1 (Baseline): Continuous Variables, Categorical Variables, Group By, Generate Table 1, Download Table 1. Only the generated mock data source was used",
+   "steps": [
+    "choose or generate the data source",
+    "select continuous and categorical variables",
+    "optionally choose a group-by",
+    "generate the table",
+    "download it"
+   ],
+   "serves_tasks": [
+    "Summarise baseline characteristics"
+   ],
+   "screens": [
+    "screens/064.webp",
+    "screens/065.webp",
+    "screens/066.webp"
+   ],
+   "id": "f9",
+   "check": "not_confirmed"
+  }
+ ],
+ "screens_never_reached": [
+  "⚙️ Configuration and 📖 Definitions views: not opened before the ~100-action limit",
+  "Code List Development Stages 2–4 (Synonyms & Existing Lists; Search Code Browsers; Review & Classify): no screen of their contents was kept, so their guidance tables are unverified",
+  "Analytics tabs Kaplan-Meier, Distributions and Custom Summary: seen as tab names only (screens/065.webp)",
+  "Linkage Extraction tabs HES OP (Outpatient), Linkage Eligibility and IMD (Deprivation): seen as tab names only",
+  "CPRD Aurum 'Extract Any File Type (All Patients)' tab: not opened",
+  "🌟 Quick Extract: only the code-entry step was seen (screens/067.webp). The run and its results were not reached",
+  "👤 Demographics: only the variable picker was seen (screens/068.webp). Extract Demographics was not pressed",
+  "Stage 6 'Import Completed Review': needs a clinician-completed .xlsx, and none was available among the test files",
+  "Stage 5 Expansion and Audit Log result tabs: not opened",
+  "Live data modes (BMRC Cluster, Any Server, Windows OS): need real CPRD data paths that do not exist in the sandbox"
+ ],
+ "not_done": [
+  "Heart-failure code list matching: the mock EMIS dictionary covers only valvular heart disease, so the 3 heart-failure SNOMED codes went to Unmatched. Only aortic stenosis (60573004) matched, so the reviewer workbook holds VHD codes, not heart-failure codes",
+  "SGLT2 inhibitor lookup: free-text 'dapagliflozin' and the library path Glucose-Lowering › SGLT2 Inhibitor both returned 0 products, because the mock product dictionary has no SGLT2 drugs. Antihypertensives were used as the drug example instead (638 ProdCodeIds)",
+  "MedCode extraction with the Stage 5 medcodeids returned 'No matching records found': the mock dictionary IDs do not appear in the mock Observation table",
+  "ONS Death extraction with manually entered I50 codes returned 'No matching records found' in the mock data",
+  "Cohort Builder criteria Gender, Has Diagnosis, Has Drug and Has HES APC Record, and the 'From previous extraction' starting population: not tried, because of the action budget. Cohort criteria that link back to earlier extractions are therefore undocumented",
+  "Demographics extraction (per-patient covariates): the variable picker was reached but Extract Demographics was never pressed",
+  "Other linked sources (HES Outpatient, IMD deprivation, linkage-eligibility file) and Aurum 'Extract Any File Type' (e.g. Consultation, Problem, Referral): not opened",
+  "Quick Extract: the one-step path was not run past code entry",
+  "Importing a clinician-completed review workbook to apply include/exclude decisions: not tested, no completed file available",
+  "Output settings (Parquet/CSV/Both, merging code descriptions) were not explored beyond the default download buttons",
+  "Table 1 was generated on freshly generated mock data, not on the 276-patient cohort built in the Cohort Builder",
+  "Parquet contents were not inspected: binary files report only their size. cohort_patients.csv and master_code_list_stage5.csv were read and confirmed"
+ ],
+ "applied": [
+  "Moved t21 (Table 1) into a new optional 'Describe the population' phase and noted it ran on generated mock data, not the cohort",
+  "Changed t17's branch from 'repeat' to 'optional' and gave t16 the matching 'optional' tag (HES and ONS are separate optional sources, not alternatives to each other)",
+  "Tagged t11 'one-of' so the three diagnosis code-source alternatives (t11, t12, t15) are tagged consistently",
+  "Narrowed t2 to Stage 1, dropped the unsupported 'clicked Stage 2–4' action, marked t2 optional, and recorded Stages 2–4 in screens_never_reached",
+  "Marked f2's 'upload the completed review' step as untested; also marked untested sub-steps in f1 (Master File filter, .txt download) and f3 (pruning drugs)",
+  "Rewrote the goal's specific to say the matched list ended up as aortic-stenosis codes and that antihypertensives replaced SGLT2 drugs",
+  "Noted in t5 and t7 that the matched codes and the workbook are aortic-stenosis codes",
+  "Noted in f7 which criteria were actually used and in f9 that only the mock data source was used",
+  "Added Demographics extract, linked-cohort criteria, other linked sources and Aurum file types, Quick Extract, review import, output settings and the Table 1 data mismatch to not_done",
+  "Removed the empty serves_tasks_note field from f4"
+ ],
+ "open_fixes": [
+  "Rerun the replay for t15, t16, t17, t19, t20, t21, f7 and f9: the second agent ran out of action budget, so these rest on one run only",
+  "Open Stages 2–4 of Code List Development and keep screens, to support or drop the claim that they hold tables of repositories and coding systems",
+  "Run Demographics extraction and, if it works, add it as a task and a 'covariate pull' feature; this needs a new run",
+  "Try the Cohort Builder's Has Diagnosis / Has Drug / Has HES APC Record criteria and the 'From previous extraction' starting population, to document cross-extraction cohort linking",
+  "Open HES OP, HES A&E (named by the reviewer but not seen in this run), IMD and Linkage Eligibility tabs, and Aurum 'Extract Any File Type', to cover the other linked sources",
+  "Test Stage 6 Import Completed Review with a clinician-completed .xlsx, to confirm the code-list review loop closes",
+  "Run Quick Extract end to end and explore the output settings (Parquet/CSV/Both, code descriptions)",
+  "Generate Table 1 from the built cohort (last extraction or uploaded cohort_patients.csv) so the describe step follows on from the cohort",
+  "Repeat the heart-failure code matching with a dictionary that contains heart-failure codes (real EMIS dictionary or a fuller mock), so the code-list phase produces the intended list"
+ ],
+ "screens_at": "pilot/public/runs/cprd-extractor/20261030-120550/",
+ "screens_filed": {
+  "screens/004.webp": "screens/004.webp",
+  "screens/005.webp": "screens/005.webp",
+  "screens/020.webp": "screens/020.webp",
+  "screens/036.webp": "screens/036.webp",
+  "screens/052.webp": "screens/052.webp",
+  "screens/057.webp": "screens/057.webp"
+ }
+}

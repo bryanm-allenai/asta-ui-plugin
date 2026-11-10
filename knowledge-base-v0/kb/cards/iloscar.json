@@ -1,0 +1,615 @@
+{
+  "schema": "astaui.card/1",
+  "id": "iloscar",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:09:19Z"
+  },
+  "app": {
+    "title": "iLOSCAR: forward and inverse runs of an ocean-atmosphere-sediment carbon cycle model",
+    "summary": "The person picks a model version and edits the parameter values in a series of numbered setup tables. They name an experiment and run it, either forward from an emission scenario they define, or inversely from observed records they point it at, with bounds on the emission rate that the solver searches. A progress bar and run log follow the integration. The results are saved as CSV files in a folder named for the experiment and drawn as stacked time series; inverse runs also show the fitted curve against the target record and the emission history that was inferred. A separate page smooths a record with LOWESS before it is used as a target, and downloads the smoothed, resampled series.",
+    "task": {
+      "text": "Run a box model of the carbon cycle forward from a set emission scenario, or invert observed records to infer the emission history that would reproduce them.",
+      "verbs": [
+        "derive",
+        "compare",
+        "plan"
+      ]
+    },
+    "data": {
+      "text": "Model parameters in editable tables, observed records as two-column CSVs of age and value, and simulated time series of many tracers written out per experiment.",
+      "item": "one model experiment: a parameter set and a forcing scenario, with the time series it produces",
+      "shapes": [
+        "table",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "simulating carbon release and inverting proxy records, after the records are compiled",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Numbered setup tables whose first column is edited in place feed parameter stores that are merged when Run is pressed; the run reports progress and a log, and its saved output is read back to draw stacked line charts. Inverse runs plot the model's fit on top of the target record and the inferred cumulative emission below it, and a separate smoothing page redraws the LOWESS curve over the raw points as a fraction slider moves.",
+      "views": [
+        "table view",
+        "form",
+        "line chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "inline edit",
+        "import",
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "export",
+        "parameter slider"
+      ],
+      "patterns": [
+        "step by step setup"
+      ]
+    },
+    "field": {
+      "text": "forward and inverse box modelling of the ocean-atmosphere-sediment carbon cycle in paleoceanography",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "carbon cycle modelling",
+        "paleoceanography",
+        "inverse modelling"
+      ]
+    },
+    "workflow": {
+      "name": "configure and run a simulation model, forward or inverted against observations",
+      "steps": [
+        {
+          "step": "set up the model's configuration and parameters",
+          "here": "Step 1 and Step 2 tables take a version (paleo or modern, sediment on or off, load initial state, temperature feedback, save final state) and eighteen physical parameters with units; switching to paleo rewrites the defaults, and invalid flags raise a warning",
+          "parts": [
+            "forward-setup",
+            "inverse-setup"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "file-path cells name the initial steady-state file and an emission file; on the inverse page a dropdown picks the target (pCO2, surface d13C, surface pH, or one of them paired with d13C) and one or two CSV path boxes appear to match",
+          "parts": [
+            "forward-setup",
+            "inverse-target"
+          ]
+        },
+        {
+          "step": "smooth the observed records before using them",
+          "here": "a CSV path loads a record as points, a fraction slider redraws its LOWESS curve, and Save results downloads the curve resampled every 200 years",
+          "parts": [
+            "lowess-smoother"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run integrates the ODE system with LSODA, or, for an inversion, solves interval by interval for the emission rate between the lower and upper bounds with TOMS 748; a progress bar and run log follow, and Cancel stops an inversion",
+          "parts": [
+            "run-panel",
+            "inverse-setup"
+          ]
+        },
+        {
+          "step": "compare the model against the observations",
+          "here": "inverse results plot the model curve over the target record, with cumulative emission and, for paired targets, the inferred d13C of the emission below",
+          "parts": [
+            "inverse-results"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "every tracer is written to CSV in a folder named after the experiment, the inferred emission history is saved with it, and a spin-up can save its final state as the starting file for later runs; forward results are drawn as stacked surface-chemistry and per-basin compensation-depth charts",
+          "parts": [
+            "run-panel",
+            "forward-results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "A spin-up run with emissions off saves its final state, which later perturbation and inverse runs load as their starting point.",
+        "Inversion needs a bracket on the unknown forcing: the person sets a lower and upper emission rate, and a bracket that is too narrow makes the run fail.",
+        "Two records can be inverted together to infer both how much carbon was released and its isotopic signature over time.",
+        "Results are organised by experiment name, one output folder per run, rather than kept in the interface."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "forward-setup",
+      "level": "view",
+      "parent": null,
+      "title": "Forward model setup tables",
+      "summary": "Four numbered tables, with the first column editable, set the model version, the physical parameters, the emission scenario and the file paths for a forward run.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "import"
+      ],
+      "patterns": [
+        "step by step setup"
+      ],
+      "spans": [
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 18,
+          "end": 74,
+          "role": "data",
+          "anchor": "717e39239a7d",
+          "first": "df_mode = pd.DataFrame(OrderedDict(["
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 76,
+          "end": 243,
+          "role": "markup",
+          "anchor": "a3c01bb302e5",
+          "first": "forward_mode = dash_table.DataTable("
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 279,
+          "end": 372,
+          "role": "markup",
+          "anchor": "9c552acfc280",
+          "first": "layout = dbc.Container(fluid = False,style = Home_STYLE, children = ["
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 412,
+          "end": 418,
+          "role": "logic",
+          "symbol": "update_param_mode",
+          "anchor": "1b642e675775",
+          "first": "def update_param_mode(data, data_pre):"
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 426,
+          "end": 437,
+          "role": "logic",
+          "symbol": "mode_warning",
+          "anchor": "e10e2d4f84f0",
+          "first": "def mode_warning(data):"
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 441,
+          "end": 512,
+          "role": "logic",
+          "anchor": "55cc12f64adb",
+          "first": "#update model parameters according to model"
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 521,
+          "end": 525,
+          "role": "logic",
+          "symbol": "update_param_model",
+          "anchor": "f01bc1413a2f",
+          "first": "def update_param_model(data, data_pre):"
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 536,
+          "end": 540,
+          "role": "logic",
+          "symbol": "update_param_carbon",
+          "anchor": "9a48c2eb4328",
+          "first": "def update_param_carbon(data, data_pre):"
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 549,
+          "end": 553,
+          "role": "logic",
+          "symbol": "update_param_file",
+          "anchor": "aae6b4be1f1e",
+          "first": "def update_param_file(data, data_pre):"
+        }
+      ]
+    },
+    {
+      "id": "run-panel",
+      "level": "component",
+      "parent": "forward-setup",
+      "title": "Experiment name, Run and progress",
+      "summary": "Names the experiment, merges the setup tables into one parameter set on Run, integrates the model with a progress bar and run log, and saves every output series to the experiment's folder.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 245,
+          "end": 274,
+          "role": "markup",
+          "anchor": "9f2cd1e97790",
+          "first": "run_section = html.Div(style = {'textAlign':'left', \"margin-left\": \"10rem\"}, children ="
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 374,
+          "end": 397,
+          "role": "markup",
+          "anchor": "39c7e7404d17",
+          "first": "dbc.Row(["
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 568,
+          "end": 580,
+          "role": "logic",
+          "symbol": "merge_params",
+          "anchor": "957043e8a1b4",
+          "first": "def merge_params(n1, n2, dict1, dict2, dict3, dict4, exp_name):"
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 590,
+          "end": 598,
+          "role": "logic",
+          "symbol": "initialize",
+          "anchor": "9910d0972397",
+          "first": "def initialize(data):"
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 607,
+          "end": 616,
+          "role": "logic",
+          "symbol": "activate_progress_bar",
+          "anchor": "5560b3a63b3c",
+          "first": "def activate_progress_bar(key, info):"
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 632,
+          "end": 639,
+          "role": "logic",
+          "symbol": "update_progress",
+          "anchor": "33c6c46b94a9",
+          "first": "def update_progress(key,data):"
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 663,
+          "end": 669,
+          "role": "logic",
+          "symbol": "save_results",
+          "anchor": "c46c24a6fa9b",
+          "first": "def save_results(ysol, tsol):"
+        },
+        {
+          "file": "code/iloscar/iLOSCAR_backend.py",
+          "start": 59,
+          "end": 186,
+          "role": "logic",
+          "symbol": "init_start",
+          "anchor": "3e807959121f",
+          "first": "def init_start(params):"
+        },
+        {
+          "file": "code/iloscar/iLOSCAR_backend.py",
+          "start": 279,
+          "end": 1201,
+          "role": "logic",
+          "symbol": "model_run",
+          "anchor": "21ac6f944041",
+          "first": "def model_run(set_progress):"
+        },
+        {
+          "file": "code/iloscar/iLOSCAR_backend.py",
+          "start": 1375,
+          "end": 1751,
+          "role": "logic",
+          "symbol": "wo_results",
+          "anchor": "9716aee4ea33",
+          "first": "def wo_results(y, t):"
+        }
+      ]
+    },
+    {
+      "id": "forward-results",
+      "level": "view",
+      "parent": null,
+      "title": "Forward run charts",
+      "summary": "Reads the saved output back and draws stacked line charts of surface DIC and alkalinity, pCO2 with pH on a second axis, and surface d13C, plus calcite compensation depth for each ocean basin.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 398,
+          "end": 402,
+          "role": "markup",
+          "anchor": "eb5f4b0f575b",
+          "first": "html.Br(),"
+        },
+        {
+          "file": "code/iloscar/pages/forward.py",
+          "start": 680,
+          "end": 856,
+          "role": "logic",
+          "symbol": "update_figure",
+          "anchor": "cd29ce120905",
+          "first": "def update_figure(data, exp_name, dict_mode):"
+        }
+      ]
+    },
+    {
+      "id": "inverse-setup",
+      "level": "view",
+      "parent": null,
+      "title": "Inverse model setup and run",
+      "summary": "The same numbered tables for an inversion, with the emission d13C and the lower and upper bounds for the root-finding search, plus Run, Cancel and Clean controls and a progress bar.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "export"
+      ],
+      "patterns": [
+        "step by step setup"
+      ],
+      "spans": [
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 67,
+          "end": 118,
+          "role": "data",
+          "anchor": "4d7dadf083f3",
+          "first": "df_mode_inv = pd.DataFrame(OrderedDict(["
+        },
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 120,
+          "end": 318,
+          "role": "markup",
+          "anchor": "caafeb8ff5d2",
+          "first": "inverse_mode = dash_table.DataTable("
+        },
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 322,
+          "end": 449,
+          "role": "markup",
+          "anchor": "934c5b23b217",
+          "first": "layout = dbc.Container(fluid = False, style = Home_STYLE, children = ["
+        },
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 517,
+          "end": 659,
+          "role": "logic",
+          "anchor": "f677a9721e86",
+          "first": "# update param_mode according to input"
+        },
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 676,
+          "end": 689,
+          "role": "logic",
+          "symbol": "merge_params",
+          "anchor": "394c5be40646",
+          "first": "def merge_params(n1, n2, dict1, dict2, dict3, dict4, exp_name, dict5):"
+        },
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 698,
+          "end": 705,
+          "role": "logic",
+          "symbol": "initialize",
+          "anchor": "472e3024f0f0",
+          "first": "def initialize(data):"
+        },
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 714,
+          "end": 721,
+          "role": "logic",
+          "symbol": "activate_progress_bar_inv",
+          "anchor": "95995cc1c36e",
+          "first": "def activate_progress_bar_inv(key, info):"
+        },
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 736,
+          "end": 742,
+          "role": "logic",
+          "symbol": "update_progress",
+          "anchor": "97b983e75e22",
+          "first": "def update_progress(set_progress,key, data):"
+        },
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 751,
+          "end": 756,
+          "role": "logic",
+          "symbol": "save_results",
+          "anchor": "c7942c38e33e",
+          "first": "def save_results(ysol, tsol):"
+        },
+        {
+          "file": "code/iloscar/iLOSCAR_backend.py",
+          "start": 1215,
+          "end": 1367,
+          "role": "logic",
+          "symbol": "cost_function",
+          "anchor": "4a04d4740f9a",
+          "first": "def cost_function(ems_new, tracer_type, hpls, tems, ems):"
+        }
+      ]
+    },
+    {
+      "id": "inverse-target",
+      "level": "component",
+      "parent": "inverse-setup",
+      "title": "Target variable and record files",
+      "summary": "A dropdown chooses which observed record or pair of records to invert, and the CSV path boxes change their prompts and show a second box when a pair is chosen.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 25,
+          "end": 62,
+          "role": "markup",
+          "anchor": "9d254791e985",
+          "first": "inv_opt = html.Div("
+        },
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 452,
+          "end": 502,
+          "role": "logic",
+          "anchor": "f7733f36c9aa",
+          "first": "# update the placeholder info from the variable selection"
+        },
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 512,
+          "end": 515,
+          "role": "logic",
+          "symbol": "update_inv_info",
+          "anchor": "15b90d953e17",
+          "first": "def update_inv_info(value1, value2, value3):"
+        }
+      ]
+    },
+    {
+      "id": "inverse-results",
+      "level": "view",
+      "parent": null,
+      "title": "Inversion fit and inferred emissions",
+      "summary": "Plots the model's result against the target record for each inverted variable, with the inferred cumulative emission and, for paired targets, the emission's d13C over time.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 443,
+          "end": 445,
+          "role": "markup",
+          "anchor": "f53fafcb68cd",
+          "first": "run_info_inv,"
+        },
+        {
+          "file": "code/iloscar/pages/inverse.py",
+          "start": 766,
+          "end": 1230,
+          "role": "logic",
+          "symbol": "update_figure",
+          "anchor": "1f3a8694d8e7",
+          "first": "def update_figure(data, exp_name, dict1):"
+        }
+      ]
+    },
+    {
+      "id": "lowess-smoother",
+      "level": "view",
+      "parent": null,
+      "title": "LOWESS smoothing",
+      "summary": "Loads a two-column record from a CSV path, shows it as points with a LOWESS curve that redraws as the fraction slider moves, and downloads the curve resampled at a fixed step.",
+      "views": [
+        "scatter plot",
+        "line chart"
+      ],
+      "interactions": [
+        "import",
+        "parameter slider",
+        "export",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/iloscar/pages/Smoothing.py",
+          "start": 68,
+          "end": 104,
+          "role": "markup",
+          "anchor": "c489ce796364",
+          "first": "f_lowess = html.Div(children = ["
+        },
+        {
+          "file": "code/iloscar/pages/Smoothing.py",
+          "start": 23,
+          "end": 66,
+          "role": "logic",
+          "symbol": "make_fig",
+          "anchor": "833d598be776",
+          "first": "def make_fig(xdata, ydata , x_axis, y_axis):"
+        },
+        {
+          "file": "code/iloscar/pages/Smoothing.py",
+          "start": 116,
+          "end": 158,
+          "role": "logic",
+          "symbol": "update_fig",
+          "anchor": "7c31585bbe0a",
+          "first": "def update_fig(file, frac):"
+        },
+        {
+          "file": "code/iloscar/pages/Smoothing.py",
+          "start": 166,
+          "end": 176,
+          "role": "logic",
+          "symbol": "save_results",
+          "anchor": "fa0bc819b6f8",
+          "first": "def save_results(n_clicks, data):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "interactions",
+      "term": "parameter slider"
+    },
+    {
+      "facet": "mechanism",
+      "list": "patterns",
+      "term": "step by step setup"
+    }
+  ]
+}

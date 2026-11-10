@@ -1,0 +1,449 @@
+{
+  "schema": "astaui.card/1",
+  "id": "paper-section-extractor",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T15:05:15Z"
+  },
+  "app": {
+    "title": "Paper Section Extractor",
+    "summary": "A person uploads a PDF of a paper, can type a search term, and presses Extract. Text is pulled from the PDF locally. Section headers are found with fixed rules, and page numbers are worked out from the page-number lines in the text. The sections then appear as a collapsible list, each with its page range, and each opens to show its paragraphs in order. If a search term was entered, only sections whose title or text contains it are kept. The sections are also saved as Markdown and JSON files.",
+    "task": {
+      "text": "Split a paper PDF into its sections, each with the pages it covers, so a chosen section can be found and handed on as a clean chunk instead of the whole paper.",
+      "verbs": [
+        "derive",
+        "organize",
+        "locate",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "One scientific paper as a PDF, turned into plain text and then into an ordered set of sections, each with a page range and paragraphs.",
+      "item": "a section of a paper: its header, first and last page, and paragraphs",
+      "shapes": [
+        "document",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "preparing paper PDFs as section chunks with page sources, before retrieval or metadata extraction",
+      "terms": [
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A left column holds the PDF upload, a search box, a debug checkbox and the Extract button. One run fills the right column with a list of collapsible sections, each titled with its page range, filtered by the search term. The same sections are written out as Markdown and JSON files.",
+      "views": [
+        "form",
+        "list",
+        "document reader"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "filter",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "section segmentation of scientific PDFs for retrieval-augmented generation",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "document parsing",
+        "retrieval augmented generation",
+        "information extraction"
+      ]
+    },
+    "workflow": {
+      "name": "split a long document into titled sections and export them",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload one PDF. It is copied into a local raw-data folder before processing.",
+          "parts": [
+            "control-panel",
+            "pdf-upload"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Optionally type a term in 'Search sections' before extracting. Only sections whose title or any paragraph contains it are kept.",
+          "parts": [
+            "section-search"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Extract Sections' turns the PDF into text lines and gives each line a page from the page-number lines. It then starts a new section at each line that passes the header rules.",
+          "parts": [
+            "pdf-upload",
+            "control-panel"
+          ]
+        },
+        {
+          "step": "look over every item at a glance, then open one in detail",
+          "here": "Each section is listed as a collapsed row titled with its header and page range. Expanding a row shows its paragraphs in order.",
+          "parts": [
+            "sections-view"
+          ]
+        },
+        {
+          "step": "check the raw computed output",
+          "here": "The 'Debug mode' checkbox fills a debug output box with the first 4000 characters of the raw section dictionary.",
+          "parts": [
+            "debug-output"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Every run writes extracted_sections.md (header, page range, paragraphs) and extracted_sections.json to an outputs folder. These are offered through download buttons.",
+          "parts": [
+            "downloads"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Headers are found by rules, with no model: a fixed list of academic section names, numbered (1.2.3), Roman-numeral and appendix patterns. Lines with more than ten words, more than four commas, 'et al' or a leading URL are rejected.",
+        "Page numbers come from the text itself: a line that is only a number, or a short running header that starts with a number and contains 'et al', sets the current page. That line is then dropped from the content.",
+        "Each section keeps its first and last page, so a chunk handed to a model can be traced back to where it sits in the paper.",
+        "Everything runs locally with no API calls. The search filter also limits what goes into the exported files."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "control-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Upload and extract controls",
+      "summary": "The left column where the person sets up a run and starts it with the Extract button, then reads the status line.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/ui/app.py",
+          "start": 133,
+          "end": 148,
+          "role": "markup",
+          "anchor": "b5ce4bea370b",
+          "first": "def build_ui():"
+        },
+        {
+          "file": "code/src/ui/app.py",
+          "start": 17,
+          "end": 21,
+          "role": "style",
+          "anchor": "13f349aa889e",
+          "first": "CUSTOM_CSS = \"\"\""
+        },
+        {
+          "file": "code/src/ui/app.py",
+          "start": 169,
+          "end": 181,
+          "role": "logic",
+          "anchor": "04d0ace2152b",
+          "first": "# Wiring"
+        },
+        {
+          "file": "code/src/ui/app.py",
+          "start": 65,
+          "end": 128,
+          "role": "logic",
+          "symbol": "on_extract",
+          "anchor": "5f87b640b054",
+          "first": "def on_extract(file, search_query, debug=False, progress=gr.Progress()):"
+        }
+      ]
+    },
+    {
+      "id": "pdf-upload",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "PDF upload and section pipeline",
+      "summary": "Takes the uploaded PDF and turns it into sections, each with a header, page range and paragraphs, using rule-based header and page detection.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/ui/app.py",
+          "start": 143,
+          "end": 143,
+          "role": "markup",
+          "anchor": "ae16014cd3f2",
+          "first": "pdf_input = gr.File(label=\"Upload PDF\", file_types=[\".pdf\"])"
+        },
+        {
+          "file": "code/src/pipeline/file_loader.py",
+          "start": 5,
+          "end": 26,
+          "role": "logic",
+          "symbol": "save_uploaded_file",
+          "anchor": "63169e0e2f5f",
+          "first": "def save_uploaded_file(file):"
+        },
+        {
+          "file": "code/src/pipeline/run_pipeline.py",
+          "start": 7,
+          "end": 25,
+          "role": "logic",
+          "symbol": "run_pipeline",
+          "anchor": "54e54d631113",
+          "first": "def run_pipeline(file: str):"
+        },
+        {
+          "file": "code/src/core/pdf_reader.py",
+          "start": 6,
+          "end": 14,
+          "role": "logic",
+          "symbol": "extract_text_from_pdf",
+          "anchor": "4a2cf5b6dd90",
+          "first": "def extract_text_from_pdf(file_path):"
+        },
+        {
+          "file": "code/src/core/block_builder.py",
+          "start": 5,
+          "end": 18,
+          "role": "logic",
+          "symbol": "assign_pages_to_blocks",
+          "anchor": "29b073fbd05d",
+          "first": "def assign_pages_to_blocks(blocks):"
+        },
+        {
+          "file": "code/src/core/page_detector.py",
+          "start": 5,
+          "end": 19,
+          "role": "logic",
+          "symbol": "extract_page_number",
+          "anchor": "4dde52bcd80b",
+          "first": "def extract_page_number(block: str):"
+        },
+        {
+          "file": "code/src/core/section_builder.py",
+          "start": 7,
+          "end": 61,
+          "role": "logic",
+          "symbol": "extract_sections",
+          "anchor": "33dacdee660e",
+          "first": "def extract_sections(page_blocks):"
+        },
+        {
+          "file": "code/src/core/section_detector.py",
+          "start": 26,
+          "end": 68,
+          "role": "logic",
+          "symbol": "is_section_header",
+          "anchor": "e4779f5fd402",
+          "first": "def is_section_header(block: str) -> bool:"
+        },
+        {
+          "file": "code/src/core/section_detector.py",
+          "start": 6,
+          "end": 21,
+          "role": "data",
+          "anchor": "f420802878c9",
+          "first": "COMMON_HEADERS = {"
+        },
+        {
+          "file": "code/src/config/constants.py",
+          "start": 4,
+          "end": 8,
+          "role": "data",
+          "anchor": "cfd0ddbc0e66",
+          "first": "BASE_DIR = Path(__file__).resolve().parents[2]"
+        }
+      ]
+    },
+    {
+      "id": "section-search",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Section search",
+      "summary": "A text box whose term limits the shown and exported sections to those whose title or text contains it.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "search",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/ui/app.py",
+          "start": 144,
+          "end": 144,
+          "role": "markup",
+          "anchor": "8b38cd4ad5ee",
+          "first": "search_box = gr.Textbox(label=\"Search sections\", placeholder=\"e.g. Introduction\")"
+        },
+        {
+          "file": "code/src/ui/app.py",
+          "start": 80,
+          "end": 86,
+          "role": "logic",
+          "anchor": "d7f463ca602b",
+          "first": "# Apply search filter"
+        }
+      ]
+    },
+    {
+      "id": "downloads",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Markdown and JSON downloads",
+      "summary": "Writes the extracted sections to a Markdown file and a JSON file and offers them for download.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/ui/app.py",
+          "start": 150,
+          "end": 152,
+          "role": "markup",
+          "anchor": "55da5a492620",
+          "first": "# Download buttons stay here (left side)"
+        },
+        {
+          "file": "code/src/ui/app.py",
+          "start": 51,
+          "end": 54,
+          "role": "logic",
+          "symbol": "save_markdown",
+          "anchor": "da3171437bbb",
+          "first": "def save_markdown(sections):"
+        },
+        {
+          "file": "code/src/ui/app.py",
+          "start": 57,
+          "end": 60,
+          "role": "logic",
+          "symbol": "save_json",
+          "anchor": "5310a7d4d9f1",
+          "first": "def save_json(sections):"
+        },
+        {
+          "file": "code/src/ui/app.py",
+          "start": 42,
+          "end": 48,
+          "role": "logic",
+          "symbol": "sections_to_markdown",
+          "anchor": "c2d58cf8895f",
+          "first": "def sections_to_markdown(sections):"
+        },
+        {
+          "file": "code/src/ui/app.py",
+          "start": 120,
+          "end": 122,
+          "role": "logic",
+          "anchor": "04257dd0ecd2",
+          "first": "progress(0.9, desc=\"Preparing downloads...\")"
+        }
+      ]
+    },
+    {
+      "id": "sections-view",
+      "level": "view",
+      "parent": null,
+      "title": "Extracted sections",
+      "summary": "Lists every detected section as a collapsible row titled with its page range. Expanding a row shows the section's paragraphs.",
+      "views": [
+        "list",
+        "document reader"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/ui/app.py",
+          "start": 155,
+          "end": 165,
+          "role": "markup",
+          "anchor": "ac1f17e51791",
+          "first": "with gr.Column(scale=2):"
+        },
+        {
+          "file": "code/src/ui/app.py",
+          "start": 25,
+          "end": 39,
+          "role": "logic",
+          "symbol": "convert_pipeline_output",
+          "anchor": "b392e680c8fd",
+          "first": "def convert_pipeline_output(raw_sections):"
+        },
+        {
+          "file": "code/src/ui/app.py",
+          "start": 100,
+          "end": 118,
+          "role": "logic",
+          "anchor": "aa9d7e3e7358",
+          "first": "# Build compact HTML"
+        }
+      ]
+    },
+    {
+      "id": "debug-output",
+      "level": "component",
+      "parent": "sections-view",
+      "title": "Debug output",
+      "summary": "When debug mode is ticked, shows the raw section dictionary from the pipeline, cut to its first 4000 characters, so the person can check what was detected.",
+      "views": [],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/ui/app.py",
+          "start": 145,
+          "end": 145,
+          "role": "markup",
+          "anchor": "de78ec5f2871",
+          "first": "debug_toggle = gr.Checkbox(label=\"Debug mode\", value=False)"
+        },
+        {
+          "file": "code/src/ui/app.py",
+          "start": 167,
+          "end": 167,
+          "role": "markup",
+          "anchor": "2e442a45c88e",
+          "first": "debug_output = gr.Textbox(label=\"Debug Output\", visible=False)"
+        },
+        {
+          "file": "code/src/ui/app.py",
+          "start": 126,
+          "end": 126,
+          "role": "logic",
+          "anchor": "681cb7a473b6",
+          "first": "debug_text = repr(raw_sections)[:4000] if debug else \"\""
+        }
+      ]
+    }
+  ]
+}

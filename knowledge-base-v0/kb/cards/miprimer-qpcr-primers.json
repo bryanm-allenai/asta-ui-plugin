@@ -1,0 +1,454 @@
+{
+  "schema": "astaui.card/1",
+  "id": "miprimer-qpcr-primers",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T22:25:41Z"
+  },
+  "app": {
+    "title": "MiPrimer (Mi-Primer)",
+    "summary": "A person pastes one microRNA sequence into a single field and presses Design. The server checks that the sequence is RNA of an allowed length, converts it to DNA and generates candidate forward and reverse primers, padding each with an adapter until its melting temperature clears a threshold. The result page shows the sequence with two tables, forward and reverse primers, each listing sequence, length and melting temperature. Each row also has three green or red markers for the A/T rules at the 3′ end, and pointing at a marker shows the rule it checks.",
+    "task": {
+      "text": "Design and screen candidate qPCR primers for a short RNA sequence against melting-temperature and 3′-end composition rules.",
+      "verbs": [
+        "derive",
+        "identify",
+        "plan"
+      ]
+    },
+    "data": {
+      "text": "One short nucleotide sequence entered by the person, and a table of primer candidates computed from it, each with length, melting temperature and pass/fail flags for its 3′ end.",
+      "item": "a candidate primer sequence designed against the input RNA",
+      "shapes": [
+        "sequence",
+        "table",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "designing primers before a qPCR assay is run",
+      "terms": [
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "A one-field form posts the sequence to the server, which computes the candidates and renders them as two tables. Each row's 3′-end checks appear as coloured squares, and hovering over one explains the rule it tests.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "hover for detail"
+      ],
+      "patterns": []
+    },
+    "field": {
+      "text": "PCR primer design for microRNA qPCR in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "primer design",
+        "qpcr",
+        "microrna"
+      ]
+    },
+    "workflow": {
+      "name": "generate candidates from one input and screen them against design rules",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "type or paste one microRNA sequence into the 'MiRNA sequence' field and press Design",
+          "parts": [
+            "sequence-form"
+          ]
+        },
+        {
+          "step": "check the input is valid",
+          "here": "whitespace is stripped and the sequence must contain only A, C, G and U and be between 15 and 40 nucleotides long",
+          "parts": [
+            "primer-engine"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "the RNA is converted to DNA. Forward candidates take 12 to 17 bases from the 5′ end, and reverse candidates take the reverse complement of the last 4 to 8 bases behind a poly-T tail. Each candidate is padded with adapter bases until its nearest-neighbour Tm is above 59 °C",
+          "parts": [
+            "primer-engine"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "forward and reverse primers are listed in two tables with sequence, length in bp and Tm in °C, under the input sequence",
+          "parts": [
+            "forward-table",
+            "reverse-table"
+          ]
+        },
+        {
+          "step": "identify which items pass each criterion",
+          "here": "three green or red squares per row show whether the last 5, 3 and 2 bases at the 3′ end hold the required number of A or T residues, and hovering shows the rule",
+          "parts": [
+            "at-status-markers"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Candidates only appear if adapter padding lifts their melting temperature above a fixed 59 °C threshold, computed with salt-corrected nearest-neighbour thermodynamics",
+        "Forward and reverse primers are built differently: reverse primers get a poly-T tail and a separate adapter, so they are shown in separate tables",
+        "3′-end A/T composition is checked against three rules of increasing strictness and shown as a row of pass/fail squares with hover explanations",
+        "Input is limited to short RNA strings (15–40 nt), which suits microRNA rather than general templates"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sequence-form",
+      "level": "view",
+      "parent": null,
+      "title": "Sequence entry form",
+      "summary": "Takes one microRNA sequence, with an example below it, and submits it to be designed.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 9,
+          "end": 18,
+          "role": "markup",
+          "anchor": "7bc07abe5aae",
+          "first": "<div class=\"container\">"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 16,
+          "end": 25,
+          "role": "style",
+          "symbol": ".mirna-input",
+          "anchor": "a1a7552f3b81",
+          "first": ".mirna-input {"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 50,
+          "end": 70,
+          "role": "style",
+          "symbol": ".design-primers",
+          "anchor": "97c7e8f32af5",
+          "first": ".design-primers {"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 43,
+          "end": 48,
+          "role": "style",
+          "symbol": ".example",
+          "anchor": "632d333ddba4",
+          "first": ".example {"
+        },
+        {
+          "file": "code/server.py",
+          "start": 22,
+          "end": 23,
+          "role": "logic",
+          "symbol": "index",
+          "anchor": "5a364615d32c",
+          "first": "def index():"
+        }
+      ]
+    },
+    {
+      "id": "primer-engine",
+      "level": "component",
+      "parent": "sequence-form",
+      "title": "Primer design engine",
+      "summary": "Checks the RNA input and generates forward and reverse primer candidates, padded with adapters until they reach the target melting temperature, with 3′-end A/T checks.",
+      "views": [],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/miprimer.py",
+          "start": 54,
+          "end": 110,
+          "role": "logic",
+          "symbol": "calculate_primers",
+          "anchor": "11dda2081b6f",
+          "first": "def calculate_primers(mi_rna):"
+        },
+        {
+          "file": "code/miprimer.py",
+          "start": 42,
+          "end": 51,
+          "role": "logic",
+          "symbol": "create_primer_entry",
+          "anchor": "41f0c3f7fc7a",
+          "first": "def create_primer_entry(sequence, at_statuses):"
+        },
+        {
+          "file": "code/miprimer.py",
+          "start": 12,
+          "end": 13,
+          "role": "logic",
+          "symbol": "calc_melt_temp",
+          "anchor": "b38f430d95a9",
+          "first": "def calc_melt_temp(dna):"
+        },
+        {
+          "file": "code/server.py",
+          "start": 27,
+          "end": 31,
+          "role": "logic",
+          "symbol": "primers",
+          "anchor": "4c06e0934207",
+          "first": "def primers():"
+        }
+      ]
+    },
+    {
+      "id": "results-page",
+      "level": "view",
+      "parent": null,
+      "title": "Primer results",
+      "summary": "Shows the input sequence above the forward and reverse primer tables.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/primers.html",
+          "start": 9,
+          "end": 14,
+          "role": "markup",
+          "anchor": "56207cf2db10",
+          "first": "<div class=\"container\">"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 72,
+          "end": 78,
+          "role": "style",
+          "symbol": ".mirna-sequence",
+          "anchor": "09ff1ba3dbe6",
+          "first": ".mirna-sequence {"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 133,
+          "end": 136,
+          "role": "style",
+          "symbol": ".polymer-sequence",
+          "anchor": "364734ad78ae",
+          "first": ".polymer-sequence {"
+        },
+        {
+          "file": "code/view.py",
+          "start": 65,
+          "end": 69,
+          "role": "logic",
+          "symbol": "build_primers_view",
+          "anchor": "d6eaf1b31f91",
+          "first": "def build_primers_view(primers):"
+        }
+      ]
+    },
+    {
+      "id": "forward-table",
+      "level": "component",
+      "parent": "results-page",
+      "title": "Forward primers table",
+      "summary": "Lists each forward primer candidate with its sequence, length in bp, Tm in °C and 3′-end checks.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/primers.html",
+          "start": 17,
+          "end": 40,
+          "role": "markup",
+          "symbol": "table.mirna-primers__table:1",
+          "anchor": "d62086070258",
+          "first": "<table class=\"mirna-primers__table\">"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 93,
+          "end": 99,
+          "role": "style",
+          "symbol": ".mirna-primers__table",
+          "anchor": "bf2c3eec13e9",
+          "first": ".mirna-primers__table {"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 115,
+          "end": 121,
+          "role": "style",
+          "symbol": ".mirna-primers__table td",
+          "anchor": "0c4033497e54",
+          "first": ".mirna-primers__table td {"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 101,
+          "end": 109,
+          "role": "style",
+          "symbol": ".mirna-primers__table th",
+          "anchor": "4d755b9ff046",
+          "first": ".mirna-primers__table th {"
+        },
+        {
+          "file": "code/view.py",
+          "start": 42,
+          "end": 62,
+          "role": "logic",
+          "symbol": "map_to_view",
+          "anchor": "ae22e80145b6",
+          "first": "def map_to_view(primers):"
+        }
+      ]
+    },
+    {
+      "id": "reverse-table",
+      "level": "component",
+      "parent": "results-page",
+      "title": "Reverse primers table",
+      "summary": "Lists each reverse primer candidate, with its poly-T tail and adapter, along with its length, Tm and 3′-end checks.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/primers.html",
+          "start": 44,
+          "end": 67,
+          "role": "markup",
+          "symbol": "table.mirna-primers__table:2",
+          "anchor": "afee876b9e72",
+          "first": "<table class=\"mirna-primers__table\">"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 84,
+          "end": 91,
+          "role": "style",
+          "symbol": ".mirna-primers__table-wrapper",
+          "anchor": "3f930d818165",
+          "first": ".mirna-primers__table-wrapper {"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 123,
+          "end": 131,
+          "role": "style",
+          "symbol": ".mirna-primers__table-name",
+          "anchor": "ecd671188f61",
+          "first": ".mirna-primers__table-name {"
+        }
+      ]
+    },
+    {
+      "id": "at-status-markers",
+      "level": "component",
+      "parent": "results-page",
+      "title": "3′-end A/T rule markers",
+      "summary": "Three green or red squares per primer show whether each 3′-end A/T rule is met, and hovering explains the rule.",
+      "views": [],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/view.py",
+          "start": 35,
+          "end": 39,
+          "role": "logic",
+          "symbol": "generate_A_T_status",
+          "anchor": "2fa1c86a69fe",
+          "first": "def generate_A_T_status(checkStatus, type):"
+        },
+        {
+          "file": "code/view.py",
+          "start": 6,
+          "end": 27,
+          "role": "logic",
+          "symbol": "generate_A_T_hint",
+          "anchor": "df6c51face83",
+          "first": "def generate_A_T_hint(checkStatus, type):"
+        },
+        {
+          "file": "code/miprimer.py",
+          "start": 34,
+          "end": 39,
+          "role": "logic",
+          "symbol": "calculate_at_statuses",
+          "anchor": "bcec6a35ea0e",
+          "first": "def calculate_at_statuses(dna):"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 138,
+          "end": 142,
+          "role": "style",
+          "symbol": ".at-status",
+          "anchor": "8b72e989e75d",
+          "first": ".at-status {"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 144,
+          "end": 146,
+          "role": "style",
+          "symbol": ".at-status_green",
+          "anchor": "def616161338",
+          "first": ".at-status_green {"
+        },
+        {
+          "file": "code/static/styles/main.css",
+          "start": 148,
+          "end": 150,
+          "role": "style",
+          "symbol": ".at-status_red",
+          "anchor": "47d2e992343a",
+          "first": ".at-status_red {"
+        },
+        {
+          "file": "code/static/styles/tooltipped.css",
+          "start": 4,
+          "end": 25,
+          "role": "style",
+          "symbol": ".tooltipped::after",
+          "anchor": "5e4ab214ef18",
+          "first": ".tooltipped::after {"
+        },
+        {
+          "file": "code/static/styles/tooltipped.css",
+          "start": 114,
+          "end": 118,
+          "role": "style",
+          "symbol": ".tooltipped-nw::after",
+          "anchor": "7db61b0a9f19",
+          "first": ".tooltipped-nw::after {"
+        }
+      ]
+    }
+  ]
+}

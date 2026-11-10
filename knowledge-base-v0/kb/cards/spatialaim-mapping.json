@@ -1,0 +1,713 @@
+{
+  "schema": "astaui.card/1",
+  "id": "spatialaim-mapping",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T19:05:06Z"
+  },
+  "app": {
+    "title": "SpatialAIM results explorer",
+    "summary": "The person points the sidebar at a single-cell reference file, a spatial transcriptomics file, an optional segmentation mask and an output folder. The pair is checked as soon as both files are set. They choose a tree linkage, any existing annotations to also start from, and one or more mapping methods. Run queues sweeps that cut the cluster tree at every number of cell types K and map each spot to one type, with a progress bar for each sweep. An overview table ranks every combination of starting clusters and method at its best K. In Explore, the person reads three criterion curves over K, jumps to the best K overall or for one criterion, and inspects the mapped cell types on UMAP and spatial maps, naming them and checking their marker genes. They can also set several methods side by side at one K and download any figure.",
+    "task": {
+      "text": "Pick the number of cell types at which a single-cell reference can be reliably mapped onto spatial data, and pick the mapping method to use, by scoring a sweep over K against several criteria.",
+      "verbs": [
+        "decide",
+        "compare",
+        "derive",
+        "explore",
+        "annotate"
+      ]
+    },
+    "data": {
+      "text": "A single-cell expression reference and a spatial expression dataset with spot coordinates. They are swept into one mapping per K, and each K's metrics go into one row of a table.",
+      "item": "one combination of starting clusters, mapping method and K: a cut of a cluster tree into K cell types, with every spatial spot assigned to one of them",
+      "shapes": [
+        "table",
+        "geospatial",
+        "hierarchy",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "choosing the cell-type granularity and mapping method after both datasets are measured, before biological interpretation",
+      "terms": [
+        "analyze",
+        "compare",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar sets up the inputs and queues the sweeps. Pages share remembered choices of starting clusters, method and K. A ranked overview table opens a combination in Explore. There, linked criterion curves and best-K buttons move one K slider, which redraws the UMAP and spatial maps, the marker genes and the report cards. A right click on a cell type opens its detail dialog.",
+      "views": [
+        "table view",
+        "line chart",
+        "scatter plot",
+        "map",
+        "bar chart",
+        "detail panel",
+        "side-by-side panes",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "filter",
+        "sort",
+        "hover for detail",
+        "zoom and pan",
+        "toggle view",
+        "parameter slider",
+        "inline edit",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "master-detail",
+        "side-by-side comparison",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "mapping a single-cell reference onto spatial transcriptomics in bioinformatics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "spatial transcriptomics",
+        "cell type mapping",
+        "single cell rna seq"
+      ]
+    },
+    "workflow": {
+      "name": "choose a granularity by sweeping a parameter and scoring every level",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Path fields (with browse buttons) for the scRNA .h5ad, ST .h5ad, an optional segmentation .tif and an output directory. The pair is validated as soon as both files are set, and problems open in a dialog.",
+          "parts": [
+            "setup-sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Pick average or Ward linkage, any annotation columns to also start from, and the baseline or reference mappers. Run queues the sweeps one after another, with a progress bar for each starting point.",
+          "parts": [
+            "setup-sidebar",
+            "explore-page"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "The Overview ranks each starting point and method at its own best overall K by the overall score, with each criterion's score beside it. Multiselects filter the table, and a selected row opens in Explore.",
+          "parts": [
+            "overview-table"
+          ]
+        },
+        {
+          "step": "pick the level that scores best on several criteria",
+          "here": "The Choose K card plots reconstruction, spatial organisation and coherence over K. The curves are linked, and a click on one sets the K slider. Best-K buttons per criterion and overall move the slider too, and a dialog shows the criterion-vs-criterion scatters with a Pareto filter.",
+          "parts": [
+            "choose-k-card",
+            "explore-page"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "At the chosen K, UMAP and spatial maps share one legend, with a confidence threshold and a confidence colouring. A right click on a cell type opens a dialog where the person names it and looks at its marker genes, maps and violins.",
+          "parts": [
+            "mapping-maps",
+            "cell-type-dialog",
+            "reference-page"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Compare puts the chosen methods' spatial maps under one reference UMAP at one K, followed by combined reconstruction, cell-fraction, assortativity and modularity cards.",
+          "parts": [
+            "compare-page"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Every figure has an Export popover that renders it as PNG, SVG or PDF to download.",
+          "parts": [
+            "mapping-maps",
+            "compare-page"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each criterion combines two curves by their harmonic mean, and the overall score is the harmonic mean of the criteria, so a K must do well on all of them",
+        "Reconstruction is shown against a label-shuffle null, so the person sees how far a K sits above chance",
+        "Pages and buttons unlock as runs finish: Overview and Reference after the first finished sweep, Compare once a starting point has two finished methods",
+        "Cell-type names are tied to a K and shared by every method, because all methods cut the same tree",
+        "An optional segmentation mask adds a shape-consistency score and a shape view for each cell type"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "setup-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Data and run setup sidebar",
+      "summary": "Takes the input paths, validates the pair, fixes linkage and annotation starts, and queues the selected mapping methods to run one after another.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/spatialaim/gui/sidebar.py",
+          "start": 433,
+          "end": 558,
+          "role": "markup",
+          "symbol": "render_sidebar",
+          "anchor": "644068635929",
+          "first": "def render_sidebar() -> argparse.Namespace | None:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/sidebar.py",
+          "start": 365,
+          "end": 370,
+          "role": "markup",
+          "symbol": "_method_rows",
+          "anchor": "8a1525e8c7fd",
+          "first": "def _method_rows("
+        },
+        {
+          "file": "code/src/spatialaim/gui/sidebar.py",
+          "start": 182,
+          "end": 222,
+          "role": "markup",
+          "symbol": "_annotation_row",
+          "anchor": "9fbef423f326",
+          "first": "def _annotation_row(sc_str: str, lock: dict | None) -> list[str]:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/sidebar.py",
+          "start": 225,
+          "end": 253,
+          "role": "markup",
+          "symbol": "_linkage_method_row",
+          "anchor": "4d50b5567cb5",
+          "first": "def _linkage_method_row(lock: dict | None) -> str:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/validation.py",
+          "start": 136,
+          "end": 141,
+          "role": "logic",
+          "symbol": "validation_row",
+          "anchor": "d7d4879e21f0",
+          "first": "def validation_row("
+        },
+        {
+          "file": "code/src/spatialaim/gui/app.py",
+          "start": 30,
+          "end": 31,
+          "role": "logic",
+          "symbol": "_start_next_queued",
+          "anchor": "ec503d4966df",
+          "first": "def _start_next_queued("
+        },
+        {
+          "file": "code/src/spatialaim/gui/app.py",
+          "start": 175,
+          "end": 185,
+          "role": "logic",
+          "symbol": "_poll",
+          "anchor": "e95663d8f049",
+          "first": "def _poll(just_started: bool, runs: dict, queue: list) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "overview-table",
+      "level": "view",
+      "parent": null,
+      "title": "Overview of starts × methods",
+      "summary": "Ranks every combination of starting clusters and method at its best overall K, filtered by multiselects, with a button that opens the selected row in Explore.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "multi-select",
+        "sort",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/spatialaim/gui/views/overview.py",
+          "start": 59,
+          "end": 61,
+          "role": "markup",
+          "symbol": "overview_view",
+          "anchor": "ce3962248f69",
+          "first": "def overview_view("
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/overview.py",
+          "start": 36,
+          "end": 56,
+          "role": "logic",
+          "symbol": "overview_table",
+          "anchor": "18218f8dc8df",
+          "first": "def overview_table(starts: list[data_access.Start]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/app.py",
+          "start": 68,
+          "end": 117,
+          "role": "logic",
+          "symbol": "_pages",
+          "anchor": "f05e88e19c1a",
+          "first": "def _pages(ctx: ViewContext, disk_starts: list[data_access.Start]) -> list:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/pages.py",
+          "start": 48,
+          "end": 56,
+          "role": "logic",
+          "symbol": "focus",
+          "anchor": "6cf956e031ad",
+          "first": "def focus(start: data_access.Start, mapper: str) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "explore-page",
+      "level": "view",
+      "parent": null,
+      "title": "Explore one start × method at one K",
+      "summary": "A control bar for starting clusters, method, K and the shared-gene UMAP toggle, then the method's progress while it computes or its results once done.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "parameter slider",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/spatialaim/gui/views/pages.py",
+          "start": 141,
+          "end": 208,
+          "role": "markup",
+          "symbol": "explore_page",
+          "anchor": "4f1bc5b4dcd8",
+          "first": "def explore_page(ctx: ViewContext) -> None:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/pages.py",
+          "start": 101,
+          "end": 102,
+          "role": "markup",
+          "symbol": "_start_select",
+          "anchor": "0780a4551f23",
+          "first": "def _start_select("
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/controls.py",
+          "start": 36,
+          "end": 50,
+          "role": "logic",
+          "symbol": "k_slider",
+          "anchor": "821a9674e14c",
+          "first": "def k_slider(ks: list[int], default_k: int | None = None) -> int:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/controls.py",
+          "start": 67,
+          "end": 74,
+          "role": "logic",
+          "symbol": "select_k",
+          "anchor": "fdc2b58ef9f6",
+          "first": "def select_k(ks: list[int], k: int | None) -> None:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/controls.py",
+          "start": 53,
+          "end": 64,
+          "role": "markup",
+          "symbol": "shared_umap_toggle",
+          "anchor": "e6ddb8377b4a",
+          "first": "def shared_umap_toggle() -> bool:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/mapper_tab.py",
+          "start": 257,
+          "end": 263,
+          "role": "logic",
+          "symbol": "mapper_tab",
+          "anchor": "bed3df1e219b",
+          "first": "def mapper_tab("
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/mapper_tab.py",
+          "start": 229,
+          "end": 253,
+          "role": "markup",
+          "symbol": "_render_progress",
+          "anchor": "cd4b422b1a54",
+          "first": "def _render_progress(mapper: str, run: compute.MapperRun) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "choose-k-card",
+      "level": "component",
+      "parent": "explore-page",
+      "title": "Choose K card",
+      "summary": "Plots the three criteria over K as linked line charts. Best-K buttons and clicks on the curves move the K slider, and a dialog shows the criterion-vs-criterion scatters with a Pareto filter.",
+      "views": [
+        "line chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select",
+        "zoom and pan",
+        "filter"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/spatialaim/gui/views/choose_k.py",
+          "start": 131,
+          "end": 132,
+          "role": "markup",
+          "symbol": "render_choose_k",
+          "anchor": "9d1c7623c071",
+          "first": "def render_choose_k("
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/choose_k.py",
+          "start": 43,
+          "end": 44,
+          "role": "markup",
+          "symbol": "_ksweep_scatter_dialog",
+          "anchor": "95f7b25a9076",
+          "first": "def _ksweep_scatter_dialog("
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/choose_k.py",
+          "start": 26,
+          "end": 39,
+          "role": "logic",
+          "symbol": "_pick_k_callback",
+          "anchor": "a72a1ffa80a9",
+          "first": "def _pick_k_callback(state_key: str, ks_all: list[int]):"
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/choose_k.py",
+          "start": 88,
+          "end": 98,
+          "role": "logic",
+          "symbol": "_select_k_callback",
+          "anchor": "c0e8143f6b1a",
+          "first": "def _select_k_callback(k: int, ks_all: list[int]):"
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/choose_k.py",
+          "start": 101,
+          "end": 118,
+          "role": "logic",
+          "symbol": "_best_k_rows",
+          "anchor": "97138a5d1898",
+          "first": "def _best_k_rows(score_table: pd.DataFrame) -> list[tuple[str, int, float, str]]:"
+        },
+        {
+          "file": "code/src/spatialaim/analysis/compare_ks/scoring.py",
+          "start": 13,
+          "end": 20,
+          "role": "logic",
+          "symbol": "score_table",
+          "anchor": "f2a5a8e422a9",
+          "first": "def score_table(df: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/spatialaim/analysis/compare_ks/selection.py",
+          "start": 29,
+          "end": 49,
+          "role": "logic",
+          "symbol": "pareto_mask",
+          "anchor": "94522d9f84c4",
+          "first": "def pareto_mask(table: pd.DataFrame, keys: tuple[str, ...] | None = None) -> np.ndarray:"
+        },
+        {
+          "file": "code/src/spatialaim/analysis/compare_ks/criteria.py",
+          "start": 14,
+          "end": 23,
+          "role": "data",
+          "symbol": "Criterion",
+          "anchor": "b4f78ae15087",
+          "first": "class Criterion:"
+        }
+      ]
+    },
+    {
+      "id": "mapping-maps",
+      "level": "component",
+      "parent": "explore-page",
+      "title": "UMAP and spatial maps",
+      "summary": "Draws the reference UMAP(s) and the spatial map of mapped cell types with one shared legend. The person can set a confidence threshold, colour by confidence, and export the figure.",
+      "views": [
+        "map",
+        "scatter plot"
+      ],
+      "interactions": [
+        "toggle view",
+        "select",
+        "hover for detail",
+        "parameter slider",
+        "export"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/spatialaim/gui/views/mapper_tab.py",
+          "start": 34,
+          "end": 44,
+          "role": "markup",
+          "symbol": "_headline",
+          "anchor": "3dca19d6beed",
+          "first": "def _headline("
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/mapper_tab.py",
+          "start": 164,
+          "end": 165,
+          "role": "markup",
+          "symbol": "_state_markers_card",
+          "anchor": "95396dfecb46",
+          "first": "def _state_markers_card("
+        },
+        {
+          "file": "code/src/spatialaim/gui/render/headline.py",
+          "start": 44,
+          "end": 57,
+          "role": "logic",
+          "symbol": "render_headline_figure",
+          "anchor": "de3b71efe68e",
+          "first": "def render_headline_figure("
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/cards.py",
+          "start": 22,
+          "end": 64,
+          "role": "logic",
+          "symbol": "export_popover",
+          "anchor": "8a1984eecea3",
+          "first": "def export_popover(fig, *, key: str, stem: str) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "cell-type-dialog",
+      "level": "component",
+      "parent": "explore-page",
+      "title": "Cell-type dialog",
+      "summary": "Opens on a right click on a cell type. The person names the type and switches between general, gene-expression and shape views of it.",
+      "views": [
+        "detail panel",
+        "map",
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/spatialaim/gui/views/cell_type_modal.py",
+          "start": 42,
+          "end": 50,
+          "role": "logic",
+          "symbol": "open_cell_type_dialog",
+          "anchor": "891e5957ec38",
+          "first": "def open_cell_type_dialog("
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/cell_type_modal.py",
+          "start": 88,
+          "end": 95,
+          "role": "markup",
+          "symbol": "_cell_type_dialog_body",
+          "anchor": "810da84670c7",
+          "first": "def _cell_type_dialog_body("
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/cell_type_modal.py",
+          "start": 215,
+          "end": 222,
+          "role": "markup",
+          "symbol": "_cell_type_gene_list",
+          "anchor": "e9c4c2e45a99",
+          "first": "def _cell_type_gene_list("
+        },
+        {
+          "file": "code/src/spatialaim/gui/state_names.py",
+          "start": 162,
+          "end": 168,
+          "role": "logic",
+          "symbol": "set_name",
+          "anchor": "1b8634e3e97c",
+          "first": "def set_name(output_dir: Path, k: int, state: int, name: str) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "compare-page",
+      "level": "view",
+      "parent": null,
+      "title": "Side-by-side method comparison",
+      "summary": "Puts the chosen methods' spatial maps under one reference UMAP at one K, followed by combined report cards for reconstruction, fractions, assortativity and modularity.",
+      "views": [
+        "side-by-side panes",
+        "map",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "multi-select",
+        "parameter slider",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/src/spatialaim/gui/views/pages.py",
+          "start": 214,
+          "end": 233,
+          "role": "markup",
+          "symbol": "compare_page",
+          "anchor": "ace69672c96f",
+          "first": "def compare_page(ctx: ViewContext) -> None:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/compare_tab.py",
+          "start": 32,
+          "end": 95,
+          "role": "markup",
+          "symbol": "compare_tab",
+          "anchor": "f8a78fded6f5",
+          "first": "def compare_tab(mappers: list[str], args: argparse.Namespace, ctrl: Controls) -> None:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/compare_tab.py",
+          "start": 101,
+          "end": 102,
+          "role": "logic",
+          "symbol": "_compare_sections",
+          "anchor": "67d07a342f9f",
+          "first": "def _compare_sections("
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/cards.py",
+          "start": 124,
+          "end": 160,
+          "role": "markup",
+          "symbol": "render_card_grid",
+          "anchor": "2b0df4e34a67",
+          "first": "def render_card_grid(cards: list[Card]) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "reference-page",
+      "level": "view",
+      "parent": null,
+      "title": "Single-cell reference",
+      "summary": "Shows the start clustering and computed cell types on the reference UMAPs, with marker genes, a dialog to name the cell types at this K, and the start clusters merged per type.",
+      "views": [
+        "scatter plot",
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "parameter slider",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/spatialaim/gui/views/pages.py",
+          "start": 239,
+          "end": 258,
+          "role": "markup",
+          "symbol": "reference_page",
+          "anchor": "3afc8958b16d",
+          "first": "def reference_page(ctx: ViewContext) -> None:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/reference_tab.py",
+          "start": 87,
+          "end": 178,
+          "role": "markup",
+          "symbol": "reference_tab",
+          "anchor": "a70a486666cf",
+          "first": "def reference_tab(mappers: list[str], args: argparse.Namespace, ctrl: Controls) -> None:"
+        },
+        {
+          "file": "code/src/spatialaim/gui/views/reference_tab.py",
+          "start": 32,
+          "end": 33,
+          "role": "markup",
+          "symbol": "_state_names_dialog",
+          "anchor": "9cb886b1aab0",
+          "first": "def _state_names_dialog("
+        },
+        {
+          "file": "code/src/spatialaim/gui/state_names.py",
+          "start": 133,
+          "end": 159,
+          "role": "logic",
+          "symbol": "save",
+          "anchor": "b5ee885dfacd",
+          "first": "def save(output_dir: Path, k: int, names: dict[int, str]) -> None:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "interactions",
+      "term": "parameter slider"
+    }
+  ]
+}

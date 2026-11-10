@@ -1,0 +1,737 @@
+{
+ "interface": {
+  "title": "RobustPrint Virtual Lab",
+  "field": "Materials and process engineering: 3D printing (FDM) with recycled mixed-plastic feedstock",
+  "stage_of_work": "Experiment planning, surrogate modelling and process optimisation under feedstock uncertainty, all against a synthetic simulator",
+  "what_it_is_for": "Explore how batch-to-batch variation in recycled feedstock composition affects printed-part strength and print success, train a calibrated model on a campaign of print jobs, choose robust print settings, and propose the next experiments."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "Most of the work ran on a simulated campaign generated in the browser (60 batches × 4 settings × 3 specimens = 240 jobs). I also uploaded example_experiments.csv (9 valid jobs, 6 of them failed prints with empty strength) and starter_design.csv. The design file was rejected because it has no outcome columns. Study results come from bundled pre-registered Python outputs."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Find process settings that work reliably on a variable raw material, judge how sure you can be of the outcome and how much of that uncertainty comes from the material itself, and decide which experiments to run next",
+  "specific": "Choose FDM print settings that are robust to recycled-feedstock composition variation, using a learned GP strength model and success classifier; read how confident the predicted part strength is and what share of its uncertainty comes from feedstock; and plan the next print jobs",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Explore how inputs drive outcomes in a simulator",
+    "specific": "Print bench",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Define the input material distribution and see the predicted outcome for an average and for random lots",
+      "specific": "Set the feedstock stream, composition fractions, Dirichlet consistency κ and moisture; read average-batch strength, modulus, clogging/warping risk and P(print), plus the next 48 random batches",
+      "screens": [
+       "screens/001.webp",
+       "screens/002.webp",
+       "screens/003.webp",
+       "screens/004.webp",
+       "screens/055.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose Stream 'Shifted stream (more fibre and residue)'",
+        "screens": [
+         "screens/002.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed PageDown on the Contam. slider (mix became 'Custom mix', fractions renormalised)",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Batch-to-batch consistency κ from 35 to 193 (± SDs shrank)",
+        "screens": [
+         "screens/004.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Median moisture from 0.30 to 1.30 % (hydrolysis factor ×0.29, strength 3.80 MPa)",
+        "screens": [
+         "screens/055.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Change process settings and see the effect on outcome and on its spread",
+      "specific": "Move print-setting sliders, redraw batches, hover a batch bar, and vary one setting on the response curves",
+      "screens": [
+       "screens/005.webp",
+       "screens/006.webp",
+       "screens/007.webp",
+       "screens/008.webp",
+       "screens/056.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged Nozzle temperature from 265 to 241 °C (P(print) 2 %, clogging 98 %)",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Draw new batches and hovered batch 1 (composition tooltip)",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Vary = Print speed on the response curves",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the strength curve at 49.4 mm/s (median and 5–95 % band)",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Reset under Print settings",
+        "screens": [
+         "screens/008.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Gather a training dataset",
+    "specific": "Campaign: fill the Lab notebook from a simulated Latin-hypercube campaign or an imported CSV of print jobs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Import your own measurements and check them against the data schema",
+      "specific": "Load a CSV of print jobs, Validate, read errors and warnings, then accept the valid jobs",
+      "branch": "one-of",
+      "screens": [
+       "screens/009.webp",
+       "screens/010.webp",
+       "screens/012.webp",
+       "screens/013.webp",
+       "screens/015.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "uploaded example_experiments.csv via Choose a CSV file (9 valid rows, 0 errors)",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed a bad row into Paste CSV and pressed Validate (3 errors, 2 warnings)",
+        "screens": [
+         "screens/011.webp",
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Use 9 valid jobs (Lab notebook: 9 jobs, 3 printed)",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "uploaded starter_design.csv (rejected: missing required columns)",
+        "screens": [
+         "screens/015.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Plan and run a space-filling campaign of experiments",
+      "specific": "Set batches, settings per batch and specimens per job, then Run campaign (Latin hypercube) to fill the Lab notebook",
+      "branch": "one-of",
+      "screens": [
+       "screens/016.webp",
+       "screens/017.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 60 in Batches and pressed Run campaign (240 jobs, 99 printed)",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "ticked Reveal the hidden true strength and pressed Show CSV",
+        "screens": [
+         "screens/017.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Copy CSV (clipboard held the full schema CSV)",
+        "screens": [
+         "screens/017.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Fit a predictive model and check whether its uncertainty is trustworthy",
+    "specific": "Model: train the physics-residual GP strength model and print-success classifier and score them on held-out batches",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Train the model, score it on held-out groups, and rescore it after new data arrive",
+      "specific": "Train the physics-residual GP and success classifier; read RMSE, CRPS, 90 % coverage, Brier, the predicted-vs-measured plot, the calibration curve, ARD sensitivities and the noise estimate; reopen Model after print-and-retrain rounds to read the refit scores",
+      "screens": [
+       "screens/014.webp",
+       "screens/020.webp",
+       "screens/021.webp",
+       "screens/054.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Train model on the 240-job campaign (progress bar, then RMSE 1.06, coverage 71 % 'overconfident')",
+        "screens": [
+         "screens/018.webp",
+         "screens/019.webp",
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "ticked 'against the hidden truth' on Predicted vs measured",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "after the Next-experiments print-and-retrain rounds, reopened Model to read the refit on 248 jobs (RMSE 0.76, coverage 78 %)",
+        "screens": [
+         "screens/054.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed",
+      "note": "App oddity seen on replay, not a tree error: the noise panel shows model noise SD 0.03 against a true SD of 0.0823, yet says the estimate is 'close to the true scatter'."
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Choose robust operating settings and test them on new material",
+    "specific": "Optimise and deploy",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Compare risk-aware optimisation objectives on fresh unseen lots, and see how much of each recommendation's uncertainty comes from input variation",
+      "specific": "Tick Nominal, Expected, 5 % quantile, CVaR and Chance-constrained; decide with the learned model, the perfect model, or both; read failure rate, expected utility, the recommended-settings table with its 'Uncertainty from feedstock' share per row, and the realised strength histograms",
+      "screens": [
+       "screens/027.webp",
+       "screens/028.webp",
+       "screens/031.webp",
+       "screens/033.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "ticked 5 % quantile and Chance-constrained, chose quick search, pressed Optimise and deploy",
+        "screens": [
+         "screens/022.webp",
+         "screens/023.webp",
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled the results table sideways to Expected utility, Uncertainty from feedstock and the Use buttons",
+        "screens": [
+         "screens/030.webp",
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Settings from 'the perfect model' on the strength histogram",
+        "screens": [
+         "screens/033.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed",
+      "note": "App oddity seen on replay, not a tree error: the page says every objective needs predicted print ≥ 90 %, yet several recommended rows show 82–89 %."
+     },
+     {
+      "kind": "task",
+      "general": "Stress-test the chosen settings on a shifted material supply",
+      "specific": "Tick 'deploy on a shifted stream (stress test)' with the perfect model",
+      "branch": "optional",
+      "screens": [
+       "screens/035.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose Decide with 'a perfect model', ticked the stress test, pressed Optimise and deploy (failures: Nominal 67 %, Expected 47 %, CVaR 46 %)",
+        "screens": [
+         "screens/034.webp",
+         "screens/035.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Adopt a recommended setting as the working setting",
+      "specific": "Press Use on a row to load its settings onto the Bench ticket",
+      "screens": [
+       "screens/032.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Use on the Expected/learned row (Bench now 279 °C / 80 °C / 14 mm/s, 94 % print)",
+        "screens": [
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Choose the next experiments by active learning",
+    "specific": "Next experiments: propose print jobs with an acquisition strategy, print them, retrain, and track regret",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Propose the most informative next experiments, run them, retrain, and track whether the recommendation improves",
+      "specific": "Pick a strategy and a job count, Propose experiments, then Print them and retrain or Copy as a CSV template; watch regret on 'Is it learning?'",
+      "branch": "repeat",
+      "screens": [
+       "screens/040.webp",
+       "screens/046.webp",
+       "screens/048.webp",
+       "screens/052.webp",
+       "screens/053.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Propose experiments with Targeted variance reduction, 4 jobs",
+        "screens": [
+         "screens/036.webp",
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Copy as a CSV template (NEXT-1..4 rows with empty outcome fields)",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Print them and retrain",
+        "screens": [
+         "screens/042.webp",
+         "screens/043.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Cost-aware variance reduction and pressed Propose experiments",
+        "screens": [
+         "screens/046.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered a target-blend bar (tooltip 'PET 35.1%')",
+        "screens": [
+         "screens/047.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Print them and retrain (regret 2.13 → 2.06 MPa)",
+        "screens": [
+         "screens/048.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Random and pressed Propose experiments (regret rose to about 3.1 MPa at 248 jobs)",
+        "screens": [
+         "screens/052.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Campaign (notebook now 248 jobs, 68 batches)",
+        "screens": [
+         "screens/053.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed",
+      "note": "App oddity seen on replay, not a tree error: the 'Is it learning?' chart's subtitle says 'true expected utility' while its axis plots regret. The chart only appears on the Propose after a print-and-retrain round."
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Compare against the published reference results",
+    "specific": "Study results",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Read the pre-registered study outcomes and set them beside your own run",
+      "specific": "Read E1 (robust vs nominal, Holm-corrected), E2 learning curves, E3 active-learning regret, E4 uncertainty sources and E5 Sobol indices",
+      "screens": [
+       "screens/025.webp",
+       "screens/026.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened 6 Study results",
+        "screens": [
+         "screens/025.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to E2/E3/E5 charts",
+        "screens": [
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Uncertain-input distribution editor with live outcome preview",
+   "general": "Set the mean mix of a multi-part input and how much it varies from lot to lot, then see the predicted outcome for the average lot and a sample of random lots",
+   "specific": "Feedstock panel (stream preset, five composition sliders that renormalise to 1, Dirichlet κ, median moisture) driving the Average batch cards and the 'next 48 batches' stacked bars with failed prints outlined",
+   "steps": [
+    "Pick a preset stream or edit fractions (the preset switches to 'Custom mix')",
+    "Adjust consistency κ to widen or narrow lot-to-lot spread (± SD shown beside each fraction)",
+    "Read the average-lot metrics and the reliability badge",
+    "Draw new batches and hover a bar for its composition and P(print)"
+   ],
+   "serves_tasks": [
+    "Define the input material distribution and see the predicted outcome for an average and for random lots"
+   ],
+   "screens": [
+    "screens/002.webp",
+    "screens/003.webp",
+    "screens/004.webp",
+    "screens/005.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Multiplicative loss waterfall",
+   "general": "Break a predicted quantity into a base value and a chain of multiplicative gains and losses, drawn to scale",
+   "specific": "'Where the strength goes': blend strength × fibre × inclusions × degradation/hydrolysis × bonding × porosity × raster × infill × over-extrusion, with red losses and green gains and a mechanism tooltip on each factor",
+   "steps": [
+    "Change an input (for example moisture or nozzle temperature)",
+    "Watch which factor bar grows",
+    "Hover a factor label for its mechanism"
+   ],
+   "serves_tasks": [
+    "Define the input material distribution and see the predicted outcome for an average and for random lots"
+   ],
+   "screens": [
+    "screens/001.webp",
+    "screens/055.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "One-factor response curves with uncertainty bands",
+   "general": "Sweep one control variable with the others held fixed and plot the median and 5–95 % band of the outcome and of the success probability, with the current setting marked",
+   "specific": "'Response to one setting': a Vary dropdown, a strength-vs-setting curve and a P(print succeeds) curve over 160 simulated batches, with a dashed line at the ticket value and a hover readout",
+   "steps": [
+    "Choose the variable to vary",
+    "Read where the median and band peak relative to the dashed current value",
+    "Hover for the value at a point",
+    "Change other settings and see the curves move"
+   ],
+   "serves_tasks": [
+    "Change process settings and see the effect on outcome and on its spread"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/007.webp",
+    "screens/008.webp",
+    "screens/056.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "CSV import with schema validation",
+   "general": "Upload or paste a data table, validate it against a schema with row-level errors and warnings, and accept only the valid rows",
+   "specific": "'Use your own measurements': Choose a CSV file or paste, Validate, a red/amber message list (fractions must sum to 1, range checks, boolean parsing, missing columns), then 'Use N valid jobs'",
+   "steps": [
+    "Choose a file or paste text",
+    "Press Validate",
+    "Read the errors and warnings per row",
+    "Press Use N valid jobs to load them into the notebook"
+   ],
+   "serves_tasks": [
+    "Import your own measurements and check them against the data schema"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/012.webp",
+    "screens/013.webp",
+    "screens/015.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Experiment notebook with summary, histogram and export",
+   "general": "Show a run log with summary counts, an outcome histogram, a per-row table with mini composition bars, an optional ground-truth column, and copy or view as CSV",
+   "specific": "Lab notebook: print jobs, printed successfully, batches, median strength, a strength histogram, Copy CSV / Show CSV, and 'Reveal the hidden true strength'",
+   "steps": [
+    "Run a campaign or import data",
+    "Read the summary cards and histogram",
+    "Toggle the hidden-truth column",
+    "Show or copy the CSV"
+   ],
+   "serves_tasks": [
+    "Plan and run a space-filling campaign of experiments",
+    "Import your own measurements and check them against the data schema"
+   ],
+   "screens": [
+    "screens/016.webp",
+    "screens/017.webp",
+    "screens/053.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Held-out model scorecard with calibration plot",
+   "general": "Train a probabilistic model, then score it on held-out groups with proper scoring rules, interval coverage, a predicted-vs-observed plot with intervals and a reliability curve",
+   "specific": "Train model / Retrain; 'Scored on batches it never saw' (RMSE, CRPS, 90 % coverage with an overconfident flag, Brier); Predicted vs measured with an 'against the hidden truth' toggle; Calibration; ARD sensitivities; model vs true noise",
+   "steps": [
+    "Press Train model (progress bar)",
+    "Read the held-out metrics and the coverage flag",
+    "Toggle the comparison to the hidden truth",
+    "Read the calibration curve and the sensitivity bars",
+    "Retrain after adding data"
+   ],
+   "serves_tasks": [
+    "Train the model, score it on held-out groups, and rescore it after new data arrive"
+   ],
+   "screens": [
+    "screens/020.webp",
+    "screens/021.webp",
+    "screens/054.webp"
+   ],
+   "id": "f6",
+   "check": "in_place_only",
+   "note": "App oddity, not a tree error: the noise message calls model SD 0.03 'close' to true SD 0.0823."
+  },
+  {
+   "name": "Risk-aware objective comparison on fresh lots",
+   "general": "Optimise decisions under several risk measures, evaluate each choice on many fresh random scenarios, and compare failure rate, utility and the share of uncertainty due to input variation",
+   "specific": "Optimise and deploy: objective checkboxes (nominal, expected, 5 % quantile, CVaR, chance-constrained), Decide with learned/perfect/both, search effort, fresh batches; failure-rate and utility bar charts, a recommended-settings table with an 'Uncertainty from feedstock' column, and realised strength histograms",
+   "steps": [
+    "Tick the objectives",
+    "Choose the model, search effort and number of fresh batches",
+    "Press Optimise and deploy",
+    "Compare the failure-rate and utility bars and the table, including each row's feedstock share of uncertainty",
+    "Switch the histogram between learned and perfect model settings"
+   ],
+   "serves_tasks": [
+    "Compare risk-aware optimisation objectives on fresh unseen lots, and see how much of each recommendation's uncertainty comes from input variation"
+   ],
+   "screens": [
+    "screens/027.webp",
+    "screens/031.webp",
+    "screens/033.webp"
+   ],
+   "id": "f7",
+   "check": "in_place_only",
+   "note": "App oddity, not a tree error: several rows show predicted print below the stated 90 % minimum."
+  },
+  {
+   "name": "Shifted-input stress test",
+   "general": "Re-evaluate the optimised choices on input drawn from a shifted distribution, to see how each risk measure holds up when the supply changes",
+   "specific": "'Deploy on a shifted stream (stress test)' checkbox in Optimise and deploy, run with Decide with 'a perfect model'; failure-rate and utility bars per objective",
+   "steps": [
+    "Choose the model to decide with",
+    "Tick the stress-test box",
+    "Press Optimise and deploy",
+    "Compare failure rates per objective with the unshifted run"
+   ],
+   "serves_tasks": [
+    "Stress-test the chosen settings on a shifted material supply"
+   ],
+   "screens": [
+    "screens/034.webp",
+    "screens/035.webp"
+   ],
+   "id": "n1",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Shared settings ticket with hand-off from the optimiser",
+   "general": "Keep one working set of control settings that the exploration view reads, and let a chosen recommendation be written into it in one click",
+   "specific": "Print settings on the Bench ticket (sliders and Reset); the Use button on each Optimise-and-deploy row loads that row's nozzle, bed, speed and layer values onto the ticket and switches to the Bench",
+   "steps": [
+    "Press Use on a recommended-settings row",
+    "Read the Bench ticket and average-batch metrics for the loaded settings",
+    "Adjust or Reset the settings on the Bench"
+   ],
+   "serves_tasks": [
+    "Adopt a recommended setting as the working setting",
+    "Change process settings and see the effect on outcome and on its spread"
+   ],
+   "screens": [
+    "screens/032.webp",
+    "screens/008.webp"
+   ],
+   "id": "n2",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Active-learning loop with regret tracker",
+   "general": "Propose a batch of next experiments with a chosen acquisition strategy, run them (or export a template), retrain, and plot regret across rounds",
+   "specific": "Next experiments: Strategy (targeted IVR, cost-aware IVR, max uncertainty, Latin hypercube, random), Jobs, Propose experiments, a Proposed jobs table (blend, settings, predicted strength interval, P(print), cost), Print them and retrain, Copy as a CSV template, and the 'Is it learning?' regret chart",
+   "steps": [
+    "Pick a strategy and a job count",
+    "Press Propose experiments",
+    "Copy as a CSV template, or Print them and retrain",
+    "Repeat with the same or another strategy",
+    "Read regret against the number of jobs"
+   ],
+   "serves_tasks": [
+    "Propose the most informative next experiments, run them, retrain, and track whether the recommendation improves"
+   ],
+   "screens": [
+    "screens/040.webp",
+    "screens/041.webp",
+    "screens/046.webp",
+    "screens/048.webp",
+    "screens/052.webp"
+   ],
+   "id": "f8",
+   "check": "in_place_only",
+   "note": "App oddity, not a tree error: the regret chart's subtitle says 'true expected utility' though it plots regret."
+  },
+  {
+   "name": "Pre-registered results viewer",
+   "general": "Show a fixed study's outcomes as grouped bar charts and curves with confidence intervals, plus a table of multiple-comparison-corrected differences against a reference, with significant results in bold",
+   "specific": "Study results: E1 robust vs nominal bars and Holm-corrected delta table, E2 learning curves, E3 active-learning regret curves with paired CIs, E4 uncertainty sources, E5 Sobol index bars",
+   "steps": [
+    "Open Study results",
+    "Read the E1 bars and the Holm-corrected table, noting the bold rows",
+    "Scroll to the E2, E3 and E5 charts",
+    "Switch tabs to set them beside your own run"
+   ],
+   "serves_tasks": [
+    "Read the pre-registered study outcomes and set them beside your own run"
+   ],
+   "screens": [
+    "screens/025.webp",
+    "screens/026.webp"
+   ],
+   "id": "n3"
+  }
+ ],
+ "screens_never_reached": [
+  "The Study results links (summary.csv, tests.csv, LIMITATIONS.md) and 'Source and study' point to github.com, outside the allowed server, so I did not open them."
+ ],
+ "not_done": [
+  "I did not round-trip the copied CSV template back through import with real measured outcomes filled in. The browser has no file of my own to edit, and typing a full results file by hand was beyond the action budget.",
+  "I could not import starter_design.csv as a design to plan from: the importer requires outcome columns and rejected it. Only the built-in Latin-hypercube campaign covers that framing.",
+  "Thorough (3 000) search effort, the 300 and 2 000 fresh-batch options, and the 'Maximum uncertainty' and 'Space-filling' strategies were not tried, to save actions.",
+  "I trained the model only on the simulated campaign. With only the 9 imported example jobs (3 strengths; at least 5 are needed), Train model stayed disabled (screens/014.webp).",
+  "The Optimise form's checkboxes and dropdowns reverted to defaults after I navigated away and back, though the results stayed. I noted this but did not investigate further.",
+  "The run never kept a screen of E4 (uncertainty sources) on Study results; the replay found it only in the accessibility tree, below the screenshots."
+ ],
+ "applied": [
+  "Goal labels now name judging confidence in part strength and the feedstock share of uncertainty",
+  "t6 labels and f7 now include the 'Uncertainty from feedstock' share shown in the Optimise table",
+  "Moved the Model refit (RMSE 0.76, coverage 78 %, screen 054) from t9 into t5 as a retrain-after-new-data action; t9 keeps only the Campaign 248-job check",
+  "Dropped t5's disabled-Train-model action from the tree and recorded it in not_done with screen 014",
+  "Renamed the 'Campaign step', 'Model step' and 'Next experiments' phases to describe the work done in each",
+  "Added a pre-registered results viewer feature (n3, screens 025–026)",
+  "Split the shifted-stream stress test out of f7 into its own feature (n1), carrying f7's in_place_only check",
+  "Split the Use → Bench hand-off out of f7 into a shared-settings-ticket feature (n2), carrying f7's in_place_only check",
+  "Removed t2 from f1's served tasks, since t2 is driven by the print-settings sliders",
+  "Added notes on t5/f6, t6/f7 and t9/f8 recording the app oddities: the noise message, rows below the 90 % print constraint, and the regret-chart subtitle",
+  "Left new features n3 without a check because the replay did not test them as features"
+ ],
+ "open_fixes": [
+  "Show the full feedstock/model/noise uncertainty split per recommendation, or its own task for it. The Optimise table showed only the feedstock share, and E4 was never captured on screen. A new run must scroll to and screenshot E4 and look for a per-recommendation breakdown.",
+  "Close the real-printer loop by filling outcomes into the copied next-experiments CSV template and importing it. This needs a new run with an editable file or enough action budget.",
+  "Cover the Maximum-uncertainty and Space-filling strategies, thorough search and the other fresh-batch counts. These controls were never tried.",
+  "Confirm that the settings ticket persists across every step, as the review describes. The run only shows it on the Bench and via Use."
+ ],
+ "screens_at": "pilot/public/runs/robustprint-virtual-lab/20261029-234133/",
+ "screens_filed": {
+  "screens/001.webp": "screens/001.webp",
+  "screens/009.webp": "screens/009.webp",
+  "screens/014.webp": "screens/014.webp",
+  "screens/027.webp": "screens/027.webp",
+  "screens/040.webp": "screens/040.webp",
+  "screens/025.webp": "screens/025.webp"
+ }
+}

@@ -1,0 +1,555 @@
+{
+  "schema": "astaui.card/1",
+  "id": "georesistivity-ves",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T09:36:49Z"
+  },
+  "app": {
+    "title": "GeoResistivity — Apparent Resistivity Calculator",
+    "summary": "A person records a survey's header details, then types the potential difference and current for each spacing on a digital copy of the paper sounding sheet, which comes pre-filled with the standard spacings and their geometric factors. Readings can also be imported from a CSV file after previewing it and mapping its columns. As values are typed, the interface checks each row, combines repeated readings at a position into one apparent resistivity with its spread, and draws the sounding curve on log-log axes with one segment per potential-electrode spacing. Bad readings are excluded with a required reason, and every correction is kept in a change history with undo. The result is the sounding curve as a figure, CSV files of the positions and readings, a PDF or HTML report, and a project file.",
+    "task": {
+      "text": "Turn field readings from a vertical electrical sounding into apparent resistivities per electrode spacing and a quality-checked sounding curve, ready to interpret and report.",
+      "verbs": [
+        "record",
+        "derive",
+        "clean",
+        "curate",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Readings of potential difference and current at a fixed schedule of electrode spacings for one sounding, with repeats and overlap readings, plus survey header details.",
+      "item": "a reading at one current-electrode half-spacing and potential-electrode spacing on a sounding sheet",
+      "shapes": [
+        "table",
+        "notes",
+        "versions"
+      ]
+    },
+    "stage": {
+      "text": "entering and checking sounding readings in the field or office, before curve interpretation",
+      "terms": [
+        "collect",
+        "clean",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "An editable sheet of fixed spacings drives a live positions table and a log-log sounding curve that recompute as each value is typed; row problems are listed beside them, exclusions and corrections are logged to a history with undo, and the result leaves as a figure, CSVs, a report or a project file.",
+      "views": [
+        "table view",
+        "line chart",
+        "form",
+        "summary stats",
+        "list"
+      ],
+      "interactions": [
+        "inline edit",
+        "import",
+        "accept or reject",
+        "toggle view",
+        "undo",
+        "export",
+        "filter",
+        "write notes"
+      ],
+      "patterns": [
+        "overview and detail",
+        "version history"
+      ]
+    },
+    "field": {
+      "text": "vertical electrical sounding with the Schlumberger array in applied geophysics",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "geophysics",
+        "electrical resistivity",
+        "vertical electrical sounding"
+      ]
+    },
+    "workflow": {
+      "name": "enter measurements on a fixed schedule, derive a value per position and plot the curve",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Survey details form for the sheet header; the sheet starts from the standard schedule or a saved template, or rows are imported from a CSV after preview, decimal detection and column mapping",
+          "parts": [
+            "survey-details",
+            "csv-import",
+            "project-controls"
+          ]
+        },
+        {
+          "step": "enter a reading for each position",
+          "here": "Type ΔV and I into rows of the editable sheet, with units chosen above it; K is computed per row from AB/2 and MN",
+          "parts": [
+            "field-sheet"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Repeated readings at one position are combined as K times the mean of ΔV/I, with coefficient of variation, standard error and flags",
+          "parts": [
+            "field-sheet",
+            "positions-table"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Tick Exclude with a mandatory reason; invalid or incomplete rows are listed by row and column, and the table and curve update",
+          "parts": [
+            "field-sheet",
+            "positions-table"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Log-log curve with equal decades as on bilog paper, one segment per MN, optional error bars, flagged points circled",
+          "parts": [
+            "sounding-curve"
+          ]
+        },
+        {
+          "step": "keep a record of changes",
+          "here": "Corrections, deleted rows, replaced sheets and unit changes are logged with time; undo last change; filter by row; export history",
+          "parts": [
+            "change-history"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Export the curve as PNG/SVG/PDF at standard size or bilog paper scale, points and readings CSVs, an A4 PDF or HTML report, and a project file",
+          "parts": [
+            "sounding-curve",
+            "exports-report",
+            "project-controls"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The sheet is pre-filled with the 45 standard AB/2 × MN positions of the paper Schlumberger sheet, with K computed from the exact formula",
+        "Overlap readings at the same AB/2 with the next MN are kept as separate curve segments so the shift between segments stays visible",
+        "The figure can be exported to bilog paper scale, set in millimetres per decade, so a print can be laid over master curves",
+        "Ambiguous numbers like 1,000 are rejected under a single decimal convention, and a coefficient-of-variation limit flags noisy repeated readings",
+        "The report carries a hash of the project content so two reports of the same data can be matched"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "field-sheet",
+      "level": "view",
+      "parent": null,
+      "title": "Field sheet (VES)",
+      "summary": "An editable table of spacings where the person types ΔV and I, marks exclusions with reasons, and sees row problems listed.",
+      "views": [
+        "table view",
+        "list"
+      ],
+      "interactions": [
+        "inline edit",
+        "accept or reject",
+        "write notes"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/georesistivity/app/field_sheet_view.py",
+          "start": 398,
+          "end": 461,
+          "role": "logic",
+          "symbol": "render_field_sheet",
+          "anchor": "f4b6a5a6ade8",
+          "first": "def render_field_sheet() -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/app/field_sheet_view.py",
+          "start": 73,
+          "end": 92,
+          "role": "logic",
+          "symbol": "rows_to_dataframe",
+          "anchor": "53c9c9802648",
+          "first": "def rows_to_dataframe(rows: list[SheetRow]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/georesistivity/app/field_sheet_view.py",
+          "start": 101,
+          "end": 115,
+          "role": "logic",
+          "symbol": "rows_from_dataframe",
+          "anchor": "d1c1d2fbc6a2",
+          "first": "def rows_from_dataframe(dataframe: pd.DataFrame) -> list[SheetRow]:"
+        },
+        {
+          "file": "code/src/georesistivity/app/field_sheet_view.py",
+          "start": 150,
+          "end": 164,
+          "role": "logic",
+          "symbol": "_render_settings",
+          "anchor": "6c0840ec42d1",
+          "first": "def _render_settings() -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/app/field_sheet_view.py",
+          "start": 167,
+          "end": 183,
+          "role": "logic",
+          "symbol": "_render_issues",
+          "anchor": "d32763d402bd",
+          "first": "def _render_issues(outcome: SheetOutcome) -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/field_sheet.py",
+          "start": 195,
+          "end": 200,
+          "role": "logic",
+          "symbol": "evaluate_sheet",
+          "anchor": "7f3db0379e6e",
+          "first": "def evaluate_sheet("
+        },
+        {
+          "file": "code/src/georesistivity/field_sheet.py",
+          "start": 112,
+          "end": 120,
+          "role": "data",
+          "symbol": "template_rows",
+          "anchor": "74fb1977d127",
+          "first": "def template_rows(number_format: NumberFormat = \"pt-BR\") -> list[SheetRow]:"
+        }
+      ]
+    },
+    {
+      "id": "positions-table",
+      "level": "component",
+      "parent": "field-sheet",
+      "title": "Table of positions",
+      "summary": "Shows one row per position with K, apparent resistivity, number of readings, spread and standard error, updated as values are typed.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/georesistivity/app/field_sheet_view.py",
+          "start": 118,
+          "end": 147,
+          "role": "logic",
+          "symbol": "_points_table",
+          "anchor": "5c77f216ea18",
+          "first": "def _points_table(points: tuple[PointResult, ...], number_format: NumberFormat) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/georesistivity/stacking.py",
+          "start": 37,
+          "end": 66,
+          "role": "logic",
+          "symbol": "stack",
+          "anchor": "4e47813a0d8e",
+          "first": "def stack(values: Sequence[float]) -> StackStatistics:"
+        },
+        {
+          "file": "code/src/georesistivity/survey.py",
+          "start": 104,
+          "end": 107,
+          "role": "logic",
+          "symbol": "evaluate_point",
+          "anchor": "4854e0696440",
+          "first": "def evaluate_point("
+        }
+      ]
+    },
+    {
+      "id": "sounding-curve",
+      "level": "component",
+      "parent": "field-sheet",
+      "title": "Sounding curve and figure export",
+      "summary": "Draws apparent resistivity against AB/2 on equal-decade log-log axes with one segment per MN and optional error bars, and exports it as a figure, optionally at bilog paper scale.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/georesistivity/app/field_sheet_view.py",
+          "start": 186,
+          "end": 222,
+          "role": "logic",
+          "symbol": "_render_curve",
+          "anchor": "2d470dbf2a4e",
+          "first": "def _render_curve(points: tuple[PointResult, ...], number_format: NumberFormat) -> bool:"
+        },
+        {
+          "file": "code/src/georesistivity/app/field_sheet_view.py",
+          "start": 236,
+          "end": 294,
+          "role": "logic",
+          "symbol": "_render_figure_export",
+          "anchor": "56134dd8b534",
+          "first": "def _render_figure_export(points: tuple[PointResult, ...], number_format: NumberFormat) -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/plotting.py",
+          "start": 298,
+          "end": 304,
+          "role": "logic",
+          "symbol": "create_sounding_figure",
+          "anchor": "24064917fc7c",
+          "first": "def create_sounding_figure("
+        },
+        {
+          "file": "code/src/georesistivity/figures.py",
+          "start": 106,
+          "end": 132,
+          "role": "logic",
+          "symbol": "figure_to_bytes",
+          "anchor": "b68f9d214288",
+          "first": "def figure_to_bytes(figure: \"Figure\", file_format: FigureFormat) -> bytes:"
+        }
+      ]
+    },
+    {
+      "id": "change-history",
+      "level": "component",
+      "parent": "field-sheet",
+      "title": "Change history",
+      "summary": "Lists every correction, deletion, sheet replacement and unit change with its time, lets the person undo the last change, filter by row and export the history.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "undo",
+        "filter",
+        "export"
+      ],
+      "patterns": [
+        "version history"
+      ],
+      "spans": [
+        {
+          "file": "code/src/georesistivity/app/field_sheet_view.py",
+          "start": 536,
+          "end": 598,
+          "role": "logic",
+          "symbol": "_render_history",
+          "anchor": "c48b9593864c",
+          "first": "def _render_history() -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/app/state.py",
+          "start": 324,
+          "end": 334,
+          "role": "logic",
+          "symbol": "undo_last_change",
+          "anchor": "484aa7f373e8",
+          "first": "def undo_last_change() -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/sheet_history.py",
+          "start": 160,
+          "end": 165,
+          "role": "logic",
+          "symbol": "reconcile_sheet",
+          "anchor": "13487b903bbf",
+          "first": "def reconcile_sheet("
+        }
+      ]
+    },
+    {
+      "id": "exports-report",
+      "level": "component",
+      "parent": "field-sheet",
+      "title": "Exports and VES report",
+      "summary": "Downloads the points and readings as CSV and the full sounding report as an A4 PDF or HTML page.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/georesistivity/app/field_sheet_view.py",
+          "start": 297,
+          "end": 319,
+          "role": "logic",
+          "symbol": "_render_exports",
+          "anchor": "78623c30307e",
+          "first": "def _render_exports(points: tuple[PointResult, ...]) -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/app/field_sheet_view.py",
+          "start": 486,
+          "end": 512,
+          "role": "logic",
+          "symbol": "_render_report",
+          "anchor": "9bd77a98af61",
+          "first": "def _render_report() -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/report.py",
+          "start": 392,
+          "end": 398,
+          "role": "logic",
+          "symbol": "build_report",
+          "anchor": "afb4bd5698d7",
+          "first": "def build_report("
+        }
+      ]
+    },
+    {
+      "id": "survey-details",
+      "level": "component",
+      "parent": "field-sheet",
+      "title": "Survey details",
+      "summary": "A form for the sheet header: survey name, sounding number, date, place, operator, equipment, azimuth, coordinates and notes.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "write notes"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/georesistivity/app/project_view.py",
+          "start": 149,
+          "end": 207,
+          "role": "logic",
+          "symbol": "render_survey_details",
+          "anchor": "9fa29dabdf6a",
+          "first": "def render_survey_details() -> None:"
+        }
+      ]
+    },
+    {
+      "id": "csv-import",
+      "level": "view",
+      "parent": null,
+      "title": "Import CSV",
+      "summary": "Previews a CSV file, detects its decimal convention, proposes an editable column mapping, lists rejected rows with line and reason, and replaces or appends to the sheet.",
+      "views": [
+        "table view",
+        "form",
+        "list"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/georesistivity/app/import_view.py",
+          "start": 337,
+          "end": 348,
+          "role": "logic",
+          "symbol": "render_import",
+          "anchor": "0a60fff19063",
+          "first": "def render_import() -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/app/import_view.py",
+          "start": 254,
+          "end": 334,
+          "role": "logic",
+          "symbol": "render_import_file",
+          "anchor": "2d8099fcee17",
+          "first": "def render_import_file(name: str, data: bytes) -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/app/import_view.py",
+          "start": 187,
+          "end": 201,
+          "role": "logic",
+          "symbol": "_render_preview",
+          "anchor": "adb741f1d5db",
+          "first": "def _render_preview(table: CsvTable) -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/app/import_view.py",
+          "start": 204,
+          "end": 226,
+          "role": "logic",
+          "symbol": "_render_mapping",
+          "anchor": "345e40be2424",
+          "first": "def _render_mapping(file_key: str, table: CsvTable, target: ImportTarget) -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/app/import_view.py",
+          "start": 134,
+          "end": 171,
+          "role": "logic",
+          "symbol": "apply_import",
+          "anchor": "17cc027667b3",
+          "first": "def apply_import() -> None:"
+        }
+      ]
+    },
+    {
+      "id": "project-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Project sidebar",
+      "summary": "Opens and saves project files, autosaves the session, and offers to restore earlier autosaved sessions.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/georesistivity/app/project_view.py",
+          "start": 110,
+          "end": 146,
+          "role": "logic",
+          "symbol": "render_project_controls",
+          "anchor": "fc58c4b14823",
+          "first": "def render_project_controls(project: Project) -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/app/project_view.py",
+          "start": 83,
+          "end": 107,
+          "role": "logic",
+          "symbol": "_render_recovery",
+          "anchor": "0726e5ef8fd9",
+          "first": "def _render_recovery(project: Project) -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/app/project_view.py",
+          "start": 62,
+          "end": 80,
+          "role": "logic",
+          "symbol": "autosave",
+          "anchor": "a61c8971cf93",
+          "first": "def autosave(project: Project) -> None:"
+        },
+        {
+          "file": "code/src/georesistivity/app/main.py",
+          "start": 80,
+          "end": 126,
+          "role": "logic",
+          "symbol": "render_sidebar",
+          "anchor": "bf17714f5dea",
+          "first": "def render_sidebar() -> DeltaGenerator:"
+        }
+      ]
+    }
+  ]
+}

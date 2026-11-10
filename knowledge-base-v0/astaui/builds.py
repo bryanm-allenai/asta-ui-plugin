@@ -27,7 +27,10 @@ CODE_EXT = {".html", ".htm", ".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".vue
 MAX_FILE = 1_500_000
 MAX_TOTAL = 6_000_000
 SOURCES = ("prompt log", "repo", "skill file", "Claude artifact", "Marble app")
-KINDS = ("seed", "study", "contributed", "paper")
+KINDS = ("seed", "study", "contributed", "paper", "public")
+# Kinds that come with no conversation behind them: a figure from a paper, an
+# interface found in a public repository.
+NO_PROMPTS = ("paper", "public")
 CONSENT = ("synthetic", "team", "public")
 
 
@@ -368,7 +371,7 @@ def add_build(
         raise KBError(f"kind must be one of {', '.join(KINDS)}")
     if consent not in CONSENT:
         raise KBError(f"consent must be one of {', '.join(CONSENT)}")
-    if not prompts and kind != "paper":
+    if not prompts and kind not in NO_PROMPTS:
         raise KBError("a build needs its prompts (--prompts FILE, --prompt TEXT or --session LOG)")
     if not code:
         raise KBError("a build needs its code (--code PATH, repeatable)")
@@ -437,18 +440,30 @@ def check_build(kb: KB, build_id: str) -> List[str]:
     for s in meta.get("sources") or []:
         if s not in SOURCES:
             problems.append(f"source {s!r} is not one of {', '.join(SOURCES)}")
-    if not b.prompts and prov.get("kind") != "paper":
+    if not b.prompts and prov.get("kind") not in NO_PROMPTS:
         problems.append("prompts.jsonl is empty")
     for i, t in enumerate(b.prompts, 1):
         if not isinstance(t.get("text"), str) or not t["text"].strip():
             problems.append(f"prompt {i} has no text")
-    files = b.code_files()
-    if not files:
+    files = b.code_files(fetch=False)
+    if not files and not b.remote_code():
         problems.append("code/ is empty")
     entry = meta.get("entry")
-    if entry and not (b.path / entry).is_file():
+    if entry and not (b.path / entry).is_file() and entry not in b.remote_code():
         problems.append(f"entry {entry!r} does not exist")
     return problems
+
+
+def ignore_public_code(b: Build) -> bool:
+    """A build found in a public repository keeps its code out of git: the code is
+    the repository's, at the commit build.json records, and the plugin fetches it
+    from there. Its folder's .gitignore says so."""
+    if b.kind != "public" or not (b.meta.get("source") or {}).get("repo"):
+        return False
+    f = b.path / ".gitignore"
+    if not f.is_file():
+        f.write_text("# The repository's code, at the commit in build.json; fetched from there.\ncode/\n", encoding="utf-8")
+    return True
 
 
 def slim_build(kb: KB, build_id: str, force: bool = False, dry_run: bool = False) -> Dict[str, Any]:
@@ -483,6 +498,7 @@ def slim_build(kb: KB, build_id: str, force: bool = False, dry_run: bool = False
         meta["slimmed"] = {"at": date.today().isoformat(), "kept": sorted(kept),
                            "dropped": (b.meta.get("slimmed") or {}).get("dropped", []) + dropped}
         write_json(b.path / "build.json", meta)
+        ignore_public_code(b)
         for d in sorted((b.path / "code").rglob("*"), reverse=True):
             if d.is_dir() and not any(d.iterdir()):
                 d.rmdir()

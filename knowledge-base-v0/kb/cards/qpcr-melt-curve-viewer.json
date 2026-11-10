@@ -1,0 +1,776 @@
+{
+  "schema": "astaui.card/1",
+  "id": "qpcr-melt-curve-viewer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T07:36:01Z"
+  },
+  "app": {
+    "title": "qPCR Melt Curve Viewer",
+    "summary": "A person uploads melt curve text files or a ZIP of experiment folders. The tool finds the curve files by name, pairs them into wells and shows a pairing table. The person searches and ticks the wells they want. The tool computes melt peaks (−dF/dT) for every replicate, takes the tallest-peak Tm and a peak count per well for a summary table, and plots all selected wells overlaid as well as each well's curve and peak side by side. The person can turn on outlier removal, leaving replicates out by hand or letting the tool preselect those whose Tm is too far from the well median; the table and plots then recompute. Finally they export the plots as PNG, PDF, an HTML report or one long PNG.",
+    "task": {
+      "text": "Derive each well's melt temperature from its replicate melt curves, check the replicates against each other, leave out outliers and export the plots.",
+      "verbs": [
+        "derive",
+        "compare",
+        "clean",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Instrument export files of fluorescence against temperature, one file per well holding several replicate curves as repeating X/signal column pairs, in nested experiment folders.",
+      "item": "a well with its replicate melt curves",
+      "shapes": [
+        "time series",
+        "table",
+        "hierarchy"
+      ]
+    },
+    "stage": {
+      "text": "analysing melt curves after a qPCR run, before reporting",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar holds the steps in order: upload, a search filter and a checklist of wells, plot options, outlier removal and export. Every change redraws the main column: the pairing table, a summary table with each well's Tm, an overlay of all selected wells (mean ± SD), and, for each well, the melt curve and the derived melt peak shown side by side.",
+      "views": [
+        "sidebar list",
+        "table view",
+        "line chart",
+        "small multiples",
+        "summary stats",
+        "tree view"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "filter",
+        "multi-select",
+        "toggle view",
+        "exclude and refit",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "small multiples",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "melt curve analysis of qPCR products in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "qpcr",
+        "melt curve analysis",
+        "molecular biology"
+      ]
+    },
+    "workflow": {
+      "name": "derive a characteristic value per sample from replicate curves, leaving out outlier replicates",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drop or pick TXT/TSV files or ZIPs (folders are read recursively). Melt-curve files are recognised by name, paired into wells and listed in a pairing table, with a warning for files it does not recognise.",
+          "parts": [
+            "upload-zone",
+            "results"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "An experiment tree groups wells by folder. A search box filters the well checklist, and 'Select all (filtered)' ticks every match.",
+          "parts": [
+            "well-selector"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Each replicate curve is resampled with PCHIP, smoothed with Savitzky–Golay and differentiated to −dF/dT. The summary table gives each well's median tallest-peak Tm (°C), its peak count and which replicates are included.",
+          "parts": [
+            "melt-plots",
+            "summary-table"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "An overlay of mean ± SD for all selected wells sits above per-well panels with the curve on the left and the peak on the right. Normalisation can be per well or across all selected wells, and the Y axis can be shared.",
+          "parts": [
+            "melt-plots"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "With outlier removal on, the person unticks replicates by hand, or switches to Tm deviation so that replicates beyond a °C threshold from the well median are preselected. The peaks, Tm and plots then recompute.",
+          "parts": [
+            "outlier-panel",
+            "summary-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Checkboxes choose PNG per plot, a PDF, or an interactive HTML report for the selected wells. A second button saves all plots as one long PNG.",
+          "parts": [
+            "export-panel"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The derived signal (the negative derivative of each curve) is computed from the raw curves instead of read from the instrument's own peak files, which are ignored.",
+        "Outliers are judged on one quantity from each replicate: the temperature of its tallest peak, compared with the well median against a threshold in degrees.",
+        "Files are paired into samples by fuzzy filename matching, and the pairing table shows the matching key and status.",
+        "Raw and derived curves are normalised separately, each by its own range, either per sample or across all selected samples."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Control sidebar",
+      "summary": "Holds every control in working order, from upload through well selection, plot options and outlier removal to export.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/html-version/index.html",
+          "start": 15,
+          "end": 189,
+          "role": "markup",
+          "symbol": "aside.sidebar",
+          "anchor": "a085de61f4f4",
+          "first": "<aside class=\"sidebar\">"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 43,
+          "end": 52,
+          "role": "style",
+          "symbol": ".sidebar",
+          "anchor": "83e86d31c57b",
+          "first": ".sidebar {"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 175,
+          "end": 177,
+          "role": "style",
+          "symbol": ".sidebar-section",
+          "anchor": "6745470295d8",
+          "first": ".sidebar-section {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 1787,
+          "end": 1792,
+          "role": "logic",
+          "symbol": "enableControls",
+          "anchor": "0e5eb0054c71",
+          "first": "function enableControls(enabled) {"
+        }
+      ]
+    },
+    {
+      "id": "upload-zone",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "File and ZIP upload",
+      "summary": "Takes melt curve files, folders or ZIPs by picking or drag and drop, finds the curve files, pairs them into wells and reports what it found.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/html-version/index.html",
+          "start": 23,
+          "end": 35,
+          "role": "markup",
+          "symbol": "#upload-zone",
+          "anchor": "48e7d6c6e498",
+          "first": "<label class=\"upload-zone\" id=\"upload-zone\">"
+        },
+        {
+          "file": "code/html-version/index.html",
+          "start": 44,
+          "end": 44,
+          "role": "markup",
+          "symbol": "#scan-status",
+          "anchor": "6db9a5247d8e",
+          "first": "<div id=\"scan-status\" class=\"scan-status\"></div>"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 188,
+          "end": 196,
+          "role": "style",
+          "symbol": ".upload-zone",
+          "anchor": "8f46c34cb5d2",
+          "first": ".upload-zone {"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 199,
+          "end": 202,
+          "role": "style",
+          "symbol": ".upload-zone.drag-over",
+          "anchor": "11e6bcd37c89",
+          "first": ".upload-zone.drag-over {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 2552,
+          "end": 2584,
+          "role": "logic",
+          "anchor": "f9971d1551e2",
+          "first": "function setupUpload() {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 1865,
+          "end": 1919,
+          "role": "logic",
+          "symbol": "handleFileUpload",
+          "anchor": "3e007d4638dc",
+          "first": "async function handleFileUpload(fileList) {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 1661,
+          "end": 1661,
+          "role": "logic",
+          "symbol": "rebuildExperimentFromLoadedFiles",
+          "anchor": "b7c15a04617b",
+          "first": "function rebuildExperimentFromLoadedFiles(batchMeta = {}) {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 1735,
+          "end": 1767,
+          "role": "logic",
+          "symbol": "clearAllUploadedFiles",
+          "anchor": "75fc8cc792f6",
+          "first": "function clearAllUploadedFiles() {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 532,
+          "end": 635,
+          "role": "logic",
+          "symbol": "findCurvePeakPairs",
+          "anchor": "007374bf4f8a",
+          "first": "function findCurvePeakPairs(files, minSimilarity = 0.85) {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 19,
+          "end": 75,
+          "role": "logic",
+          "symbol": "parseRepeatingXYFile",
+          "anchor": "c660511af53d",
+          "first": "function parseRepeatingXYFile(text, filename = \"\") {"
+        }
+      ]
+    },
+    {
+      "id": "well-selector",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Experiment tree, search and well checklist",
+      "summary": "Shows wells grouped by folder and lets the person filter them by text and tick which ones to analyse.",
+      "views": [
+        "tree view",
+        "list"
+      ],
+      "interactions": [
+        "search",
+        "filter",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/html-version/index.html",
+          "start": 49,
+          "end": 54,
+          "role": "markup",
+          "symbol": "#section-tree",
+          "anchor": "8ac8a7e29e43",
+          "first": "<section class=\"sidebar-section\" id=\"section-tree\">"
+        },
+        {
+          "file": "code/html-version/index.html",
+          "start": 56,
+          "end": 64,
+          "role": "markup",
+          "symbol": "#section-search",
+          "anchor": "60ff58f177d6",
+          "first": "<section class=\"sidebar-section\" id=\"section-search\">"
+        },
+        {
+          "file": "code/html-version/index.html",
+          "start": 66,
+          "end": 75,
+          "role": "markup",
+          "symbol": "#section-wells",
+          "anchor": "97aba9d056b7",
+          "first": "<section class=\"sidebar-section\" id=\"section-wells\">"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 395,
+          "end": 402,
+          "role": "style",
+          "symbol": ".well-select",
+          "anchor": "53dcbc53c660",
+          "first": ".well-select {"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 373,
+          "end": 381,
+          "role": "style",
+          "symbol": ".tree",
+          "anchor": "c2d02408668a",
+          "first": ".tree {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 1967,
+          "end": 1987,
+          "role": "logic",
+          "symbol": "renderExperimentTree",
+          "anchor": "d4652a14ead3",
+          "first": "function renderExperimentTree() {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 1989,
+          "end": 2019,
+          "role": "logic",
+          "anchor": "ba2a6ae77530",
+          "first": "function renderWellSelector() {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 1938,
+          "end": 1948,
+          "role": "logic",
+          "symbol": "getFilteredWells",
+          "anchor": "5a7dec52d9b5",
+          "first": "function getFilteredWells() {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 2586,
+          "end": 2600,
+          "role": "logic",
+          "anchor": "181cdbff5708",
+          "first": "searchInput.addEventListener(\"input\", () => {"
+        }
+      ]
+    },
+    {
+      "id": "outlier-panel",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Outlier removal",
+      "summary": "Lets the person exclude replicates per well by hand, or preselects those whose tallest-peak Tm is too far from the well median.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "exclude and refit",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/html-version/index.html",
+          "start": 134,
+          "end": 163,
+          "role": "markup",
+          "symbol": "#section-outlier",
+          "anchor": "6c0c94caa66a",
+          "first": "<section class=\"sidebar-section\" id=\"section-outlier\">"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 352,
+          "end": 360,
+          "role": "style",
+          "symbol": ".replicate-list",
+          "anchor": "64d9328c494a",
+          "first": ".replicate-list {"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 347,
+          "end": 350,
+          "role": "style",
+          "symbol": ".option-group.disabled",
+          "anchor": "25472149ebc7",
+          "first": ".option-group.disabled {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 2057,
+          "end": 2102,
+          "role": "logic",
+          "anchor": "518776e21ed6",
+          "first": "function renderManualReplicates() {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 1960,
+          "end": 1965,
+          "role": "logic",
+          "symbol": "syncAutoExclusions",
+          "anchor": "7c4235224284",
+          "first": "function syncAutoExclusions() {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 720,
+          "end": 729,
+          "role": "logic",
+          "symbol": "computeAutoExcluded",
+          "anchor": "3512265fb575",
+          "first": "function computeAutoExcluded(well, method, tmThresholdC = 0.5) {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 691,
+          "end": 703,
+          "role": "logic",
+          "symbol": "detectTmOutliers",
+          "anchor": "e4caa068c895",
+          "first": "function detectTmOutliers(peakSeries, thresholdC = 0.5) {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 2649,
+          "end": 2674,
+          "role": "logic",
+          "anchor": "476147981ede",
+          "first": "$(\"#opt-outlier-enable\").addEventListener(\"change\", (e) => {"
+        }
+      ]
+    },
+    {
+      "id": "export-panel",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Export",
+      "summary": "Saves the selected wells' plots as PNGs, a PDF, an interactive HTML report or one long PNG.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/html-version/index.html",
+          "start": 165,
+          "end": 185,
+          "role": "markup",
+          "symbol": "#section-export",
+          "anchor": "21ceb054823b",
+          "first": "<section class=\"sidebar-section\" id=\"section-export\">"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 432,
+          "end": 443,
+          "role": "style",
+          "symbol": ".btn-export",
+          "anchor": "58093dc0d433",
+          "first": ".btn-export {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 2244,
+          "end": 2385,
+          "role": "logic",
+          "anchor": "43b820fff6ab",
+          "first": "async function exportSelected() {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 2490,
+          "end": 2531,
+          "role": "logic",
+          "anchor": "2e2ccaff294b",
+          "first": "async function downloadAllPlotsLongPNG() {"
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "level": "view",
+      "parent": null,
+      "title": "Results column with pairing table",
+      "summary": "The main column, which appears once data is loaded and starts with a collapsible table of curve files, their pairing keys and status.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/html-version/index.html",
+          "start": 210,
+          "end": 267,
+          "role": "markup",
+          "symbol": "#results-panel",
+          "anchor": "116da3608a7c",
+          "first": "<div id=\"results-panel\" class=\"hidden\">"
+        },
+        {
+          "file": "code/html-version/index.html",
+          "start": 211,
+          "end": 233,
+          "role": "markup",
+          "symbol": "#pairing-card",
+          "anchor": "5bfa5c879e44",
+          "first": "<div class=\"card\" id=\"pairing-card\">"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 504,
+          "end": 511,
+          "role": "style",
+          "symbol": ".card",
+          "anchor": "56b710b8b182",
+          "first": ".card {"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 535,
+          "end": 539,
+          "role": "style",
+          "symbol": "table.data-table",
+          "anchor": "72b1d9b981ac",
+          "first": "table.data-table {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 2020,
+          "end": 2031,
+          "role": "logic",
+          "anchor": "115ccb460d46",
+          "first": "function renderPairingTable() {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 2231,
+          "end": 2243,
+          "role": "logic",
+          "anchor": "f9d8edecb6e0",
+          "first": "function renderAll() {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 1769,
+          "end": 1785,
+          "role": "logic",
+          "symbol": "renderUnrecognizedWarning",
+          "anchor": "acc2c8b1c802",
+          "first": "function renderUnrecognizedWarning() {"
+        }
+      ]
+    },
+    {
+      "id": "summary-table",
+      "level": "component",
+      "parent": "results",
+      "title": "Per-well Tm summary",
+      "summary": "Lists each selected well's replicates, which are included or excluded, the median tallest-peak Tm and the number of peaks.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/html-version/index.html",
+          "start": 239,
+          "end": 251,
+          "role": "markup",
+          "symbol": "#summary-table",
+          "anchor": "1109614d8946",
+          "first": "<table class=\"data-table\" id=\"summary-table\">"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 2032,
+          "end": 2056,
+          "role": "logic",
+          "anchor": "9e276b9bea73",
+          "first": "function renderSummaryTable() {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 440,
+          "end": 459,
+          "role": "logic",
+          "symbol": "computePeakSummary",
+          "anchor": "b3637dec4889",
+          "first": "function computePeakSummary(peakSeries) {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 423,
+          "end": 433,
+          "role": "logic",
+          "symbol": "tallestPeakTmForReplicate",
+          "anchor": "fd8bd1ae4eec",
+          "first": "function tallestPeakTmForReplicate(series) {"
+        },
+        {
+          "file": "code/html-version/js/peak-detection.js",
+          "start": 82,
+          "end": 102,
+          "role": "logic",
+          "symbol": "findMeltPeaks",
+          "anchor": "5f880ae481a1",
+          "first": "function findMeltPeaks(y) {"
+        }
+      ]
+    },
+    {
+      "id": "melt-plots",
+      "level": "component",
+      "parent": "results",
+      "title": "Melt curve and melt peak plots",
+      "summary": "Overlays all selected wells as mean ± SD, then shows each well's melt curve beside its derived −dF/dT peak, under the chosen replicate, averaging and normalisation options.",
+      "views": [
+        "line chart",
+        "small multiples",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "overview and detail",
+        "small multiples",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/html-version/index.html",
+          "start": 256,
+          "end": 266,
+          "role": "markup",
+          "symbol": "#plots-area",
+          "anchor": "cbb9683c7ee8",
+          "first": "<div id=\"plots-area\">"
+        },
+        {
+          "file": "code/html-version/index.html",
+          "start": 77,
+          "end": 132,
+          "role": "markup",
+          "symbol": "#section-plot",
+          "anchor": "c60ba4892b5f",
+          "first": "<section class=\"sidebar-section\" id=\"section-plot\">"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 599,
+          "end": 605,
+          "role": "style",
+          "symbol": ".well-plot-row",
+          "anchor": "66d1aecbf02a",
+          "first": ".well-plot-row {"
+        },
+        {
+          "file": "code/html-version/styles.css",
+          "start": 588,
+          "end": 593,
+          "role": "style",
+          "symbol": ".summary-plot-row",
+          "anchor": "1cce58291b45",
+          "first": ".summary-plot-row {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 2155,
+          "end": 2209,
+          "role": "logic",
+          "anchor": "7a9f117154d1",
+          "first": "async function renderPlots() {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 1292,
+          "end": 1332,
+          "role": "logic",
+          "symbol": "renderSummaryPlots",
+          "anchor": "04e4f97c6f4a",
+          "first": "async function renderSummaryPlots(selectedWells, containerEl, options) {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 1373,
+          "end": 1480,
+          "role": "logic",
+          "symbol": "renderWellPlots",
+          "anchor": "ca690e9244d7",
+          "first": "function renderWellPlots(well, containerEl, options) {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 166,
+          "end": 193,
+          "role": "logic",
+          "symbol": "getNormalizationBounds",
+          "anchor": "4482c7d61dbe",
+          "first": "function getNormalizationBounds(selectedWells, dataType, mode, getExcludedForWell) {"
+        },
+        {
+          "file": "code/html-version/app.js",
+          "start": 2611,
+          "end": 2635,
+          "role": "logic",
+          "anchor": "15b6f584b821",
+          "first": "function syncNormOptionsUI() {"
+        },
+        {
+          "file": "code/html-version/js/melt-pipeline.js",
+          "start": 446,
+          "end": 446,
+          "role": "logic",
+          "symbol": "processWellReplicates",
+          "anchor": "42608299ff1d",
+          "first": "function processWellReplicates(seriesList, options = {}) {"
+        }
+      ]
+    }
+  ]
+}

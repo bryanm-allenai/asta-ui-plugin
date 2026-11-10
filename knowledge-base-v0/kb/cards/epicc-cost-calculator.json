@@ -1,0 +1,692 @@
+{
+  "schema": "astaui.card/1",
+  "id": "epicc-cost-calculator",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T19:16:13Z"
+  },
+  "app": {
+    "title": "Epidemiological Cost Calculator (EPICC)",
+    "summary": "The person picks a cost model from a list, or loads their own model file. They adjust its grouped parameters, stack presets or a saved parameter file on top, and set up several named scenarios that each have their own values. They run the model, which evaluates its equations once per scenario and fills in a report of prose, tables with scenarios as columns, and charts. They then save the changed parameters as a YAML or Excel preset, export the report as a PDF or DOCX, or share the calculation through the URL in the address bar. A tabbed editor lets them change the model itself (parameters, equations, scenarios, report blocks, presets) and try the edited version in the calculator before saving it.",
+    "task": {
+      "text": "Estimate what an outbreak and the public health response to it cost under several alternative scenarios, so a policy choice can be compared and justified.",
+      "verbs": [
+        "derive",
+        "compare",
+        "decide",
+        "write"
+      ]
+    },
+    "data": {
+      "text": "A model document of typed parameters with defaults, ranges, units and references, plus ordered equations, named scenarios that override some parameters, presets, and report blocks. The output is a set of computed values for each scenario.",
+      "item": "a cost or epidemiological parameter of a model, with its default, range, unit and source",
+      "shapes": [
+        "table",
+        "hierarchy",
+        "document"
+      ]
+    },
+    "stage": {
+      "text": "estimating and comparing intervention costs across scenarios to support a public health policy decision",
+      "terms": [
+        "analyze",
+        "compare",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "The parameter form drives the model. Presets, scenarios and edited values change its inputs, and Run evaluates the equations and fills in a report pane beside the form, with one column per scenario in its tables and charts. Every change is also written into the URL, and the report and the parameters can each be exported. A separate tabbed editor changes the model itself and can be tried live in the calculator.",
+      "views": [
+        "form",
+        "table view",
+        "bar chart",
+        "line chart",
+        "document reader",
+        "text editor"
+      ],
+      "interactions": [
+        "select",
+        "inline edit",
+        "import",
+        "export",
+        "toggle view",
+        "undo"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "master-detail"
+      ]
+    },
+    "field": {
+      "text": "scenario-based outbreak cost estimation in public health epidemiology",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "epidemiology",
+        "public health",
+        "cost estimation"
+      ]
+    },
+    "workflow": {
+      "name": "compute and compare outcomes of a parameterised model across scenarios",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pick a bundled model from the 'Select a model...' box, or load a custom model YAML through 'Load Custom Model', which accepts a file, a URL or pasted code. A shared link can also open a model with its values already filled in.",
+          "parts": [
+            "model-picker",
+            "permalink"
+          ]
+        },
+        {
+          "step": "set the inputs for the computation",
+          "here": "Edit the parameters, grouped in nested expanders and each with help text, a unit and a range. Stack built-in presets or a preset uploaded from a file, and reorder them with the up and down arrows. 'Reset to Preset' undoes edits.",
+          "parts": [
+            "parameter-panel",
+            "preset-stack"
+          ]
+        },
+        {
+          "step": "define the alternatives to compare",
+          "here": "In the Scenarios expander, label each scenario, set its own variables, and add or remove scenarios within a minimum and maximum count.",
+          "parts": [
+            "scenario-editor"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Run Simulation' (disabled while any input has an error) evaluates the model's equations in dependency order for each scenario.",
+          "parts": [
+            "parameter-panel"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "The report pane renders the model's markdown, tables with one column per scenario, and bar, stacked-bar, line or pie charts.",
+          "parts": [
+            "results-report"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Save Changes as Preset' downloads the changed parameters as YAML or XLSX. The report exports as a print-to-PDF or a DOCX file, and the URL keeps only the values that differ from the defaults.",
+          "parts": [
+            "report-export",
+            "permalink",
+            "parameter-panel"
+          ]
+        },
+        {
+          "step": "revise the model and try it",
+          "here": "'Open Model Editor' has tabs for metadata, parameters, equations, scenarios, report and presets. The edited model is validated, and 'Try in Calculator' runs it without saving.",
+          "parts": [
+            "model-editor"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Models are declarative documents (parameters, equations, scenarios, report layout), compiled at runtime. Their equations are checked against a restricted syntax before they are evaluated.",
+        "Each parameter carries its unit, its allowed range and its literature references, so every figure in the report can be traced to a source.",
+        "Presets stack in an ordered list, and a parameter file can be uploaded as one more layer. The panel tracks which values differ from the model's defaults.",
+        "The address bar is a readable, hand-editable permalink that stores only the changes from the defaults. Values out of range are clamped, and the app shows a warning about them.",
+        "Parameter files can be written and read as YAML or as Excel spreadsheets, for people who work in spreadsheets."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "model-picker",
+      "level": "view",
+      "parent": null,
+      "title": "Model selector and custom model loader",
+      "summary": "Chooses which cost model to work with, or loads a custom model from a file, a URL or pasted YAML.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/epicc/__main__.py",
+          "start": 191,
+          "end": 221,
+          "role": "markup",
+          "anchor": "37ed3e562a8e",
+          "first": "hdr_title, hdr_controls = st.columns([3, 4.25])"
+        },
+        {
+          "file": "code/src/epicc/ui/model_loader.py",
+          "start": 54,
+          "end": 157,
+          "role": "logic",
+          "symbol": "_load_model_dialog",
+          "anchor": "47c0b2d235fe",
+          "first": "def _load_model_dialog() -> None:"
+        },
+        {
+          "file": "code/src/epicc/ui/model_loader.py",
+          "start": 160,
+          "end": 168,
+          "role": "markup",
+          "symbol": "render_load_model_button",
+          "anchor": "439f9fcefc94",
+          "first": "def render_load_model_button(container: Any = None) -> None:"
+        },
+        {
+          "file": "code/src/epicc/model/models/__init__.py",
+          "start": 22,
+          "end": 36,
+          "role": "logic",
+          "symbol": "get_all_models",
+          "anchor": "e1527d427aa9",
+          "first": "def get_all_models() -> list[BaseSimulationModel]:"
+        },
+        {
+          "file": "code/src/epicc/model/models/tb_isolation.yaml",
+          "start": 1,
+          "end": 40,
+          "role": "data",
+          "anchor": "fd638acf6984",
+          "first": "title: \"TB Isolation Cost Estimation\""
+        }
+      ]
+    },
+    {
+      "id": "parameter-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Parameter panel",
+      "summary": "Shows the model's parameters as typed, grouped inputs with help text and ranges, tracks which ones differ from the defaults, and holds the run, save-preset and reset buttons.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "undo"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/epicc/__main__.py",
+          "start": 353,
+          "end": 440,
+          "role": "markup",
+          "anchor": "4f24f040f983",
+          "first": "param_col, result_col = st.columns([2, 3], gap=\"large\")"
+        },
+        {
+          "file": "code/src/epicc/ui/parameters.py",
+          "start": 736,
+          "end": 742,
+          "role": "logic",
+          "symbol": "render_sidebar_parameters",
+          "anchor": "151dcd238857",
+          "first": "def render_sidebar_parameters("
+        },
+        {
+          "file": "code/src/epicc/ui/parameters.py",
+          "start": 185,
+          "end": 193,
+          "role": "logic",
+          "symbol": "_render_group_node",
+          "anchor": "24e6dfbd5307",
+          "first": "def _render_group_node("
+        },
+        {
+          "file": "code/src/epicc/ui/parameters.py",
+          "start": 70,
+          "end": 77,
+          "role": "logic",
+          "symbol": "_render_spec_widget",
+          "anchor": "48ebceab97fc",
+          "first": "def _render_spec_widget("
+        },
+        {
+          "file": "code/src/epicc/ui/parameters.py",
+          "start": 248,
+          "end": 252,
+          "role": "logic",
+          "symbol": "reset_parameters_to_defaults",
+          "anchor": "9aa12c36b7ce",
+          "first": "def reset_parameters_to_defaults("
+        },
+        {
+          "file": "code/src/epicc/ui/parameters.py",
+          "start": 533,
+          "end": 536,
+          "role": "logic",
+          "symbol": "_compute_dirty_state",
+          "anchor": "2ccda7071d6c",
+          "first": "def _compute_dirty_state("
+        },
+        {
+          "file": "code/src/epicc/web/sidebar.css",
+          "start": 264,
+          "end": 271,
+          "role": "style",
+          "symbol": ".st-key-parameter-panel",
+          "anchor": "267b021673e2",
+          "first": ".st-key-parameter-panel {"
+        },
+        {
+          "file": "code/src/epicc/model/evaluator.py",
+          "start": 117,
+          "end": 152,
+          "role": "logic",
+          "symbol": "evaluate_all",
+          "anchor": "8202efba0b03",
+          "first": "def evaluate_all(self, context: dict[str, Any]) -> dict[str, Any]:"
+        }
+      ]
+    },
+    {
+      "id": "preset-stack",
+      "level": "component",
+      "parent": "parameter-panel",
+      "title": "Preset stack",
+      "summary": "Layers built-in presets or a preset uploaded from a saved parameter file over the defaults, in an order that can be rearranged.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "select",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/epicc/ui/parameters.py",
+          "start": 599,
+          "end": 602,
+          "role": "logic",
+          "symbol": "_render_preset_controls_inline",
+          "anchor": "29df26c2e068",
+          "first": "def _render_preset_controls_inline("
+        },
+        {
+          "file": "code/src/epicc/model/parameters.py",
+          "start": 41,
+          "end": 44,
+          "role": "logic",
+          "symbol": "parse_preset_from_file",
+          "anchor": "a78724235883",
+          "first": "def parse_preset_from_file("
+        }
+      ]
+    },
+    {
+      "id": "scenario-editor",
+      "level": "component",
+      "parent": "parameter-panel",
+      "title": "Scenario editor",
+      "summary": "Lets the person name each scenario, set the variables that differ between scenarios, and add or remove scenarios.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/src/epicc/ui/parameters.py",
+          "start": 443,
+          "end": 447,
+          "role": "logic",
+          "symbol": "_render_scenario_editor",
+          "anchor": "c03881b5e3bb",
+          "first": "def _render_scenario_editor("
+        },
+        {
+          "file": "code/src/epicc/ui/parameters.py",
+          "start": 419,
+          "end": 421,
+          "role": "logic",
+          "symbol": "_collect_scenario_overrides",
+          "anchor": "19f15c977a95",
+          "first": "def _collect_scenario_overrides("
+        },
+        {
+          "file": "code/src/epicc/ui/parameters.py",
+          "start": 405,
+          "end": 408,
+          "role": "logic",
+          "symbol": "reset_scenario_state",
+          "anchor": "cbf343bfc71d",
+          "first": "def reset_scenario_state("
+        }
+      ]
+    },
+    {
+      "id": "results-report",
+      "level": "view",
+      "parent": null,
+      "title": "Results report",
+      "summary": "Fills in the model's report after a run: prose, tables with one column per scenario, and bar, stacked-bar, line or pie charts.",
+      "views": [
+        "document reader",
+        "table view",
+        "bar chart",
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/src/epicc/__main__.py",
+          "start": 442,
+          "end": 466,
+          "role": "markup",
+          "anchor": "056d3a87aadb",
+          "first": "with result_col:"
+        },
+        {
+          "file": "code/src/epicc/ui/report.py",
+          "start": 392,
+          "end": 420,
+          "role": "logic",
+          "symbol": "get_report_renderer",
+          "anchor": "b978c4a2bdad",
+          "first": "def get_report_renderer(model: Any) -> ReportRenderer:"
+        },
+        {
+          "file": "code/src/epicc/ui/report.py",
+          "start": 363,
+          "end": 389,
+          "role": "logic",
+          "symbol": "ReportRenderer",
+          "anchor": "ad61818bd9d4",
+          "first": "class ReportRenderer:"
+        },
+        {
+          "file": "code/src/epicc/ui/report.py",
+          "start": 56,
+          "end": 116,
+          "role": "logic",
+          "symbol": "TableBlockRenderer",
+          "anchor": "95f2bc100409",
+          "first": "class TableBlockRenderer(BlockRenderer):"
+        },
+        {
+          "file": "code/src/epicc/ui/report.py",
+          "start": 144,
+          "end": 351,
+          "role": "logic",
+          "symbol": "GraphBlockRenderer",
+          "anchor": "8ba33797a78c",
+          "first": "class GraphBlockRenderer(BlockRenderer):"
+        },
+        {
+          "file": "code/src/epicc/web/sidebar.css",
+          "start": 282,
+          "end": 287,
+          "role": "style",
+          "symbol": ".st-key-results-report",
+          "anchor": "a2b93fc62d61",
+          "first": ".st-key-results-report {"
+        }
+      ]
+    },
+    {
+      "id": "report-export",
+      "level": "component",
+      "parent": "results-report",
+      "title": "Report and parameter export",
+      "summary": "Prints the report to PDF once its charts have drawn, builds a DOCX version, and saves the changed parameters as a YAML or Excel preset.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/epicc/__main__.py",
+          "start": 467,
+          "end": 477,
+          "role": "markup",
+          "anchor": "2d03200b3fbf",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/src/epicc/ui/export.py",
+          "start": 117,
+          "end": 132,
+          "role": "logic",
+          "symbol": "render_pdf_export_button",
+          "anchor": "ce5ba70d2c93",
+          "first": "def render_pdf_export_button(container: Any = None) -> None:"
+        },
+        {
+          "file": "code/src/epicc/ui/export.py",
+          "start": 135,
+          "end": 174,
+          "role": "logic",
+          "symbol": "trigger_print_if_requested",
+          "anchor": "5cf47ad93d65",
+          "first": "def trigger_print_if_requested() -> None:"
+        },
+        {
+          "file": "code/src/epicc/ui/export.py",
+          "start": 177,
+          "end": 180,
+          "role": "logic",
+          "symbol": "render_docx_export_button",
+          "anchor": "bd12c011b57d",
+          "first": "def render_docx_export_button("
+        },
+        {
+          "file": "code/src/epicc/ui/export.py",
+          "start": 24,
+          "end": 28,
+          "role": "logic",
+          "symbol": "_export_dialog",
+          "anchor": "1bbdc4b54fd1",
+          "first": "def _export_dialog("
+        },
+        {
+          "file": "code/src/epicc/ui/export.py",
+          "start": 81,
+          "end": 88,
+          "role": "logic",
+          "symbol": "render_parameter_export_modal",
+          "anchor": "d4a570455f0e",
+          "first": "def render_parameter_export_modal("
+        },
+        {
+          "file": "code/src/epicc/ui/report_exports.py",
+          "start": 137,
+          "end": 146,
+          "role": "logic",
+          "symbol": "build_report_docx_bytes",
+          "anchor": "447c8fae7855",
+          "first": "def build_report_docx_bytes(report_payload: dict[str, Any]) -> bytes:"
+        },
+        {
+          "file": "code/src/epicc/js/print_results.js",
+          "start": 55,
+          "end": 75,
+          "role": "logic",
+          "symbol": "whenReadyToPrint",
+          "anchor": "e8015415192d",
+          "first": "function whenReadyToPrint() {"
+        },
+        {
+          "file": "code/src/epicc/web/sidebar.css",
+          "start": 380,
+          "end": 566,
+          "role": "style",
+          "symbol": "@media print",
+          "anchor": "43aba504f6da",
+          "first": "@media print {"
+        }
+      ]
+    },
+    {
+      "id": "permalink",
+      "level": "component",
+      "parent": "parameter-panel",
+      "title": "Shareable URL state",
+      "summary": "Writes the model and every value that differs from the defaults into a readable query string, and restores them from a link, with warnings for values it cannot accept.",
+      "views": [],
+      "interactions": [
+        "export",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/epicc/ui/url_params.py",
+          "start": 575,
+          "end": 578,
+          "role": "logic",
+          "symbol": "write_url_state",
+          "anchor": "10f4d7b409cb",
+          "first": "def write_url_state("
+        },
+        {
+          "file": "code/src/epicc/ui/url_params.py",
+          "start": 532,
+          "end": 535,
+          "role": "logic",
+          "symbol": "read_url_state",
+          "anchor": "516dbf35c573",
+          "first": "def read_url_state("
+        },
+        {
+          "file": "code/src/epicc/ui/url_params.py",
+          "start": 279,
+          "end": 282,
+          "role": "logic",
+          "symbol": "encode_state",
+          "anchor": "15e8440b4878",
+          "first": "def encode_state("
+        },
+        {
+          "file": "code/src/epicc/ui/url_params.py",
+          "start": 371,
+          "end": 373,
+          "role": "logic",
+          "symbol": "decode_state",
+          "anchor": "92add5dc13d5",
+          "first": "def decode_state("
+        },
+        {
+          "file": "code/src/epicc/__main__.py",
+          "start": 100,
+          "end": 161,
+          "role": "logic",
+          "anchor": "16d6ebd8172e",
+          "first": "# Restore model selection and parameters from URL query string on first load."
+        }
+      ]
+    },
+    {
+      "id": "model-editor",
+      "level": "view",
+      "parent": null,
+      "title": "Model editor",
+      "summary": "Uses tabs to edit a model's metadata, parameters and groups, equations, scenarios, report blocks and presets, validates the result, and lets the person try the edited model in the calculator without saving.",
+      "views": [
+        "form",
+        "text editor",
+        "tree view"
+      ],
+      "interactions": [
+        "inline edit",
+        "import",
+        "export",
+        "toggle view"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/epicc/ui/editor.py",
+          "start": 1222,
+          "end": 1225,
+          "role": "logic",
+          "symbol": "render_model_editor",
+          "anchor": "d50db0fc6051",
+          "first": "def render_model_editor("
+        },
+        {
+          "file": "code/src/epicc/ui/editor.py",
+          "start": 294,
+          "end": 349,
+          "role": "logic",
+          "symbol": "_render_parameters_tab",
+          "anchor": "2c39afb34b77",
+          "first": "def _render_parameters_tab(doc: dict[str, Any]) -> None:"
+        },
+        {
+          "file": "code/src/epicc/ui/editor.py",
+          "start": 657,
+          "end": 686,
+          "role": "logic",
+          "symbol": "_render_equations_tab",
+          "anchor": "8526e3fa4553",
+          "first": "def _render_equations_tab(doc: dict[str, Any]) -> None:"
+        },
+        {
+          "file": "code/src/epicc/ui/editor.py",
+          "start": 755,
+          "end": 787,
+          "role": "logic",
+          "symbol": "_render_scenarios_tab",
+          "anchor": "54647132c626",
+          "first": "def _render_scenarios_tab(doc: dict[str, Any]) -> None:"
+        },
+        {
+          "file": "code/src/epicc/ui/editor.py",
+          "start": 862,
+          "end": 891,
+          "role": "logic",
+          "symbol": "_render_report_tab",
+          "anchor": "13eba21d86fd",
+          "first": "def _render_report_tab(doc: dict[str, Any]) -> None:"
+        },
+        {
+          "file": "code/src/epicc/ui/editor.py",
+          "start": 148,
+          "end": 181,
+          "role": "logic",
+          "symbol": "_validate",
+          "anchor": "fd200f9ba423",
+          "first": "def _validate(doc: dict[str, Any]) -> Model | list[ValidationIssue]:"
+        },
+        {
+          "file": "code/src/epicc/__main__.py",
+          "start": 164,
+          "end": 184,
+          "role": "logic",
+          "symbol": "_activate_preview",
+          "anchor": "7034e872e44e",
+          "first": "def _activate_preview(model_label: str) -> bool:"
+        },
+        {
+          "file": "code/src/epicc/__main__.py",
+          "start": 300,
+          "end": 331,
+          "role": "markup",
+          "anchor": "bd20531b27f5",
+          "first": "if st.session_state.get(_EDITOR_MODE_KEY):"
+        }
+      ]
+    }
+  ]
+}

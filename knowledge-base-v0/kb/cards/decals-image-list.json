@@ -1,0 +1,529 @@
+{
+  "schema": "astaui.card/1",
+  "id": "decals-image-list",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T16:56:55Z"
+  },
+  "app": {
+    "title": "Cutout Image List Tool for DESI Legacy Imaging Surveys and More",
+    "summary": "A person pastes a table of sky coordinates, picks a survey image layer and a cutout size, and gets a grid with one image cutout per row. Pointing at a cutout shows that row's values, and clicking one opens it in the full sky viewer. With marking turned on, clicking a cutout marks or unmarks it. Record marks then writes the table back into the paste box with a true/false marked column, ready to copy out or paste in again later.",
+    "task": {
+      "text": "Look at a sky image of every object in a coordinate list and mark the ones that pass inspection, so the selection can be written back to the table.",
+      "verbs": [
+        "identify",
+        "triage",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A table of objects with sky coordinates and other columns, shown as image cutouts fetched from sky survey services, plus a yes/no mark on each object",
+      "item": "one catalog row (an object at a right ascension and declination) shown as one image cutout",
+      "shapes": [
+        "table",
+        "image collection",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "visually inspecting catalog candidates during target selection, before follow-up",
+      "terms": [
+        "review"
+      ]
+    },
+    "mechanism": {
+      "text": "The pasted table is parsed into a grid of cutouts, and the layer and size controls swap the images in place. With marking on, clicks toggle a flag on each tile, and Record marks writes the flags back into the same text box as a new column. Pasting that table again brings the marks back.",
+      "views": [
+        "form",
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "hover for detail",
+        "multi-select"
+      ],
+      "patterns": [
+        "round trip table"
+      ]
+    },
+    "field": {
+      "text": "visual inspection of imaging-survey cutouts for target selection in astronomy",
+      "disciplines": [
+        "astronomy"
+      ],
+      "terms": [
+        "target selection",
+        "imaging surveys",
+        "visual inspection"
+      ]
+    },
+    "workflow": {
+      "name": "mark items by eye in an image grid and write the marks back to the table",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Paste a space-, tab- or comma-separated table into the text box. The RA and Dec columns are found by header name (many aliases) or by position, and an optional last 'marked' column brings back earlier marks. The table can also come in through a URL parameter.",
+          "parts": [
+            "input-form"
+          ]
+        },
+        {
+          "step": "choose how each item is shown",
+          "here": "A dropdown picks the image source: Legacy Surveys image, model or residual layers, unWISE, SDSS, DES, HSC, GALEX, dust maps, VLASS or DSS. A number field sets the cutout side length in arcminutes. Changing either one swaps the images in place and keeps the marks.",
+          "parts": [
+            "source-controls"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "One 180-pixel cutout per row in a responsive grid. Images load lazily and failed loads are retried. Pointing at a cutout shows all of its row's values, and clicking opens that position in the survey's full sky viewer.",
+          "parts": [
+            "cutout-grid"
+          ]
+        },
+        {
+          "step": "mark the items that pass inspection",
+          "here": "Ticking 'Enable marking' makes a click toggle a blue border on a cutout, while Ctrl-click still opens the sky viewer. The text box is locked while marking is on.",
+          "parts": [
+            "marking"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Record marks' rewrites the text box as the original table plus a marked column of true/false. The page warns before closing if some marks have not been recorded.",
+          "parts": [
+            "record-marks"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Images are not uploaded: each cutout is fetched live from a sky survey cutout service, using the row's coordinates and an angular size in arcminutes",
+        "The same objects can be checked in image, model and residual layers, or in other surveys, without losing marks, because switching layers only rewrites the image URLs",
+        "The output is the input table with one added true/false column, so the marks go back to the catalog and can be loaded again later",
+        "A URL option rotates and flips each cutout at random, so the inspection is less biased by orientation"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "input-form",
+      "level": "view",
+      "parent": null,
+      "title": "Coordinate list box",
+      "summary": "Takes a pasted table of sky coordinates, works out its delimiter, header and RA/Dec columns, and later receives the table with marks written back.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "round trip table"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 111,
+          "end": 183,
+          "role": "markup",
+          "symbol": "#form",
+          "anchor": "b4eb0d7cd128",
+          "first": "<div id=\"form\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 29,
+          "end": 33,
+          "role": "style",
+          "symbol": "#form",
+          "anchor": "d21595295c54",
+          "first": "#form{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 115,
+          "end": 130,
+          "role": "markup",
+          "symbol": "#input",
+          "anchor": "c20beb8cf661",
+          "first": "<p><textarea id=\"input\" placeholder=\"Paste a list of R.A. and Decl.\"  required>SAGA_SAT    RA  DEC"
+        },
+        {
+          "file": "code/index.html",
+          "start": 34,
+          "end": 38,
+          "role": "style",
+          "symbol": "#input",
+          "anchor": "e28ca5e341eb",
+          "first": "#input{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 234,
+          "end": 236,
+          "role": "logic",
+          "symbol": "escapeHtml",
+          "anchor": "9cc6f4a43427",
+          "first": "const escapeHtml = function(s) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 238,
+          "end": 287,
+          "role": "logic",
+          "symbol": "parseHeader",
+          "anchor": "cbc66ebc72f2",
+          "first": "const parseHeader = function(line_raw) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 405,
+          "end": 409,
+          "role": "logic",
+          "anchor": "c68defca77a7",
+          "first": "$(\"form\").on(\"submit\", (event) => {event.preventDefault();});"
+        },
+        {
+          "file": "code/index.html",
+          "start": 421,
+          "end": 424,
+          "role": "logic",
+          "anchor": "2898dcd85c5e",
+          "first": "if (search_params.get(\"input\")) { $(\"#input\").val(search_params.get(\"input\")); }"
+        }
+      ]
+    },
+    {
+      "id": "source-controls",
+      "level": "component",
+      "parent": "input-form",
+      "title": "Image source and cutout size",
+      "summary": "Chooses the survey layer and the angular side length of the cutouts, and redraws or swaps the images when either changes.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 133,
+          "end": 158,
+          "role": "markup",
+          "symbol": "#layer",
+          "anchor": "b152d62387e2",
+          "first": "<select id=\"layer\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 161,
+          "end": 161,
+          "role": "markup",
+          "symbol": "#scale",
+          "anchor": "411737335f92",
+          "first": "Side length = <input type=\"number\" id=\"scale\" value=\"0.75\" step=\"any\" min=\"0.01\" max=\"999\" required> arcmin"
+        },
+        {
+          "file": "code/index.html",
+          "start": 39,
+          "end": 43,
+          "role": "style",
+          "symbol": "#layer, #scale",
+          "anchor": "e9fb72c6c109",
+          "first": "#layer, #scale{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 44,
+          "end": 46,
+          "role": "style",
+          "anchor": "767e66e47d0e",
+          "first": "#scale{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 57,
+          "end": 60,
+          "role": "style",
+          "symbol": ".options > label",
+          "anchor": "f3fb5b329ca8",
+          "first": ".options > label{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 216,
+          "end": 220,
+          "role": "data",
+          "symbol": "_image_urls",
+          "anchor": "9ca10743a53b",
+          "first": "const _image_urls = {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 222,
+          "end": 227,
+          "role": "data",
+          "symbol": "_link_urls",
+          "anchor": "eb4a038c3989",
+          "first": "const _link_urls = {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 321,
+          "end": 370,
+          "role": "logic",
+          "symbol": "run",
+          "anchor": "ea3aa849275d",
+          "first": "const run = async function() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 193,
+          "end": 197,
+          "role": "logic",
+          "anchor": "a53f4d986313",
+          "first": "const search_params = (new URL(document.location.href)).searchParams;"
+        },
+        {
+          "file": "code/index.html",
+          "start": 407,
+          "end": 408,
+          "role": "logic",
+          "anchor": "cf706cc9a615",
+          "first": "$(\"#layer\").on(\"input\", run);"
+        },
+        {
+          "file": "code/index.html",
+          "start": 420,
+          "end": 420,
+          "role": "logic",
+          "anchor": "4956974fad9a",
+          "first": "if (_select_layer){ $(\"#layer > option[value='\" + _select_layer + \"']\").prop(\"selected\", true); }"
+        }
+      ]
+    },
+    {
+      "id": "cutout-grid",
+      "level": "view",
+      "parent": null,
+      "title": "Cutout grid",
+      "summary": "Shows one survey cutout per table row in a responsive grid. Each tile shows its row's values on hover and links to the full sky viewer at that position.",
+      "views": [
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 184,
+          "end": 184,
+          "role": "markup",
+          "symbol": "#list",
+          "anchor": "4dffdbb57b9b",
+          "first": "<div id=\"list\"></div>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 47,
+          "end": 51,
+          "role": "style",
+          "anchor": "de08cbc0854c",
+          "first": "#list{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 94,
+          "end": 105,
+          "role": "style",
+          "anchor": "4fc134d1e718",
+          "first": "@media (min-width: 420px) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 70,
+          "end": 76,
+          "role": "style",
+          "symbol": ".pic",
+          "anchor": "d0e249a5a7ab",
+          "first": ".pic{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 87,
+          "end": 93,
+          "role": "style",
+          "anchor": "ec8dcfe1c6eb",
+          "first": ".r1 {transform: rotate(90deg);}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 185,
+          "end": 185,
+          "role": "markup",
+          "symbol": "#loading",
+          "anchor": "e87b308da09f",
+          "first": "<div class=\"info_button\" id=\"loading\"><span class=\"pure-button pure-button-disabled\" style=\"border-radius: 4px;\">Loading"
+        },
+        {
+          "file": "code/index.html",
+          "start": 52,
+          "end": 56,
+          "role": "style",
+          "symbol": ".info_button",
+          "anchor": "b5545d17281a",
+          "first": ".info_button{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 229,
+          "end": 231,
+          "role": "data",
+          "anchor": "714b1c786144",
+          "first": "const _img_dom_template = \"<img class='pic ${marked} ${rot}' title='${title}' src='${img_url}' width='180' height='180' "
+        },
+        {
+          "file": "code/index.html",
+          "start": 301,
+          "end": 319,
+          "role": "logic",
+          "symbol": "addImage",
+          "anchor": "333cde4ba6f6",
+          "first": "const addImage = function(line) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 289,
+          "end": 299,
+          "role": "logic",
+          "symbol": "handleImageError",
+          "anchor": "0347dc6cac63",
+          "first": "const handleImageError = function(img) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 200,
+          "end": 202,
+          "role": "logic",
+          "symbol": "delay",
+          "anchor": "a8664da3759b",
+          "first": "const delay = function(){"
+        }
+      ]
+    },
+    {
+      "id": "marking",
+      "level": "component",
+      "parent": "cutout-grid",
+      "title": "Click-to-mark mode",
+      "summary": "When enabled, a click toggles a highlighted border on a cutout, Ctrl-click still opens the sky viewer, and the input box is locked.",
+      "views": [],
+      "interactions": [
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 164,
+          "end": 164,
+          "role": "markup",
+          "symbol": "#enable_marking",
+          "anchor": "175a970c45e5",
+          "first": "<input type=\"checkbox\" id=\"enable_marking\"/> Enable marking"
+        },
+        {
+          "file": "code/index.html",
+          "start": 77,
+          "end": 79,
+          "role": "style",
+          "symbol": ".marked",
+          "anchor": "74cc748b7577",
+          "first": ".marked{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 372,
+          "end": 391,
+          "role": "logic",
+          "symbol": "update_click_events",
+          "anchor": "23d1cd6beaed",
+          "first": "const update_click_events = function(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 410,
+          "end": 413,
+          "role": "logic",
+          "anchor": "b5d6fd934d2c",
+          "first": "$(\"#enable_marking\").on(\"input\", () => {"
+        }
+      ]
+    },
+    {
+      "id": "record-marks",
+      "level": "component",
+      "parent": "input-form",
+      "title": "Record marks",
+      "summary": "Writes the table back into the text box with a true/false marked column for every row, and warns before leaving the page if some marks have not been recorded.",
+      "views": [],
+      "interactions": [],
+      "patterns": [
+        "round trip table"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 167,
+          "end": 167,
+          "role": "markup",
+          "symbol": "#generate_output",
+          "anchor": "0e11ae7dc464",
+          "first": "<button id=\"generate_output\" class=\"pure-button\" disabled>Record marks</button>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 393,
+          "end": 403,
+          "role": "logic",
+          "symbol": "record_output",
+          "anchor": "6bfe265747ad",
+          "first": "const record_output = function(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 406,
+          "end": 406,
+          "role": "logic",
+          "anchor": "abb20251267f",
+          "first": "$(\"#generate_output\").on(\"click\", record_output);"
+        },
+        {
+          "file": "code/index.html",
+          "start": 414,
+          "end": 418,
+          "role": "logic",
+          "anchor": "07aa1b604081",
+          "first": "$(window).on(\"beforeunload\", () => {"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "patterns",
+      "term": "round trip table"
+    }
+  ]
+}

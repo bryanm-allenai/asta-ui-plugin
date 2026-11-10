@@ -1,0 +1,395 @@
+{
+  "schema": "astaui.card/1",
+  "id": "teiko-immune-cell-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:23:47Z"
+  },
+  "app": {
+    "title": "Immune cell population composition and responder comparison dashboard",
+    "summary": "On first load the dashboard builds a database from the trial's cell-count file, linking each sample to its subject and treatment. The person reads each sample's immune cell populations as percentages of its total count, either for every sample or for one picked sample, alongside the average composition across all samples. They then choose a cohort by condition, treatment and sample type, and compare responders with non-responders using box plots and a per-population table of rank tests, effect sizes and FDR-adjusted p-values. A fixed baseline subset is broken down by project, response and sex, and the frequency table, the comparison and the baseline sample list can each be downloaded as CSV.",
+    "task": {
+      "text": "Work out each sample's cell population composition and test whether any population differs between treatment responders and non-responders in a chosen cohort.",
+      "verbs": [
+        "compare",
+        "derive",
+        "summarize",
+        "filter",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A table of samples. Each sample has raw counts for a fixed panel of cell populations and is linked to attributes of the subject (project, condition, age, sex) and of the sample (treatment, response, sample type, time from treatment start).",
+      "item": "a blood sample from a trial subject, with a count for each cell population",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "analysing trial cell counts to compare treatment responders with non-responders, before reporting",
+      "terms": [
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Four tabs share one joined table of samples with per-sample percentages. A frequency table and a mean-composition bar chart give an overview, and three cascading selects narrow the data to a cohort. That cohort drives grouped box plots and a statistics table recomputed from it, and a fixed baseline subset is summarized as metrics and count tables. Each result table has its own CSV download.",
+      "views": [
+        "table view",
+        "bar chart",
+        "box plot",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "select",
+        "hover for detail",
+        "sort",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "immune cell population frequencies compared between treatment responders and non-responders in a clinical trial",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "immunology",
+        "clinical trial",
+        "responder analysis"
+      ]
+    },
+    "workflow": {
+      "name": "compare a measured composition between two outcome groups within a chosen cohort",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "if the database is missing, it is built from the cell-count CSV on first load, and the cell counts are joined to the sample and subject tables",
+          "parts": [
+            "frequency-tab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "each population's count becomes a percentage of that sample's total; the table can be narrowed to one sample, and a bar chart shows the mean percentage for each population across all samples",
+          "parts": [
+            "frequency-tab",
+            "composition-bar"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "cascading selects for condition, then treatment, then sample type, each offering only the values that remain and defaulting to the study's main cohort; only samples with a yes or no response are kept",
+          "parts": [
+            "cohort-filters"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "box plots of percentage for each population, coloured by responder versus non-responder, with outliers shown as points",
+          "parts": [
+            "responder-boxplot"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "for each population: medians and means for both groups, a Mann-Whitney U test, Welch's t-test, the rank-biserial effect size, and Benjamini-Hochberg FDR-adjusted p-values with a significance flag at 0.05",
+          "parts": [
+            "stats-table"
+          ]
+        },
+        {
+          "step": "summarize a fixed subset",
+          "here": "metrics and count tables for baseline (time 0) samples in one cohort, broken down by project, response and sex, plus the average count of one population for a defined subgroup",
+          "parts": [
+            "baseline-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "separate CSV downloads for the frequency table, the responder comparison and the baseline sample list",
+          "parts": [
+            "frequency-tab",
+            "stats-table",
+            "baseline-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "counts are turned into relative frequencies within each sample, so the comparison is about composition, not absolute abundance",
+        "several populations are tested at once, so p-values are corrected with the Benjamini-Hochberg false discovery rate",
+        "an effect size (rank-biserial r) is shown next to each p-value, so that tiny differences reaching significance in large groups are not over-read",
+        "the cohort filters cascade: each select offers only the values that exist under the choices made above it",
+        "baseline is defined by time from treatment start being zero, and the breakdown counts unique subjects as well as samples"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "frequency-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Per-sample frequencies",
+      "summary": "Shows each sample's populations as counts and as percentages of the sample total, optionally narrowed to one sample, with a CSV download.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "filter",
+        "sort",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 36,
+          "end": 53,
+          "role": "data",
+          "symbol": "load_frequencies",
+          "anchor": "a0dd95a04d70",
+          "first": "def load_frequencies() -> pd.DataFrame:"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 60,
+          "end": 64,
+          "role": "data",
+          "anchor": "07c833d4ef93",
+          "first": "if not DB_PATH.exists():"
+        },
+        {
+          "file": "code/load_data.py",
+          "start": 126,
+          "end": 137,
+          "role": "data",
+          "symbol": "main",
+          "anchor": "d9db45992a17",
+          "first": "def main() -> None:"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 56,
+          "end": 57,
+          "role": "logic",
+          "symbol": "distinct_values",
+          "anchor": "a44cc04f625c",
+          "first": "def distinct_values(df: pd.DataFrame, col: str) -> list:"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 143,
+          "end": 167,
+          "role": "markup",
+          "anchor": "a6e9280e47ef",
+          "first": "with tab2:"
+        }
+      ]
+    },
+    {
+      "id": "composition-bar",
+      "level": "component",
+      "parent": "frequency-tab",
+      "title": "Average composition bar chart",
+      "summary": "Bars show the mean percentage of each cell population across all samples, with one fixed colour per population.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 169,
+          "end": 185,
+          "role": "markup",
+          "anchor": "ba4c032f162f",
+          "first": "avg_composition = ("
+        },
+        {
+          "file": "code/analysis/part3_stats.py",
+          "start": 29,
+          "end": 37,
+          "role": "style",
+          "anchor": "e77e3a10dbaf",
+          "first": "POPULATIONS = [\"b_cell\", \"cd8_t_cell\", \"cd4_t_cell\", \"nk_cell\", \"monocyte\"]"
+        }
+      ]
+    },
+    {
+      "id": "responder-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Responder analysis",
+      "summary": "Compares responders with non-responders within a cohort the person chooses.",
+      "views": [
+        "box plot",
+        "table view"
+      ],
+      "interactions": [
+        "filter",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 188,
+          "end": 193,
+          "role": "markup",
+          "anchor": "ed2d44254dbb",
+          "first": "with tab3:"
+        }
+      ]
+    },
+    {
+      "id": "cohort-filters",
+      "level": "component",
+      "parent": "responder-tab",
+      "title": "Cascading cohort filters",
+      "summary": "Condition, treatment and sample type selects, each limited to the values that remain under the selects before it, narrow the data to the samples with a yes or no response.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 195,
+          "end": 224,
+          "role": "logic",
+          "anchor": "c1ac5015d705",
+          "first": "col1, col2, col3 = st.columns(3)"
+        }
+      ]
+    },
+    {
+      "id": "responder-boxplot",
+      "level": "component",
+      "parent": "responder-tab",
+      "title": "Responder box plots",
+      "summary": "Box plots of percentage for each population, split and coloured by response.",
+      "views": [
+        "box plot"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 226,
+          "end": 237,
+          "role": "markup",
+          "anchor": "3639d4bde7e8",
+          "first": "fig = px.box("
+        }
+      ]
+    },
+    {
+      "id": "stats-table",
+      "level": "component",
+      "parent": "responder-tab",
+      "title": "Statistical comparison table",
+      "summary": "For each population: group summaries, Mann-Whitney and Welch tests, rank-biserial effect size and FDR-adjusted p-values, with a CSV download.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 239,
+          "end": 257,
+          "role": "markup",
+          "anchor": "073039b290ce",
+          "first": "stats_df = compare_populations("
+        },
+        {
+          "file": "code/analysis/part3_stats.py",
+          "start": 72,
+          "end": 114,
+          "role": "logic",
+          "symbol": "compare_populations",
+          "anchor": "be4d415ef81f",
+          "first": "def compare_populations(df: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/analysis/part3_stats.py",
+          "start": 55,
+          "end": 65,
+          "role": "logic",
+          "symbol": "benjamini_hochberg",
+          "anchor": "97a440c8e3e7",
+          "first": "def benjamini_hochberg(p_values: list[float]) -> list[float]:"
+        }
+      ]
+    },
+    {
+      "id": "baseline-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Baseline subset",
+      "summary": "Metrics and count tables for a fixed baseline cohort by project, response and sex, an average population count for a defined subgroup, and a download of the baseline sample list.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 260,
+          "end": 310,
+          "role": "markup",
+          "anchor": "7d9fef0428e5",
+          "first": "with tab4:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "task",
+      "list": "verbs",
+      "term": "filter"
+    },
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "box plot"
+    }
+  ]
+}

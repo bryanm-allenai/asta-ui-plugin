@@ -1,0 +1,646 @@
+{
+ "interface": {
+  "title": "micromorph - SEM morphology analysis (v0.1)",
+  "field": "materials science / electron microscopy (fibrous materials, nonwovens, electrospun mats)",
+  "stage_of_work": "image analysis and quantification after SEM imaging",
+  "what_it_is_for": "Segment an SEM image of a fiber network with Otsu thresholding, correct dark fiber-center bands wrongly marked as pores by reclassifying regions on shape, and report fiber diameter and void/pore chord-length distributions (d50/p95) that can be exported as CSV or HTML."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "I uploaded A0_Ax1000.tif at magnification x1000, then replaced it with A0_Ax5000.tif at x5000. The uploader holds one file: adding a second file replaced the first. I did not use the x200, x500 or x2000 test files. Pixel calibration comes from the magnification dropdown (Hitachi S-4800 defaults: 0.0990 µm/px at x1000, 0.0200 at x5000, 0.4960 at x200)."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Measure fiber size and pore size from a microscope image of a fibrous material, without measuring by hand",
+  "specific": "Get fiber diameter d50/p95 and void chord-length d50/p95 from an SEM TIFF of a stacked fiber network",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Set up the analysis",
+    "specific": "Choose the morphology preset (stacked 3D or 2D single layer), upload the SEM image, and set and sanity-check the magnification",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Pick the structure model that matches the sample",
+      "specific": "Choose a morphology preset button: Fiber network (stacked 3D), selected at start, or Fiber network (2D single layer). Spongy porous, Honeycomb, Microsphere, Nanorod, Woven mesh and Auto-detect are marked 🚧. The replay clicked Spongy porous: it showed only a 'Planned for v0.2.0' toast and the selection stayed on stacked 3D.",
+      "screens": [
+       "screens/004.webp",
+       "screens/005.webp",
+       "screens/007.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Fiber network (2D single layer)",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Fiber network (stacked 3D)",
+        "screens": [
+         "screens/007.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Tell the analysis whether the sample is one layer or stacked layers, so pore metrics are read correctly",
+      "specific": "Switching between Fiber network (stacked 3D) and (2D single layer) changes vocabulary and interpretation, not numbers. In stacked 3D, results speak of real_void and Void chord length, and Step 4 carries an info note that void metrics are upper bounds to be checked against MIP or microCT. In 2D single layer, labels become real_pore and Pore chord length. On the x5000 image the numbers stayed the same (fiber 1.22/3.83 µm, pore chord 1.08/3.66 µm), and an 'Ambiguous regions account for 5.7% … consider manual QC' warning showed. In 2D mode the Step 4 note still talks about stacked 3D materials.",
+      "screens": [
+       "screens/044.webp",
+       "screens/045.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Fiber network (2D single layer) with the x5000 image loaded",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Load the image and give its scale",
+      "specific": "Upload the SEM TIF and pick the magnification (x200/x500/x1000/x2000/x5000) in a searchable dropdown (type the value, press Enter). This sets µm/px and the closing radius shown in Step 1.",
+      "screens": [
+       "screens/009.webp",
+       "screens/010.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Magnification dropdown, chose x1000",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Upload and gave A0_Ax1000.tif",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "task",
+        "general": "Check that the scale setting matches the image, because a wrong one breaks the analysis without warning",
+        "specific": "Setting x200 on the x5000 image gives calibration 0.4960 µm/px and closing radius 1 px. The mask breaks down (fiber fraction 26.0%), and no mismatch warning appears near the dropdown or in Step 1.",
+        "screens": [
+         "screens/049.webp",
+         "screens/050.webp"
+        ],
+        "branch": "optional",
+        "children": [
+         {
+          "kind": "action",
+          "label": "typed x200 in the Magnification dropdown on the x5000 image",
+          "screens": [
+           "screens/049.webp",
+           "screens/050.webp"
+          ]
+         }
+        ],
+        "id": "t12",
+        "check": "replayed"
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Segment the image and correct misclassification",
+    "specific": "Step 1 initial binarisation, Step 2 diagnosis and shape reclassification, Step 3 revised binarisation",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Make a first foreground/background mask",
+      "specific": "Step 1: view the raw image beside the Otsu + closing fiber mask, with threshold (134.0), closing radius (0.49 µm, 5 px), initial fiber area fraction (61.6%) and calibration (0.0990 µm/px) for the x1000 image",
+      "screens": [
+       "screens/010.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Step 1 - Initial binarisation",
+        "screens": [
+         "screens/010.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Find background regions that are really parts of the object and flip them, at a chosen strictness",
+      "specific": "Step 2: classify dark regions as pseudo_pore (red), real_void (blue) or ambiguous (yellow) on a diagnostic overlay, using a quick preset or custom aspect-ratio/solidity/circularity/noise sliders",
+      "screens": [
+       "screens/010.webp",
+       "screens/024.webp",
+       "screens/026.webp",
+       "screens/031.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "left Default preset (23 pseudo_pore, 8.5% flipped)",
+        "screens": [
+         "screens/010.webp",
+         "screens/011.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🔥 Aggressive (114 pseudo_pore, 18.5% flipped)",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🛡️ Conservative (7 pseudo_pore, 21 ambiguous, 2.1% flipped)",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed ✋ Custom",
+        "screens": [
+         "screens/027.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged pseudo_pore aspect_ratio_min slider to 3.00",
+        "screens": [
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged pseudo_pore circularity_max slider to 0.71 (34 pseudo_pore, 7.7% flipped)",
+        "screens": [
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the diagnostic overlay Fullscreen and pressed Escape",
+        "screens": [
+         "screens/046.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Compare the mask before and after correction and see which regions changed",
+      "specific": "Step 3: Initial mask (v1) beside Revised mask (v2) with fiber area fractions (61.6% vs 70.1%, +8.5 pp under Default), plus flipped regions in green with a region count",
+      "screens": [
+       "screens/011.webp",
+       "screens/012.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Step 3 - Revised binarisation",
+        "screens": [
+         "screens/011.webp",
+         "screens/012.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Run without the correction to see how much it matters",
+      "specific": "Untick Enable shape reclassification: flipped area becomes 0.0%, v2 = v1 = 61.6%, and fiber d50/p95 drop to 1.83/4.75 µm. The run did this from the Custom slider state left by t4 (aspect_ratio_min 3.00, circularity_max 0.71). Its 2.21/6.36 µm baseline and the ambiguous-regions QC warning (10.0%) depend on that state. From Default, the replay got a 2.24/6.58 µm baseline and 'No diagnostic warnings'.",
+      "screens": [
+       "screens/034.webp",
+       "screens/035.webp",
+       "screens/036.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered help for Enable shape reclassification",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "unticked Enable shape reclassification",
+        "screens": [
+         "screens/034.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "re-ticked Enable shape reclassification and pressed 🎯 Default",
+        "screens": [
+         "screens/037.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Check the segmentation visually before trusting the numbers",
+    "specific": "Final edge confirmation: yellow contour overlay on the raw image; if outlines do not sit on the fibers, return to Step 2 and change preset or sliders",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Overlay segmentation outlines on the raw image and inspect them, going back to the correction step if they do not line up",
+      "specific": "Show contours toggle, Contour mode (Auto, which drew void outlines here / Fiber boundaries / Void boundaries), and Minimum region area to display slider (20–500 px). These change the display only. After this check the run went back to Step 2 presets (screens/024.webp).",
+      "screens": [
+       "screens/012.webp",
+       "screens/018.webp",
+       "screens/020.webp",
+       "screens/023.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose Contour mode 🧵 Fiber boundaries (427 fiber boundaries drawn)",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Contour mode ⚫ Void boundaries",
+        "screens": [
+         "screens/019.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Minimum region area to display to 380 px (233 void boundaries)",
+        "screens": [
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "toggled Show contours off (raw image only)",
+        "screens": [
+         "screens/023.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Read and export the measurements",
+    "specific": "Step 4 - Quantitative results and download",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Read size distributions and summary percentiles",
+      "specific": "Fiber diameter and void chord length d50/p95/n, fiber area v1 vs v2, histograms and CDFs (under Default at x1000: fiber 2.24/6.58 µm, void chord 1.88/5.45 µm)",
+      "screens": [
+       "screens/013.webp",
+       "screens/014.webp",
+       "screens/032.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered fiber diameter histogram bar (0.5-1 µm, 5456)",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged a zoom box on the Fiber diameter CDF, then double-clicked to reset",
+        "screens": [
+         "screens/016.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Download results as tables and a report",
+      "specific": "Download results.csv (one summary row, including the inscribed-circle (MIC) pore diameter pore_mic_d50/p95), distributions.csv (metric,value_um per measurement, including *_mic_diameter_um rows) and report.html (the summary table). MIC pore diameter appears only in the downloads, not on screen.",
+      "screens": [
+       "screens/014.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Download results.csv",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download distributions.csv",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download report.html",
+        "screens": [
+         "screens/014.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Repeat the analysis on another image",
+    "specific": "Replace the image with A0_Ax5000.tif at x5000, re-apply a preset and export again",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Analyse a second image at its own scale and export its results",
+      "specific": "Upload A0_Ax5000.tif, set x5000 (0.0200 µm/px), re-press Default (sliders had reset to their minimum values), read fiber d50 1.22 / p95 3.83 µm and download results.csv (um_per_px 0.02, fiber d50/p95 1.224/3.827)",
+      "screens": [
+       "screens/038.webp",
+       "screens/041.webp",
+       "screens/042.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Add files and gave A0_Ax5000.tif (replaced the x1000 file)",
+        "screens": [
+         "screens/038.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed x5000 in the Magnification dropdown",
+        "screens": [
+         "screens/038.webp",
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 🎯 Default",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download results.csv",
+        "screens": [
+         "screens/042.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Preset-or-custom shape classifier with live diagnostic overlay",
+   "general": "Sort candidate background regions into 'actually object', 'true background' and 'unsure' using shape thresholds. Pick a named strictness preset or tune the thresholds yourself, see the classes colour-coded on the image with counts, and get a warning when too much is unsure.",
+   "specific": "In Step 2, press Default / Aggressive / Conservative / Custom, or drag the pseudo_pore aspect_ratio_min, solidity_min, circularity_max and noise filter sliders. Red/blue/yellow overlay and pseudo_pore / real_void / ambiguous / noise / flipped-area metrics update. An 'Ambiguous regions account for X% … consider manual QC' warning appears above 5% ambiguous area; otherwise 'No diagnostic warnings'.",
+   "steps": [
+    "Pick a quick preset (Default, Aggressive or Conservative)",
+    "Read the counts and the flipped-area percentage beside the overlay",
+    "Drag a threshold slider; the label switches to Custom with a 'values don't match any preset' note",
+    "Read the diagnostic warning (or 'No diagnostic warnings')",
+    "Press a preset again to reset the sliders"
+   ],
+   "serves_tasks": [
+    "Find background regions that are really parts of the object and flip them, at a chosen strictness",
+    "Compare the mask before and after correction and see which regions changed"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/024.webp",
+    "screens/026.webp",
+    "screens/029.webp",
+    "screens/031.webp",
+    "screens/035.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Before/after mask comparison with change highlight",
+   "general": "Show the original and corrected binary masks side by side with their area fractions and the difference, then highlight the changed regions on the raw image. Toggling the correction on or off shows how much it moves the downstream numbers.",
+   "specific": "Step 3 shows Initial mask (v1) and Revised mask (v2) with fiber area fraction (+pp) and a green 'Flipped regions' overlay with region count. Step 4 repeats Fiber area v1 (raw) vs v2 (refined). The Enable shape reclassification checkbox turns the correction off; the size of the shift depends on the classifier settings in use.",
+   "steps": [
+    "Look at v1 and v2 masks side by side",
+    "Read both fiber area fractions and the +pp change",
+    "Inspect the green flipped regions on the raw image",
+    "Untick Enable shape reclassification to see v2 = v1 and the uncorrected d50/p95"
+   ],
+   "serves_tasks": [
+    "Compare the mask before and after correction and see which regions changed",
+    "Run without the correction to see how much it matters"
+   ],
+   "screens": [
+    "screens/011.webp",
+    "screens/012.webp",
+    "screens/035.webp",
+    "screens/036.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Contour overlay for segmentation QC",
+   "general": "Draw segmentation outlines over the raw image to check alignment. Choose which phase to outline (auto-chosen from coverage, foreground or background), hide small regions with a minimum-area filter, and turn the overlay off to compare with the bare image. If outlines miss, go back and retune the correction.",
+   "specific": "Final edge confirmation: Show contours toggle, Contour mode radio (Auto, which picks void outlines at high fiber coverage / Fiber boundaries / Void boundaries), Minimum region area to display slider (20–500 px), and a caption giving how many boundaries were drawn. This changes the display only, not the measurements.",
+   "steps": [
+    "Leave Contour mode on Auto or pick Fiber or Void boundaries",
+    "Drag Minimum region area to display to hide small regions",
+    "Read the 'Drawn N … boundaries (area > X px)' caption",
+    "Toggle Show contours off to see the raw image",
+    "If outlines do not sit on the fibers, return to Step 2 and change preset or sliders"
+   ],
+   "serves_tasks": [
+    "Overlay segmentation outlines on the raw image and inspect them, going back to the correction step if they do not line up"
+   ],
+   "screens": [
+    "screens/012.webp",
+    "screens/018.webp",
+    "screens/020.webp",
+    "screens/023.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Distribution summary with interactive histogram + CDF",
+   "general": "Summarise a measured size population as median and 95th percentile with n, and plot it as a histogram and a cumulative curve with hover and zoom.",
+   "specific": "Step 4 shows Fiber diameter and Void (Pore) chord length d50/p95/n metrics and Plotly histograms and CDFs (hover, box zoom, double-click reset).",
+   "steps": [
+    "Read d50, p95 and n for each distribution",
+    "Hover a histogram bar for its bin range and count",
+    "Drag a box on the CDF to zoom, then double-click to reset"
+   ],
+   "serves_tasks": [
+    "Read size distributions and summary percentiles"
+   ],
+   "screens": [
+    "screens/013.webp",
+    "screens/014.webp",
+    "screens/015.webp",
+    "screens/016.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Three-file results export (summary row, raw values, report)",
+   "general": "Export one analysis as a one-row summary table, a long table of every measured value, and a readable HTML report, so results can be compared or re-analysed elsewhere.",
+   "specific": "Step 4 Download results.csv (one row with um_per_px, d50/p95 for fiber diameter, void chord and MIC pore diameter), distributions.csv (metric,value_um rows, including *_mic_diameter_um) and report.html (summary table). Each export holds one image.",
+   "steps": [
+    "Press Download results.csv for the summary row",
+    "Press Download distributions.csv for every measured value",
+    "Press Download report.html for the summary table as a page"
+   ],
+   "serves_tasks": [
+    "Download results as tables and a report",
+    "Analyse a second image at its own scale and export its results"
+   ],
+   "screens": [
+    "screens/014.webp",
+    "screens/042.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Sample-type mode switch with interpretation caveat",
+   "general": "Declare whether the sample is a single layer or a stacked 3D network. The tool renames background measurements (void vs pore) and warns that, for stacked samples, apparent void sizes are upper bounds to cross-check with a bulk method.",
+   "specific": "Morphology buttons Fiber network (stacked 3D) / (2D single layer) switch labels real_void ↔ real_pore and Void ↔ Pore chord length without changing numbers. Stacked 3D shows a Step 4 note that void metrics are upper bounds (check against MIP or microCT). Only these two modes work in v0.1.",
+   "steps": [
+    "Press Fiber network (stacked 3D) or (2D single layer)",
+    "Check the Step 2 and Step 4 labels (void or pore)",
+    "Read the Step 4 interpretation note before reporting void/pore sizes"
+   ],
+   "serves_tasks": [
+    "Pick the structure model that matches the sample",
+    "Tell the analysis whether the sample is one layer or stacked layers, so pore metrics are read correctly"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/044.webp",
+    "screens/045.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Magnification-driven calibration",
+   "general": "Choose the instrument magnification so pixels convert to physical units. The calibration and the scale-dependent processing (closing radius) follow from that choice.",
+   "specific": "The Magnification dropdown (x200–x5000) sets µm/px from Hitachi S-4800 defaults, shown in Step 1 with the closing radius. Design gap: there is no check against the image, so a wrong choice (x200 on an x5000 image) breaks the mask with no warning, and there is no custom µm/px entry.",
+   "steps": [
+    "Upload the image",
+    "Pick its magnification in the dropdown",
+    "Check Calibration and Closing radius in Step 1",
+    "Check the Step 1 mask looks sane, since no mismatch warning is given"
+   ],
+   "serves_tasks": [
+    "Load the image and give its scale",
+    "Analyse a second image at its own scale and export its results",
+    "Check that the scale setting matches the image, because a wrong one breaks the analysis without warning"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/039.webp",
+    "screens/050.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Spongy porous, Honeycomb / Ordered array, Microsphere assembly, Nanorod / Nanowire, Woven mesh and Auto-detect morphology modes: marked 🚧, and the tooltip says 'Planned for v0.2.0'. Clicking them does not change the selected morphology.",
+  "A multi-image batch view: the uploader holds one file at a time, so there is no screen comparing several samples"
+ ],
+ "not_done": [
+  "Batch comparison across images was only done one image at a time: each export holds one image's row. There is no in-app table that combines samples, and I did not combine the two results.csv files myself.",
+  "I did not run the x200, x500 or x2000 test images at their matching magnifications.",
+  "I did not check the Download plot as PNG button on the Plotly charts or the Main menu (Deploy, settings).",
+  "I did not set a custom µm/px calibration; the interface offers only the fixed magnification presets.",
+  "Pressing 🚧 Spongy porous only showed a 'Planned for v0.2.0' toast (confirmed by the replay); no kept screen shows that toast, and the other 🚧 buttons were not clicked.",
+  "Possible bug: after replacing the uploaded file, the Step 2 sliders reset to their minimum values (1.50 / 0.30 / 0.00 / 1) under 'Custom' until a preset was pressed again (screens/039.webp).",
+  "Possible bug: in 2D single-layer mode the Step 4 info note still talks about stacked 3D materials (screens/044.webp)."
+ ],
+ "applied": [
+  "Moved t11 into the setup phase after t1 and relabelled its general words as the stacked-vs-single-layer interpretation choice",
+  "Added the upper-bound (MIP/microCT) caveat note to t11",
+  "Nested t12 under t2 as a scale-check task",
+  "Renamed the last phase to 'Repeat the analysis on another image'; it now holds only t10",
+  "Dropped the Spongy porous action and its wrong citation from t1, kept the behaviour in t1's text (replay-confirmed) and logged it in not_done",
+  "Rewrote t6's specific label: the 2.21/6.36 baseline and the QC warning come from the t4 Custom state; from Default the result is 2.24/6.58 with no warning",
+  "Moved 'hovered help for Enable shape reclassification' from t2 to t6",
+  "Moved 'opened diagnostic overlay Fullscreen' from t7 to t4, and dropped the fullscreen step from f3",
+  "Added MIC pore diameter (pore_mic_d50/p95, *_mic_diameter_um) to t9",
+  "Added the loop back to Step 2 to t7, the visual-check phase and f3",
+  "Added feature f7 (sample-type mode switch with caveat note)",
+  "Split export out of f4 into f6",
+  "Noted the missing wrong-scale warning in f5 as a design gap",
+  "Added replay-confirmed numbers to t3, t5, t8 and t10"
+ ],
+ "open_fixes": [
+  "Actually comparing samples (x1000 vs x5000 side by side, or the examples/A0/B sets) needs a new run that combines exported rows; this run handled one image at a time.",
+  "A kept screen of the stacked-3D Step 4 caveat note showing the 'upper bound … MIP or microCT' wording is needed; this run only cites the note in 2D mode (screens/044.webp).",
+  "A screen of the 'Planned for v0.2.0' toast after clicking a 🚧 preset needs a new capture; the other 🚧 buttons were never clicked.",
+  "Showing the contour check driving a re-tune (a misaligned outline, then a Step 2 change that fixes it) needs a new run; this run returned to Step 2 after the contours but not because of a recorded mismatch.",
+  "f6 and f7 are new features; their 'replayed' check rests on the t9/t10 and t11 replays, not on a separate feature replay."
+ ],
+ "screens_at": "pilot/public/runs/micromorph-sem/20261030-150228/",
+ "screens_filed": {
+  "screens/004.webp": "screens/004.webp",
+  "screens/010.webp": "screens/010.webp",
+  "screens/012.webp": "screens/012.webp",
+  "screens/013.webp": "screens/013.webp",
+  "screens/038.webp": "screens/038.webp"
+ }
+}

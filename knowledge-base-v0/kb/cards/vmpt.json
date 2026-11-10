@@ -1,0 +1,695 @@
+{
+  "schema": "astaui.card/1",
+  "id": "vmpt",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T06:31:54Z"
+  },
+  "app": {
+    "title": "vMPT — visual MSA Planning Tool",
+    "summary": "The person loads an image of a sky field and a target catalogue. They aim the multi-shutter mask over it by setting the centre and roll angle, and choose a disperser and filter. They can run an optimizer that searches pointings for the one that places the most targets, or the most weight or priority, in usable shutters, then apply one of the ranked solutions. They pick and remove slitlets by hand on the image while coloured overlays show where each spectrum would fall on the others and where two slitlets conflict. The finished shutter plan is saved as a session and exported as a bundle that the observatory's proposal tool can import.",
+    "task": {
+      "text": "Plan a multi-object spectroscopy observation by choosing a telescope pointing and the set of open shutters that catches the most high-priority targets without their spectra overlapping, then export the plan.",
+      "verbs": [
+        "plan",
+        "decide",
+        "derive",
+        "identify",
+        "curate"
+      ]
+    },
+    "data": {
+      "text": "A world-coordinate image of a field, a table of candidate targets with sky positions and optional priority, weight, magnitude and redshift, and a fixed grid of instrument shutters, each marked operable, stuck open or failed closed.",
+      "item": "a candidate target placed in a shutter of the micro-shutter grid",
+      "shapes": [
+        "image",
+        "table",
+        "per element",
+        "geospatial",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "planning an observation from an existing image and target catalogue, before submitting it to the proposal tool",
+      "terms": [
+        "plan",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "A large image view shows the shutter grid laid over the field at the current pointing. A sidebar of tabs drives the view: inputs, pointing and optimizer, settings, and plan import and export. Clicking on the image opens or closes slitlets, and every change recomputes the coloured overlap overlays and the summary numbers.",
+      "views": [
+        "image viewer",
+        "map",
+        "table view",
+        "summary stats",
+        "form",
+        "sidebar list",
+        "bar chart"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "zoom and pan",
+        "keyboard shortcuts",
+        "hover for detail",
+        "filter",
+        "sort",
+        "inline edit",
+        "undo",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "multi-object spectroscopy observation planning in astronomy",
+      "disciplines": [
+        "astronomy"
+      ],
+      "terms": [
+        "multi object spectroscopy",
+        "observation planning",
+        "jwst nirspec"
+      ]
+    },
+    "workflow": {
+      "name": "choose a placement on a fixed grid that captures the most prioritized targets under conflict rules",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Load a FITS image, or a JPG/PNG with a WCS sidecar, plus one or more target catalogues. Each catalogue gets its own colour chip, a visibility checkbox and a stacking order. DS9 regions and contours can be added as overlays. Two bundled example fields load with one click.",
+          "parts": [
+            "input-tab",
+            "catalog-editor"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Filter targets by priority class or magnitude. A spreadsheet editor lets the person sort and edit cells, add columns, derive weight from priority (or the reverse), and apply the changes back.",
+          "parts": [
+            "catalog-editor"
+          ]
+        },
+        {
+          "step": "set where the layout sits",
+          "here": "Set RA/Dec and the V3 PA roll with a slider, or type an aperture PA. Pick a disperser/filter. Optionally compute the allowed roll window for a date.",
+          "parts": [
+            "pointing-tab",
+            "field-canvas"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The optimizer searches a grid of RA, Dec and PA, then refines the top candidates. It scores by count (Democracy), by weight sum (Meritocracy) or by strict priority tiers (Hierarchy), with optional collision protection for chosen targets. It shows live progress and the ten best solutions with per-tier scores, and Apply #N opens slitlets on every target placed.",
+          "parts": [
+            "optimizer-dialog"
+          ]
+        },
+        {
+          "step": "place or remove items by hand with live conflict feedback",
+          "here": "Clicking the image opens an N-shutter slitlet at the nearest operable shutter and tags it with the catalogue source inside. Clicking an open shutter closes it, and Space toggles the single shutter under the pointer. Orange, pink and purple overlays mark shutters masked by spectra, masked by stuck-open shutters, or in conflict. Undo and clear are available.",
+          "parts": [
+            "field-canvas",
+            "settings-tab"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "A stats bar shows the pointing, roll, number of open shutters, targets covered, spectral conflicts and the disperser.",
+          "parts": [
+            "stats-bar"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Save a session, or export a timestamped bundle containing an APT source catalogue, an MPT plan JSON, a README of the import steps, eMPT target, pointing and shutter-mask files, and a workspace JSON. Earlier APT plans, shutter-mask CSVs or .aptx archives can be imported back in.",
+          "parts": [
+            "mpt-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Shutters come from a real instrument grid with a known operability map, so targets can only go in operable shutters and stuck-open shutters always contaminate their rows.",
+        "Each open slitlet's spectrum is projected along the dispersion direction, and the overlap is classified live as masked by a pick, masked by a stuck-open shutter, or a conflict between two slitlets.",
+        "Three scoring rules are available: equal count, weighted sum, or strict priority tiers where a higher tier is never traded for any number of lower ones.",
+        "Selected high-priority targets can be protected so that no other spectrum may overlap theirs during the search.",
+        "The plan round-trips with the observatory's proposal tool formats, including a byte-compatible shutter-mask CSV."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "field-canvas",
+      "level": "view",
+      "parent": null,
+      "title": "Field image with shutter overlay",
+      "summary": "Shows the field image with the shutter quadrants, catalogue targets and coloured spectral-overlap overlays, and takes the clicks, Space presses and keyboard pans that open and close slitlets.",
+      "views": [
+        "image viewer",
+        "map"
+      ],
+      "interactions": [
+        "select",
+        "zoom and pan",
+        "keyboard shortcuts",
+        "hover for detail",
+        "undo"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/vmpt/main.py",
+          "start": 3776,
+          "end": 4843,
+          "role": "logic",
+          "symbol": "refresh_overlays",
+          "anchor": "710a8fd8d692",
+          "first": "def refresh_overlays() -> None:"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 5092,
+          "end": 5189,
+          "role": "logic",
+          "symbol": "refresh_image_glyph",
+          "anchor": "d5270148b481",
+          "first": "def refresh_image_glyph() -> None:"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 6264,
+          "end": 6340,
+          "role": "logic",
+          "symbol": "on_tap",
+          "anchor": "ebf0fe0c70db",
+          "first": "def on_tap(event):"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 6167,
+          "end": 6220,
+          "role": "logic",
+          "symbol": "_open_or_toggle_slitlet_at",
+          "anchor": "ee49f1407989",
+          "first": "def _open_or_toggle_slitlet_at(q: int, s: int, d: int, target_id: str | None) -> None:"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 10201,
+          "end": 10225,
+          "role": "logic",
+          "symbol": "_on_spacebar_toggle",
+          "anchor": "48835ca0cc14",
+          "first": "def _on_spacebar_toggle(attr, old, new) -> None:"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 6740,
+          "end": 6743,
+          "role": "logic",
+          "symbol": "on_ranges_update",
+          "anchor": "f7c4fdd68896",
+          "first": "def on_ranges_update(event):"
+        },
+        {
+          "file": "code/vmpt/wavelengths.py",
+          "start": 162,
+          "end": 182,
+          "role": "logic",
+          "symbol": "v2_overlap_distance",
+          "anchor": "d9c9687ba066",
+          "first": "def v2_overlap_distance(disperser: str, filt: str) -> float:"
+        }
+      ]
+    },
+    {
+      "id": "input-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Input tab",
+      "summary": "Loads the image, one or more catalogues and DS9 overlays, and lists the loaded catalogues with colour, visibility, remove and reorder controls.",
+      "views": [
+        "sidebar list",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/vmpt/main.py",
+          "start": 5659,
+          "end": 5670,
+          "role": "logic",
+          "symbol": "on_fits_path",
+          "anchor": "2f487fda3f78",
+          "first": "def on_fits_path(attr, old, new):"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 5692,
+          "end": 5707,
+          "role": "logic",
+          "symbol": "on_jpg_path",
+          "anchor": "c03b8b0e6760",
+          "first": "def on_jpg_path(attr, old, new):"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 5728,
+          "end": 5739,
+          "role": "logic",
+          "symbol": "on_catalog_add",
+          "anchor": "dcf7c557f017",
+          "first": "def on_catalog_add():"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 5491,
+          "end": 5598,
+          "role": "logic",
+          "symbol": "_render_catalog_list",
+          "anchor": "0510fa3156b2",
+          "first": "def _render_catalog_list() -> None:"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 7139,
+          "end": 7149,
+          "role": "logic",
+          "symbol": "on_example_a370",
+          "anchor": "cc0b9f468f50",
+          "first": "def on_example_a370():"
+        },
+        {
+          "file": "code/vmpt/catalog.py",
+          "start": 525,
+          "end": 617,
+          "role": "logic",
+          "symbol": "load_catalog",
+          "anchor": "b10ab80cf055",
+          "first": "def load_catalog(path: str) -> Catalog:"
+        }
+      ]
+    },
+    {
+      "id": "catalog-editor",
+      "level": "component",
+      "parent": "input-tab",
+      "title": "Catalogue editor",
+      "summary": "A sortable spreadsheet for editing target rows in place, adding columns, deriving weight from priority or the reverse, with undo and redo, saving to CSV and applying back.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "sort",
+        "undo",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/vmpt/main.py",
+          "start": 9382,
+          "end": 9407,
+          "role": "logic",
+          "symbol": "_cat_edit_open",
+          "anchor": "d871f4dd438c",
+          "first": "def _cat_edit_open():"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 8860,
+          "end": 8996,
+          "role": "logic",
+          "symbol": "_cat_edit_populate_table",
+          "anchor": "ca325175332a",
+          "first": "def _cat_edit_populate_table(idx: int) -> None:"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 9159,
+          "end": 9183,
+          "role": "logic",
+          "symbol": "_on_cat_edit_compute_w_from_p",
+          "anchor": "e293d78f3178",
+          "first": "def _on_cat_edit_compute_w_from_p():"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 9440,
+          "end": 9567,
+          "role": "logic",
+          "symbol": "_on_cat_edit_apply",
+          "anchor": "7df56bb7b7a4",
+          "first": "def _on_cat_edit_apply():"
+        },
+        {
+          "file": "code/vmpt/catalog_ops.py",
+          "start": 11,
+          "end": 56,
+          "role": "logic",
+          "symbol": "compute_weights_from_priorities",
+          "anchor": "12b6b183e686",
+          "first": "def compute_weights_from_priorities(priorities) -> list[str] | None:"
+        }
+      ]
+    },
+    {
+      "id": "pointing-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Pointing tab",
+      "summary": "Sets the pointing centre, the roll angle (slider or aperture PA) and the disperser/filter, and can report the allowed roll window for a date.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "time slider"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/vmpt/main.py",
+          "start": 5747,
+          "end": 5760,
+          "role": "logic",
+          "symbol": "on_pointing",
+          "anchor": "73563274ca48",
+          "first": "def on_pointing(attr, old, new):"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 5783,
+          "end": 5791,
+          "role": "logic",
+          "symbol": "on_v3pa_slider",
+          "anchor": "a6afb5e2a0bc",
+          "first": "def on_v3pa_slider(attr, old, new):"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 5826,
+          "end": 5841,
+          "role": "logic",
+          "symbol": "on_apa_text",
+          "anchor": "76983bd8c992",
+          "first": "def on_apa_text(attr, old, new):"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 5849,
+          "end": 5863,
+          "role": "logic",
+          "symbol": "on_disperser_filter",
+          "anchor": "7987437bc88b",
+          "first": "def on_disperser_filter(attr, old, new):"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 8228,
+          "end": 8239,
+          "role": "logic",
+          "symbol": "on_visibility",
+          "anchor": "26e0b76ce91e",
+          "first": "def on_visibility():"
+        }
+      ]
+    },
+    {
+      "id": "optimizer-dialog",
+      "level": "component",
+      "parent": "pointing-tab",
+      "title": "Pointing optimizer",
+      "summary": "Searches pointing and roll for the placement that scores best by count, weight or priority tier, optionally protecting chosen spectra, and lists the top solutions with an Apply button for each.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select",
+        "undo"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/vmpt/main.py",
+          "start": 8375,
+          "end": 8387,
+          "role": "logic",
+          "symbol": "_open_opt_config_modal",
+          "anchor": "dabcdeae05be",
+          "first": "def _open_opt_config_modal():"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 11744,
+          "end": 12066,
+          "role": "logic",
+          "symbol": "on_optimize",
+          "anchor": "33da7fe25649",
+          "first": "def on_optimize():"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 10861,
+          "end": 10864,
+          "role": "logic",
+          "symbol": "_opt_render_results_in_modal",
+          "anchor": "fc11e588462e",
+          "first": "def _opt_render_results_in_modal("
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 10399,
+          "end": 10401,
+          "role": "logic",
+          "symbol": "_apply_optimizer_result",
+          "anchor": "a1c7f9df33ce",
+          "first": "def _apply_optimizer_result("
+        },
+        {
+          "file": "code/vmpt/optimizer.py",
+          "start": 477,
+          "end": 1476,
+          "role": "logic",
+          "symbol": "PointingEvaluator",
+          "anchor": "ab3574382662",
+          "first": "class PointingEvaluator:"
+        },
+        {
+          "file": "code/vmpt/optimizer.py",
+          "start": 1484,
+          "end": 1496,
+          "role": "logic",
+          "symbol": "grid_search",
+          "anchor": "366f502b816f",
+          "first": "def grid_search("
+        },
+        {
+          "file": "code/vmpt/optimizer.py",
+          "start": 1570,
+          "end": 1582,
+          "role": "logic",
+          "symbol": "refine_top",
+          "anchor": "fcbbe523a880",
+          "first": "def refine_top("
+        }
+      ]
+    },
+    {
+      "id": "settings-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Settings tab",
+      "summary": "Sets the slitlet size and snap-to-operable, holds undo and clear for picks, and opens the image display and layer visibility dialogs.",
+      "views": [
+        "form",
+        "bar chart"
+      ],
+      "interactions": [
+        "undo",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/vmpt/main.py",
+          "start": 5866,
+          "end": 5867,
+          "role": "logic",
+          "symbol": "on_slitlet_height",
+          "anchor": "b0eacbfbdf27",
+          "first": "def on_slitlet_height(attr, old, new):"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 6343,
+          "end": 6349,
+          "role": "logic",
+          "symbol": "on_undo",
+          "anchor": "2b8aca1c4292",
+          "first": "def on_undo():"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 6352,
+          "end": 6358,
+          "role": "logic",
+          "symbol": "on_clear",
+          "anchor": "4a9fd657e52c",
+          "first": "def on_clear():"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 4932,
+          "end": 4975,
+          "role": "logic",
+          "symbol": "_rebuild_histogram",
+          "anchor": "4250e78352b6",
+          "first": "def _rebuild_histogram() -> None:"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 5844,
+          "end": 5846,
+          "role": "logic",
+          "symbol": "on_layers",
+          "anchor": "ad6d6b5d51a6",
+          "first": "def on_layers(attr, old, new):"
+        }
+      ]
+    },
+    {
+      "id": "stats-bar",
+      "level": "component",
+      "parent": null,
+      "title": "Statistics bar",
+      "summary": "Shows the current pointing, roll, open-shutter count, targets covered and conflict count, updated on every change.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/vmpt/main.py",
+          "start": 12105,
+          "end": 12124,
+          "role": "logic",
+          "symbol": "_on_stats_bar_choice",
+          "anchor": "9068a6b44898",
+          "first": "def _on_stats_bar_choice(attr, old, new):"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 12447,
+          "end": 12449,
+          "role": "logic",
+          "symbol": "_open_stats_bar_modal",
+          "anchor": "b94ef328fc2e",
+          "first": "def _open_stats_bar_modal(_e=None) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "mpt-tab",
+      "level": "view",
+      "parent": null,
+      "title": "MPT tab: plan import, session and export",
+      "summary": "Imports APT plans, shutter masks or .aptx archives, saves and loads sessions, and exports the APT and eMPT bundle.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/vmpt/main.py",
+          "start": 6366,
+          "end": 6733,
+          "role": "logic",
+          "symbol": "on_export",
+          "anchor": "5b45a879341e",
+          "first": "def on_export():"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 6818,
+          "end": 6839,
+          "role": "logic",
+          "symbol": "on_session_save",
+          "anchor": "ef983ed1f23a",
+          "first": "def on_session_save():"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 6851,
+          "end": 6871,
+          "role": "logic",
+          "symbol": "on_session_load",
+          "anchor": "8c68c917adb3",
+          "first": "def on_session_load():"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 7209,
+          "end": 7221,
+          "role": "logic",
+          "symbol": "on_mpt_load",
+          "anchor": "7699f976e543",
+          "first": "def on_mpt_load():"
+        },
+        {
+          "file": "code/vmpt/main.py",
+          "start": 7260,
+          "end": 7294,
+          "role": "logic",
+          "symbol": "on_mpt_csv_load",
+          "anchor": "96368487b5bc",
+          "first": "def on_mpt_csv_load():"
+        },
+        {
+          "file": "code/vmpt/session_io.py",
+          "start": 600,
+          "end": 609,
+          "role": "logic",
+          "symbol": "export_session_json",
+          "anchor": "af6857ea87f0",
+          "first": "def export_session_json(session: Session, path: str) -> None:"
+        },
+        {
+          "file": "code/vmpt/empt_io.py",
+          "start": 337,
+          "end": 341,
+          "role": "logic",
+          "symbol": "write_shutter_mask_csv",
+          "anchor": "2b761f3ae1b1",
+          "first": "def write_shutter_mask_csv("
+        }
+      ]
+    }
+  ]
+}

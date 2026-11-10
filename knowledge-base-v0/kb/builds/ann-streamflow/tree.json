@@ -1,0 +1,665 @@
+{
+ "interface": {
+  "title": "ANN Streamflow Prediction Dashboard (Streamlit)",
+  "field": "Hydrology / machine learning for daily river discharge (streamflow) forecasting",
+  "stage_of_work": "Post-training model evaluation and selection: comparing finished runs, checking diagnostics and running ad hoc queries on stored results",
+  "what_it_is_for": "Browse a daily discharge record and its chronological 80/20 train/test split, then compare 25 pre-trained neural-network configurations (5 activations x 5 optimizers) by R², RMSE, MAE and RME, inspect fit, residuals and loss curves for chosen models, and run SQL on the bundled results database."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "Everything comes from the bundled read-only streamflow_results.db (tables raw_data, model_configurations, training_results, training_logs, predictions): 13,874 daily discharge values from 1985-01-06 to 2022-12-31 and the results of 25 trained models. No upload anywhere. The API Demo page needs a FastAPI server on localhost:8000, which was not running. The External Data page calls the live USGS Water Services API, which this server cannot reach."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Pick the best predictive model configuration for a time series and check that its evaluation can be trusted",
+  "specific": "Find the best of 25 ANN activation x optimizer configurations for daily discharge prediction and check its fit, convergence and data split",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Understand the input data and how it was split",
+    "specific": "Review the discharge time series and the temporal 80/20 train/test split",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Look at the whole record and its summary statistics",
+      "specific": "Read the Home page KPIs (13,874 points, 25 models, best R² 0.9999, mean R² 0.8648), the discharge time series coloured by train/test, the discharge histogram and the monthly average discharge bars",
+      "screens": [
+       "screens/003.webp",
+       "screens/004.webp",
+       "screens/006.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the app (Home) page",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled down to the time series, histogram and monthly bars",
+        "screens": [
+         "screens/004.webp",
+         "screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Confirm that the training period comes entirely before the test period",
+      "specific": "Zoom the time series on the boundary between Training Data (blue) and Testing Data (red); blue ends in 2015 and red starts right after it. The box zoom also cuts the y-axis near 400, so low flows are hidden in the zoomed view",
+      "screens": [
+       "screens/005.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged a zoom box over 2015-2023 on the Discharge Time Series",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "double-clicked the chart to reset the zoom",
+        "screens": [
+         "screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check the split boundaries and sizes exactly with a query",
+      "specific": "Run SQL on raw_data grouped by data_split: train 1985-01-06 to 2015-05-26 (11,098 rows), test 2015-05-27 to 2022-12-31 (2,776 rows), i.e. 80/20 in date order. The README states 11,099/2,775; the database counts differ from it by one row",
+      "screens": [
+       "screens/040.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed SELECT data_split, MIN(date), MAX(date), COUNT(*) FROM raw_data GROUP BY data_split",
+        "screens": [
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run Query",
+        "screens": [
+         "screens/040.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Rank the candidate models on error metrics",
+    "specific": "Compare R², RMSE, MAE (and RME) across the 25 configurations on the Model Comparison page",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Narrow the candidate set by its two design factors",
+      "specific": "Remove Sigmoid from the Activation Functions multiselect and SGD from the Optimizers multiselect; the table (16 rows) and all charts update",
+      "screens": [
+       "screens/009.webp",
+       "screens/010.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Model Comparison",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked x on the Sigmoid chip",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked x on the SGD chip",
+        "screens": [
+         "screens/010.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Sort and search the results table",
+      "specific": "Sort the Results Table by rmse_test, scroll across to best_epoch and training_time_seconds, and search the table for 'ELU'",
+      "screens": [
+       "screens/011.webp",
+       "screens/012.webp",
+       "screens/014.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the rmse_test column header twice (sorted descending)",
+        "screens": [
+         "screens/011.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled the table sideways",
+        "screens": [
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed the table Search icon and typed ELU (24 matches highlighted)",
+        "screens": [
+         "screens/013.webp",
+         "screens/014.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Read the best model and the factor interaction from charts",
+      "specific": "Read the Best Model banner (best run in the current filter: ANN_64-32-16_ELU_Adam, R² 0.9999, RMSE 3.81), hover cells of the activation x optimizer R² heatmap, isolate one activation in the R² bar chart, and hover points on the RMSE vs R² scatter",
+      "screens": [
+       "screens/015.webp",
+       "screens/016.webp",
+       "screens/017.webp",
+       "screens/019.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered the ReLU/Adagrad heatmap cell (0.983672)",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "double-clicked ELU in the bar-chart legend to show ELU only",
+        "screens": [
+         "screens/017.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the ELU/Adam point on the RMSE vs R² scatter",
+        "screens": [
+         "screens/018.webp",
+         "screens/019.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Rank models on a metric the page does not show",
+      "specific": "Use the Database Explorer to order all models by rme_test (ELU/Adam lowest at 0.012, then Sigmoid/Adam and Tanh/Adam)",
+      "screens": [
+       "screens/039.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed a JOIN of model_configurations and training_results ordered by rme_test, LIMIT 5",
+        "screens": [
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run Query",
+        "screens": [
+         "screens/039.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Check the predictions of chosen models",
+    "specific": "Use the Predictions page to look at actual-vs-predicted discharge and residuals",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Inspect the best model's fit over a chosen time window",
+      "specific": "With ANN_64-32-16_ELU_Adam selected, narrow the Date Range slider to 2021-03-05 to 2022-12-31 and read the time-series overlay, the 1:1 scatter and the residuals over time (about ±15 cumecs)",
+      "screens": [
+       "screens/020.webp",
+       "screens/021.webp",
+       "screens/022.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Predictions (best model preselected; R² 0.9999, RMSE 3.81, MAE 2.81, RME 0.0120)",
+        "screens": [
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged the left Date Range handle to 2021-03-05",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled down to the scatter and residual plots",
+        "screens": [
+         "screens/022.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Repeat the check for a poor model to compare",
+      "specific": "Pick ANN_64-32-16_Sigmoid_SGD by typing in the Select Model box; its metrics (R² -0.2433, RMSE 550.20, MAE 424.03, RME 1.7344), a flat ~550 prediction line, a horizontal scatter and residuals down to about -4,900 show it failed",
+      "screens": [
+       "screens/026.webp",
+       "screens/027.webp",
+       "screens/028.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Select Model and typed Tanh_SGD (R² 0.9933), then Sigmoid_SGD",
+        "screens": [
+         "screens/023.webp",
+         "screens/024.webp",
+         "screens/025.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Enter to select Sigmoid_SGD",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the scatter and residuals",
+        "screens": [
+         "screens/027.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged a zoom box over the low-flow corner of the scatter",
+        "screens": [
+         "screens/028.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Check how training converged",
+    "specific": "Compare training/validation loss curves and early stopping on the Training Analysis page",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Overlay learning curves of several models",
+      "specific": "Change the 'Select Models to Compare' multiselect from the five ELU models to ELU_Adam, ELU_SGD and Sigmoid_SGD and read the log-scale train/val MSE curves",
+      "screens": [
+       "screens/029.webp",
+       "screens/030.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Training Analysis (5 ELU models preselected)",
+        "screens": [
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "removed ELU_Adadelta, ELU_Adagrad and ELU_RMSprop chips",
+        "screens": [
+         "screens/030.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed Sigmoid_SGD in the multiselect and pressed Enter",
+        "screens": [
+         "screens/030.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Judge early stopping and plateaus",
+      "specific": "Read the Normalized Loss Curves (Validation) and the Convergence Summary table. The columns recorded were best_epoch, training_time_seconds and total_epochs (Sigmoid_SGD 1/11, ELU_SGD 27/37, ELU_Adam 36/46, so every run stopped 10 epochs after its best, before the 50-epoch limit); the code's early_stopped flag was not recorded as visible",
+      "screens": [
+       "screens/031.webp",
+       "screens/032.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to the Normalized Loss Curves and the Convergence Summary",
+        "screens": [
+         "screens/031.webp",
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Ask custom questions of the stored results",
+    "specific": "Run SQL against streamflow_results.db in the Database Explorer",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Learn the database structure",
+      "specific": "Expand the Database Schema panel listing raw_data, model_configurations, training_results, training_logs and predictions",
+      "screens": [
+       "screens/035.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Database Schema",
+        "screens": [
+         "screens/034.webp",
+         "screens/035.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Run a ready-made query",
+      "specific": "Choose an Example Query, which fills the SQL box, then press Run Query: 'Average R2 by activation function' (SELU 0.995, Tanh 0.9945, ELU 0.9908) and 'Rank models within activation' (RANK() window function)",
+      "screens": [
+       "screens/038.webp",
+       "screens/043.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Example Queries and chose 'Average R2 by activation function'",
+        "screens": [
+         "screens/036.webp",
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run Query",
+        "screens": [
+         "screens/038.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'Rank models within activation' and pressed Run Query",
+        "screens": [
+         "screens/042.webp",
+         "screens/043.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Write a query of my own; a mistyped query returns a readable error instead of a result",
+      "specific": "Type custom SQL (the RME ranking in t7 and the split dates in t3); a query on a misspelled table returns 'Query error: ... no such table: results_typo'",
+      "screens": [
+       "screens/039.webp",
+       "screens/041.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed SELECT * FROM results_typo; and pressed Run Query",
+        "screens": [
+         "screens/041.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Two-factor filter driving a linked results table and charts",
+   "general": "Pick which levels of two experimental factors to keep; a ranked table, a per-run bar chart, a factor-by-factor heatmap and an error-vs-fit scatter all redraw for that subset, with the best run in the current selection named in a banner",
+   "specific": "Activation Functions and Optimizers multiselects on Model Comparison filter the Results Table, the R² Test by Configuration bars, the Activation vs Optimizer heatmap, the RMSE vs R² scatter and the Training Time chart; the Best Model banner (r2_test maximum of the filtered rows) names ELU_Adam while ELU and Adam are selected. Clearing every activation empties the table and shows an argmax error",
+   "steps": [
+    "remove or add level chips in each factor multiselect",
+    "read the filtered results table",
+    "hover heatmap cells to get the exact factor-pair score",
+    "double-click a legend entry to isolate one factor level in the bar chart",
+    "hover scatter points for the full metric set of one run"
+   ],
+   "serves_tasks": [
+    "Narrow the candidate set by its two design factors",
+    "Read the best model and the factor interaction from charts"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/015.webp",
+    "screens/016.webp",
+    "screens/017.webp",
+    "screens/019.webp",
+    "screens/049.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Interactive results grid (sort, search, column scroll)",
+   "general": "Sort a metrics table by any column, find text in it with highlighting, and scroll across wide tables",
+   "specific": "Streamlit dataframe toolbar on the Results Table: click a header to sort (e.g. rmse_test), Search icon to highlight matches (ELU gave 24 results), sideways scroll to best_epoch and training_time_seconds. The toolbar also offers Download as CSV, but pressing it produced no file, so export is unverified",
+   "steps": [
+    "click a column header to sort ascending or descending",
+    "open Search and type a term to highlight matching cells",
+    "scroll sideways to further columns"
+   ],
+   "serves_tasks": [
+    "Sort and search the results table"
+   ],
+   "screens": [
+    "screens/011.webp",
+    "screens/012.webp",
+    "screens/014.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Model picker with observed-vs-predicted, 1:1 scatter and residuals over a date window",
+   "general": "Choose one fitted model and a time window; see its headline error metrics, an observed/predicted overlay, an observed-vs-predicted scatter with a 1:1 line, and residuals over time",
+   "specific": "Predictions page: a type-to-search Select Model box (labels include R²) updates the R²/RMSE/MAE/RME metrics and three Plotly charts; a two-handle Date Range slider limits the test period shown",
+   "steps": [
+    "type part of a model name in Select Model and press Enter",
+    "read the R², RMSE, MAE and RME tiles",
+    "drag a Date Range handle to narrow the window",
+    "inspect the time-series overlay, 1:1 scatter and residual plot",
+    "drag a zoom box on the scatter to look at low values"
+   ],
+   "serves_tasks": [
+    "Inspect the best model's fit over a chosen time window",
+    "Repeat the check for a poor model to compare"
+   ],
+   "screens": [
+    "screens/021.webp",
+    "screens/022.webp",
+    "screens/026.webp",
+    "screens/027.webp",
+    "screens/028.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Multi-run learning-curve overlay with convergence summary",
+   "general": "Select several training runs and overlay their training and validation loss per epoch on a log scale, plus normalized validation curves and a table of best epoch, total epochs and run time to judge early stopping",
+   "specific": "Training Analysis page: the 'Select Models to Compare' multiselect drives the Training Loss Curves (Train dashed, Val solid), the Normalized Loss Curves (Validation) and the Convergence Summary table (recorded columns: best_epoch, training_time_seconds, total_epochs; the code also defines an early_stopped flag, total_epochs < 50, not confirmed as shown)",
+   "steps": [
+    "add or remove models in the multiselect",
+    "compare train vs val loss curves on the log-MSE axis",
+    "read the normalized validation curves",
+    "read best_epoch vs total_epochs in the Convergence Summary"
+   ],
+   "serves_tasks": [
+    "Overlay learning curves of several models",
+    "Judge early stopping and plateaus"
+   ],
+   "screens": [
+    "screens/030.webp",
+    "screens/031.webp",
+    "screens/032.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "SQL console with schema reference and example-query templates",
+   "general": "Ask any question of a results database: look up the tables, start from a template query or write your own, run it and get a result table or a readable error",
+   "specific": "Database Explorer: expandable Database Schema, Example Queries selectbox (All model configurations, Top 5 by R2, Average R2 by activation, Best model per optimizer, Rank models within activation, Monthly prediction accuracy, Training convergence analysis) filling an editable SQL Query box, Run Query, and a result grid or red 'Query error' message",
+   "steps": [
+    "expand Database Schema to see the tables",
+    "pick an example query or type SQL in the box",
+    "press Run Query",
+    "read the result grid, or the error message if the SQL fails"
+   ],
+   "serves_tasks": [
+    "Run a ready-made query",
+    "Write a query of my own; a mistyped query returns a readable error instead of a result",
+    "Rank models on a metric the page does not show",
+    "Check the split boundaries and sizes exactly with a query"
+   ],
+   "screens": [
+    "screens/035.webp",
+    "screens/038.webp",
+    "screens/039.webp",
+    "screens/040.webp",
+    "screens/041.webp",
+    "screens/043.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Train/test-coloured time series with box zoom",
+   "general": "Plot a long time series coloured by data partition and drag a box to zoom in on the partition boundary, double-clicking to reset",
+   "specific": "Home page Discharge Time Series (Training Data blue, Testing Data red), with the Discharge Distribution histogram stacked by data_split and Monthly Average Discharge bars beside it; a box zoom also crops the y-axis to the dragged range",
+   "steps": [
+    "read the colour-coded series",
+    "drag a zoom box over the train/test boundary",
+    "double-click to reset the zoom"
+   ],
+   "serves_tasks": [
+    "Look at the whole record and its summary statistics",
+    "Confirm that the training period comes entirely before the test period"
+   ],
+   "screens": [
+    "screens/004.webp",
+    "screens/005.webp",
+    "screens/006.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "API Demo results for List Models, Model Details, Compare and USGS Data: the FastAPI server on localhost:8000 was not running, so Fetch Models returned 'Connection refused' (screens/045.webp). Only the request forms and the API documentation table were visible (screens/046.webp).",
+  "External Data chart of live USGS discharge: Fetch Real-Time Data failed with a proxy/403 error because the server has no internet (screens/048.webp)."
+ ],
+ "not_done": [
+  "Download as CSV on the Results Table: pressing it produced no file in the browser's download list, so the export could not be checked.",
+  "Clicking the 'test' legend entry on the Home page histogram produced no visible change (screens/007.webp).",
+  "Model Details and USGS Data tabs on API Demo were not opened; they depend on the same offline API.",
+  "Other USGS stations and Data Period options were not tried, since every fetch fails offline.",
+  "The PNG-download buttons in the chart toolbars were not tried.",
+  "Edge case found: clearing every Activation Function on Model Comparison leaves an empty table and the error 'Error loading data: attempt to get argmax of an empty sequence' (screens/049.webp).",
+  "Observation: on the Normalized Loss Curves, Sigmoid_SGD sits around -2.5 to -3 while the other models sit near 0, so the normalization is unclear (screens/031.webp)."
+ ],
+ "applied": [
+  "f1 general: banner now names the best run in the current selection, not the overall best; specific notes it is the r2_test maximum of the filtered rows",
+  "f2: removed the 'press Download as CSV' step, dropped CSV from the name and marked the export unverified in specific",
+  "t1: removed the no-op histogram legend click and moved it to not_done",
+  "t11/f4: stated which Convergence Summary columns were recorded and that the early_stopped flag was not confirmed visible",
+  "t3: noted the database's 11,098/2,776 versus the README's 11,099/2,775",
+  "not_done: dropped the 'sparse training points' observation, which likely came from 005's y-axis crop; t2 and f6 now note that the box zoom hides low flows",
+  "t9: corrected the residual minimum to about -4,900 and added MAE 424.03, as the review and replay read them",
+  "t14 general: reworded away from software testing toward writing one's own query",
+  "t4: added the 16-row count the replay recorded"
+ ],
+ "open_fixes": [
+  "Accuracy versus training cost task using the Training Time by Model chart: the run never read that chart (the replay also skipped it), so a new run must look at it and keep a screen.",
+  "Overfitting check from train vs test metrics (r2_train vs r2_test, rmse_train vs rmse_test): never queried or shown, so it needs a new run, for example a Database Explorer query on training_results.",
+  "early_stopped flag in the Convergence Summary: a new run must scroll the table fully and confirm whether the column is shown.",
+  "Jagged training series on the Home page: re-inspect the unzoomed time series (screens/004) to decide whether the gaps are real or come from the zoom's y-axis crop.",
+  "Download as CSV: retry in a browser setup that records downloads to confirm whether export works."
+ ],
+ "screens_at": "pilot/public/runs/ann-streamflow/20261101-175402/",
+ "screens_filed": {
+  "screens/003.webp": "screens/003.webp",
+  "screens/009.webp": "screens/009.webp",
+  "screens/020.webp": "screens/020.webp",
+  "screens/029.webp": "screens/029.webp",
+  "screens/035.webp": "screens/035.webp"
+ }
+}

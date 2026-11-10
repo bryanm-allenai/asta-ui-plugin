@@ -1,0 +1,637 @@
+{
+  "schema": "astaui.card/1",
+  "id": "sem-analyzer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T17:44:02Z"
+  },
+  "app": {
+    "title": "SEM analyzer: measure features on micrographs and assemble figure panels",
+    "summary": "A person loads a folder or upload of electron micrographs, along with any instrument metadata files, and picks one from a thumbnail sidebar. They set the scale, either automatically from the metadata and the detected scale bar or by drawing a line over the scale bar and typing its length. Then they draw lines and circles on the image, and each one becomes a length or diameter in real units, written on the image and added to a table. They can crop the instrument info strip, add a clean scale bar, a panel label and text boxes, and download the annotated PNG and a measurement CSV. They can also pick several images in order and lay them out as one labelled figure with scale bars, which downloads as a PNG or as a ZIP of the processed images.",
+    "task": {
+      "text": "Measure lengths and diameters of features in calibrated micrographs, and prepare the annotated images and multi-panel figures for publication.",
+      "verbs": [
+        "derive",
+        "annotate",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "A set of microscope images, each with an optional key=value metadata file giving magnification and scale-bar length, plus the table of measurements drawn on each image.",
+      "item": "a single micrograph with its calibration and the shapes drawn on it",
+      "shapes": [
+        "image collection",
+        "image",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "measuring features on micrographs after imaging, and preparing figures for a paper",
+      "terms": [
+        "analyze",
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar of thumbnails chooses the image open in the main view. There, a drawing canvas turns each line or circle into a calibrated length that is written on the image and gathered in a table, while side controls set the calibration, crop and figure overlays that are composed into the canvas background. A second mode uses the same sidebar to queue images in click order and tiles them into one figure grid with per-panel scale bars and letter labels.",
+      "views": [
+        "thumbnail grid",
+        "image viewer",
+        "canvas",
+        "table view",
+        "form",
+        "small multiples"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "draw shapes",
+        "drag to arrange",
+        "undo",
+        "keyboard shortcuts",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "master-detail",
+        "small multiples"
+      ]
+    },
+    "field": {
+      "text": "scale-calibrated measurement of SEM micrographs and figure preparation in materials science",
+      "disciplines": [
+        "materials science"
+      ],
+      "terms": [
+        "scanning electron microscopy",
+        "particle sizing",
+        "figure preparation"
+      ]
+    },
+    "workflow": {
+      "name": "calibrate images to real units, measure features, and assemble a figure",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A native folder picker or a typed path loads every image in a folder, or several images are uploaded with their matching .txt metadata files. Each image is calibrated automatically where the metadata allows.",
+          "parts": [
+            "image-sidebar"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Clicking a thumbnail opens that image on the drawing canvas. Each thumbnail shows whether its image is calibrated yet.",
+          "parts": [
+            "thumbnail-picker",
+            "measure-canvas"
+          ]
+        },
+        {
+          "step": "set the scale from a known reference",
+          "here": "Auto-calibration divides the metadata's MicronMarker length by the scale-bar length detected in the bottom info strip. Manual calibration means drawing a line over the scale bar and entering its real length in µm.",
+          "parts": [
+            "scale-calibration"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Lines drawn on the canvas give lengths and circles give diameters in µm or nm. Labels are written along each line, and the values build up in a table. Shapes can be moved, resized or deleted, and Ctrl+Z undoes.",
+          "parts": [
+            "measure-canvas"
+          ]
+        },
+        {
+          "step": "add figure annotations to the image",
+          "here": "Options to crop the info strip, draw a new scale bar with a rounded length, add a corner panel label such as 'a)', and place free text boxes.",
+          "parts": [
+            "figure-elements"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Downloads the annotated PNG and a CSV of the measurements, both named after the project and image.",
+          "parts": [
+            "single-export"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "In Figures mode, thumbnails clicked in order are tiled into a grid with a set number of columns, a gap, a background colour and cell width. Each cell is cropped and gets a scale bar and an auto letter label. The result downloads as one PNG or as a ZIP of the processed cells.",
+          "parts": [
+            "thumbnail-picker",
+            "montage-figure"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each image must be calibrated (µm per pixel) before any measurement shows in real units. The calibration comes from instrument metadata plus automatic detection of a tick-ruler scale bar, or from a hand-drawn line over the bar.",
+        "Measured values are drawn onto the image, rotated to run along each line, so the exported picture carries its own measurements.",
+        "The instrument's black data strip at the bottom of each image is detected so it can be cropped off before the figure is made.",
+        "Scale-bar lengths are rounded to 1, 2 or 5 × 10^n, and montage panels can keep each image's original scale-bar length or use one shared length.",
+        "Everything runs locally as a desktop app so unpublished images never leave the machine."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "image-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Project and image loading sidebar",
+      "summary": "Sets the project and output file names, loads images from a folder or an upload with their metadata files, and switches between single-image editing and figure mode.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 455,
+          "end": 513,
+          "role": "logic",
+          "symbol": "sidebar",
+          "anchor": "b897192360a0",
+          "first": "def sidebar():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 377,
+          "end": 398,
+          "role": "logic",
+          "symbol": "load_from_folder",
+          "anchor": "c9d03efb752e",
+          "first": "def load_from_folder(folder: str):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 401,
+          "end": 418,
+          "role": "logic",
+          "symbol": "load_from_uploads",
+          "anchor": "bcdaeaecae54",
+          "first": "def load_from_uploads(files):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 269,
+          "end": 374,
+          "role": "logic",
+          "symbol": "pick_folder_dialog",
+          "anchor": "7cb63f0991b0",
+          "first": "def pick_folder_dialog():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 212,
+          "end": 223,
+          "role": "logic",
+          "symbol": "add_image",
+          "anchor": "13d81101736a",
+          "first": "def add_image(name: str, img: Image.Image, meta: dict | None):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 187,
+          "end": 192,
+          "role": "logic",
+          "symbol": "init_state",
+          "anchor": "ff08f0a978cc",
+          "first": "def init_state():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 149,
+          "end": 184,
+          "role": "style",
+          "anchor": "0b3a2692d895",
+          "first": "SIDEBAR_CSS = \"\"\""
+        },
+        {
+          "file": "code/sem_meta.py",
+          "start": 77,
+          "end": 85,
+          "role": "logic",
+          "symbol": "load_sidecar",
+          "anchor": "baff3e1c2528",
+          "first": "def load_sidecar(image_path: str) -> Optional[dict]:"
+        },
+        {
+          "file": "code/sem_meta.py",
+          "start": 88,
+          "end": 90,
+          "role": "logic",
+          "symbol": "load_sidecar_bytes",
+          "anchor": "d13d3bbcc2b4",
+          "first": "def load_sidecar_bytes(raw: bytes) -> dict:"
+        },
+        {
+          "file": "code/sem_meta.py",
+          "start": 45,
+          "end": 74,
+          "role": "logic",
+          "symbol": "summarize",
+          "anchor": "a22143f98204",
+          "first": "def summarize(fields: dict) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "thumbnail-picker",
+      "level": "component",
+      "parent": "image-sidebar",
+      "title": "Thumbnail picker",
+      "summary": "Shows loaded images as a two-column grid of thumbnails with a calibration mark. A click opens an image for editing, or in figure mode adds it to or removes it from the panel order.",
+      "views": [
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "select",
+        "multi-select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 226,
+          "end": 263,
+          "role": "logic",
+          "symbol": "sidebar_image_picker",
+          "anchor": "949f2e65497e",
+          "first": "def sidebar_image_picker(ss, mode):"
+        }
+      ]
+    },
+    {
+      "id": "measure-canvas",
+      "level": "view",
+      "parent": null,
+      "title": "Drawing canvas and measurement table",
+      "summary": "Lets the person draw lines, circles or freehand strokes on the image and edit them. Each line or circle becomes a calibrated length or diameter, labelled on the image and listed in a table.",
+      "views": [
+        "canvas",
+        "image viewer",
+        "table view"
+      ],
+      "interactions": [
+        "draw shapes",
+        "drag to arrange",
+        "undo",
+        "keyboard shortcuts"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 555,
+          "end": 593,
+          "role": "logic",
+          "anchor": "0020c89ec80d",
+          "first": "def single_tab():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 661,
+          "end": 760,
+          "role": "logic",
+          "anchor": "22a99cda9efc",
+          "first": "# ---- left column: canvas + measurements ----"
+        },
+        {
+          "file": "code/app.py",
+          "start": 991,
+          "end": 1028,
+          "role": "logic",
+          "symbol": "extract_measurements",
+          "anchor": "42466c1db612",
+          "first": "def extract_measurements(json_data, scale, um_per_px):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 979,
+          "end": 988,
+          "role": "logic",
+          "symbol": "_draw_sig",
+          "anchor": "b711aec18f03",
+          "first": "def _draw_sig(json_data):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 959,
+          "end": 962,
+          "role": "logic",
+          "symbol": "display_size",
+          "anchor": "ce6c7e9e7acb",
+          "first": "def display_size(img: Image.Image):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 548,
+          "end": 549,
+          "role": "logic",
+          "symbol": "inject_undo_shortcut",
+          "anchor": "b7a86babdaeb",
+          "first": "def inject_undo_shortcut():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 522,
+          "end": 545,
+          "role": "logic",
+          "anchor": "406ad24aa520",
+          "first": "_UNDO_JS = \"\"\""
+        },
+        {
+          "file": "code/imaging.py",
+          "start": 299,
+          "end": 303,
+          "role": "logic",
+          "symbol": "draw_measurement_labels",
+          "anchor": "b4fc7e7f9e5c",
+          "first": "def draw_measurement_labels("
+        }
+      ]
+    },
+    {
+      "id": "scale-calibration",
+      "level": "component",
+      "parent": "measure-canvas",
+      "title": "Scale calibration",
+      "summary": "Sets the image's µm per pixel, either automatically from the metadata's scale-bar length and the detected bar, or by drawing a line over the scale bar and entering its real length.",
+      "views": [
+        "canvas",
+        "form"
+      ],
+      "interactions": [
+        "draw shapes"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 596,
+          "end": 640,
+          "role": "logic",
+          "anchor": "988ca688203f",
+          "first": "with right:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 201,
+          "end": 209,
+          "role": "logic",
+          "symbol": "auto_calibrate",
+          "anchor": "a9027e19bdc5",
+          "first": "def auto_calibrate(img: Image.Image, meta: dict | None):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 965,
+          "end": 969,
+          "role": "logic",
+          "symbol": "last_object",
+          "anchor": "3f03a230c8a8",
+          "first": "def last_object(canvas, obj_type):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 972,
+          "end": 976,
+          "role": "logic",
+          "symbol": "bbox_len",
+          "anchor": "46ab738aa6f0",
+          "first": "def bbox_len(obj):"
+        },
+        {
+          "file": "code/imaging.py",
+          "start": 45,
+          "end": 58,
+          "role": "logic",
+          "symbol": "detect_info_strip",
+          "anchor": "bf296bfb6a84",
+          "first": "def detect_info_strip(img: Image.Image, dark_frac: float = 0.5) -> int:"
+        },
+        {
+          "file": "code/imaging.py",
+          "start": 70,
+          "end": 122,
+          "role": "logic",
+          "symbol": "detect_scalebar_px",
+          "anchor": "242eaa192e9a",
+          "first": "def detect_scalebar_px(img: Image.Image, strip_top: int) -> Optional[float]:"
+        }
+      ]
+    },
+    {
+      "id": "figure-elements",
+      "level": "component",
+      "parent": "measure-canvas",
+      "title": "Crop and figure overlays",
+      "summary": "Crops the instrument info strip and adds a fresh scale bar, a corner panel label and free text boxes, all composed into the image background.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 642,
+          "end": 659,
+          "role": "logic",
+          "anchor": "b40ffcc164a3",
+          "first": "st.markdown(\"##### 2. 크롭\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 796,
+          "end": 810,
+          "role": "logic",
+          "symbol": "scalebar_controls",
+          "anchor": "9cdebb3c34fa",
+          "first": "def scalebar_controls(meta, rec):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 785,
+          "end": 793,
+          "role": "logic",
+          "symbol": "nice_scalebar_um",
+          "anchor": "000c838471a1",
+          "first": "def nice_scalebar_um(um_per_px, img_w):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 813,
+          "end": 823,
+          "role": "logic",
+          "symbol": "panel_controls",
+          "anchor": "bd99bd4fe710",
+          "first": "def panel_controls(name):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 826,
+          "end": 848,
+          "role": "logic",
+          "symbol": "textbox_controls",
+          "anchor": "43d2f47cc0d3",
+          "first": "def textbox_controls(name):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 424,
+          "end": 443,
+          "role": "logic",
+          "symbol": "compose_background",
+          "anchor": "a3fb04523c72",
+          "first": "def compose_background(rec, opts):"
+        },
+        {
+          "file": "code/imaging.py",
+          "start": 61,
+          "end": 67,
+          "role": "logic",
+          "symbol": "crop_bottom",
+          "anchor": "430387484fcf",
+          "first": "def crop_bottom(img: Image.Image, strip_px: int) -> Image.Image:"
+        },
+        {
+          "file": "code/imaging.py",
+          "start": 137,
+          "end": 147,
+          "role": "logic",
+          "symbol": "draw_scalebar",
+          "anchor": "10cb5ec31297",
+          "first": "def draw_scalebar("
+        },
+        {
+          "file": "code/imaging.py",
+          "start": 210,
+          "end": 217,
+          "role": "logic",
+          "symbol": "draw_panel_label",
+          "anchor": "bc5ea6a0aae7",
+          "first": "def draw_panel_label("
+        },
+        {
+          "file": "code/imaging.py",
+          "start": 182,
+          "end": 207,
+          "role": "logic",
+          "symbol": "draw_text_boxes",
+          "anchor": "c1a4c75ae5bd",
+          "first": "def draw_text_boxes(img: Image.Image, boxes: list) -> Image.Image:"
+        }
+      ]
+    },
+    {
+      "id": "single-export",
+      "level": "component",
+      "parent": "measure-canvas",
+      "title": "Annotated image and CSV export",
+      "summary": "Combines the drawing with the composed image, previews it with the measurement labels, and downloads it as a PNG along with the measurements as a CSV.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 762,
+          "end": 782,
+          "role": "logic",
+          "anchor": "3df02d73a3f3",
+          "first": "# ---- export & preview ----"
+        },
+        {
+          "file": "code/app.py",
+          "start": 195,
+          "end": 198,
+          "role": "logic",
+          "symbol": "save_basename",
+          "anchor": "a3d92d340a6b",
+          "first": "def save_basename(default: str) -> str:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 446,
+          "end": 449,
+          "role": "logic",
+          "symbol": "png_bytes",
+          "anchor": "5bbf3ff0525d",
+          "first": "def png_bytes(img: Image.Image) -> bytes:"
+        },
+        {
+          "file": "code/imaging.py",
+          "start": 337,
+          "end": 346,
+          "role": "logic",
+          "symbol": "composite_canvas",
+          "anchor": "0768eb086f02",
+          "first": "def composite_canvas(bg: Image.Image, canvas_rgba: np.ndarray, scale: float) -> Image.Image:"
+        }
+      ]
+    },
+    {
+      "id": "montage-figure",
+      "level": "view",
+      "parent": null,
+      "title": "Multi-panel figure builder",
+      "summary": "Tiles the chosen images in click order into one grid, with options for crop, scale bar, automatic letter labels, columns, gap and cell size. The figure downloads as a PNG, or the processed cells as a ZIP.",
+      "views": [
+        "small multiples",
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "small multiples",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 854,
+          "end": 933,
+          "role": "logic",
+          "symbol": "montage_tab",
+          "anchor": "24ab90d04764",
+          "first": "def montage_tab():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 936,
+          "end": 953,
+          "role": "logic",
+          "symbol": "build_montage",
+          "anchor": "4ea69a409d83",
+          "first": "def build_montage(cells, per_row, cell_w, gap, bg_color):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "interactions",
+      "term": "draw shapes"
+    }
+  ]
+}

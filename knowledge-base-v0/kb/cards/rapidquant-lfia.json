@@ -1,0 +1,534 @@
+{
+  "schema": "astaui.card/1",
+  "id": "rapidquant-lfia",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T21:04:31Z"
+  },
+  "app": {
+    "title": "RapidQuant — Lateral Flow Strip Quantification with Standard Curves and Limit of Detection",
+    "summary": "The person picks a workflow (single strip, limit-of-detection series or unknown quantification) and fills in an experiment form: a name, a concentration unit, the replicate count and the concentration levels of the standards. Next they bring in strip photos from the live camera, the gallery or a folder. They confirm each photo, give each strip its standard concentration or mark it as an unknown with a sample ID and a dilution factor, and start quantification. Each strip is cropped automatically, and its test and control bands are measured as peak areas to give a T/C ratio. The standards are fitted with a 4PL or 5PL curve, chosen by statistical test, which gives the limit of blank and limit of detection, back-calculated recoveries and unknown concentrations with prediction intervals. Suspect high readings can be checked against a diluted strip for hook effect. The experiment is saved and can be exported as a ZIP or a combined PDF of figures, a summary table and raw data.",
+    "task": {
+      "text": "Turn photos of lateral flow test strips into band-intensity ratios, fit a calibration curve to the standards, and report the limit of detection and the concentrations of unknown samples.",
+      "verbs": [
+        "derive",
+        "identify",
+        "decide",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Photos of assay test strips, each tagged with an assigned standard concentration or marked as an unknown sample. From each photo the code computes a 1D band intensity profile, band areas and a T/C ratio. These are pooled into a concentration–response table, and saved experiments are kept as records on the device.",
+      "item": "a photographed lateral flow test strip with a control band and a test band",
+      "shapes": [
+        "image collection",
+        "table",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "quantifying assay strips into a calibration curve and unknown concentrations, right after running the strips",
+      "terms": [
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "A step-by-step flow (setup form, then strip loader, then results) gathers labelled strip images. The rest is disabled until the required fields are filled and at least one strip is loaded. A batch run then fills a results screen that holds the calibration-curve figure, a model audit card with fitted parameters and limits, an unknowns table with zone flags, and per-strip chromatogram cards that can be zoomed and downloaded.",
+      "views": [
+        "form",
+        "list",
+        "image viewer",
+        "line chart",
+        "summary stats",
+        "table view",
+        "detail panel"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "apply label",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "status pipeline"
+      ]
+    },
+    "field": {
+      "text": "lateral flow immunoassay densitometry and calibration in bioanalytical chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "lateral flow immunoassay",
+        "limit of detection",
+        "dose response"
+      ]
+    },
+    "workflow": {
+      "name": "fit a standard curve to measured standards and read unknowns off it",
+      "steps": [
+        {
+          "step": "define the experiment and its standard levels",
+          "here": "A form takes the experiment name, a concentration unit (or a custom one), the replicate count n=1–3 and a list of concentration levels, with preset series. Continue stays disabled until the name and the levels are filled in.",
+          "parts": [
+            "experiment-setup"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "Strip photos come from the live camera (with torch and tap-to-focus), the native camera, the gallery or a whole folder. Each capture is shown for a retake-or-confirm check before it is added.",
+          "parts": [
+            "sample-loader",
+            "live-camera"
+          ]
+        },
+        {
+          "step": "label each item with its role and known value",
+          "here": "Each loaded strip gets a standard concentration, typed or picked from the preset levels, or is switched to an unknown with a sample ID and a dilution factor (1x–100x). Strips can be previewed or removed.",
+          "parts": [
+            "strip-assignment-list"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Start Quantification runs a progress overlay. For each strip, two on-device detectors crop it and find its bands, and the background-subtracted band areas give a T/C ratio. The standards are then fitted with 4PL or 5PL, chosen by F-test and AICc.",
+          "parts": [
+            "sample-loader",
+            "results"
+          ]
+        },
+        {
+          "step": "check the fit and the limits",
+          "here": "An audit card shows the model formula, why that model was chosen, the parameters a–d, LoB, LoD, the linear dynamic range, the saturation threshold and a standards recovery table. Per-strip chromatogram cards show T/C, the band areas and the figure.",
+          "parts": [
+            "model-audit",
+            "results"
+          ]
+        },
+        {
+          "step": "flag and verify suspect results",
+          "here": "Unknowns are listed with T/C, a concentration ± prediction interval and a zone badge (linear, saturated, hook suspect). 'Verify 1:10 Dilution' takes a photo of a diluted strip and either confirms the true low value or applies a ×10 corrected concentration.",
+          "parts": [
+            "unknowns-hook-check"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The experiment is saved on the device and listed among saved experiments. Export writes a ZIP archive or a combined PDF with a CSV summary, raw JSON, the standard curve and the strip chromatograms, either to the last-used location or to a new one.",
+          "parts": [
+            "saved-experiments-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The signal is read from photos: each strip is auto-cropped, its control and test bands are located, and the background-subtracted band areas give a test/control ratio",
+        "The curve model is picked automatically between 4PL and 5PL by an extra-sum-of-squares F-test and AICc, and the reason is shown",
+        "Limit of blank and limit of detection follow a named clinical lab standard (CLSI EP17-A2), with back-calculated recovery of the standards against an acceptance band",
+        "Unknowns carry dilution factors and a zone flag, and a suspected hook (prozone) effect can be checked by photographing a 1:10 diluted strip",
+        "Three modes (single strip, LoD series, unknown quantification) share one setup → load → results flow"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "experiment-setup",
+      "level": "view",
+      "parent": null,
+      "title": "Experiment setup form",
+      "summary": "Collects the experiment name, concentration unit, replicate count, standard concentration levels (with preset series) and optional assay details, and blocks progress until the required fields are filled.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 474,
+          "end": 648,
+          "role": "markup",
+          "symbol": "#view-experiment-setup",
+          "anchor": "10d5b7e9cb53",
+          "first": "<div id=\"view-experiment-setup\" class=\"p-4 space-y-4 hidden\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 5527,
+          "end": 5854,
+          "role": "logic",
+          "anchor": "7b73deec87f6",
+          "first": "function getSelectedAssayUnit() {"
+        },
+        {
+          "file": "code/js/rq-bootstrap.js",
+          "start": 11,
+          "end": 37,
+          "role": "logic",
+          "anchor": "93f8d9577e4c",
+          "first": "// --- Home Screen Primary Workflow Buttons ---"
+        }
+      ]
+    },
+    {
+      "id": "sample-loader",
+      "level": "view",
+      "parent": null,
+      "title": "Strip image loader",
+      "summary": "Brings in strip photos from the camera, gallery, folder or cloud links, confirms each capture in a preview, and starts the batch quantification once strips are loaded.",
+      "views": [
+        "list",
+        "image viewer"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 653,
+          "end": 785,
+          "role": "markup",
+          "symbol": "#view-sample-loader",
+          "anchor": "5f84a8bf8f0c",
+          "first": "<div id=\"view-sample-loader\" class=\"p-4 space-y-4 hidden\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 1128,
+          "end": 1200,
+          "role": "markup",
+          "symbol": "#cam-preview-upload-modal",
+          "anchor": "a8549c24dc64",
+          "first": "<div id=\"cam-preview-upload-modal\" class=\"fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 hidden flex items-center j"
+        },
+        {
+          "file": "code/index.html",
+          "start": 1413,
+          "end": 1459,
+          "role": "markup",
+          "anchor": "24aec1655c9c",
+          "first": "<div id=\"batch-hud-overlay\" class=\"fixed inset-0 bg-white/95 backdrop-blur-md z-50 hidden flex flex-col items-center jus"
+        },
+        {
+          "file": "code/index.html",
+          "start": 5855,
+          "end": 6444,
+          "role": "logic",
+          "anchor": "005fe8c9bb8a",
+          "first": "function initSampleLoaderView() {"
+        },
+        {
+          "file": "code/js/rq-bootstrap.js",
+          "start": 78,
+          "end": 235,
+          "role": "logic",
+          "anchor": "a67d3aeb742f",
+          "first": "// --- Batch Execution & Two-Stage YOLO Quantification ---"
+        }
+      ]
+    },
+    {
+      "id": "live-camera",
+      "level": "view",
+      "parent": null,
+      "title": "Live camera capture",
+      "summary": "Shows a live camera feed with a guide, torch, lens flip and tap-to-focus, and hands each snapped frame to the preview for confirmation.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 790,
+          "end": 856,
+          "role": "markup",
+          "symbol": "#view-camera",
+          "anchor": "4b3374ad2c5a",
+          "first": "<div id=\"view-camera\" class=\"relative h-full flex flex-col bg-slate-900 hidden overflow-hidden\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 54,
+          "end": 56,
+          "role": "style",
+          "symbol": ".cutout-guide",
+          "anchor": "c005590d7f93",
+          "first": ".cutout-guide {"
+        },
+        {
+          "file": "code/js/rq-camera.js",
+          "start": 74,
+          "end": 159,
+          "role": "logic",
+          "symbol": "openLiveCamera",
+          "anchor": "7efda9b724a8",
+          "first": "async function openLiveCamera(facing = 'environment') {"
+        },
+        {
+          "file": "code/js/rq-camera.js",
+          "start": 161,
+          "end": 256,
+          "role": "logic",
+          "anchor": "c327f8d7f30a",
+          "first": "if (cameraCloseBtn) {"
+        }
+      ]
+    },
+    {
+      "id": "strip-assignment-list",
+      "level": "component",
+      "parent": "sample-loader",
+      "title": "Loaded strips with assigned concentrations",
+      "summary": "Lists each loaded strip with preview and remove buttons. Each strip can be given a standard concentration, typed or picked from the preset levels, or switched to an unknown with a sample ID and a dilution factor.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "inline edit",
+        "apply label",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 769,
+          "end": 773,
+          "role": "markup",
+          "symbol": "#loaded-strips-list",
+          "anchor": "cc7554487552",
+          "first": "<div id=\"loaded-strips-list\" class=\"space-y-2\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 1387,
+          "end": 1397,
+          "role": "markup",
+          "symbol": "#image-preview-modal",
+          "anchor": "32efcb24e946",
+          "first": "<div id=\"image-preview-modal\" class=\"fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex flex-col items-center j"
+        },
+        {
+          "file": "code/index.html",
+          "start": 6445,
+          "end": 6690,
+          "role": "logic",
+          "anchor": "134c71e27bb8",
+          "first": "function addLoadedStripItem(item) {"
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "level": "view",
+      "parent": null,
+      "title": "Calibration results and strip chromatograms",
+      "summary": "Shows the headline LoD, R² and LoB, the fitted calibration-curve figure with zoom and download, and a card per strip with T/C ratio, concentration, band areas and its chromatogram.",
+      "views": [
+        "summary stats",
+        "line chart",
+        "detail panel"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 861,
+          "end": 1081,
+          "role": "markup",
+          "symbol": "#view-results",
+          "anchor": "64b521caec39",
+          "first": "<div id=\"view-results\" class=\"p-4 space-y-4 hidden\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 6701,
+          "end": 6984,
+          "role": "logic",
+          "anchor": "9544b57992b8",
+          "first": "function displayResultsView(exp) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 2513,
+          "end": 3265,
+          "role": "logic",
+          "anchor": "467052adbeaf",
+          "first": "async function executeOnDeviceBioanalyticalEngine(imageSrc, assignedConc, unit) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 4110,
+          "end": 4392,
+          "role": "logic",
+          "anchor": "a37a2f6b207b",
+          "first": "function createChromatogramPlotDataUrl(strip, exp) {"
+        }
+      ]
+    },
+    {
+      "id": "model-audit",
+      "level": "component",
+      "parent": "results",
+      "title": "Model audit card",
+      "summary": "Shows which curve model was chosen and why, its formula and parameters, the validation limits (LoB, LoD, linear dynamic range, saturation threshold) and a back-calculated recovery table for the standards.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 936,
+          "end": 1057,
+          "role": "markup",
+          "symbol": "#results-model-audit-card",
+          "anchor": "3711b7055a97",
+          "first": "<div id=\"results-model-audit-card\" class=\"bg-white border border-slate-200 rounded-3xl p-4 shadow-xs space-y-3.5\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3338,
+          "end": 3704,
+          "role": "logic",
+          "anchor": "54ecc8d2f029",
+          "first": "function nelderMead(costFn, initParams, stepSizes = null, maxIter = 1000, tol = 1e-6) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3705,
+          "end": 4109,
+          "role": "logic",
+          "anchor": "0d12cf088eba",
+          "first": "async function executeOnDeviceLoDCalibration(concs, tcs, expName, analyteName, unit, unknownStrips = []) {"
+        }
+      ]
+    },
+    {
+      "id": "unknowns-hook-check",
+      "level": "component",
+      "parent": "results",
+      "title": "Unknown samples table with hook-effect verification",
+      "summary": "Lists each unknown with its T/C ratio, concentration ± prediction interval, zone badge and dilution. A diluted-strip photo then confirms or corrects a suspect reading.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "accept or reject"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 1028,
+          "end": 1055,
+          "role": "markup",
+          "symbol": "#results-unknown-batch-section",
+          "anchor": "eaae4b580046",
+          "first": "<div id=\"results-unknown-batch-section\" class=\"hidden space-y-2 pt-2 border-t border-slate-100\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 1257,
+          "end": 1386,
+          "role": "markup",
+          "anchor": "540411c19071",
+          "first": "<div id=\"hook-dilution-modal\" class=\"fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-50 hidden flex items-center justif"
+        },
+        {
+          "file": "code/index.html",
+          "start": 6840,
+          "end": 6897,
+          "role": "logic",
+          "anchor": "aefde3fbdca7",
+          "first": "<td class=\"p-2\"><span class=\"px-2 py-0.5 rounded-full text-[9px] font-bold ${rec.pass ? 'bg-emerald-50 text-emerald-700 "
+        },
+        {
+          "file": "code/index.html",
+          "start": 4393,
+          "end": 4560,
+          "role": "logic",
+          "anchor": "47c0b152e7be",
+          "first": "function openHookDilutionModal(uRecord, exp) {"
+        }
+      ]
+    },
+    {
+      "id": "saved-experiments-export",
+      "level": "view",
+      "parent": null,
+      "title": "Saved experiments and export",
+      "summary": "Lists experiments saved on the device so they can be opened, deleted or exported, and writes a chosen experiment (or all of them) to a ZIP archive or a combined PDF.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 1086,
+          "end": 1118,
+          "role": "markup",
+          "symbol": "#view-archives",
+          "anchor": "7a75d51fb4f5",
+          "first": "<div id=\"view-archives\" class=\"p-4 space-y-4 hidden\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 1460,
+          "end": 1521,
+          "role": "markup",
+          "symbol": "#export-options-modal",
+          "anchor": "00ce9411ef82",
+          "first": "<div id=\"export-options-modal\" class=\"fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justi"
+        },
+        {
+          "file": "code/index.html",
+          "start": 4710,
+          "end": 4904,
+          "role": "logic",
+          "anchor": "4b918e75c051",
+          "first": "function getStoredExperiments() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 5038,
+          "end": 5439,
+          "role": "logic",
+          "anchor": "a66cba973fd4",
+          "first": "function openExportDialog(exp) {"
+        }
+      ]
+    }
+  ]
+}

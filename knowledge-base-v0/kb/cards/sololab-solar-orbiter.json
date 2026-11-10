@@ -1,0 +1,945 @@
+{
+  "schema": "astaui.card/1",
+  "id": "sololab-solar-orbiter",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T04:27:33Z"
+  },
+  "app": {
+    "title": "SoloLab — STIX · RPW · EPD Temporal Analysis Tool",
+    "summary": "A person brings in data from several instruments that observed the same event: they upload spectrogram files or search and download them from the public archives, and fetch particle flux for one day. For each instrument they can subtract a background, taken from a quiet time interval or a separate background file with a chosen statistic. They preview the result and the background with its spread, then load it, and a status grid shows what is loaded. They set how each instrument is drawn and stack the chosen instruments into one multi-panel figure on a shared time axis, in an order they pick, over a time window that starts as the overlap of all of them. They can also rebuild X-ray images over one interval or a sequence of tiles, and save the whole session as a data pack file to reload later.",
+    "task": {
+      "text": "Clean the background out of several instruments' time series for one event and stack them on a shared time axis, so the signals can be matched up in time.",
+      "verbs": [
+        "compare",
+        "clean",
+        "explore",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "Time series of intensity from several instruments over the same period: spectrograms of counts or power over time and energy or frequency, per-channel particle fluxes over time, and images rebuilt from pixel data.",
+      "item": "one instrument's observation file for an event: a time-by-energy or time-by-frequency spectrogram, or a day of per-channel particle flux",
+      "shapes": [
+        "time series",
+        "image",
+        "image collection"
+      ]
+    },
+    "stage": {
+      "text": "cleaning and lining up raw instrument data from one event, to explore it across instruments before detailed analysis",
+      "terms": [
+        "clean",
+        "explore",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Each instrument has its own import page with a control column and a preview chart. Buttons there stay disabled until a file is loaded, and the background controls appear only after a first preview. A shared status grid in the sidebar shows which instruments are loaded. Plot settings are saved per instrument and drive a combined page that stacks the chosen instruments as panels on one time axis, in an order set with up/down buttons.",
+      "views": [
+        "heatmap",
+        "line chart",
+        "form",
+        "summary stats",
+        "image viewer",
+        "small multiples"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "select",
+        "toggle view",
+        "zoom and pan",
+        "hover for detail",
+        "time slider",
+        "exclude and refit",
+        "drag to arrange",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "focus and context",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "multi-instrument time-series quicklooks with background subtraction in heliophysics",
+      "disciplines": [
+        "astronomy"
+      ],
+      "terms": [
+        "heliophysics",
+        "dynamic spectra",
+        "x ray imaging"
+      ]
+    },
+    "workflow": {
+      "name": "line up several sources' time series of one event on a shared time axis",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a FITS or CDF file per instrument, or search the STIX Data Center by start time, duration and product and download one result, or download a day of EPD flux by date, particle type and resample interval.",
+          "parts": [
+            "stix-import",
+            "rpw-epd-import"
+          ]
+        },
+        {
+          "step": "estimate a baseline from a quiet stretch and subtract it",
+          "here": "After a preview, tick to subtract a background from a time range (prefilled with the file's span) and/or a background file. Pick a statistic (mean, median, min, max, percentile), preview the subtracted data with the interval marked, and plot the background per channel with its spread.",
+          "parts": [
+            "background-subtraction",
+            "rpw-epd-import"
+          ]
+        },
+        {
+          "step": "track which sources are ready",
+          "here": "LOAD stores the final data for the session, and a 2x2 badge grid in the sidebar shows each instrument's status and time range.",
+          "parts": [
+            "session-sidebar"
+          ]
+        },
+        {
+          "step": "choose how each source is drawn",
+          "here": "Tabs per instrument set the plot type (spectrogram, time profiles, overlay), log axes, smoothing, energy or frequency limits, and lists of energy bins, frequencies or channels, with a preview plot.",
+          "parts": [
+            "plot-prefs"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Pick the loaded instruments, order the panels top to bottom with up/down buttons, optionally limit to a date range prefilled with the overlap of all selected data, set line width and font size, then PLOT one stacked figure on a shared time axis.",
+          "parts": [
+            "combined-plot",
+            "panel-order"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "From STIX pixel data, estimate the flare location, then reconstruct images with a chosen algorithm and energy ranges over one interval or a sequence of tiles. Step or play through the tiles, or view them as a mosaic, with the interval highlighted on a lightcurve.",
+          "parts": [
+            "stix-imaging"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Save Data Pack downloads all loaded instrument data as a compressed .pkl named after the instruments it holds, which can be uploaded later. Reconstructed images can be downloaded one at a time or all at once.",
+          "parts": [
+            "session-sidebar",
+            "stix-imaging"
+          ]
+        }
+      ],
+      "distinctive": [
+        "the combined figure's default time window is the overlap of every selected instrument's coverage, worked out from each one's loaded time range",
+        "the background is taken per channel or per frequency with a chosen statistic, and its spread is kept so it can be drawn as error bars; a tooltip warns that min and max are unreliable on spiky counts",
+        "the sources differ in kind (X-ray counts by energy, radio power by frequency, particle flux by channel), and each has its own preprocessing before they share one axis",
+        "the order of panels in the stack can be set by hand and is remembered across pages",
+        "the whole loaded session can be saved and reloaded as one data pack file, so nothing has to be downloaded again"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "session-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar with instrument status and data pack",
+      "summary": "Shows a badge for each instrument saying whether its data is loaded, links to the import, plot and imaging pages, and saves or reloads the whole session as a data pack file.",
+      "views": [
+        "summary stats",
+        "list"
+      ],
+      "interactions": [
+        "hover for detail",
+        "export",
+        "import"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/sololab/dash_app/app.py",
+          "start": 126,
+          "end": 172,
+          "role": "markup",
+          "anchor": "984925ed3e84",
+          "first": "sidebar = html.Div("
+        },
+        {
+          "file": "code/sololab/dash_app/app.py",
+          "start": 94,
+          "end": 105,
+          "role": "markup",
+          "symbol": "_status_grid",
+          "anchor": "0c939228a55a",
+          "first": "def _status_grid():"
+        },
+        {
+          "file": "code/sololab/dash_app/app.py",
+          "start": 211,
+          "end": 219,
+          "role": "logic",
+          "symbol": "render_status_badges",
+          "anchor": "317b9cbb0e91",
+          "first": "def render_status_badges(status):"
+        },
+        {
+          "file": "code/sololab/dash_app/assets/custom.css",
+          "start": 23,
+          "end": 27,
+          "role": "style",
+          "symbol": ".sidebar",
+          "anchor": "a08c4cc841a5",
+          "first": ".sidebar {"
+        },
+        {
+          "file": "code/sololab/dash_app/assets/custom.css",
+          "start": 37,
+          "end": 42,
+          "role": "style",
+          "symbol": ".status-grid",
+          "anchor": "59534b8b9858",
+          "first": ".status-grid {"
+        },
+        {
+          "file": "code/sololab/dash_app/assets/custom.css",
+          "start": 49,
+          "end": 53,
+          "role": "style",
+          "symbol": ".status-badge",
+          "anchor": "86d518ef6abe",
+          "first": ".status-badge {"
+        },
+        {
+          "file": "code/sololab/dash_app/utils.py",
+          "start": 94,
+          "end": 106,
+          "role": "logic",
+          "symbol": "status_badge_content",
+          "anchor": "00e36196547d",
+          "first": "def status_badge_content(key, info):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/data_pack_page.py",
+          "start": 18,
+          "end": 57,
+          "role": "markup",
+          "symbol": "layout",
+          "anchor": "07f16aed74c2",
+          "first": "def layout(**kwargs):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/data_pack_page.py",
+          "start": 61,
+          "end": 63,
+          "role": "logic",
+          "symbol": "toggle_save_btn",
+          "anchor": "13cc5863e264",
+          "first": "def toggle_save_btn(status):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/data_pack_page.py",
+          "start": 73,
+          "end": 79,
+          "role": "logic",
+          "symbol": "save_data_pack",
+          "anchor": "6cb9ec42d0e0",
+          "first": "def save_data_pack(n_clicks, sid, status):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/data_pack_page.py",
+          "start": 92,
+          "end": 106,
+          "role": "logic",
+          "symbol": "load_data_pack",
+          "anchor": "2ecbde66157a",
+          "first": "def load_data_pack(contents, sid, status):"
+        },
+        {
+          "file": "code/sololab/dash_app/data_pack.py",
+          "start": 24,
+          "end": 50,
+          "role": "logic",
+          "symbol": "build_payload",
+          "anchor": "92fde85cc3f1",
+          "first": "def build_payload(sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/data_pack.py",
+          "start": 68,
+          "end": 128,
+          "role": "logic",
+          "symbol": "apply_payload",
+          "anchor": "4c14ae5844ef",
+          "first": "def apply_payload(sid, payload):"
+        }
+      ]
+    },
+    {
+      "id": "stix-import",
+      "level": "view",
+      "parent": null,
+      "title": "Import STIX data",
+      "summary": "Lets the person upload an X-ray spectrogram file, or search the archive by start time, duration and product and download one result, then preview it as a spectrogram and load it.",
+      "views": [
+        "form",
+        "heatmap"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "select",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 65,
+          "end": 139,
+          "role": "markup",
+          "anchor": "802ae0c5a728",
+          "first": "layout = dbc.Container("
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 216,
+          "end": 255,
+          "role": "markup",
+          "anchor": "0a6cd9108822",
+          "first": "html.Hr(),"
+        },
+        {
+          "file": "code/sololab/dash_app/assets/custom.css",
+          "start": 67,
+          "end": 74,
+          "role": "style",
+          "symbol": ".upload-box",
+          "anchor": "67a72bbb7b68",
+          "first": ".upload-box {"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 271,
+          "end": 275,
+          "role": "logic",
+          "symbol": "on_stix_upload",
+          "anchor": "dfa112c89d9a",
+          "first": "def on_stix_upload(contents, filename, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 291,
+          "end": 319,
+          "role": "logic",
+          "symbol": "stix_search",
+          "anchor": "d0f0d8c6202c",
+          "first": "def stix_search(n_clicks, date_str, time_str, duration_label, product_type):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 326,
+          "end": 327,
+          "role": "logic",
+          "symbol": "toggle_stix_download_btn",
+          "anchor": "c74ab5136708",
+          "first": "def toggle_stix_download_btn(file_id):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 343,
+          "end": 352,
+          "role": "logic",
+          "symbol": "stix_download",
+          "anchor": "9b3200ebf1c6",
+          "first": "def stix_download(n_clicks, file_id, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 423,
+          "end": 437,
+          "role": "logic",
+          "symbol": "stix_preview",
+          "anchor": "282982b7b438",
+          "first": "def stix_preview(n_clicks, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 504,
+          "end": 531,
+          "role": "logic",
+          "symbol": "stix_load",
+          "anchor": "79580812e2f9",
+          "first": "def stix_load(n_clicks, bkg_file_enabled, bkg_time_enabled, bkg_start, bkg_end, poll, sid, status):"
+        }
+      ]
+    },
+    {
+      "id": "background-subtraction",
+      "level": "component",
+      "parent": "stix-import",
+      "title": "Background subtraction controls",
+      "summary": "Subtracts a background estimated from a quiet time range and/or a background file with a chosen statistic, previews the result with the interval marked, and plots the background per channel with its spread.",
+      "views": [
+        "form",
+        "line chart"
+      ],
+      "interactions": [
+        "exclude and refit",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 140,
+          "end": 215,
+          "role": "markup",
+          "anchor": "c63be89c2e58",
+          "first": "html.Div("
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 373,
+          "end": 374,
+          "role": "logic",
+          "symbol": "toggle_bkg_file_row",
+          "anchor": "fdfefa402250",
+          "first": "def toggle_bkg_file_row(enabled):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 381,
+          "end": 382,
+          "role": "logic",
+          "symbol": "toggle_bkg_time_row",
+          "anchor": "e763b8eca166",
+          "first": "def toggle_bkg_time_row(enabled):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 362,
+          "end": 366,
+          "role": "logic",
+          "symbol": "on_stix_bkg_upload",
+          "anchor": "516f65a0acab",
+          "first": "def on_stix_bkg_upload(contents, filename, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 388,
+          "end": 408,
+          "role": "logic",
+          "symbol": "_compute_stix_counts",
+          "anchor": "ef5476f55ac1",
+          "first": "def _compute_stix_counts(sid, bkg_file_enabled, bkg_time_enabled, bkg_start, bkg_end, poll):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 455,
+          "end": 472,
+          "role": "logic",
+          "symbol": "stix_preview_with_bkg",
+          "anchor": "2e0de84a0a37",
+          "first": "def stix_preview_with_bkg(n_clicks, bkg_file_enabled, bkg_time_enabled, bkg_start, bkg_end, poll, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_stix.py",
+          "start": 482,
+          "end": 486,
+          "role": "logic",
+          "symbol": "stix_plot_background",
+          "anchor": "5e2c247e5f2a",
+          "first": "def stix_plot_background(n_clicks, sid):"
+        },
+        {
+          "file": "code/sololab/stix_read.py",
+          "start": 250,
+          "end": 306,
+          "role": "logic",
+          "symbol": "stix_remove_bkg_counts",
+          "anchor": "26ada9aee1f4",
+          "first": "def stix_remove_bkg_counts(pathfile,pathbkg=None,stix_bkg_range=None,date_range=None,correct_flight_time = False,energy_"
+        }
+      ]
+    },
+    {
+      "id": "rpw-epd-import",
+      "level": "view",
+      "parent": null,
+      "title": "Import radio and particle data",
+      "summary": "Brings in radio spectrogram files (upload, or download from CDAWeb) and particle flux for one day, with the same preview, background subtraction and load steps as the X-ray page.",
+      "views": [
+        "form",
+        "heatmap",
+        "line chart"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "select",
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/sololab/dash_app/rpw_import_factory.py",
+          "start": 51,
+          "end": 210,
+          "role": "markup",
+          "symbol": "make_rpw_import_layout",
+          "anchor": "b4bc5ea2610e",
+          "first": "def make_rpw_import_layout(data_type):"
+        },
+        {
+          "file": "code/sololab/dash_app/rpw_import_factory.py",
+          "start": 213,
+          "end": 424,
+          "role": "logic",
+          "symbol": "register_rpw_import_callbacks",
+          "anchor": "aaf70eb9bb40",
+          "first": "def register_rpw_import_callbacks(data_type):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_epd.py",
+          "start": 71,
+          "end": 194,
+          "role": "markup",
+          "symbol": "_layout",
+          "anchor": "328448258c40",
+          "first": "def _layout():"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_epd.py",
+          "start": 210,
+          "end": 236,
+          "role": "logic",
+          "symbol": "epd_download",
+          "anchor": "83551b0209bc",
+          "first": "def epd_download(n_clicks, date_str, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_epd.py",
+          "start": 262,
+          "end": 285,
+          "role": "logic",
+          "symbol": "epd_preview",
+          "anchor": "6005c6ab8b05",
+          "first": "def epd_preview(n_clicks, particle, resample, date_str, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_epd.py",
+          "start": 41,
+          "end": 61,
+          "role": "logic",
+          "symbol": "_epd_bkg_subtract",
+          "anchor": "ec4217680ed8",
+          "first": "def _epd_bkg_subtract(df, particle, bkg_start, bkg_end, poll_function):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_epd.py",
+          "start": 309,
+          "end": 329,
+          "role": "logic",
+          "symbol": "epd_preview_with_bkg",
+          "anchor": "cc970c8f7ba1",
+          "first": "def epd_preview_with_bkg(n_clicks, particle, resample, bkg_start, bkg_end, poll, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_epd.py",
+          "start": 340,
+          "end": 346,
+          "role": "logic",
+          "symbol": "epd_plot_background",
+          "anchor": "80828e9d24c4",
+          "first": "def epd_plot_background(n_clicks, particle, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/import_epd.py",
+          "start": 366,
+          "end": 389,
+          "role": "logic",
+          "symbol": "epd_load_click",
+          "anchor": "d4d435cb2ec8",
+          "first": "def epd_load_click(n_clicks, date_str, particle, resample, bkg_enabled, bkg_start, bkg_end, poll, sid, status):"
+        }
+      ]
+    },
+    {
+      "id": "plot-prefs",
+      "level": "view",
+      "parent": null,
+      "title": "Plot Preferences",
+      "summary": "Has a tab per instrument for setting how it is drawn (spectrogram, time profiles or overlay, log axes, smoothing, energy or frequency limits, and lists of bins, frequencies or channels), with a preview plot, and saves each choice right away.",
+      "views": [
+        "form",
+        "heatmap",
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "inline edit",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/sololab/dash_app/pages/plot_prefs.py",
+          "start": 35,
+          "end": 65,
+          "role": "markup",
+          "symbol": "layout",
+          "anchor": "ab5c6999bd03",
+          "first": "def layout(**kwargs):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/plot_prefs.py",
+          "start": 71,
+          "end": 118,
+          "role": "markup",
+          "symbol": "_stix_tab",
+          "anchor": "4d33d8ebd7ef",
+          "first": "def _stix_tab():"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/plot_prefs.py",
+          "start": 124,
+          "end": 179,
+          "role": "markup",
+          "symbol": "_rpw_tab",
+          "anchor": "fb5075dde8e5",
+          "first": "def _rpw_tab():"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/plot_prefs.py",
+          "start": 185,
+          "end": 211,
+          "role": "markup",
+          "symbol": "_epd_tab",
+          "anchor": "b3aad36b5b3f",
+          "first": "def _epd_tab():"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/plot_prefs.py",
+          "start": 328,
+          "end": 342,
+          "role": "logic",
+          "symbol": "sync_stix_prefs",
+          "anchor": "bae0ce9fc5fe",
+          "first": "def sync_stix_prefs(plot_type, logy_e, logy_c, logy_eo, logy_co, logz, smoothing, range_enabled, e_min, e_max, prefs):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/plot_prefs.py",
+          "start": 362,
+          "end": 385,
+          "role": "logic",
+          "symbol": "sync_rpw_prefs",
+          "anchor": "91ebf80890b6",
+          "first": "def sync_rpw_prefs(plot_type, logy_f, logy_i, logy_fo, logy_io, logz, invert_y, overlay_choice, smoothing, range_enabled"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/plot_prefs.py",
+          "start": 395,
+          "end": 398,
+          "role": "logic",
+          "symbol": "sync_epd_prefs",
+          "anchor": "a0e6a4f6be89",
+          "first": "def sync_epd_prefs(plot_type, logy, prefs):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/plot_prefs.py",
+          "start": 536,
+          "end": 568,
+          "role": "logic",
+          "symbol": "stix_prefs_preview",
+          "anchor": "f4d7bf7aa244",
+          "first": "def stix_prefs_preview(n_clicks, prefs, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/plot_prefs.py",
+          "start": 598,
+          "end": 626,
+          "role": "logic",
+          "symbol": "rpw_prefs_preview",
+          "anchor": "da4626ae3c57",
+          "first": "def rpw_prefs_preview(n_hfr, n_tnr, prefs, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/plot_prefs.py",
+          "start": 667,
+          "end": 693,
+          "role": "logic",
+          "symbol": "epd_prefs_preview",
+          "anchor": "c431f14dea48",
+          "first": "def epd_prefs_preview(n_clicks, prefs, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/constants.py",
+          "start": 46,
+          "end": 87,
+          "role": "data",
+          "anchor": "8c24d0bb8531",
+          "first": "DEFAULT_PLOT_PREFS = {"
+        }
+      ]
+    },
+    {
+      "id": "combined-plot",
+      "level": "view",
+      "parent": null,
+      "title": "Combined Plot",
+      "summary": "Stacks the chosen loaded instruments into one multi-panel figure on a shared time axis, over an optional date range that starts as the overlap of their coverage, with set line width and font size.",
+      "views": [
+        "heatmap",
+        "line chart",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "time slider",
+        "zoom and pan",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/sololab/dash_app/pages/combined_plot.py",
+          "start": 60,
+          "end": 113,
+          "role": "markup",
+          "symbol": "layout",
+          "anchor": "f03d75373371",
+          "first": "def layout(**kwargs):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/combined_plot.py",
+          "start": 152,
+          "end": 160,
+          "role": "logic",
+          "symbol": "open_instrument_modal",
+          "anchor": "144487719634",
+          "first": "def open_instrument_modal(n_clicks, status, current):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/combined_plot.py",
+          "start": 172,
+          "end": 185,
+          "role": "logic",
+          "symbol": "close_instrument_modal",
+          "anchor": "0eb319842e15",
+          "first": "def close_instrument_modal(n_clicks, selected, prefs):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/combined_plot.py",
+          "start": 263,
+          "end": 286,
+          "role": "logic",
+          "symbol": "prefill_date_range",
+          "anchor": "29e9e5806157",
+          "first": "def prefill_date_range(display, status):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/combined_plot.py",
+          "start": 246,
+          "end": 253,
+          "role": "logic",
+          "symbol": "sync_combined_fields",
+          "anchor": "5869743e6322",
+          "first": "def sync_combined_fields(date_range_enabled, linewidth, fontsize, prefs):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/combined_plot.py",
+          "start": 305,
+          "end": 375,
+          "role": "logic",
+          "symbol": "render_combined_plot",
+          "anchor": "b5fdc131a2a0",
+          "first": "def render_combined_plot(n_clicks, display, date_range_enabled, date_start, date_end, linewidth, fontsize, prefs, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/plotting.py",
+          "start": 1060,
+          "end": 1089,
+          "role": "logic",
+          "symbol": "quicklook_plot_plotly",
+          "anchor": "d462286dbad6",
+          "first": "def quicklook_plot_plotly("
+        }
+      ]
+    },
+    {
+      "id": "panel-order",
+      "level": "component",
+      "parent": "combined-plot",
+      "title": "Panel order list",
+      "summary": "Lists the selected instruments top to bottom with up/down buttons that move each one's panel in the stack, and remembers the order.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "drag to arrange"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/sololab/dash_app/pages/combined_plot.py",
+          "start": 35,
+          "end": 57,
+          "role": "markup",
+          "symbol": "_order_rows",
+          "anchor": "d9d35b7cc200",
+          "first": "def _order_rows(display):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/combined_plot.py",
+          "start": 192,
+          "end": 193,
+          "role": "logic",
+          "symbol": "render_order_rows",
+          "anchor": "c0c7ab943594",
+          "first": "def render_order_rows(display):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/combined_plot.py",
+          "start": 204,
+          "end": 223,
+          "role": "logic",
+          "symbol": "move_panel",
+          "anchor": "d3ab84dac046",
+          "first": "def move_panel(n_clicks_list, display, prefs):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/combined_plot.py",
+          "start": 128,
+          "end": 137,
+          "role": "logic",
+          "symbol": "restore_combined_prefs",
+          "anchor": "dd120069ff06",
+          "first": "def restore_combined_prefs(pathname, prefs):"
+        }
+      ]
+    },
+    {
+      "id": "stix-imaging",
+      "level": "view",
+      "parent": null,
+      "title": "STIX Imaging",
+      "summary": "Estimates the flare location from loaded pixel data, then reconstructs images with a chosen algorithm over one interval or a sequence of tiles. The person can step, play or view the tiles as a mosaic beside a lightcurve with the interval highlighted, and download the images.",
+      "views": [
+        "image viewer",
+        "small multiples",
+        "line chart",
+        "form"
+      ],
+      "interactions": [
+        "time slider",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/sololab/dash_app/pages/stix_imaging.py",
+          "start": 93,
+          "end": 176,
+          "role": "markup",
+          "symbol": "layout",
+          "anchor": "ff8bed42e761",
+          "first": "def layout(**kwargs):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/stix_imaging.py",
+          "start": 198,
+          "end": 354,
+          "role": "markup",
+          "symbol": "_controls_card",
+          "anchor": "ee2eab10fbb0",
+          "first": "def _controls_card():"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/stix_imaging.py",
+          "start": 440,
+          "end": 481,
+          "role": "logic",
+          "symbol": "estimate_stix_imaging_flare_location",
+          "anchor": "4d6802156f33",
+          "first": "def estimate_stix_imaging_flare_location(n_clicks, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/stix_imaging.py",
+          "start": 843,
+          "end": 847,
+          "role": "logic",
+          "symbol": "run_stix_imaging",
+          "anchor": "4aa969bc6a02",
+          "first": "def run_stix_imaging("
+        },
+        {
+          "file": "code/sololab/dash_app/pages/stix_imaging.py",
+          "start": 683,
+          "end": 696,
+          "role": "logic",
+          "symbol": "render_stix_imaging_lightcurve",
+          "anchor": "13bcd373c5a4",
+          "first": "def render_stix_imaging_lightcurve(status, sid):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/stix_imaging.py",
+          "start": 725,
+          "end": 728,
+          "role": "logic",
+          "symbol": "stix_imaging_prev_tile",
+          "anchor": "e9abce457198",
+          "first": "def stix_imaging_prev_tile(n_clicks, value):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/stix_imaging.py",
+          "start": 738,
+          "end": 741,
+          "role": "logic",
+          "symbol": "stix_imaging_next_tile",
+          "anchor": "821603a59c1c",
+          "first": "def stix_imaging_next_tile(n_clicks, value, max_value):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/stix_imaging.py",
+          "start": 789,
+          "end": 794,
+          "role": "logic",
+          "symbol": "advance_stix_imaging_animation",
+          "anchor": "2d2a272a2e99",
+          "first": "def advance_stix_imaging_animation(n_intervals, value, max_value):"
+        },
+        {
+          "file": "code/sololab/dash_app/pages/stix_imaging.py",
+          "start": 958,
+          "end": 983,
+          "role": "logic",
+          "symbol": "toggle_stix_imaging_display",
+          "anchor": "c0cffa6a20b2",
+          "first": "def toggle_stix_imaging_display(view, display_mode, tile_index, contour_levels_pct, sid):"
+        },
+        {
+          "file": "code/sololab/stix_imaging.py",
+          "start": 246,
+          "end": 253,
+          "role": "logic",
+          "symbol": "reconstruct_stix_image",
+          "anchor": "4aeb17a838a7",
+          "first": "def reconstruct_stix_image("
+        }
+      ]
+    }
+  ]
+}

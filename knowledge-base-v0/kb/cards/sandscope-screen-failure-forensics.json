@@ -1,0 +1,587 @@
+{
+  "schema": "astaui.card/1",
+  "id": "sandscope-screen-failure-forensics",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T07:49:28Z"
+  },
+  "app": {
+    "title": "GP Screen Failure Analysis",
+    "summary": "A batch computer-vision pipeline has already found, outlined, classified and measured defects in a set of inspection photographs. The person starts on a campaign dashboard of headline numbers and charts, then works through a queue of detections the classifier was unsure about, ticking each one reviewed and saving the decisions. From there they browse annotated images in a filterable gallery, tag images by well and compare selected ones side by side, or open a single image for a close look with its overlays, per-defect table and a scale calibration that converts pixels to millimetres. They finish by reading an auto-generated campaign assessment of risk, likely root causes and recommended actions, and downloading the metrics and defect tables as CSV and the PDF reports.",
+    "task": {
+      "text": "Check and confirm automated defect detections on a set of inspection photographs, then summarise the damage across the set into a risk assessment and exportable reports.",
+      "verbs": [
+        "review",
+        "triage",
+        "summarize",
+        "compare",
+        "derive",
+        "identify",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "A collection of inspection photographs, each with machine-detected defect regions (boxes, masks, a failure type, a severity and a confidence), per-image metrics derived from them, and human review flags.",
+      "item": "an inspection photograph of one retrieved part, with its detected defects",
+      "shapes": [
+        "image collection",
+        "table",
+        "categories",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "reviewing automated defect findings from inspection photos, before the failure report",
+      "terms": [
+        "review",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A campaign dashboard of KPIs and charts links to a review queue of low-confidence detections, sorted by severity and then confidence, where checkbox edits are saved to the database. A filterable thumbnail gallery and a per-image detail page, reached by deep links from the queue, show the annotated overlays and per-defect tables, and tabs below hold a templated assessment and the CSV and PDF exports.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "scatter plot",
+        "table view",
+        "thumbnail grid",
+        "image viewer",
+        "detail panel",
+        "side-by-side panes",
+        "list"
+      ],
+      "interactions": [
+        "filter",
+        "sort",
+        "select",
+        "multi-select",
+        "accept or reject",
+        "inline edit",
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "review queue",
+        "overview and detail",
+        "master-detail",
+        "side-by-side comparison",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "computer-vision defect inspection for failure analysis in petroleum engineering",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "failure analysis",
+        "petroleum engineering",
+        "sand control"
+      ]
+    },
+    "workflow": {
+      "name": "review machine-flagged findings on a collection of images and summarize the damage",
+      "steps": [
+        {
+          "step": "look over every item at a glance",
+          "here": "Five KPI tiles (images, mean and max erosion %, total defects, need review), a bar chart of erosion % per image coloured by severity with 20% and 50% threshold lines, failure-type bars, a severity donut and a per-image summary table",
+          "parts": [
+            "overview-dashboard"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "The Review Queue lists every detection below the confidence threshold, most severe first and least confident first within each band, with the model's reasoning. The person ticks Reviewed and saves, and can filter by severity or failure type or show already-reviewed items",
+          "parts": [
+            "review-queue"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "A gallery of annotated overlays filtered by severity and dominant failure type, sorted by erosion % or filename, and optionally grouped by a well tag edited inline",
+          "parts": [
+            "image-gallery"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Compare checkboxes on gallery cards, or 'Compare this well', put the selected screens in a metrics table, a row of overlays and an erosion bar chart",
+          "parts": [
+            "screen-compare"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Picking an image, or arriving from a queue link, shows its metrics, quality checks, 3-panel original/annotated/mask view, a failure-type breakdown and per-defect rows with review checkboxes. A pixels-per-mm entry converts sizes to mm and cm²",
+          "parts": [
+            "per-image-analysis"
+          ]
+        },
+        {
+          "step": "write up the result",
+          "here": "The Assessment tab builds a campaign risk banner (the worst severity present), observed conditions, the classification basis for each failure type, root causes keyed on co-occurring types, and numbered recommended actions",
+          "parts": [
+            "campaign-assessment"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download the sorted metrics table and the per-defect table as CSV, plus the campaign and per-image PDF reports (the per-image ones also as a ZIP)",
+          "parts": [
+            "full-data-export",
+            "report-downloads"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Review decisions are stored in their own table, keyed by image and detection index, so they survive a rerun of the classifier",
+        "Campaign risk is the worst severity present, not an average, so one critical item makes the whole set critical",
+        "Root causes are looked up from the combination of failure types that occur together, falling back to the closest overlap",
+        "A per-image pixels-per-mm calibration turns pixel areas and diameters into physical units",
+        "A Management/Engineering role switch changes how much detail the dashboard, gallery and analysis pages show"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "overview-dashboard",
+      "level": "view",
+      "parent": null,
+      "title": "Campaign dashboard",
+      "summary": "Shows the whole inspection set at once as KPI tiles, erosion, failure-type and severity charts and a summary table, with a link to the review queue when anything is flagged.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/main.py",
+          "start": 37,
+          "end": 121,
+          "role": "markup",
+          "anchor": "d5a71dff617b",
+          "first": "role = render_sidebar_header()"
+        },
+        {
+          "file": "code/app/components/data_loader.py",
+          "start": 22,
+          "end": 97,
+          "role": "data",
+          "symbol": "load_summary_df",
+          "anchor": "404d431ce659",
+          "first": "def load_summary_df(db_path: str) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app/components/data_loader.py",
+          "start": 170,
+          "end": 185,
+          "role": "data",
+          "symbol": "load_failure_type_totals",
+          "anchor": "6fbe625cfcd5",
+          "first": "def load_failure_type_totals(db_path: str) -> dict[str, int]:"
+        },
+        {
+          "file": "code/app/components/charts.py",
+          "start": 30,
+          "end": 62,
+          "role": "logic",
+          "symbol": "erosion_bar",
+          "anchor": "4f1963441643",
+          "first": "def erosion_bar(df: pd.DataFrame) -> go.Figure:"
+        },
+        {
+          "file": "code/app/components/charts.py",
+          "start": 65,
+          "end": 93,
+          "role": "logic",
+          "symbol": "failure_type_bar",
+          "anchor": "e4aa74685309",
+          "first": "def failure_type_bar(type_counts: dict[str, int]) -> go.Figure:"
+        },
+        {
+          "file": "code/app/components/charts.py",
+          "start": 96,
+          "end": 123,
+          "role": "logic",
+          "symbol": "severity_pie",
+          "anchor": "33dc9495c9d9",
+          "first": "def severity_pie(severity_counts: dict[str, int]) -> go.Figure:"
+        },
+        {
+          "file": "code/app/components/nav.py",
+          "start": 8,
+          "end": 40,
+          "role": "logic",
+          "symbol": "render_sidebar_header",
+          "anchor": "5d8af796d597",
+          "first": "def render_sidebar_header() -> str:"
+        }
+      ]
+    },
+    {
+      "id": "campaign-assessment",
+      "level": "view",
+      "parent": null,
+      "title": "Campaign assessment",
+      "summary": "Builds a templated engineering assessment of the set: a risk banner, observed conditions, the classification basis for each type, likely root causes, severity counts and prioritised actions.",
+      "views": [
+        "summary stats",
+        "detail panel"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/main.py",
+          "start": 126,
+          "end": 202,
+          "role": "markup",
+          "anchor": "de979de6bc74",
+          "first": "with tab_assess:"
+        },
+        {
+          "file": "code/app/components/interpretation.py",
+          "start": 269,
+          "end": 346,
+          "role": "logic",
+          "symbol": "campaign_assessment",
+          "anchor": "5b6a8d934c73",
+          "first": "def campaign_assessment(df) -> dict:"
+        },
+        {
+          "file": "code/app/components/interpretation.py",
+          "start": 251,
+          "end": 266,
+          "role": "logic",
+          "symbol": "potential_causes",
+          "anchor": "b91f02d3bb98",
+          "first": "def potential_causes(failure_types: list[str]) -> list[str]:"
+        },
+        {
+          "file": "code/app/components/interpretation.py",
+          "start": 246,
+          "end": 248,
+          "role": "logic",
+          "symbol": "classification_evidence",
+          "anchor": "973ae5e509cc",
+          "first": "def classification_evidence(failure_type: str) -> str:"
+        },
+        {
+          "file": "code/app/components/interpretation.py",
+          "start": 137,
+          "end": 243,
+          "role": "data",
+          "anchor": "94afcf8bbe57",
+          "first": "_CLASSIFICATION_EVIDENCE: dict[str, str] = {"
+        }
+      ]
+    },
+    {
+      "id": "full-data-export",
+      "level": "view",
+      "parent": null,
+      "title": "Full data and export",
+      "summary": "Shows an erosion-versus-defect-count scatter, the full per-image metrics table and the per-defect table, each with a CSV download.",
+      "views": [
+        "scatter plot",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/main.py",
+          "start": 207,
+          "end": 293,
+          "role": "markup",
+          "anchor": "69a71e1d3385",
+          "first": "with tab_full:"
+        },
+        {
+          "file": "code/app/components/charts.py",
+          "start": 126,
+          "end": 150,
+          "role": "logic",
+          "symbol": "scatter_erosion_defects",
+          "anchor": "88bf9fde36af",
+          "first": "def scatter_erosion_defects(df: pd.DataFrame) -> go.Figure:"
+        },
+        {
+          "file": "code/app/components/data_loader.py",
+          "start": 101,
+          "end": 149,
+          "role": "data",
+          "symbol": "load_defects_df",
+          "anchor": "be0894bda2d0",
+          "first": "def load_defects_df(db_path: str) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "review-queue",
+      "level": "view",
+      "parent": null,
+      "title": "Review queue",
+      "summary": "Lists the low-confidence detections, most severe first and least confident first, with the model's reasoning. The person ticks each one reviewed, saves to the database and can jump to the image.",
+      "views": [
+        "table view",
+        "list"
+      ],
+      "interactions": [
+        "accept or reject",
+        "filter",
+        "sort",
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "review queue",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app/pages/1_Review_Queue.py",
+          "start": 18,
+          "end": 113,
+          "role": "logic",
+          "anchor": "6edebec912a3",
+          "first": "db_path = get_db_path()"
+        },
+        {
+          "file": "code/app/components/data_loader.py",
+          "start": 153,
+          "end": 166,
+          "role": "data",
+          "symbol": "load_review_status_df",
+          "anchor": "3177b127bacf",
+          "first": "def load_review_status_df(db_path: str) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/classification/store.py",
+          "start": 84,
+          "end": 89,
+          "role": "logic",
+          "symbol": "set_reviewed",
+          "anchor": "b79ce419ebec",
+          "first": "def set_reviewed("
+        }
+      ]
+    },
+    {
+      "id": "image-gallery",
+      "level": "view",
+      "parent": null,
+      "title": "Image gallery",
+      "summary": "Shows annotated overlays as cards with erosion, defect count and severity, filtered by severity and failure type, sorted, and optionally grouped by well tags edited in an inline table.",
+      "views": [
+        "thumbnail grid",
+        "table view"
+      ],
+      "interactions": [
+        "filter",
+        "sort",
+        "inline edit",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/pages/2_Gallery.py",
+          "start": 20,
+          "end": 122,
+          "role": "logic",
+          "anchor": "8d66fe3e1ddc",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app/pages/2_Gallery.py",
+          "start": 126,
+          "end": 155,
+          "role": "markup",
+          "symbol": "_render_card",
+          "anchor": "d3e82826bfbf",
+          "first": "def _render_card(col, rec) -> None:"
+        },
+        {
+          "file": "code/app/pages/2_Gallery.py",
+          "start": 158,
+          "end": 184,
+          "role": "logic",
+          "anchor": "8cb03e56f3dc",
+          "first": "if group_by_well:"
+        }
+      ]
+    },
+    {
+      "id": "screen-compare",
+      "level": "component",
+      "parent": "image-gallery",
+      "title": "Screen comparison",
+      "summary": "Shows the screens ticked for comparison, or a whole well, as a metrics table, a row of overlays and an erosion bar chart.",
+      "views": [
+        "side-by-side panes",
+        "table view",
+        "bar chart"
+      ],
+      "interactions": [
+        "multi-select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/pages/2_Gallery.py",
+          "start": 135,
+          "end": 135,
+          "role": "markup",
+          "anchor": "692759901a8c",
+          "first": "st.checkbox(\"Compare\", key=f\"cmp_{rec['image_id']}\")"
+        },
+        {
+          "file": "code/app/pages/2_Gallery.py",
+          "start": 162,
+          "end": 170,
+          "role": "logic",
+          "anchor": "601cea1fcad0",
+          "first": "head_col, btn_col = st.columns([5, 1])"
+        },
+        {
+          "file": "code/app/pages/2_Gallery.py",
+          "start": 186,
+          "end": 215,
+          "role": "logic",
+          "anchor": "def10e850112",
+          "first": "# ---- Comparison ----"
+        }
+      ]
+    },
+    {
+      "id": "per-image-analysis",
+      "level": "view",
+      "parent": null,
+      "title": "Per-image analysis",
+      "summary": "Opens one image with its metrics, image-quality checks, 3-panel original/annotated/mask view, templated interpretation, failure-type breakdown, scale calibration and per-defect rows with review checkboxes.",
+      "views": [
+        "image viewer",
+        "detail panel",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "inline edit",
+        "accept or reject",
+        "toggle view"
+      ],
+      "patterns": [
+        "master-detail",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/pages/3_Analysis.py",
+          "start": 29,
+          "end": 395,
+          "role": "logic",
+          "anchor": "a7832dfb499d",
+          "first": "db_path = get_db_path()"
+        },
+        {
+          "file": "code/app/components/image_viewer.py",
+          "start": 21,
+          "end": 25,
+          "role": "logic",
+          "symbol": "show_three_panel",
+          "anchor": "c5c043125291",
+          "first": "def show_three_panel("
+        },
+        {
+          "file": "code/app/components/image_viewer.py",
+          "start": 51,
+          "end": 57,
+          "role": "logic",
+          "symbol": "show_panel",
+          "anchor": "80d507f7c524",
+          "first": "def show_panel(path: str | None) -> None:"
+        },
+        {
+          "file": "code/app/components/charts.py",
+          "start": 153,
+          "end": 175,
+          "role": "logic",
+          "symbol": "failure_type_breakdown_pie",
+          "anchor": "a09274337303",
+          "first": "def failure_type_breakdown_pie(breakdown: dict) -> go.Figure:"
+        },
+        {
+          "file": "code/app/components/interpretation.py",
+          "start": 349,
+          "end": 354,
+          "role": "logic",
+          "symbol": "engineering_interpretation",
+          "anchor": "1be12be4529e",
+          "first": "def engineering_interpretation("
+        }
+      ]
+    },
+    {
+      "id": "report-downloads",
+      "level": "view",
+      "parent": null,
+      "title": "Report downloads",
+      "summary": "Lists the generated campaign and per-image PDF reports, each with a download button and an option to download all per-image PDFs as one ZIP.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/pages/4_Reports.py",
+          "start": 25,
+          "end": 102,
+          "role": "logic",
+          "anchor": "025c518d22c5",
+          "first": "db_path = get_db_path()"
+        },
+        {
+          "file": "code/app/components/data_loader.py",
+          "start": 189,
+          "end": 201,
+          "role": "data",
+          "symbol": "load_pdf_records",
+          "anchor": "bdeafd2b1e4d",
+          "first": "def load_pdf_records(db_path: str) -> pd.DataFrame:"
+        }
+      ]
+    }
+  ]
+}

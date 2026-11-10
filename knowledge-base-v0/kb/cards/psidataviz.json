@@ -1,0 +1,777 @@
+{
+  "schema": "astaui.card/1",
+  "id": "psidataviz",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T15:01:31Z"
+  },
+  "app": {
+    "title": "ΨDataViz (PsiDataViz): Scientific Data Visualization",
+    "summary": "A person points the interface at a public lab data folder or repository, or picks one from a search of open data repositories, and scans it. The scan groups files that share a base name into datasets and reports them by technique and by compound, with a coverage report of which formats could not be read and why. The person picks a technique, filters the dataset table by sample, date or compound, and clicks rows to parse and overlay them on one plot, optionally normalised, alongside heatmaps, a 3D molecule view and the parsed metadata. For a single dataset they can check that its different file formats hold the same data. They then convert it to a standard format, or export the selection as a runnable notebook.",
+    "task": {
+      "text": "Find and read a lab's instrument data files across many formats, overlay and compare the datasets, and convert them to standard open formats.",
+      "verbs": [
+        "explore",
+        "compare",
+        "lookup",
+        "summarize",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "A folder or repository of raw instrument and computational output files in many vendor formats. Files that share a base name are collapsed into one dataset, and each dataset is parsed into 1D signals (spectra, thermograms, chromatograms), 2D maps or images, molecular structures or audio.",
+      "item": "a dataset: one measurement saved in one or more file formats, with its technique, sample and date",
+      "shapes": [
+        "table",
+        "spectra",
+        "image",
+        "media",
+        "hierarchy"
+      ]
+    },
+    "stage": {
+      "text": "exploring raw instrument files in a shared lab folder, before analysis",
+      "terms": [
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A scan of a source fills technique and compound chips and a coverage report. Choosing a technique fills a filterable dataset table, and each row clicked there is parsed and added to an overlay panel that sends each dataset to the right view: a line plot, heatmap or slice viewer, a 3D structure viewer or an audio player. Clicking a peak on a computed spectrum animates the matching vibrational mode in the 3D viewer, and a single selected dataset can be format-compared, converted or exported as a notebook.",
+      "views": [
+        "table view",
+        "line chart",
+        "heatmap",
+        "image viewer",
+        "summary stats",
+        "3d structure viewer"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "filter",
+        "multi-select",
+        "select",
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "multi-technique instrument data (spectroscopy, diffraction, thermal analysis) in chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "spectroscopy",
+        "fair data"
+      ]
+    },
+    "workflow": {
+      "name": "catalogue a data folder, overlay chosen datasets and convert them to standard formats",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "paste a public GitHub, Codeberg, Google Drive or Box link, with an optional path keyword, or click a preset or a result from a search of open repositories, then Scan",
+          "parts": [
+            "source-picker"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "the scan reports how many datasets came from how many files, how the folder is organised, chips counting datasets per technique and per compound, and the percentage readable, with the unread formats and the reasons",
+          "parts": [
+            "scan-overview"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "click a technique chip to load its datasets into the table, then narrow by compound chip or by typing a sample or date",
+          "parts": [
+            "scan-overview",
+            "dataset-table"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "clicking rows parses each dataset and overlays it on one plot, with a Normalize toggle and line or point modes; 2D data goes to heatmap tabs, and computed jobs show their molecule",
+          "parts": [
+            "dataset-table",
+            "overlay-panel",
+            "spectrum-plot",
+            "structure-viewer"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "for one dataset saved in several formats, Compare formats parses each format and reports whether the data are identical, or lists the differences",
+          "parts": [
+            "format-compare"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Convert offers JCAMP-DX, CSDM, HDF5, CSV, Parquet or Feather, with recommended formats chosen by data kind; the notebook menu writes a Colab or marimo notebook that re-fetches the selected datasets",
+          "parts": [
+            "export-menu"
+          ]
+        }
+      ],
+      "distinctive": [
+        "files that share a base name across formats collapse into one dataset, and the formats can be checked against each other for identical data",
+        "a parsing-coverage report ranks unread file extensions by count, with guidance on how to export proprietary formats",
+        "each technique gets its plotting convention: reversed axes for NMR and FTIR, sticks for mass spectra, a wavelength slider for diode-array chromatography",
+        "clicking a peak on a computed IR or Raman spectrum animates that vibrational mode on the 3D molecule",
+        "a compound guessed from the dataset name, or known from the source, is resolved to a 3D structure automatically"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "source-picker",
+      "level": "view",
+      "parent": null,
+      "title": "Data source picker",
+      "summary": "Takes a public folder or repository link, a preset or an open-repository search result, and scans it.",
+      "views": [
+        "form",
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "search"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 308,
+          "end": 373,
+          "role": "markup",
+          "anchor": "c2091962bd9a",
+          "first": "<div className=\"row\">"
+        },
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 186,
+          "end": 200,
+          "role": "logic",
+          "symbol": "doScan",
+          "anchor": "3b22d07e1026",
+          "first": "async function doScan(target?: string) {"
+        },
+        {
+          "file": "code/apps/frontend/src/components/RepoSearch.tsx",
+          "start": 8,
+          "end": 8,
+          "role": "logic",
+          "symbol": "RepoSearch",
+          "anchor": "f4ba5b0b323d",
+          "first": "export function RepoSearch({ onPick, busy }: { onPick: (url: string) => void; busy?: boolean }) {"
+        },
+        {
+          "file": "code/apps/frontend/src/components/ConnectGuide.tsx",
+          "start": 78,
+          "end": 78,
+          "role": "logic",
+          "symbol": "ConnectGuide",
+          "anchor": "1a73226e12ae",
+          "first": "export function ConnectGuide({ onTryExample }: { onTryExample?: (url: string) => void }) {"
+        },
+        {
+          "file": "code/apps/frontend/src/styles.css",
+          "start": 160,
+          "end": 160,
+          "role": "style",
+          "symbol": ".presets",
+          "anchor": "1e27bd0f0f0f",
+          "first": ".presets { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }"
+        },
+        {
+          "file": "code/apps/frontend/src/styles.css",
+          "start": 161,
+          "end": 163,
+          "role": "style",
+          "symbol": ".src-chip",
+          "anchor": "f9e230c7dd54",
+          "first": ".src-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--panel-2);"
+        },
+        {
+          "file": "code/apps/backend/src/psidata_backend/main.py",
+          "start": 47,
+          "end": 52,
+          "role": "logic",
+          "symbol": "scan",
+          "anchor": "d57712c6b590",
+          "first": "def scan(url: str = Query(..., description=\"GitHub repo URL or owner/repo\"),"
+        },
+        {
+          "file": "code/apps/backend/src/psidata_backend/services.py",
+          "start": 184,
+          "end": 214,
+          "role": "logic",
+          "symbol": "scan_summary",
+          "anchor": "37b10d7fc98c",
+          "first": "def scan_summary(catalog: Catalog) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "scan-overview",
+      "level": "view",
+      "parent": null,
+      "title": "Scan overview and parsing coverage",
+      "summary": "Shows dataset counts, how the folder is organised, chips per technique and compound, and which formats could not be read and why.",
+      "views": [
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [
+        "filter",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 397,
+          "end": 451,
+          "role": "markup",
+          "anchor": "cfc1ada6cc6a",
+          "first": "{scan && ("
+        },
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 122,
+          "end": 122,
+          "role": "logic",
+          "symbol": "OrgBanner",
+          "anchor": "2b5019441c8a",
+          "first": "function OrgBanner({ org }: { org: Organization }) {"
+        },
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 202,
+          "end": 207,
+          "role": "logic",
+          "symbol": "pickTechnique",
+          "anchor": "0004060519b2",
+          "first": "async function pickTechnique(t: string, source: string = src) {"
+        },
+        {
+          "file": "code/apps/frontend/src/components/Diagnostics.tsx",
+          "start": 5,
+          "end": 5,
+          "role": "logic",
+          "symbol": "Diagnostics",
+          "anchor": "e012d1224240",
+          "first": "export function Diagnostics({ d }: { d: DiagnosticsData }) {"
+        },
+        {
+          "file": "code/apps/frontend/src/styles.css",
+          "start": 74,
+          "end": 77,
+          "role": "style",
+          "symbol": ".chip",
+          "anchor": "10be1245f6aa",
+          "first": ".chip {"
+        },
+        {
+          "file": "code/apps/frontend/src/styles.css",
+          "start": 145,
+          "end": 146,
+          "role": "style",
+          "symbol": ".coverage-bar",
+          "anchor": "eed0d381d29b",
+          "first": ".coverage-bar { height: 8px; background: var(--bg); border-radius: 999px; overflow: hidden;"
+        },
+        {
+          "file": "code/apps/backend/src/psidata_backend/services.py",
+          "start": 236,
+          "end": 263,
+          "role": "logic",
+          "symbol": "_diagnostics",
+          "anchor": "7580b38bb92c",
+          "first": "def _diagnostics(groups: dict, summary: dict) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "dataset-table",
+      "level": "view",
+      "parent": null,
+      "title": "Dataset table",
+      "summary": "Lists the chosen technique's datasets by date, compound, description and formats; filtering narrows it and clicking a row adds or removes that dataset from the overlay.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "filter",
+        "search",
+        "multi-select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 453,
+          "end": 503,
+          "role": "markup",
+          "anchor": "fe7ee768729e",
+          "first": "{records.length > 0 && ("
+        },
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 281,
+          "end": 286,
+          "role": "logic",
+          "anchor": "cc7cfae74bba",
+          "first": "const needle = filter.trim().toLowerCase();"
+        },
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 209,
+          "end": 227,
+          "role": "logic",
+          "symbol": "toggleRecord",
+          "anchor": "f9efcc794c85",
+          "first": "async function toggleRecord(r: RecordRow) {"
+        },
+        {
+          "file": "code/apps/frontend/src/styles.css",
+          "start": 92,
+          "end": 92,
+          "role": "style",
+          "symbol": "tbody tr.selected",
+          "anchor": "5e6751c519b7",
+          "first": "tbody tr.selected { background: rgba(28, 126, 214, 0.18); }"
+        },
+        {
+          "file": "code/apps/frontend/src/styles.css",
+          "start": 136,
+          "end": 138,
+          "role": "style",
+          "symbol": "input[type=\"text\"].filter",
+          "anchor": "c516caff5e3a",
+          "first": "input[type=\"text\"].filter {"
+        }
+      ]
+    },
+    {
+      "id": "overlay-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Overlay panel",
+      "summary": "Holds the selected datasets and sends each to its view (plot, heatmap tabs, structure, audio), with Normalize, Clear, switching between datasets in an archive, and the parsed metadata.",
+      "views": [
+        "side-by-side panes",
+        "heatmap",
+        "detail panel"
+      ],
+      "interactions": [
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 505,
+          "end": 559,
+          "role": "markup",
+          "anchor": "98ac6e801498",
+          "first": "{selectedDatasets.length > 0 && ("
+        },
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 579,
+          "end": 612,
+          "role": "markup",
+          "anchor": "fe9716a2b231",
+          "first": "{soleRecord && datasets[rid(soleRecord)] && ("
+        },
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 244,
+          "end": 253,
+          "role": "logic",
+          "anchor": "6a1403f1a825",
+          "first": "const selectedDatasets = selected.map((k) => datasets[k]).filter(Boolean);"
+        },
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 230,
+          "end": 235,
+          "role": "logic",
+          "symbol": "loadMember",
+          "anchor": "be17528a3d00",
+          "first": "async function loadMember(r: RecordRow, member: string | null) {"
+        },
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 618,
+          "end": 618,
+          "role": "logic",
+          "symbol": "Metadata",
+          "anchor": "13e645782e58",
+          "first": "function Metadata({ meta }: { meta: Record<string, unknown> }) {"
+        },
+        {
+          "file": "code/apps/frontend/src/components/Heatmap.tsx",
+          "start": 8,
+          "end": 8,
+          "role": "logic",
+          "symbol": "Heatmap",
+          "anchor": "de76ca34ca31",
+          "first": "export function Heatmap({ dataset }: { dataset: DatasetData }) {"
+        },
+        {
+          "file": "code/apps/frontend/src/components/LayoutTabs.tsx",
+          "start": 14,
+          "end": 14,
+          "role": "logic",
+          "symbol": "LayoutTabs",
+          "anchor": "d44c94d206cd",
+          "first": "export function LayoutTabs({ items }: { items: LayoutItem[] }) {"
+        },
+        {
+          "file": "code/apps/frontend/src/styles.css",
+          "start": 98,
+          "end": 98,
+          "role": "style",
+          "symbol": ".meta",
+          "anchor": "ecb1c72da432",
+          "first": ".meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 13px; }"
+        }
+      ]
+    },
+    {
+      "id": "spectrum-plot",
+      "level": "component",
+      "parent": "overlay-panel",
+      "title": "Overlay spectrum plot",
+      "summary": "Draws every selected signal on shared axes, optionally min-max normalised, using each technique's conventions, and passes a clicked peak on to the structure viewer.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan",
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/apps/frontend/src/components/SpectrumPlot.tsx",
+          "start": 34,
+          "end": 38,
+          "role": "logic",
+          "symbol": "SpectrumPlot",
+          "anchor": "f0f4deb5dc73",
+          "first": "export function SpectrumPlot({"
+        },
+        {
+          "file": "code/apps/frontend/src/components/SpectrumPlot.tsx",
+          "start": 23,
+          "end": 32,
+          "role": "logic",
+          "symbol": "normalizeY",
+          "anchor": "a90b750083ac",
+          "first": "function normalizeY(ys: number[]): number[] {"
+        },
+        {
+          "file": "code/apps/frontend/src/components/SpectrumPlot.tsx",
+          "start": 15,
+          "end": 15,
+          "role": "data",
+          "symbol": "REVERSED",
+          "anchor": "1e88d1134731",
+          "first": "const REVERSED = new Set([\"NMR\", \"FTIR\"]);"
+        },
+        {
+          "file": "code/apps/frontend/src/components/SpectrumPlot.tsx",
+          "start": 17,
+          "end": 17,
+          "role": "data",
+          "symbol": "STICK",
+          "anchor": "2faf0327cf26",
+          "first": "const STICK = new Set([\"Mass Spec\", \"SIMS\"]);"
+        },
+        {
+          "file": "code/apps/backend/src/psidata_backend/services.py",
+          "start": 481,
+          "end": 495,
+          "role": "logic",
+          "symbol": "_downsample",
+          "anchor": "1892635faaec",
+          "first": "def _downsample(x: np.ndarray, y: np.ndarray, max_points: int) -> list[list[float]]:"
+        }
+      ]
+    },
+    {
+      "id": "structure-viewer",
+      "level": "component",
+      "parent": "overlay-panel",
+      "title": "3D molecule viewer",
+      "summary": "Shows a dataset's computed structure with animated vibrational modes, or resolves a typed or guessed SMILES or compound name to a 3D structure.",
+      "views": [
+        "3d structure viewer"
+      ],
+      "interactions": [
+        "search",
+        "zoom and pan",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 560,
+          "end": 570,
+          "role": "markup",
+          "anchor": "60493b7c6e5c",
+          "first": "{structureDatasets.map((ds) => ("
+        },
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 257,
+          "end": 268,
+          "role": "logic",
+          "anchor": "806a60427da4",
+          "first": "const knownSmiles = selected"
+        },
+        {
+          "file": "code/apps/frontend/src/components/MoleculeViewer.tsx",
+          "start": 8,
+          "end": 12,
+          "role": "logic",
+          "symbol": "MoleculeViewer",
+          "anchor": "66430144bbbc",
+          "first": "export function MoleculeViewer({"
+        },
+        {
+          "file": "code/apps/frontend/src/components/CompoundViewer.tsx",
+          "start": 7,
+          "end": 7,
+          "role": "logic",
+          "symbol": "CompoundViewer",
+          "anchor": "db5e1f2b20ac",
+          "first": "export function CompoundViewer({ initialQuery }: { initialQuery?: string }) {"
+        },
+        {
+          "file": "code/apps/frontend/src/compound.ts",
+          "start": 16,
+          "end": 29,
+          "role": "logic",
+          "symbol": "guessCompound",
+          "anchor": "89e4f3eb44a0",
+          "first": "export function guessCompound(raw: string): string {"
+        },
+        {
+          "file": "code/apps/frontend/src/styles.css",
+          "start": 232,
+          "end": 235,
+          "role": "style",
+          "symbol": ".mol-card",
+          "anchor": "a6c1b8e20d5c",
+          "first": ".mol-card {"
+        },
+        {
+          "file": "code/apps/backend/src/psidata_backend/molecule.py",
+          "start": 86,
+          "end": 114,
+          "role": "logic",
+          "symbol": "molecule_payload",
+          "anchor": "a61f5960ceec",
+          "first": "def molecule_payload(*, smiles: str | None = None, name: str | None = None,"
+        }
+      ]
+    },
+    {
+      "id": "format-compare",
+      "level": "component",
+      "parent": "overlay-panel",
+      "title": "Format comparison",
+      "summary": "For one dataset saved in several formats, parses each format and reports whether the data are identical or how they differ.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 521,
+          "end": 525,
+          "role": "markup",
+          "anchor": "1b090d13f12c",
+          "first": "{canCompare && ("
+        },
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 574,
+          "end": 578,
+          "role": "markup",
+          "anchor": "73fe83ecb120",
+          "first": "{compare && ("
+        },
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 237,
+          "end": 242,
+          "role": "logic",
+          "symbol": "doCompare",
+          "anchor": "b208556b0f23",
+          "first": "async function doCompare() {"
+        },
+        {
+          "file": "code/apps/frontend/src/components/CompareView.tsx",
+          "start": 3,
+          "end": 3,
+          "role": "logic",
+          "symbol": "CompareView",
+          "anchor": "9fc033152aa7",
+          "first": "export function CompareView({ result }: { result: CompareResult }) {"
+        },
+        {
+          "file": "code/apps/frontend/src/styles.css",
+          "start": 123,
+          "end": 124,
+          "role": "style",
+          "symbol": ".cmp",
+          "anchor": "9fb2bc64bdbf",
+          "first": ".cmp { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;"
+        },
+        {
+          "file": "code/apps/frontend/src/styles.css",
+          "start": 129,
+          "end": 129,
+          "role": "style",
+          "symbol": ".difflist",
+          "anchor": "5b071964864f",
+          "first": ".difflist { margin: 8px 0 0; padding-left: 18px; color: var(--dim); font-size: 12.5px; line-height: 1.7; }"
+        },
+        {
+          "file": "code/packages/psidata/src/psidata/compare.py",
+          "start": 66,
+          "end": 102,
+          "role": "logic",
+          "symbol": "compare_record_formats",
+          "anchor": "4044ba5ab426",
+          "first": "def compare_record_formats(record, load) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "export-menu",
+      "level": "component",
+      "parent": "overlay-panel",
+      "title": "Convert and notebook export",
+      "summary": "Converts the selected dataset to a standard file format, recommending one by data kind, or writes a Colab or marimo notebook that reproduces the selection.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/apps/frontend/src/App.tsx",
+          "start": 600,
+          "end": 608,
+          "role": "markup",
+          "anchor": "2c3607f29ff8",
+          "first": "<div className=\"export-row\">"
+        },
+        {
+          "file": "code/apps/frontend/src/components/ExportMenu.tsx",
+          "start": 25,
+          "end": 31,
+          "role": "logic",
+          "symbol": "ExportMenu",
+          "anchor": "caf6d83a8052",
+          "first": "export function ExportMenu({"
+        },
+        {
+          "file": "code/apps/frontend/src/components/NotebookMenu.tsx",
+          "start": 11,
+          "end": 11,
+          "role": "logic",
+          "symbol": "NotebookMenu",
+          "anchor": "89ddd43b1aee",
+          "first": "export function NotebookMenu({ datasets }: { datasets: NotebookDataset[] }) {"
+        },
+        {
+          "file": "code/apps/frontend/src/styles.css",
+          "start": 199,
+          "end": 201,
+          "role": "style",
+          "symbol": ".export-dropdown",
+          "anchor": "98377576fe92",
+          "first": ".export-dropdown { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;"
+        },
+        {
+          "file": "code/apps/frontend/src/styles.css",
+          "start": 202,
+          "end": 204,
+          "role": "style",
+          "symbol": ".export-item",
+          "anchor": "5e86e151bba4",
+          "first": ".export-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;"
+        },
+        {
+          "file": "code/apps/backend/src/psidata_backend/main.py",
+          "start": 162,
+          "end": 185,
+          "role": "logic",
+          "symbol": "_convert_response",
+          "anchor": "a3ae97082351",
+          "first": "def _convert_response(url: str, name: str, technique: str | None, fmt: str,"
+        },
+        {
+          "file": "code/apps/backend/src/psidata_backend/main.py",
+          "start": 219,
+          "end": 236,
+          "role": "logic",
+          "symbol": "notebook_endpoint",
+          "anchor": "80be8f8b7137",
+          "first": "def notebook_endpoint(payload: dict = Body(...)):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "data",
+      "list": "shapes",
+      "term": "spectra"
+    },
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "3d structure viewer"
+    }
+  ]
+}

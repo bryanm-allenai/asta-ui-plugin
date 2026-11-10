@@ -1,0 +1,420 @@
+{
+  "schema": "astaui.card/1",
+  "id": "bioseq-analyzer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:24:00Z"
+  },
+  "app": {
+    "title": "BioSeq Analyzer",
+    "summary": "A person pastes a DNA sequence, uploads a FASTA file or loads a bundled example, and picks one record when the file holds several; sequences with characters other than A, C, G and T are refused. The interface then shows headline numbers for the sequence and four tabs: base composition as a chart and table, the reverse complement, mRNA and straight translation, open reading frames found in all six frames above an adjustable minimum length, and a restriction map of where a fixed panel of enzymes cut. They come away with the sequence's composition, its candidate coding regions and the protein of the longest one, and which enzymes cut it where and which do not cut it at all.",
+    "task": {
+      "text": "Compute the basic properties of one DNA sequence and locate its coding regions and restriction sites.",
+      "verbs": [
+        "derive",
+        "locate",
+        "summarize",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "One or more nucleotide sequences in plain text or FASTA, from which per-sequence statistics, transformed sequences and tables of located features are computed.",
+      "item": "a DNA sequence record (header and bases)",
+      "shapes": [
+        "sequence",
+        "table",
+        "spans"
+      ]
+    },
+    "stage": {
+      "text": "characterising a DNA sequence before planning cloning or annotation",
+      "terms": [
+        "analyze",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "An input area parses pasted or uploaded FASTA into records and validates the chosen one; summary metrics sit above tabs that each run one analysis on the same sequence, with a slider recomputing the ORF list and a tick map placing restriction sites along the sequence's length.",
+      "views": [
+        "form",
+        "summary stats",
+        "bar chart",
+        "table view",
+        "sequence track"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "toggle view",
+        "filter",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "DNA sequence analysis in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "molecular biology",
+        "sequence analysis",
+        "restriction mapping"
+      ]
+    },
+    "workflow": {
+      "name": "compute properties and locate features along one sequence",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Paste plain or FASTA text, load the bundled example, or upload a .fasta/.fa/.fna/.txt file; with several records a dropdown picks one, and any non-ACGT character stops the analysis with an error.",
+          "parts": [
+            "sequence-input",
+            "record-picker"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Length in bp, GC and AT percent and complete codons as metrics, then per-base counts and percentages as a bar chart beside a table.",
+          "parts": [
+            "summary-metrics",
+            "composition-tab"
+          ]
+        },
+        {
+          "step": "derive transformed versions of the item",
+          "here": "Reverse complement, mRNA (T to U) and a straight frame +1 translation with stops marked, each shown as wrapped text.",
+          "parts": [
+            "transformations-tab"
+          ]
+        },
+        {
+          "step": "find candidate features above a threshold",
+          "here": "Six-frame ATG-to-stop scan with a minimum protein length slider; the longest ORF's frame, coordinates and protein are reported, then all ORFs in a table.",
+          "parts": [
+            "orf-finder"
+          ]
+        },
+        {
+          "step": "locate every occurrence of known motifs",
+          "here": "Recognition sites for 12 type II enzymes drawn as ticks along the sequence per enzyme, a table of cutters with positions, and a list of non-cutters.",
+          "parts": [
+            "restriction-map"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Reading frames are scanned on both strands, and minus-strand coordinates run backwards (start larger than end).",
+        "Non-cutting enzymes are listed separately because they can open a vector without cutting the insert.",
+        "Input is strictly validated to the four bases before anything is computed.",
+        "The analysis functions are written from scratch and checked against a reference library by an automated test suite."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sequence-input",
+      "level": "view",
+      "parent": null,
+      "title": "Sequence input",
+      "summary": "Lets the person paste a sequence, load an example or upload a FASTA file, then parses and validates it.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 29,
+          "end": 54,
+          "role": "markup",
+          "anchor": "8d19be5b40fb",
+          "first": "# ---------- Input ----------"
+        },
+        {
+          "file": "code/app.py",
+          "start": 14,
+          "end": 15,
+          "role": "logic",
+          "symbol": "load_example",
+          "anchor": "ca4ecac9e9b0",
+          "first": "def load_example():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 67,
+          "end": 77,
+          "role": "logic",
+          "anchor": "8ae72c77dfda",
+          "first": "if not sequence:"
+        },
+        {
+          "file": "code/seq_tools.py",
+          "start": 69,
+          "end": 84,
+          "role": "logic",
+          "symbol": "parse_fasta",
+          "anchor": "462e66f03d54",
+          "first": "def parse_fasta(raw_text):"
+        },
+        {
+          "file": "code/seq_tools.py",
+          "start": 23,
+          "end": 25,
+          "role": "logic",
+          "symbol": "find_invalid_characters",
+          "anchor": "72ebc7091eae",
+          "first": "def find_invalid_characters(sequence):"
+        }
+      ]
+    },
+    {
+      "id": "record-picker",
+      "level": "component",
+      "parent": "sequence-input",
+      "title": "Record picker",
+      "summary": "When the input holds several sequences, a dropdown of their headers chooses the one to analyse.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 56,
+          "end": 65,
+          "role": "logic",
+          "anchor": "2e9ef1f57102",
+          "first": "# A FASTA file can hold several sequences: let the user pick one"
+        }
+      ]
+    },
+    {
+      "id": "summary-metrics",
+      "level": "view",
+      "parent": null,
+      "title": "Summary metrics",
+      "summary": "Shows the record header with its length, GC content, AT content and number of complete codons.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 79,
+          "end": 90,
+          "role": "markup",
+          "anchor": "89bf3396e36f",
+          "first": "st.subheader(header)"
+        },
+        {
+          "file": "code/seq_tools.py",
+          "start": 33,
+          "end": 38,
+          "role": "logic",
+          "symbol": "gc_content",
+          "anchor": "b0edb1f9c670",
+          "first": "def gc_content(sequence):"
+        },
+        {
+          "file": "code/seq_tools.py",
+          "start": 41,
+          "end": 46,
+          "role": "logic",
+          "symbol": "at_content",
+          "anchor": "664118bfa0ed",
+          "first": "def at_content(sequence):"
+        }
+      ]
+    },
+    {
+      "id": "composition-tab",
+      "level": "component",
+      "parent": "summary-metrics",
+      "title": "Composition",
+      "summary": "Counts each base and shows the counts as a bar chart with hover percentages beside a table.",
+      "views": [
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 92,
+          "end": 111,
+          "role": "logic",
+          "anchor": "4ea8268c0a14",
+          "first": "# ---------- Nucleotide composition ----------"
+        },
+        {
+          "file": "code/seq_tools.py",
+          "start": 28,
+          "end": 30,
+          "role": "logic",
+          "symbol": "nucleotide_counts",
+          "anchor": "e7b5290428e2",
+          "first": "def nucleotide_counts(sequence):"
+        }
+      ]
+    },
+    {
+      "id": "transformations-tab",
+      "level": "component",
+      "parent": "summary-metrics",
+      "title": "Sequence transformations",
+      "summary": "Shows the reverse complement, the mRNA transcript and a straight translation from the first base.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 113,
+          "end": 126,
+          "role": "logic",
+          "anchor": "a47a2b5531fc",
+          "first": "# ---------- Sequence transformations ----------"
+        },
+        {
+          "file": "code/seq_tools.py",
+          "start": 49,
+          "end": 51,
+          "role": "logic",
+          "symbol": "reverse_complement",
+          "anchor": "391f972d87ea",
+          "first": "def reverse_complement(sequence):"
+        },
+        {
+          "file": "code/seq_tools.py",
+          "start": 54,
+          "end": 56,
+          "role": "logic",
+          "symbol": "transcribe",
+          "anchor": "f319053d5165",
+          "first": "def transcribe(sequence):"
+        },
+        {
+          "file": "code/seq_tools.py",
+          "start": 59,
+          "end": 66,
+          "role": "logic",
+          "symbol": "translate",
+          "anchor": "b5da2aa3bcfa",
+          "first": "def translate(sequence):"
+        },
+        {
+          "file": "code/seq_tools.py",
+          "start": 8,
+          "end": 13,
+          "role": "data",
+          "anchor": "78bceeae40a2",
+          "first": "# The standard genetic code (NCBI table 1), laid out in T-C-A-G order,"
+        }
+      ]
+    },
+    {
+      "id": "orf-finder",
+      "level": "component",
+      "parent": "summary-metrics",
+      "title": "Open reading frames",
+      "summary": "Scans all six frames for start-to-stop regions above a minimum protein length set by a slider, reporting the longest one's protein and a table of all.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 128,
+          "end": 150,
+          "role": "logic",
+          "anchor": "c8db01852f52",
+          "first": "# ---------- Open reading frames ----------"
+        },
+        {
+          "file": "code/seq_tools.py",
+          "start": 89,
+          "end": 127,
+          "role": "logic",
+          "symbol": "find_orfs",
+          "anchor": "468efb78ead6",
+          "first": "def find_orfs(sequence, min_protein_length=30):"
+        }
+      ]
+    },
+    {
+      "id": "restriction-map",
+      "level": "component",
+      "parent": "summary-metrics",
+      "title": "Restriction sites",
+      "summary": "Finds every recognition site of a fixed enzyme panel, draws them as ticks along the sequence per enzyme, tables the cutters and lists the non-cutters.",
+      "views": [
+        "sequence track",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 152,
+          "end": 195,
+          "role": "logic",
+          "anchor": "e75ffd9341f7",
+          "first": "# ---------- Restriction sites ----------"
+        },
+        {
+          "file": "code/seq_tools.py",
+          "start": 149,
+          "end": 159,
+          "role": "logic",
+          "symbol": "find_restriction_sites",
+          "anchor": "e46903472e88",
+          "first": "def find_restriction_sites(sequence, enzymes=RESTRICTION_ENZYMES):"
+        },
+        {
+          "file": "code/seq_tools.py",
+          "start": 130,
+          "end": 146,
+          "role": "data",
+          "anchor": "daef41bdd46f",
+          "first": "# Common type II restriction enzymes and their recognition sites."
+        }
+      ]
+    }
+  ]
+}

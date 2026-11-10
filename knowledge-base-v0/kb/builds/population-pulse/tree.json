@@ -1,0 +1,788 @@
+{
+ "interface": {
+  "title": "population-pulse",
+  "field": "Public health surveillance / epidemiology (respiratory emergency-department demand vs. population-mobility, weather and wastewater signals)",
+  "stage_of_work": "Exploratory and descriptive analysis: finding lead-lag relationships, then screening regression models and checking them before any causal or event-study follow-up",
+  "what_it_is_for": "Line up weekly city signals (transit, bikeshare, weather, events, academic calendar, wastewater by pathogen) against respiratory ED demand, find which drivers lead demand and by how many weeks with multiple-comparison correction, then fit and check surge and count regressions for overfitting and confounding."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "Built-in Boston parquet files. The data is partly real and partly synthetic. hospital_demand (MA DPH, 2019-06 onward), events and academic_calendar come from real checked-in CSVs. Transit, bikeshare, weather and wastewater are synthetic samples. 'boston' is the only City option (screens/047.webp). Each signal covers a different span: transit, bikeshare and weather run 2018-07 to 2026-10; hospital_demand 2019-06 to 2026-07; wastewater 2022-12 on; transit_service_level only from 2025-10 (screens/005.webp). The 8 most recent weeks of demand are marked provisional and left out of the correlation and regression."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Find which outside signals lead a weekly health outcome, by how much, and whether that lead holds up under multiple-testing correction, out-of-sample validation and a confounding check",
+  "specific": "Find which Boston drivers (transit, bikeshare, weather, events, academic calendar, wastewater Influenza A/RSV/SARS-CoV-2) lead respiratory ED demand, and test that with BH correction, walk-forward folds and VIF",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Set the study window and get oriented in the data",
+    "specific": "Sidebar date range and Overview tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Choose the time window every analysis uses",
+      "specific": "Pick a date-range preset (1Y/2Y/5Y/All) or type a From date in the sidebar",
+      "screens": [
+       "screens/004.webp",
+       "screens/039.webp",
+       "screens/041.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed All (From became 2018/07/01)",
+        "screens": [
+         "screens/004.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 2Y (Overview: 89 weeks in range, -1,099.3 vs. baseline)",
+        "screens": [
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 2022/09/01 in From and picked 1 Sep in the calendar (202 weeks in range)",
+        "screens": [
+         "screens/040.webp",
+         "screens/041.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Read the latest outcome value against its seasonal baseline and check how current each data source is",
+      "specific": "Overview tab: latest-week respiratory ED demand, vs.-seasonal-baseline residual, below/above-baseline banner, Notable events table and Data freshness table",
+      "screens": [
+       "screens/003.webp",
+       "screens/005.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Overview tab",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the Notable events and Data freshness tables",
+        "screens": [
+         "screens/005.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Look at all the signals together on one shared time axis",
+    "specific": "Timeline tab: z-scored multi-signal chart",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Overlay chosen signals, put on a common scale, against the outcome",
+      "specific": "Choose signals in 'Signals to show' and compare z-scored lines; hospital_demand vs. wastewater Influenza A shows matching winter peaks",
+      "screens": [
+       "screens/007.webp",
+       "screens/009.webp",
+       "screens/010.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Timeline tab (default: hospital_demand, transit, weather, bikeshare)",
+        "screens": [
+         "screens/006.webp",
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the Signals to show dropdown and picked wastewater: Influenza A",
+        "screens": [
+         "screens/008.webp",
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked × on bikeshare, weather and transit",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "mouse wheel over the chart (zoomed the time axis out)",
+        "screens": [
+         "screens/012.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Identify marked events on the timeline",
+      "specific": "Hover a gray dashed event line to see the event, venue and expected attendance",
+      "screens": [
+       "screens/011.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered the Dec 30 2025 line (First Night, Boston Common, 50,000)",
+        "screens": [
+         "screens/011.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Inspect the raw aligned weekly values",
+      "specific": "Expand 'Aligned weekly data table'",
+      "screens": [
+       "screens/012.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Aligned weekly data table",
+        "screens": [
+         "screens/012.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Find how many weeks a driver leads the outcome, and whether that holds up after correction",
+    "specific": "Correlation & Regression tab: lagged cross-correlation panel, lags 0-8",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Run the lagged correlation for a chosen driver and read the strongest lag",
+      "specific": "Choose a Driver signal; read the lag bar chart with CIs and the 'Strongest correlation' metric",
+      "screens": [
+       "screens/014.webp",
+       "screens/016.webp",
+       "screens/034.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Correlation & Regression (default transit: +0.18 at lag 8)",
+        "screens": [
+         "screens/013.webp",
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Driver signal = wastewater: Influenza A (-0.45 at lag 4)",
+        "screens": [
+         "screens/015.webp",
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Driver signal = transit_service_level (-0.69 at lag 8)",
+        "screens": [
+         "screens/034.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the lag-5 bar to read ci_low/ci_high",
+        "screens": [
+         "screens/035.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Show data on the lag chart to get the lag/correlation/pvalue/CI table",
+        "screens": [
+         "screens/036.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check whether the best lag survives multiple-comparison correction and whether it clearly beats the next-best lag",
+      "specific": "Read the raw vs. Benjamini-Hochberg-corrected p and lag survival count, plus the 'This lag isn't a clear winner' ambiguity warning",
+      "screens": [
+       "screens/014.webp",
+       "screens/016.webp",
+       "screens/034.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "read transit: 3 of 9 lags survive, ambiguity warning shown",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "read wastewater Influenza A: 6 of 9 survive, no ambiguity warning",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "read transit_service_level: 1 of 9 survive vs. 2 before correction",
+        "screens": [
+         "screens/034.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Compare results with and without removing the seasonal trend",
+      "specific": "Toggle 'Deseasonalize first (recommended)'",
+      "screens": [
+       "screens/017.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "unchecked Deseasonalize first (Influenza A becomes +0.69 at lag 0 with ambiguity warning)",
+        "screens": [
+         "screens/017.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "re-checked Deseasonalize first",
+        "screens": [
+         "screens/018.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "See how the lag result changes over a shorter window",
+      "specific": "Switch the sidebar to 2Y and re-read the Influenza A lag table (corrected p 0.0002 vs. 0.0000 over All)",
+      "screens": [
+       "screens/037.webp",
+       "screens/038.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 2Y (transit_service_level unchanged because its data starts 2025-10)",
+        "screens": [
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Driver signal = wastewater: Influenza A again",
+        "screens": [
+         "screens/038.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Correct every driver's every lag together, to guard against picking the one driver that happened to survive",
+      "specific": "Expand 'Every driver, corrected together (full-scan significance check)': best_lag, correlation, raw/corrected p, significant and ambiguous for all 8 drivers",
+      "screens": [
+       "screens/031.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded Every driver, corrected together (15 of 72 driver-lag tests survive vs. 20 raw)",
+        "screens": [
+         "screens/031.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Fit predictive models of the outcome on the lagged driver",
+    "specific": "'Lagged regression: does this driver predict a surge?' panel",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Fit a classifier for high-outcome weeks on the lagged driver and read its discrimination",
+      "specific": "Set Driver lag and Surge threshold (quantile); read AUC-ROC, pseudo-R² and driver p-value of the surge logistic regression",
+      "screens": [
+       "screens/018.webp",
+       "screens/022.webp",
+       "screens/027.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "left lag at 4 as auto-set by the correlation panel (AUC 0.41)",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Driver lag slider to 0 (AUC 0.74, p=0.0001)",
+        "screens": [
+         "screens/021.webp",
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Surge threshold slider from 0.75 to 0.85 (AUC 0.83, 25 of 178 weeks labeled surge)",
+        "screens": [
+         "screens/026.webp",
+         "screens/027.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Fit a count model of the outcome and compare distribution families by AIC",
+      "specific": "Count regression family: negative_binomial vs. poisson; read driver coefficient, p-value, AIC",
+      "screens": [
+       "screens/022.webp",
+       "screens/025.webp",
+       "screens/042.webp",
+       "screens/043.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "read negative_binomial at lag 0 (AIC 3562.0, p=0.0098)",
+        "screens": [
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose poisson (AIC 73397.2, p=0.0000)",
+        "screens": [
+         "screens/023.webp",
+         "screens/025.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "at lag 4: poisson p=0.0000, AIC 107399; switched to negative_binomial: p=0.3912, AIC 3482",
+        "screens": [
+         "screens/042.webp",
+         "screens/043.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Check the fitted model before trusting it",
+    "specific": "Expanders under the regression panel",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Validate out-of-sample with time-ordered expanding-window folds and compare to the in-sample fit",
+      "specific": "Expand 'Out-of-sample validation (walk-forward)': in-sample vs. out-of-sample AUC and MAE with per-fold values",
+      "screens": [
+       "screens/027.webp",
+       "screens/043.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded walk-forward at lag 0, q=0.85, poisson (AUC 0.83 in vs 0.80 out; MAE 1435.8 vs 2093.1)",
+        "screens": [
+         "screens/027.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "re-read at lag 4, negative_binomial (AUC 0.37 in vs 0.53 out; per-fold 0.05, 0.73, 0.81)",
+        "screens": [
+         "screens/043.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check the automatically chosen lag against a forced nearby lag before trusting either one",
+      "specific": "Move the Driver lag slider off the lag auto-set by the correlation panel (4 for wastewater Influenza A) to lag 0, then compare surge AUC, count-model p-value and walk-forward results at both lags",
+      "screens": [
+       "screens/018.webp",
+       "screens/022.webp",
+       "screens/027.webp",
+       "screens/043.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "at the auto-set lag 4 (window All): surge AUC 0.41",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "forced lag 0 (window All): surge AUC 0.74, p=0.0001; negative_binomial p=0.0098",
+        "screens": [
+         "screens/021.webp",
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "compared walk-forward: lag 0, q=0.85 (All) out-of-sample AUC 0.80 vs. lag 4, negative_binomial (From 2022/09/01) out-of-sample AUC 0.53 with per-fold 0.05, 0.73, 0.81; NB p=0.3912 at lag 4. The windows differ, so AIC and AUC are not strictly comparable",
+        "screens": [
+         "screens/027.webp",
+         "screens/043.webp"
+        ]
+       }
+      ],
+      "id": "n1"
+     },
+     {
+      "kind": "task",
+      "general": "Check whether drivers are correlated with one another, so an apparent effect isn't carried by a correlated driver",
+      "specific": "Expand 'Driver correlation matrix (confounding check)': deseasonalized driver×driver heatmap plus VIF table",
+      "screens": [
+       "screens/028.webp",
+       "screens/029.webp",
+       "screens/030.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded Driver correlation matrix",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the Influenza A × RSV cell (+0.34)",
+        "screens": [
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the VIF table (all under 5; highest wastewater Influenza A 2.96, n=41 overlapping weeks)",
+        "screens": [
+         "screens/030.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Read the method's stated limits",
+      "specific": "Expand 'Methodology & caveats'",
+      "screens": [
+       "screens/033.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded Methodology & caveats",
+        "screens": [
+         "screens/033.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Multi-signal z-score timeline with event annotations",
+   "general": "Choose any set of time series, rescale each to z-scores over the selected window, and overlay them on one time axis with hoverable event markers and a provisional-data cutoff line",
+   "specific": "Timeline tab: 'Signals to show' multiselect drives a z-scored Vega line chart with gray dashed event lines (hover shows event, venue, attendance), an orange provisional line, and an 'Aligned weekly data table' expander; follows the sidebar date range",
+   "steps": [
+    "Set the date window (preset or From/To)",
+    "Add or remove signals in the multiselect",
+    "Compare the overlaid z-scored curves; scroll over the chart to zoom",
+    "Hover an event line for details",
+    "Expand the aligned weekly table for raw values"
+   ],
+   "serves_tasks": [
+    "Overlay chosen signals, put on a common scale, against the outcome",
+    "Identify marked events on the timeline",
+    "Inspect the raw aligned weekly values"
+   ],
+   "screens": [
+    "screens/007.webp",
+    "screens/009.webp",
+    "screens/010.webp",
+    "screens/011.webp",
+    "screens/012.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Lagged cross-correlation scan with BH correction and ambiguity flag",
+   "general": "For one predictor, compute correlation with the outcome at each lag in a range, show bars with confidence intervals, name the strongest lag with raw and FDR-corrected p-values, and warn when the top lag's interval overlaps the runner-up's",
+   "specific": "Driver signal selectbox + 'Deseasonalize first' checkbox → lag 0-8 bar chart with CI whiskers, 'Strongest correlation' metric, 'X of 9 lags survive correction (vs. Y before)' text and the 'This lag isn't a clear winner' warning; the best lag is passed on as the default of the regression's Driver lag slider",
+   "steps": [
+    "Choose the driver signal",
+    "Optionally turn deseasonalizing off or on",
+    "Read the bars and hover for CI bounds, or press Show data for the table",
+    "Read the strongest lag with raw vs. BH-corrected p and survival count",
+    "Heed or note the ambiguity warning"
+   ],
+   "serves_tasks": [
+    "Run the lagged correlation for a chosen driver and read the strongest lag",
+    "Check whether the best lag survives multiple-comparison correction and whether it clearly beats the next-best lag",
+    "Compare results with and without removing the seasonal trend"
+   ],
+   "screens": [
+    "screens/014.webp",
+    "screens/016.webp",
+    "screens/017.webp",
+    "screens/034.webp",
+    "screens/035.webp",
+    "screens/036.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Full-scan family-wide significance table",
+   "general": "Correct every predictor × every lag together as one family of tests and list, per predictor, its best lag, effect, raw and corrected p, significance and ambiguity",
+   "specific": "'Every driver, corrected together (full-scan significance check)' expander: BH correction across 72 driver-lag tests with significant/ambiguous checkboxes per driver",
+   "steps": [
+    "Expand the full-scan section",
+    "Sort or scan drivers by corrected p-value",
+    "Compare survivors against the count that looked significant before correction",
+    "Note which drivers are significant but ambiguous about the lag"
+   ],
+   "serves_tasks": [
+    "Correct every driver's every lag together, to guard against picking the one driver that happened to survive"
+   ],
+   "screens": [
+    "screens/031.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Lagged surge-logistic + count-GLM fit panel",
+   "general": "At a chosen lag, turn the outcome into a binary 'unusually high' label by quantile threshold and fit a logistic model (AUC, pseudo-R², p), and alongside it fit a count GLM with a selectable family (Poisson vs. Negative-Binomial) to compare by AIC",
+   "specific": "Driver lag slider (0-8), Surge threshold (quantile 0.50-0.95) slider and Count regression family selectbox → AUC-ROC, Pseudo-R², driver p-value (surge), plus driver coefficient, p-value and AIC for the GLM. The driver coefficient displays as +0.000 (too few decimals to read)",
+   "steps": [
+    "Accept or move the driver lag",
+    "Set the surge quantile threshold",
+    "Read AUC, pseudo-R² and p for the surge model",
+    "Switch the count family between negative_binomial and poisson",
+    "Compare AIC and p-value across families"
+   ],
+   "serves_tasks": [
+    "Fit a classifier for high-outcome weeks on the lagged driver and read its discrimination",
+    "Fit a count model of the outcome and compare distribution families by AIC",
+    "Check the automatically chosen lag against a forced nearby lag before trusting either one"
+   ],
+   "screens": [
+    "screens/018.webp",
+    "screens/022.webp",
+    "screens/025.webp",
+    "screens/027.webp",
+    "screens/042.webp",
+    "screens/043.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Walk-forward (expanding-window) validation readout",
+   "general": "Refit the current model on past data only across successive time folds and show in-sample vs. out-of-sample metrics with per-fold values, so overfitting shows up as a gap",
+   "specific": "'Out-of-sample validation (walk-forward)' expander: 5 expanding-window folds with a 52-week minimum training window; AUC-ROC (surge) and mean absolute error, in-sample vs. out-of-sample, per-fold lists; recomputes when the lag, threshold or family changes",
+   "steps": [
+    "Fit a model in the regression panel",
+    "Expand the walk-forward section",
+    "Compare in-sample and out-of-sample AUC and MAE",
+    "Inspect per-fold values for unstable folds",
+    "Change lag or family and re-read"
+   ],
+   "serves_tasks": [
+    "Validate out-of-sample with time-ordered expanding-window folds and compare to the in-sample fit",
+    "Check the automatically chosen lag against a forced nearby lag before trusting either one"
+   ],
+   "screens": [
+    "screens/027.webp",
+    "screens/043.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Predictor collinearity heatmap + VIF table",
+   "general": "Show a predictor × predictor correlation heatmap (after removing seasonality) with hover values, and a variance-inflation-factor table on the overlapping rows, to flag predictors whose effects could be confounded",
+   "specific": "'Driver correlation matrix (confounding check)' expander: deseasonalized 8×8 RdBu heatmap with hover tooltip, and a driver/vif/n_obs table with the 'VIF above ~5' guidance",
+   "steps": [
+    "Expand the confounding-check section",
+    "Scan the heatmap for strongly coloured off-diagonal cells",
+    "Hover a cell to read the pairwise correlation",
+    "Read the VIF table and note any driver above ~5"
+   ],
+   "serves_tasks": [
+    "Check whether drivers are correlated with one another, so an apparent effect isn't carried by a correlated driver"
+   ],
+   "screens": [
+    "screens/028.webp",
+    "screens/029.webp",
+    "screens/030.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Date-window control with presets",
+   "general": "Set the analysis window by one-click presets or typed and calendar-picked start and end dates; every view recomputes for that window",
+   "specific": "Sidebar Date range: 1Y/2Y/5Y/All buttons plus From/To date inputs with calendar popover; drives Overview metrics, Timeline z-scores and all correlation and regression results",
+   "steps": [
+    "Press a preset button",
+    "Or type a From/To date and confirm in the calendar",
+    "Re-read the dependent metrics (weeks in range, baseline residual, lag p-values)"
+   ],
+   "serves_tasks": [
+    "Choose the time window every analysis uses",
+    "See how the lag result changes over a shorter window"
+   ],
+   "screens": [
+    "screens/004.webp",
+    "screens/039.webp",
+    "screens/040.webp",
+    "screens/041.webp",
+    "screens/038.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Latest value vs. seasonal baseline with data-freshness table",
+   "general": "Show the most recent value of the outcome next to its seasonal-baseline residual, with an above/below-baseline banner, a provisional-data warning, a list of notable events and a per-source table of how current each input series is",
+   "specific": "Overview tab: latest-week respiratory ED demand metric, 'vs. seasonal baseline' delta, 'Below/Above baseline for this time of year' banner, Notable events table and Data freshness table (one row per signal with its last date); follows the sidebar date range",
+   "steps": [
+    "Set the date window",
+    "Open the overview",
+    "Read the latest value and its residual against the seasonal baseline",
+    "Note the above/below-baseline banner and any provisional-data warning",
+    "Scroll to the data-freshness table and check each source's last date"
+   ],
+   "serves_tasks": [
+    "Read the latest outcome value against its seasonal baseline and check how current each data source is"
+   ],
+   "screens": [
+    "screens/003.webp",
+    "screens/005.webp",
+    "screens/039.webp"
+   ],
+   "id": "f8"
+  }
+ ],
+ "screens_never_reached": [
+  "Any city other than boston: the City dropdown lists only 'boston' (screens/047.webp)"
+ ],
+ "not_done": [
+  "Download as CSV on the VIF table: I clicked the toolbar download icon (tooltip 'Download as CSV', screens/046.webp), but browser_downloads stayed empty. The headless browser probably cannot complete Streamlit's save flow, so the CSV export is unverified.",
+  "The Download as CSV button on the Aligned weekly data table was not tried, so that export is unverified too.",
+  "Pressing the Home key to move the lag slider did not change it; the page scrolled to the top instead (screens/019.webp). Dragging the slider worked.",
+  "The count-model driver coefficient always displays as +0.000 for both negative_binomial and poisson. That is too few decimals to read the size or direction of the effect; only its p-value and the AIC are usable (seen in the replay: check/screens/020.webp, check/screens/023.webp).",
+  "The Fullscreen buttons on the charts and tables, and the Search and Show/hide columns buttons on the tables, were not tried.",
+  "The 1Y and 5Y presets and the To date input were not tried individually; 2Y, All and a typed From date were.",
+  "A joint multi-driver regression is not offered. The confounding check stops at the correlation matrix and VIF, so no coefficient is adjusted for the other drivers.",
+  "Weather, bikeshare and academic_calendar were never selected as the single driver in the lag and regression panels; they appear only in the full-scan table (screens/031.webp). Events is not offered as a driver at all and appears only as timeline annotations and the Overview table.",
+  "The forced-lag comparison (task n1) mixes windows: the lag-0 results were read under All, while the lag-4 count-model and walk-forward results were read after From was set to 2022/09/01. A same-window comparison was not made."
+ ],
+ "applied": [
+  "Corrected data.note: hospital_demand, events and academic_calendar are real checked-in data; only transit, bikeshare, weather and wastewater are synthetic",
+  "Moved the 'mouse wheel over the chart' action from t5 to t3 (t5's screens list kept)",
+  "Added feature f8 (Overview latest value vs. seasonal baseline, banner, notable events, data-freshness table) serving t2; it has no check field because no replay tested it as a feature, though check.json's t2 replay covered the same readout",
+  "Added task n1 (auto-picked lag vs. forced nearby lag) from actions the run already did, citing 018, 021, 022, 027 and 043; noted that the two lags were read under different windows; no check field because it was not replayed as its own task",
+  "Linked n1 to f4 and f5 via serves_tasks",
+  "Added to not_done that the count-model coefficient always displays as +0.000, citing the replay's check/screens/020 and 023",
+  "Added the coefficient display limit to f4's specific label",
+  "Recorded in not_done that the Aligned weekly data table CSV download was not tried, instead of adding it to t5/f1",
+  "Expanded the not_done driver note: weather, bikeshare and academic_calendar were never run as the single driver",
+  "Reconciled check.json screen references: its paths resolve to the checker's own kept screens under check/screens/ (e.g. t4 -> check/screens/008, t6 -> check/screens/011), not this run's screens/ folder; new citations of replay evidence use the check/ prefix"
+ ],
+ "open_fixes": [
+  "Add the Aligned weekly data table 'Download as CSV' to t5 and f1: this run never clicked that button (its only download attempt was on the VIF table), so a new run must try it and record whether the file arrives",
+  "Run weather, bikeshare and academic_calendar as the single driver through the lag scan and regression panels, to cover the README's weather, gathering and commute sub-hypotheses; this needs a new exploration",
+  "Redo the lag-4 vs. lag-0 comparison for Influenza A within one window, so the AUC, p-value and AIC in n1 are directly comparable",
+  "Rewrite the path strings inside check.json itself to check/screens/...; that file is outside this tree, so it is left for whoever regenerates the check"
+ ],
+ "screens_at": "pilot/public/runs/population-pulse/20261030-121335/",
+ "screens_filed": {
+  "screens/004.webp": "screens/004.webp",
+  "screens/007.webp": "screens/007.webp",
+  "screens/014.webp": "screens/014.webp",
+  "screens/018.webp": "screens/018.webp",
+  "screens/027.webp": "screens/027.webp"
+ }
+}

@@ -1,0 +1,652 @@
+{
+ "interface": {
+  "title": "KAI - Calcium Imaging Analyzer (Streamlit app_streamlit.py)",
+  "field": "Cell physiology / cardiac electrophysiology: calcium-imaging transient analysis",
+  "stage_of_work": "Signal processing and analysis of recorded time series, from raw trace to curated metrics and an exported bundle",
+  "what_it_is_for": "Turn a raw periodic calcium-imaging trace (optionally ambient-subtracted) into curated beat-by-beat periods, a normalized mean ± SD overlay, and aggregated transient-morphology metrics (APD20/50/90, rise/decay, slopes, AUC), exported as XLSX, PNG and session JSON."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "sample_raw_signal_data.csv (t,i, about 5 s and 5 transients) was uploaded through 'Load Raw...', and sample_ambient_signal_data.csv through 'Load Ambient (optional)...'. Subtracting the ambient moved the baseline from about 170 to about 3–5 a.u. (screens/009.webp). A second, fresh session used raw only (screens/054.webp)."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Quantify the shape of repeated transients in a periodic time-series recording and save a reproducible record of the analysis",
+  "specific": "Analyse a paced calcium-imaging trace in KAI: subtract ambient, set pacing, smooth, detect and curate periods, review overlay and APD/slope/AUC metrics, export XLSX/PNG/session.json",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Read how the method works",
+    "specific": "User Guide tab",
+    "branch": "optional",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Get the method documentation",
+      "specific": "Open the User Guide tab, which covers S levels, APD definitions and the export sheets. A '⬇️ Download User-Guide.md' button is also shown but was not pressed",
+      "screens": [
+       "screens/005.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked User Guide tab",
+        "screens": [
+         "screens/005.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Bring in the recording and remove background",
+    "specific": "Load Raw / Load Ambient and Ambient alignment in the sidebar",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load the primary time series",
+      "specific": "Upload the raw calcium trace CSV; the Signal tab plots 'Raw' against Time (s)",
+      "screens": [
+       "screens/004.webp",
+       "screens/007.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "uploaded sample_raw_signal_data.csv to 'Load Raw...'",
+        "screens": [
+         "screens/007.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Subtract a background recording from the signal",
+      "specific": "Upload the ambient trace; the plot switches to an 'Ambient-corrected' trace with baseline near 3–5 a.u.",
+      "screens": [
+       "screens/009.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "uploaded sample_ambient_signal_data.csv to 'Load Ambient (optional)...'",
+        "screens": [
+         "screens/008.webp",
+         "screens/009.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Adjust the time shift and gain of the background before subtracting it",
+      "specific": "Set Offset (ms) and Scale under Ambient alignment and press Apply. Offset 20 ms with scale 0.9 left the baseline near 20 (under-subtracted), so it was set back to 0 / 1.0",
+      "screens": [
+       "screens/010.webp",
+       "screens/011.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed Offset (ms) = 20 and Scale = 0.9, pressed Apply",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed Scale = 1, Offset = 0, pressed Apply",
+        "screens": [
+         "screens/011.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Denoise and segment the trace into cycles",
+    "specific": "Pacing (manual), the Smoothing S slider and Detect Peaks",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Set the expected cycle rate so detection ignores peaks spaced too closely",
+      "specific": "Enter Hz under Pacing (manual) and press Use; 'Current: auto' changes to 'Current: 1 Hz'. Pacing mainly sets Detect Peaks' minimum peak spacing (about 0.6 × the period); it changes the smoothing filter only at S≥3, through the Butterworth cutoff. Set it before smoothing and detection (in this run it was set after a first auto-pacing detection)",
+      "screens": [
+       "screens/020.webp",
+       "screens/021.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Use with Hz = 1.00",
+        "screens": [
+         "screens/020.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Choose a smoothing strength that removes noise but keeps transient shape",
+      "specific": "Move the S = 0..5 slider; a 'Filtered (S=n)' trace is drawn over the corrected signal. With auto pacing, S=1 and S=3 barely changed the trace. With pacing at 1 Hz, S=3 flattened the peaks, so S=1 was kept",
+      "screens": [
+       "screens/013.webp",
+       "screens/016.webp",
+       "screens/021.webp",
+       "screens/023.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed ArrowRight on S slider (S=1)",
+        "screens": [
+         "screens/012.webp",
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked slider track at S=3",
+        "screens": [
+         "screens/015.webp",
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked slider track at S=1 (after setting 1 Hz pacing)",
+        "screens": [
+         "screens/022.webp",
+         "screens/023.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Automatically find peaks and troughs and split the trace into cycles",
+      "specific": "Press Detect Peaks to mark max/min, draw numbered period boundaries and shade the incomplete edge regions red. Auto pacing at S=3 gave 13 periods, many of them spurious, because the estimated rate allowed closely spaced peaks. 1 Hz at S=3 gave 4. 1 Hz at S=1 gave 5 clean periods. Raw only at S=0 with auto pacing gave 9, including a 0.18 s period",
+      "screens": [
+       "screens/019.webp",
+       "screens/021.webp",
+       "screens/025.webp",
+       "screens/054.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Detect Peaks (auto pacing, S=3)",
+        "screens": [
+         "screens/019.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Detect Peaks (1 Hz, S=3)",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Detect Peaks (1 Hz, S=1)",
+        "screens": [
+         "screens/024.webp",
+         "screens/025.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Detect Peaks on raw-only trace in a fresh session (S=0, auto)",
+        "screens": [
+         "screens/054.webp"
+        ]
+       },
+       {
+        "kind": "task",
+        "general": "Check the detected cycles' lengths for spurious short cycles",
+        "specific": "The Periods tab lists 'Period NN: N=samples duration=s' (at 1 Hz, S=1: 0.645, 1.089, 0.931, 0.889, 0.952 s)",
+        "screens": [
+         "screens/026.webp",
+         "screens/036.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "clicked Periods tab",
+          "screens": [
+           "screens/026.webp"
+          ]
+         }
+        ],
+        "id": "t7",
+        "check": "replayed"
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Curate which cycles count",
+    "specific": "Edit Mode: click maxima and minima on the Signal plot. The plot redraws one click late, and clicks made while it redraws are ignored, so check the Periods list after each click and repeat a click that had no effect",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Exclude an artifactual or incomplete cycle",
+      "specific": "With Edit Mode on, click Period 1's maximum. Period 01 (0.645 s, out of phase in the overlay) drops from the list and is shaded red (the shading can appear only on the next redraw), and the overlay and metrics recompute on periods 2–5. Clicking the same maximum again, which the README says restores the period, did not restore it in this run (unconfirmed; possibly a click lost during a redraw)",
+      "screens": [
+       "screens/030.webp",
+       "screens/032.webp",
+       "screens/033.webp",
+       "screens/035.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "ticked Edit Mode checkbox",
+        "screens": [
+         "screens/029.webp",
+         "screens/030.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked orange max marker of period 1 at t≈0.264 s",
+        "screens": [
+         "screens/031.webp",
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Remove a cycle boundary (merge two cycles)",
+      "specific": "Click the minimum at t=3.776 s. Periods 4 and 5 merge into Period 04 of 1.851 s, and an overlay drawn on the Signal tab shows it as a double hump. A click made while the plot is still redrawing is ignored and has to be repeated",
+      "screens": [
+       "screens/039.webp",
+       "screens/041.webp",
+       "screens/042.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked blue min marker at t=3.776 s",
+        "screens": [
+         "screens/038.webp",
+         "screens/039.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Insert a missing cycle boundary",
+      "specific": "Click the filtered trace in the trough at t≈3.78 s to add a minimum. The list goes back to Period 04 (0.889 s) and Period 05 (0.952 s), while the plot still shows the merged boundary until the next redraw. As with merging, a click during a redraw is ignored",
+      "screens": [
+       "screens/043.webp",
+       "screens/044.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked trace at (3.787, 3.28)",
+        "screens": [
+         "screens/043.webp",
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Review consistency and measurements",
+    "specific": "Overlay and Metrics tabs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Superimpose the kept cycles on a normalized time axis and check mean ± spread",
+      "specific": "The Overlay tab plots each kept period against normalized time τ, with a mean line and SD band; the 'Normalized amplitude' axis runs to about 15, not 0–1. Use it with Edit Mode off: with Edit Mode on, the tab shows 'Overlay error: There are multiple plotly_chart elements with the same auto-generated ID'",
+      "screens": [
+       "screens/027.webp",
+       "screens/033.webp",
+       "screens/052.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Overlay tab",
+        "screens": [
+         "screens/027.webp",
+         "screens/052.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Read aggregated shape metrics across kept cycles and check they are plausible",
+      "specific": "The Metrics tab gives Raw mean/std and Filt mean/std for APD20, APD50, APD90, rise_10_90, decay_90_10, time_to_peak, up/downstroke angle, auc_above_baseline and min/max slopes. It updates after curation, e.g. APD20 0.1079 → 0.1087. Only aggregates are shown; per-period values are said to be in the XLSX but were not verified. Check APD ordering: in this run raw APD90 (0.053) came out below raw APD50 (0.208), the reversed-APD case the User Guide says to fix by lowering S, verifying the minima and re-detecting (not tried here)",
+      "screens": [
+       "screens/028.webp",
+       "screens/033.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Metrics tab",
+        "screens": [
+         "screens/028.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Save results and a reproducibility record",
+    "specific": "Export XLSX/CSV, then the download buttons",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Export the workbook, figures and a session snapshot",
+      "specific": "Export XLSX/CSV shows Download XLSX, Download signal.png, Download periods_overlay.png and Download session.json. Each download reruns the app and hides the buttons, so Export has to be pressed again before each file. session.json held smoothing_level 1, peaks_min/max indices, removed_periods [1], the ambient offset/scale/mean/std and n_periods 4 (these curated values come from this run only; the replay exported an uncurated session). The workbook's sheets (Parameters, Aggregates, per-period metrics, Resampled_Periods) and the PNGs' contents are unverified",
+      "screens": [
+       "screens/046.webp",
+       "screens/049.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Export XLSX/CSV",
+        "screens": [
+         "screens/045.webp",
+         "screens/046.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download XLSX (output.xlsx, 28 KB)",
+        "screens": [
+         "screens/047.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Export XLSX/CSV again, then Download session.json",
+        "screens": [
+         "screens/049.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Export XLSX/CSV again, then Download signal.png",
+        "screens": [
+         "screens/051.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Export XLSX/CSV again, then Download periods_overlay.png",
+        "screens": [
+         "screens/051.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Background-trace subtraction with time-offset and gain alignment",
+   "general": "Load an optional reference/background series, shift it in time and scale it, subtract it from the main signal, and see the corrected trace right away",
+   "specific": "Load Ambient (optional) plus Ambient alignment: Offset (ms), Scale, Apply. The Signal plot switches to 'Ambient-corrected'",
+   "steps": [
+    "Upload the background file next to the main signal",
+    "Check the corrected trace's baseline",
+    "Enter a time offset and a scale factor",
+    "Press Apply and compare the baseline; repeat until it sits at the expected level"
+   ],
+   "serves_tasks": [
+    "Subtract a background recording from the signal",
+    "Adjust the time shift and gain of the background before subtracting it"
+   ],
+   "screens": [
+    "screens/009.webp",
+    "screens/010.webp",
+    "screens/011.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Single-dial smoothing with a live filtered overlay",
+   "general": "One 0–5 strength dial for a low-pass filter, with the filtered trace drawn over the unfiltered one; at the strongest levels the cutoff follows the expected cycle rate",
+   "specific": "S = 0..5 slider and the 'Filtered (S=n)' overlay on the Signal plot; at S≥3 the Butterworth cutoff depends on the pacing rate ('Current: auto' or '1 Hz')",
+   "steps": [
+    "Move the S slider (keyboard or click on the track; dragging did not work)",
+    "Compare the Filtered trace with the corrected trace for flattened peaks",
+    "Lower S if peaks are rounded"
+   ],
+   "serves_tasks": [
+    "Choose a smoothing strength that removes noise but keeps transient shape"
+   ],
+   "screens": [
+    "screens/016.webp",
+    "screens/021.webp",
+    "screens/023.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Rate-aware peak/trough detection with numbered cycle segmentation",
+   "general": "Use a user-given or estimated cycle rate to set the minimum spacing between peaks, find maxima and minima, split the series into numbered min-to-min cycles, mark incomplete edge cycles as excluded, and list each cycle's sample count and duration",
+   "specific": "Pacing (manual) Hz + Use sets the minimum peak distance (about 0.6 × period); Detect Peaks then puts orange max and blue min markers on the plot, dashed boundaries with period numbers, red-shaded edge regions, and the Periods tab list",
+   "steps": [
+    "Enter the pacing rate and press Use (otherwise it is estimated)",
+    "Press Detect Peaks",
+    "Inspect the markers and numbered periods on the plot",
+    "Check the durations in the Periods tab",
+    "If there are spurious short periods, set the pacing or change S and re-detect"
+   ],
+   "serves_tasks": [
+    "Set the expected cycle rate so detection ignores peaks spaced too closely",
+    "Automatically find peaks and troughs and split the trace into cycles",
+    "Check the detected cycles' lengths for spurious short cycles"
+   ],
+   "screens": [
+    "screens/019.webp",
+    "screens/020.webp",
+    "screens/025.webp",
+    "screens/026.webp",
+    "screens/054.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Click-to-curate cycles on a time-series plot",
+   "general": "In an edit mode, click a cycle's peak to exclude it, click a trough marker to delete a boundary, or click the trace to insert one; all downstream summaries recompute",
+   "specific": "Edit Mode checkbox plus clicks on the Signal plot: max toggles the period (red shading, dropped from the Periods list; restoring by a second click was not confirmed), a min click removes a boundary, a trace click adds a minimum. The plot redraws one click late and ignores clicks made during a redraw",
+   "steps": [
+    "Tick Edit Mode",
+    "Click a maximum to exclude that period (a second click should restore it; unconfirmed)",
+    "Click a minimum marker to merge neighbouring periods",
+    "Click the trace at a trough to insert a boundary",
+    "After each click, wait for the redraw and check the Periods list and metrics; repeat a click that had no effect",
+    "Turn Edit Mode off before opening the Overlay tab"
+   ],
+   "serves_tasks": [
+    "Exclude an artifactual or incomplete cycle",
+    "Remove a cycle boundary (merge two cycles)",
+    "Insert a missing cycle boundary"
+   ],
+   "screens": [
+    "screens/030.webp",
+    "screens/032.webp",
+    "screens/035.webp",
+    "screens/039.webp",
+    "screens/044.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Normalized cycle overlay with mean ± SD band",
+   "general": "Rescale each kept cycle to a common 0–1 time axis, overlay them, and draw the mean with a dispersion band so outlier cycles stand out",
+   "specific": "Overlay tab: 'Normalized time τ' vs 'Normalized amplitude' (axis runs to about 15), Period n traces, a Mean line and an SD band, updated by curation. With Edit Mode on, the Overlay tab errors ('multiple plotly_chart elements with the same auto-generated ID'); an overlay is then drawn on the Signal tab instead",
+   "steps": [
+    "Detect periods",
+    "Turn Edit Mode off and open Overlay",
+    "Spot traces out of phase with the mean (e.g. short Period 1, or a merged double hump)",
+    "Go back and curate, then re-check the band"
+   ],
+   "serves_tasks": [
+    "Superimpose the kept cycles on a normalized time axis and check mean ± spread",
+    "Exclude an artifactual or incomplete cycle"
+   ],
+   "screens": [
+    "screens/027.webp",
+    "screens/033.webp",
+    "screens/041.webp",
+    "screens/052.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Aggregated transient-morphology metrics table (raw vs filtered)",
+   "general": "Compute per-cycle shape metrics (durations to 20/50/90% recovery, rise and decay times, time to peak, slopes, area) and show the mean and SD across kept cycles for both the unsmoothed and the smoothed signal",
+   "specific": "Metrics tab: APD20/50/90, rise_10_90, decay_90_10, time_to_peak, up/downstroke angle, auc_above_baseline, min/max slope, with Raw mean, Raw std, Filt mean and Filt std columns. Only aggregates are shown in the UI",
+   "steps": [
+    "Detect and curate periods",
+    "Open Metrics",
+    "Check that APD20 < APD50 < APD90; if reversed, lower S, verify the minima and re-detect",
+    "Compare the Raw and Filt columns to judge how smoothing affects each metric",
+    "Re-check after excluding periods"
+   ],
+   "serves_tasks": [
+    "Read aggregated shape metrics across kept cycles and check they are plausible"
+   ],
+   "screens": [
+    "screens/028.webp",
+    "screens/033.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Export bundle with session snapshot",
+   "general": "Generate a workbook, figure images and a JSON record of parameters and curation decisions in one step, then download each",
+   "specific": "Export XLSX/CSV, then Download XLSX (output.xlsx), signal.png, periods_overlay.png and session.json (smoothing_level, peaks_min/max, removed_periods, meta_ambient, n_periods; manual pacing Hz is not recorded). Workbook sheet contents unverified",
+   "steps": [
+    "Finish curation",
+    "Press Export XLSX/CSV",
+    "Download each file (press Export again after each download, because the buttons disappear)",
+    "Keep session.json with the data, and note the pacing Hz separately"
+   ],
+   "serves_tasks": [
+    "Export the workbook, figures and a session snapshot"
+   ],
+   "screens": [
+    "screens/046.webp",
+    "screens/049.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Column chooser for time/signal columns: the User Guide mentions it, but the t,i CSV was auto-detected and no prompt appeared",
+  "Per-period metrics table: the UI shows only aggregates. The guide says PerPeriod_Raw/Filtered sheets are in the XLSX, but the browser could not open it (binary)",
+  "Overlay with a period hidden through the plot legend: clicking the 'Period 2' legend entry froze the page (screenshot and snapshot timed out), and reloading started a new session"
+ ],
+ "not_done": [
+  "Could not check the content of output.xlsx, signal.png or periods_overlay.png. The read tool reports only their size (xlsx 28 KB), so the sheet names the User Guide promises (Parameters, Aggregates, PerPeriod_*, Resampled_Periods) and the per-period metrics are unconfirmed",
+  "Did not switch a removed period back on. A second click on Period 1's maximum (same coordinates) did not toggle it back; the replay later found that the plot lags one click and ignores clicks made during a redraw, which may explain it. Period 1 stayed excluded",
+  "Dragging the S slider handle did not move it; it was set with the keyboard (ArrowRight) and by clicking the track",
+  "Did not set S to 4 or 5 (my click at the right end of the slider did not register)",
+  "Did not export a CSV, although the button is labelled 'Export XLSX/CSV'; only the XLSX, two PNGs and the JSON were offered",
+  "Did not press '⬇️ Download User-Guide.md'; only the User Guide tab was opened",
+  "Did not test the plot toolbar (zoom, pan, box/lasso select, PNG camera) on the Signal or Overlay plots",
+  "Observed but not resolved: after curation, aggregated raw APD90 (0.053) is smaller than raw APD50 (0.208), the 'reversed APD' case the User Guide warns about. The filtered APD90 (0.211) is close to APD50 (0.213). The suggested remedy (lower S, verify minima, re-detect) was not tried. session.json does not record the manual pacing Hz",
+  "The Overlay tab errors while Edit Mode is on ('multiple plotly_chart elements with the same auto-generated ID', seen by the replay), and clicking it again froze the page",
+  "Stopped at about 100 actions; the page froze after the legend click and the session was reset, so the raw-only run (screens/054.webp) was not curated or exported"
+ ],
+ "applied": [
+  "Corrected pacing's role in t5: it mainly sets detection's minimum peak spacing (~0.6 × period) and changes the filter only at S≥3",
+  "Moved the pacing task t5 ahead of smoothing (t4) and detection (t6)",
+  "Rewrote t5's general label to drop 'beat' and state its purpose for detection",
+  "Moved pacing out of f2 into f3 (rate-aware detection); f2 is now smoothing only, noting the S≥3 cutoff link",
+  "Nested 'List the detected cycles' (t7) inside detection (t6) as a check step",
+  "Recorded the unconfirmed restore-by-second-click in t8 and f4",
+  "Added the reversed-APD sanity check and the untried remedy to t12 and as a step in f6",
+  "Moved the documentation task t14 out of 'Save results' into its own optional first phase, matching when it was done",
+  "Dropped t14's 'Download User-Guide.md' action (the trace shows only the tab click) and moved it to not_done",
+  "Recorded the one-click plot redraw lag and ignored clicks in the curation phase, t8, t9, t10 and f4",
+  "Recorded the Overlay tab error in Edit Mode in t11, f4, f5 and not_done; noted that t9's double hump was seen in an overlay on the Signal tab",
+  "Noted that the overlay's 'Normalized amplitude' axis runs to about 15, not 0–1",
+  "Marked the workbook sheets, per-period metrics and PNG contents as unverified in t12, t13 and f7",
+  "Noted that the curated session.json values come from this run only, and that pacing Hz is not saved (f7)"
+ ],
+ "open_fixes": [
+  "Restoring an excluded cycle needs a new run: click an excluded period's maximum again after the plot has finished redrawing, and confirm that it returns to the Periods list",
+  "The reversed-APD remedy needs a new run: lower S (e.g. S=0), verify the minima, re-detect and check whether APD20 < APD50 < APD90",
+  "Per-period metrics and the workbook structure need a run that can open output.xlsx (and the PNGs) to confirm the sheet names and contents",
+  "The curated export values (S=1, removed_periods [1], n_periods 4) need an independent replay; the checker's export came from an uncurated session after a reload",
+  "S levels 4–5, the CSV export, the column chooser, legend-based hiding in the overlay and the plot toolbar were never reached and need new exploration"
+ ],
+ "screens_at": "pilot/public/runs/kai-calcium-trace-analyzer/20261029-211215/",
+ "screens_filed": {
+  "screens/005.webp": "screens/005.webp",
+  "screens/004.webp": "screens/004.webp",
+  "screens/020.webp": "screens/020.webp",
+  "screens/030.webp": "screens/030.webp",
+  "screens/027.webp": "screens/027.webp",
+  "screens/046.webp": "screens/046.webp"
+ }
+}

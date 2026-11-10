@@ -1,0 +1,512 @@
+{
+  "schema": "astaui.card/1",
+  "id": "dungeon-memory-lab",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T16:26:19Z"
+  },
+  "app": {
+    "title": "Dungeon With Amnesia · Memory Lab",
+    "summary": "A person picks an environment family, a policy architecture and a trained checkpoint, sets the environment's parameters and a seed, and then runs or steps the agent one decision at a time. While it runs, they watch the agent's local observation, a map built only from what the agent has observed, a log of observed events and plots of the agent's internal state. At any decision they can fork the episode into a control and a treatment branch, change only the treatment's retained memory (delete it, zero part of it, add noise or restore an earlier snapshot), and run both to the end. The two branches are set side by side with their outcomes and the first decision where the actions differ, and the paired trace can be downloaded as JSON; a separate tab shows the recorded tables and plots from the batch experiments.",
+    "task": {
+      "text": "Test whether an agent's behaviour depends on its retained internal state by intervening on that state partway through an episode and comparing the result with an untouched copy of the same episode.",
+      "verbs": [
+        "compare",
+        "monitor",
+        "explore",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "Simulated episodes of a learned policy acting in seeded, partially observable environments: per-decision actions, rewards, observations and hidden-state vectors, a log of observed events, a graph reconstructed by an observer, and recorded results tables and plots.",
+      "item": "one episode of an agent acting in a seeded environment, recorded decision by decision",
+      "shapes": [
+        "time series",
+        "events",
+        "network",
+        "table",
+        "image collection"
+      ]
+    },
+    "stage": {
+      "text": "probing a trained agent's memory after training, before writing up the results",
+      "terms": [
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Settings in a sidebar define the episode. A live view steps the policy and refreshes metric tiles, the discovered-map graph, the observation text, the event log and the hidden-state heatmap and PCA all together. An intervention tab forks the current episode into a control branch and a treatment branch, and draws each branch's metrics, map, state heatmap and action table next to the other, with the first divergence reported below.",
+      "views": [
+        "form",
+        "summary stats",
+        "network diagram",
+        "detail panel",
+        "list",
+        "heatmap",
+        "line chart",
+        "scatter plot",
+        "table view",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select",
+        "toggle view",
+        "export",
+        "undo"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "causal interventions on the memory of recurrent reinforcement-learning agents in machine learning",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "reinforcement learning",
+        "pomdp",
+        "interpretability"
+      ]
+    },
+    "workflow": {
+      "name": "fork a run, change one condition, and compare control with treatment",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "The sidebar chooses the environment family, the policy architecture and a checkpoint (or a local .pt path), and sets the seed, detour length, grid size, clue reliability and speed. The episode resets whenever any of these change.",
+          "parts": [
+            "run-setup"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "Run, Pause and Step advance the policy one decision at a time. A human action can be executed in place of the policy's choice, and metric tiles show decisions, rooms discovered, reward and status.",
+          "parts": [
+            "live-episode"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Each decision shows the agent's text observation, the map drawn from observations (or the ground truth when that toggle is on), and the latest events, including contradictions between a clue and an observation.",
+          "parts": [
+            "discovered-map",
+            "event-trace",
+            "live-episode"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "An expander plots the hidden state as a heatmap over decisions, with its L2 norm, an episode PCA trajectory and the cosine similarity between consecutive states.",
+          "parts": [
+            "state-plots"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Fork & compare clones the episode, applies reset, partial zeroing, Gaussian noise or restoring an earlier snapshot to the treatment only, and runs both branches to the end. The branches then appear in two columns with outcome, steps, reward, map, state heatmap and action table, and the first decision where the actions diverge is reported.",
+          "parts": [
+            "intervention-compare"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download paired trace saves the control and treatment records (metrics, config, timeline, interventions, events) as paired_trace.json.",
+          "parts": [
+            "intervention-compare"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The Experiment results tab reads the recorded comparison CSV for the chosen experiment family and shows the saved training, generalization, dependency and ablation plots.",
+          "parts": [
+            "recorded-results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Both branches share the same weights, environment and greedy action prefix up to the fork, so the treatment's retained state is the only thing that differs.",
+        "When there is no action divergence, the interface says outright that a state change alone does not establish a behavioural effect.",
+        "There are two kinds of memory display, and they are kept apart: the observer's symbolic notebook, which can be edited but which the policy never reads, and the neural state, shown only as unlabelled heatmap and PCA plots.",
+        "A ground-truth map is a privileged debug toggle, separate from the map built from observations.",
+        "A recorded deterministic episode can be replayed to reproduce a verified deletion effect."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "run-setup",
+      "level": "view",
+      "parent": null,
+      "title": "Environment and policy settings",
+      "summary": "A sidebar for choosing the environment family, policy architecture, checkpoint, seed and environment parameters, with buttons to reset the episode or move to a new seed.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "toggle view",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 53,
+          "end": 92,
+          "role": "markup",
+          "anchor": "d7af7722419e",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 48,
+          "end": 51,
+          "role": "logic",
+          "symbol": "get_policy",
+          "anchor": "db80e92c93dd",
+          "first": "def get_policy(path, stamp, agent):"
+        },
+        {
+          "file": "code/dungeon/entities.py",
+          "start": 11,
+          "end": 28,
+          "role": "data",
+          "symbol": "DungeonConfig",
+          "anchor": "8affebf2963c",
+          "first": "class DungeonConfig:"
+        },
+        {
+          "file": "code/memory/runner.py",
+          "start": 11,
+          "end": 61,
+          "role": "logic",
+          "symbol": "Session",
+          "anchor": "86800a1d5142",
+          "first": "class Session:"
+        }
+      ]
+    },
+    {
+      "id": "live-episode",
+      "level": "view",
+      "parent": null,
+      "title": "Explore the dungeon",
+      "summary": "Runs, pauses or steps the agent, or takes a human action, and shows metric tiles, the current action and the text observation for each decision, along with the decision table.",
+      "views": [
+        "summary stats",
+        "detail panel",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "dashboard",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 104,
+          "end": 116,
+          "role": "markup",
+          "anchor": "3cb8c07e2935",
+          "first": "with live:"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 118,
+          "end": 154,
+          "role": "logic",
+          "symbol": "render_live",
+          "anchor": "8a8276bd6d0a",
+          "first": "def render_live():"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 19,
+          "end": 41,
+          "role": "style",
+          "anchor": "e98b3b39dbb7",
+          "first": "st.markdown(\"\"\"<style>"
+        },
+        {
+          "file": "code/dungeon/observations.py",
+          "start": 45,
+          "end": 59,
+          "role": "logic",
+          "symbol": "text",
+          "anchor": "c6fe626a73e9",
+          "first": "def text(self) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "discovered-map",
+      "level": "component",
+      "parent": "live-episode",
+      "title": "Spatial notebook map",
+      "summary": "Draws the room graph built from observed moves, with stubs for observed locked doors, and can switch to the privileged ground-truth map.",
+      "views": [
+        "network diagram"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 128,
+          "end": 131,
+          "role": "markup",
+          "anchor": "72f409ae2e37",
+          "first": "with left:"
+        },
+        {
+          "file": "code/memory/visualization.py",
+          "start": 19,
+          "end": 43,
+          "role": "logic",
+          "symbol": "map_figure",
+          "anchor": "a50ebcf5e9e4",
+          "first": "def map_figure(session, truth=False):"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 100,
+          "end": 102,
+          "role": "logic",
+          "symbol": "draw",
+          "anchor": "09e2c5e02b48",
+          "first": "def draw(fig):"
+        }
+      ]
+    },
+    {
+      "id": "event-trace",
+      "level": "component",
+      "parent": "live-episode",
+      "title": "Observed event trace",
+      "summary": "Lists the latest observed events (doors, keys, clues, the cue, contradictions), colour-coded by kind, newest first.",
+      "views": [
+        "list"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 137,
+          "end": 141,
+          "role": "markup",
+          "anchor": "0edff3bc6812",
+          "first": "with right:"
+        },
+        {
+          "file": "code/dashboard/app.py",
+          "start": 31,
+          "end": 33,
+          "role": "style",
+          "anchor": "b74d11a01eda",
+          "first": ".event {border-left:2px solid #567789;background:#141f2b;padding:9px 12px;margin:7px 0;border-radius:0 6px 6px 0;font-si"
+        },
+        {
+          "file": "code/memory/episodic_trace.py",
+          "start": 14,
+          "end": 48,
+          "role": "logic",
+          "anchor": "5e6a546fea24",
+          "first": "def update(self, obs, step, previous_action=None, previous_obs=None):"
+        }
+      ]
+    },
+    {
+      "id": "state-plots",
+      "level": "component",
+      "parent": "live-episode",
+      "title": "Learned state plots",
+      "summary": "Plots the hidden-state vectors over decisions as a heatmap with an L2-norm line, an episode PCA trajectory, and the cosine similarity between consecutive states.",
+      "views": [
+        "heatmap",
+        "line chart",
+        "scatter plot"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 142,
+          "end": 144,
+          "role": "markup",
+          "anchor": "b19aa297a1db",
+          "first": "with st.expander(\"Learned state · heatmap, norm and PCA\",expanded=False):"
+        },
+        {
+          "file": "code/memory/visualization.py",
+          "start": 45,
+          "end": 59,
+          "role": "logic",
+          "symbol": "hidden_figure",
+          "anchor": "8a7c2e15004b",
+          "first": "def hidden_figure(timeline):"
+        },
+        {
+          "file": "code/memory/visualization.py",
+          "start": 61,
+          "end": 77,
+          "role": "logic",
+          "symbol": "trajectory_figure",
+          "anchor": "0f93e99b671c",
+          "first": "def trajectory_figure(timeline):"
+        }
+      ]
+    },
+    {
+      "id": "intervention-compare",
+      "level": "view",
+      "parent": null,
+      "title": "Memory intervention",
+      "summary": "Forks the current episode, modifies only the treatment branch's retained state, runs both branches to the end, sets them side by side with the first action divergence, and exports the paired trace.",
+      "views": [
+        "side-by-side panes",
+        "table view",
+        "summary stats",
+        "heatmap",
+        "network diagram"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 157,
+          "end": 206,
+          "role": "markup",
+          "anchor": "fb7e9cc5d2ed",
+          "first": "with comparison:"
+        },
+        {
+          "file": "code/memory/runner.py",
+          "start": 49,
+          "end": 51,
+          "role": "logic",
+          "symbol": "fork",
+          "anchor": "09b222473d09",
+          "first": "def fork(self):"
+        },
+        {
+          "file": "code/memory/runner.py",
+          "start": 43,
+          "end": 47,
+          "role": "logic",
+          "symbol": "apply",
+          "anchor": "87cd56e1cdc7",
+          "first": "def apply(self, kind, **kwargs):"
+        },
+        {
+          "file": "code/memory/runner.py",
+          "start": 63,
+          "end": 71,
+          "role": "logic",
+          "symbol": "paired",
+          "anchor": "4609f8250d83",
+          "first": "def paired(policy, config, map_seed, at_step, kind=\"reset\", **kwargs):"
+        },
+        {
+          "file": "code/memory/interventions.py",
+          "start": 4,
+          "end": 26,
+          "role": "logic",
+          "symbol": "intervene",
+          "anchor": "7daafc9dfb0f",
+          "first": "def intervene(state, kind=\"reset\", fraction=0.5, noise=0.5, seed=0, earlier=None):"
+        }
+      ]
+    },
+    {
+      "id": "notebook-edit",
+      "level": "component",
+      "parent": "intervention-compare",
+      "title": "Edit the notebook",
+      "summary": "Removes a chosen entry from the observer's event log. This changes only the display and never the policy.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "undo"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 207,
+          "end": 213,
+          "role": "markup",
+          "anchor": "1b9ddd06cd0a",
+          "first": "with st.expander(\"Edit the notebook (visual-only)\"):"
+        },
+        {
+          "file": "code/memory/episodic_trace.py",
+          "start": 50,
+          "end": 52,
+          "role": "logic",
+          "symbol": "remove_event",
+          "anchor": "2687a8e3abbf",
+          "first": "def remove_event(self, index):"
+        }
+      ]
+    },
+    {
+      "id": "recorded-results",
+      "level": "view",
+      "parent": null,
+      "title": "Experiment results",
+      "summary": "Shows the recorded architecture comparison table and the saved result plots for the chosen experiment family.",
+      "views": [
+        "table view",
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/app.py",
+          "start": 215,
+          "end": 227,
+          "role": "markup",
+          "anchor": "e1038c38e1b6",
+          "first": "with results:"
+        },
+        {
+          "file": "code/experiments/common.py",
+          "start": 29,
+          "end": 42,
+          "role": "logic",
+          "symbol": "plot",
+          "anchor": "4a9afcbcfbd8",
+          "first": "def plot(rows, output, name, x, y=\"success_rate\", title=None):"
+        }
+      ]
+    }
+  ]
+}

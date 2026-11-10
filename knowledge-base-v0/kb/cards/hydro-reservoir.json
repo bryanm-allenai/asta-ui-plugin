@@ -1,0 +1,372 @@
+{
+  "schema": "astaui.card/1",
+  "id": "hydro-reservoir",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T21:13:56Z"
+  },
+  "app": {
+    "title": "Cascade reservoir scheduling API (Swagger UI)",
+    "summary": "A person downloads the bundled sample input workbook or prepares their own, then uploads it to the compute endpoint and picks a daily, ten-day or monthly time step and an output format. The service splits the workbook into per-reservoir inputs and simulates an upper and a lower reservoir in series, step by step: water balance, releases, supply to users, top-up from the upper reservoir, and hydropower output. It sums the per-step results by month, calendar year and hydrological year. The person gets back a results workbook, or JSON with a preview of the input parameters, the result tables, chart-ready series of water level, flow and power, and the workbook encoded in base64.",
+    "task": {
+      "text": "Simulate how two reservoirs in series operate over a historical inflow record, then summarise their water levels, supply, shortages and power output by period.",
+      "verbs": [
+        "derive",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A multi-sheet input workbook with run parameters and, for each reservoir, characteristics (dead, flood-limit and normal water levels), level–storage and level–discharge curves, inflow and demand series, limit lines and operating rules. Output is per-step and aggregated time series tables for each reservoir.",
+      "item": "one reservoir's state over one time step (a day, a ten-day period or a month)",
+      "shapes": [
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "running operating simulations on prepared inflow and reservoir parameters, before reporting the scheduling results",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "The interface is the auto-generated Swagger page over a small HTTP API. A sample endpoint serves an input workbook, and a compute form takes the uploaded workbook, a time step and an output format. Compute returns either a results workbook to download or JSON with an input preview, result tables, and date-keyed series for level, flow and power charts.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "toggle view"
+      ],
+      "patterns": []
+    },
+    "field": {
+      "text": "cascade reservoir operation and hydropower scheduling in water resources engineering",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "water resources engineering",
+        "reservoir operation",
+        "hydropower scheduling"
+      ]
+    },
+    "workflow": {
+      "name": "run a simulation model from a parameter workbook and export the results",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "GET /api/sample downloads the bundled input workbook as a template. The person then uploads their own workbook to the compute form's file field.",
+          "parts": [
+            "sample-endpoint",
+            "compute-form"
+          ]
+        },
+        {
+          "step": "choose how the computation runs",
+          "here": "The calc_step field takes 日 / 旬 / 月 (daily, ten-day or monthly) and anything else is rejected. The format field picks a binary xlsx or a JSON payload.",
+          "parts": [
+            "compute-form"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "In JSON mode the run-parameter sheet and both reservoirs' information sheets are read back as tables, and the upper and lower reservoir names are pulled out so the inputs can be checked.",
+          "parts": [
+            "input-preview"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The workbook is split into per-reservoir inputs. Both reservoirs are then simulated together over each step: storage from the level–storage curve, losses, flood-limit storage by season, supply to users and shortfalls, top-up from the upper reservoir, and power output from head and discharge.",
+          "parts": [
+            "simulation-pipeline"
+          ]
+        },
+        {
+          "step": "summarize by period",
+          "here": "Each reservoir's per-step results are added up into monthly, calendar-year and hydrological-year tables plus a summary sheet. Daily tables are limited to 500 rows in the JSON.",
+          "parts": [
+            "simulation-pipeline",
+            "results-payload"
+          ]
+        },
+        {
+          "step": "prepare series for charts",
+          "here": "End-of-period water level for both reservoirs, upper-reservoir inflow against generation-plus-spill outflow, and power per reservoir and in total are keyed by date and thinned to about 600 points.",
+          "parts": [
+            "chart-series"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The results workbook comes back with sheets for each reservoir, with the reservoir names URL-encoded in response headers. In JSON mode the same workbook is included as base64.",
+          "parts": [
+            "results-payload"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Two reservoirs are run together in series: the upper one tops up downstream users from storage between set characteristic levels, and named users are cut off when the upper reservoir's storage falls too low.",
+        "Flood-limit storage changes by season (plum-rain and typhoon flood seasons). It is expanded into a day-of-year lookup with separate values for leap years.",
+        "The time step can be daily, ten-day (periods starting on the 1st, 11th and 21st) or monthly, with conversions between scales.",
+        "Results are summed by hydrological year as well as by calendar year and month, and the number of shortage periods is counted."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sample-endpoint",
+      "level": "component",
+      "parent": "compute-form",
+      "title": "Sample input download",
+      "summary": "Serves the bundled example input workbook so the person can try a run or use it as a template.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 342,
+          "end": 351,
+          "role": "logic",
+          "symbol": "sample_xlsx",
+          "anchor": "09cfb92e6535",
+          "first": "def sample_xlsx() -> Response:"
+        },
+        {
+          "file": "code/src/reservoir/xlsx_bridge.py",
+          "start": 176,
+          "end": 290,
+          "role": "data",
+          "symbol": "create_example_xlsx",
+          "anchor": "0a4b58e5be3b",
+          "first": "def create_example_xlsx(xlsx_path: Path, template_dir: Path = None):"
+        }
+      ]
+    },
+    {
+      "id": "compute-form",
+      "level": "view",
+      "parent": null,
+      "title": "Compute form",
+      "summary": "Takes the uploaded input workbook, a time step and an output format, checks them, and starts the run.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 307,
+          "end": 310,
+          "role": "logic",
+          "symbol": "compute",
+          "anchor": "8b8a81f2e2ad",
+          "first": "async def compute("
+        },
+        {
+          "file": "code/api.py",
+          "start": 306,
+          "end": 338,
+          "role": "logic",
+          "anchor": "e756eede6f48",
+          "first": "@app.post(\"/api/compute\")"
+        }
+      ]
+    },
+    {
+      "id": "input-preview",
+      "level": "component",
+      "parent": "compute-form",
+      "title": "Input parameter preview",
+      "summary": "Reads the run-parameter sheet and both reservoirs' information sheets back as tables and names the upper and lower reservoirs.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 68,
+          "end": 99,
+          "role": "logic",
+          "symbol": "_parse_input_preview",
+          "anchor": "8358be27e162",
+          "first": "def _parse_input_preview(xlsx_bytes: bytes) -> dict:"
+        },
+        {
+          "file": "code/hydro_api_helpers.py",
+          "start": 40,
+          "end": 46,
+          "role": "logic",
+          "symbol": "df_to_json_safe",
+          "anchor": "afc7de6c6b1b",
+          "first": "def df_to_json_safe(df: pd.DataFrame, limit: int | None = None) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "simulation-pipeline",
+      "level": "component",
+      "parent": "compute-form",
+      "title": "Cascade simulation",
+      "summary": "Splits the workbook into per-reservoir inputs, simulates both reservoirs over each time step, and writes per-period statistics.",
+      "views": [],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 102,
+          "end": 198,
+          "role": "logic",
+          "symbol": "_run_reservoir_pipeline",
+          "anchor": "1e06ec64fbc9",
+          "first": "def _run_reservoir_pipeline(xlsx_bytes: bytes, calc_step: str) -> tuple[bytes, str, str, dict[str, pd.DataFrame]]:"
+        },
+        {
+          "file": "code/src/reservoir/xlsx_bridge.py",
+          "start": 60,
+          "end": 143,
+          "role": "logic",
+          "symbol": "xlsx_to_csv",
+          "anchor": "7c537c2c0a19",
+          "first": "def xlsx_to_csv(xlsx_path: Path, output_dir: Path) -> dict:"
+        },
+        {
+          "file": "code/src/reservoir/hydro_core.py",
+          "start": 3471,
+          "end": 3827,
+          "role": "logic",
+          "symbol": "read_info_txt",
+          "anchor": "007774117e51",
+          "first": "def read_info_txt("
+        },
+        {
+          "file": "code/src/reservoir/hydro_core.py",
+          "start": 2086,
+          "end": 3170,
+          "role": "logic",
+          "symbol": "power_operate_year_up_down",
+          "anchor": "d0a8ba89272c",
+          "first": "def power_operate_year_up_down(self, if_up_q_eco_as_in,"
+        },
+        {
+          "file": "code/src/reservoir/hydro_core.py",
+          "start": 3172,
+          "end": 3262,
+          "role": "logic",
+          "symbol": "statistic_for_up_down",
+          "anchor": "0ea28b00dedc",
+          "first": "def statistic_for_up_down(self, process_table, tm_str, res_name, output_col_name_list,"
+        },
+        {
+          "file": "code/src/reservoir/hydro_core.py",
+          "start": 153,
+          "end": 238,
+          "role": "logic",
+          "symbol": "statistic",
+          "anchor": "1e6bb3b138dd",
+          "first": "def statistic(df_day_input, limited_value, hydro_year_start_month, hydro_year_end_month):"
+        },
+        {
+          "file": "code/src/reservoir/output_columns.csv",
+          "start": 1,
+          "end": 26,
+          "role": "data",
+          "anchor": "3713e7bd7129",
+          "first": "来水流量（包含上库生态流量）"
+        }
+      ]
+    },
+    {
+      "id": "chart-series",
+      "level": "component",
+      "parent": "compute-form",
+      "title": "Chart series",
+      "summary": "Builds date-keyed series of water level, inflow against outflow, and power output for both reservoirs, thinned to about 600 points for plotting.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 207,
+          "end": 264,
+          "role": "logic",
+          "symbol": "_build_charts",
+          "anchor": "6a6ecd6aa9a5",
+          "first": "def _build_charts(up_daily: pd.DataFrame | None, down_daily: pd.DataFrame | None) -> dict:"
+        },
+        {
+          "file": "code/api.py",
+          "start": 281,
+          "end": 289,
+          "role": "logic",
+          "anchor": "bca0c7435f85",
+          "first": "up_daily = sheets.get(\"上游_逐日过程\")"
+        }
+      ]
+    },
+    {
+      "id": "results-payload",
+      "level": "component",
+      "parent": "compute-form",
+      "title": "Results workbook and JSON",
+      "summary": "Puts each reservoir's daily, monthly, yearly, hydrological-year and summary tables into a results workbook, and returns them either as a download or as JSON with the workbook in base64.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 267,
+          "end": 303,
+          "role": "logic",
+          "symbol": "_run_reservoir_full",
+          "anchor": "180707126a17",
+          "first": "def _run_reservoir_full(xlsx_bytes: bytes, calc_step: str) -> dict:"
+        },
+        {
+          "file": "code/src/reservoir/xlsx_bridge.py",
+          "start": 146,
+          "end": 173,
+          "role": "logic",
+          "symbol": "csv_to_xlsx",
+          "anchor": "90cffba6b5ba",
+          "first": "def csv_to_xlsx(csv_dir: Path, xlsx_path: Path, up_res: str, down_res: str):"
+        },
+        {
+          "file": "code/hydro_api_helpers.py",
+          "start": 20,
+          "end": 21,
+          "role": "logic",
+          "symbol": "cjk_header_safe",
+          "anchor": "a5cb171cefa7",
+          "first": "def cjk_header_safe(value: str) -> str:"
+        }
+      ]
+    }
+  ]
+}

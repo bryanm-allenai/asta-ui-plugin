@@ -1,0 +1,906 @@
+{
+  "schema": "astaui.card/1",
+  "id": "dms-viz",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:04:42Z"
+  },
+  "app": {
+    "title": "dms-viz: per-site mutation scores on a 3D protein structure",
+    "summary": "A person loads a prepared JSON file of per-mutation scores (local file or URL), picks a dataset, and sees every site summarized as a line along the sequence, with a small overview strip to zoom into a region. Clicking or brushing sites opens the per-mutation heatmap for a site and highlights the selected sites, colored by score, on an interactive 3D structure. They switch the summary statistic, choose which experimental conditions to plot and which to paint on the structure, and narrow mutations with threshold sliders. They leave with images of the plot and the structure, and a URL that restores the view.",
+    "task": {
+      "text": "Find the positions along a protein where mutations have strong effects, and see where those positions sit on the 3D structure, across one or more experimental conditions.",
+      "verbs": [
+        "explore",
+        "locate",
+        "summarize",
+        "compare",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "A table of scores, one row per mutation, with the site, the original and the substituted residue, a condition, and optional filter columns, plus a map from sites to chains of a reference 3D structure.",
+      "item": "a site (residue position) in a protein, with a score for each possible substitution under each condition",
+      "shapes": [
+        "table",
+        "sequence",
+        "per element"
+      ]
+    },
+    "stage": {
+      "text": "exploring per-mutation scores after a mutational scan has been processed, before writing it up",
+      "terms": [
+        "explore",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "An overview strip of per-site summaries drives a zoomable line-and-point plot; clicking or brushing sites there fills a per-mutation heatmap for a site and highlights the same sites on a 3D structure viewer, colored by the summary score. Sidebar controls switch the dataset, summary statistic, conditions and filter thresholds, and every view recomputes.",
+      "views": [
+        "line chart",
+        "heatmap",
+        "3d structure viewer",
+        "sidebar list",
+        "form"
+      ],
+      "interactions": [
+        "brush",
+        "select",
+        "multi-select",
+        "hover for detail",
+        "zoom and pan",
+        "filter",
+        "toggle view",
+        "keyboard shortcuts",
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "focus and context"
+      ]
+    },
+    "field": {
+      "text": "deep mutational scanning mapped onto protein structure in biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "deep mutational scanning",
+        "protein structure",
+        "mutational effects"
+      ]
+    },
+    "workflow": {
+      "name": "map per-position scores onto a 3D structure and pick out the positions that stand out",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a JSON file made by the companion command-line formatter, or paste a URL and press Enter; an optional markdown description loads alongside, and an example dataset is shown at first.",
+          "parts": [
+            "data-loader"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Choose the dataset and a summary statistic (sum, mean, max, min, median) that reduces each site's mutations to one value; 'Floor' clamps negative values to zero and 'Display Mutation Count' plots how many mutations each site has.",
+          "parts": [
+            "chart-options"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The overview strip shows every site; brushing over it zooms the main line-and-point plot to that region of the sequence, and hovering a point shows its values.",
+          "parts": [
+            "site-chart"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Clicking a point fills the heatmap with the score for every substitution at that site, with the original residue marked, and adds the site to the structure; brushing selects many sites, and double-click or Option-brush deselects them.",
+          "parts": [
+            "site-chart",
+            "structure-viewer"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "The condition legend picks which condition paints the structure; Option-clicking adds or removes conditions from the plot so they overlay.",
+          "parts": [
+            "chart-options",
+            "structure-viewer"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Threshold sliders for each filter column hide mutations below the cutoff, and the plot, heatmap and structure recolor.",
+          "parts": [
+            "site-filters"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Download Protein Image' and 'Download Plot Image' save pictures, and every setting is written into the page URL so the view can be shared.",
+          "parts": [
+            "export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Scores are shown both along the sequence and on a 3D structure, with selection in the plot driving which residues are highlighted in the structure.",
+        "Each site holds a full set of substitutions, so a per-site summary (sum, mean, max, min, median) is chosen and the substitutions are shown as a heatmap for each site.",
+        "Several experimental conditions share one plot, each in its own color, but only one paints the structure at a time.",
+        "The structure display can be tuned (representation, colors and opacity for the protein, selection, peripheral chains and ligands) without changing the data.",
+        "The whole view state is kept in the URL, so a configured view can be linked or embedded."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Collapsible options sidebar",
+      "summary": "Holds the upload, chart, protein, filter and download sections as accordions and can be collapsed to icons.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/v0/index.html",
+          "start": 73,
+          "end": 343,
+          "role": "markup",
+          "symbol": "#app-sidebar",
+          "anchor": "c776b5dddc58",
+          "first": "<div class=\"app-sidebar\" , id=\"app-sidebar\">"
+        },
+        {
+          "file": "code/v0/index.html",
+          "start": 40,
+          "end": 43,
+          "role": "markup",
+          "symbol": "#sidebar-toggle",
+          "anchor": "a90e45ece886",
+          "first": "<button class=\"sidebar-toggle\" id=\"sidebar-toggle\">"
+        },
+        {
+          "file": "code/v0/css/sidebar.css",
+          "start": 36,
+          "end": 50,
+          "role": "style",
+          "symbol": ".app-sidebar .accordion",
+          "anchor": "d3fe325643e8",
+          "first": ".app-sidebar .accordion {"
+        },
+        {
+          "file": "code/v0/css/sidebar.css",
+          "start": 56,
+          "end": 61,
+          "role": "style",
+          "symbol": ".app-sidebar .accordion-content",
+          "anchor": "e5d4f1f9185f",
+          "first": ".app-sidebar .accordion-content {"
+        },
+        {
+          "file": "code/v0/css/sidebar.css",
+          "start": 193,
+          "end": 196,
+          "role": "style",
+          "symbol": ".app-sidebar.sidebar-collapsed",
+          "anchor": "cb64b1b3ddd5",
+          "first": ".app-sidebar.sidebar-collapsed {"
+        },
+        {
+          "file": "code/v0/css/layout.css",
+          "start": 12,
+          "end": 22,
+          "role": "style",
+          "symbol": ".app-sidebar",
+          "anchor": "f53fea25cc4b",
+          "first": ".app-sidebar {"
+        },
+        {
+          "file": "code/v0/js/ui.js",
+          "start": 27,
+          "end": 57,
+          "role": "logic",
+          "symbol": "toggleSidebar",
+          "anchor": "29f8ac360f80",
+          "first": "toggleSidebar() {"
+        },
+        {
+          "file": "code/v0/js/ui.js",
+          "start": 60,
+          "end": 75,
+          "role": "logic",
+          "symbol": "toggleAccordion",
+          "anchor": "334fc9b21ffb",
+          "first": "toggleAccordion(btn) {"
+        }
+      ]
+    },
+    {
+      "id": "data-loader",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Upload data (local or remote)",
+      "summary": "Loads a JSON dataset from a local file or a URL, plus an optional markdown description from a URL, and resets the views.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/v0/index.html",
+          "start": 91,
+          "end": 134,
+          "role": "markup",
+          "symbol": "#download-accordion",
+          "anchor": "1de365bffd3e",
+          "first": "<div class=\"accordion-content\" id=\"download-accordion\">"
+        },
+        {
+          "file": "code/v0/css/sidebar.css",
+          "start": 117,
+          "end": 130,
+          "role": "style",
+          "symbol": ".download-toggle",
+          "anchor": "fcbe157fbefe",
+          "first": ".download-toggle {"
+        },
+        {
+          "file": "code/v0/css/sidebar.css",
+          "start": 132,
+          "end": 141,
+          "role": "style",
+          "symbol": ".download-toggle button",
+          "anchor": "41c4d3402c72",
+          "first": ".download-toggle button {"
+        },
+        {
+          "file": "code/v0/css/sidebar.css",
+          "start": 143,
+          "end": 146,
+          "role": "style",
+          "symbol": ".download-toggle .upload-method",
+          "anchor": "5912b8906387",
+          "first": ".download-toggle .upload-method {"
+        },
+        {
+          "file": "code/v0/js/main.js",
+          "start": 91,
+          "end": 132,
+          "role": "logic",
+          "symbol": "initializeTool",
+          "anchor": "60318f335b84",
+          "first": "async function initializeTool() {"
+        },
+        {
+          "file": "code/v0/js/main.js",
+          "start": 141,
+          "end": 163,
+          "role": "logic",
+          "symbol": "fetchFromURL",
+          "anchor": "9f340ba6665a",
+          "first": "async function fetchFromURL(URL, format = \"json\") {"
+        },
+        {
+          "file": "code/v0/js/main.js",
+          "start": 194,
+          "end": 366,
+          "role": "logic",
+          "symbol": "setUpFileUploadListeners",
+          "anchor": "1a2c76617c1c",
+          "first": "function setUpFileUploadListeners() {"
+        },
+        {
+          "file": "code/v0/js/main.js",
+          "start": 166,
+          "end": 178,
+          "role": "logic",
+          "symbol": "renderMarkdown",
+          "anchor": "4c71881693b9",
+          "first": "function renderMarkdown(markdown) {"
+        },
+        {
+          "file": "code/v0/js/utils.js",
+          "start": 125,
+          "end": 141,
+          "role": "logic",
+          "symbol": "validateSpecification",
+          "anchor": "fbab0e307b65",
+          "first": "export function validateSpecification(plotSpec) {"
+        },
+        {
+          "file": "code/v0/data/example.json",
+          "start": 1,
+          "end": 1,
+          "role": "data",
+          "anchor": "d749ac395a6e",
+          "first": "{\"markdown_description\": \"# Escape from the antibodies in the Regeneron cocktail targeting the SARS-CoV-2 RBD\\n\\n`dms-vi"
+        }
+      ]
+    },
+    {
+      "id": "chart-options",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Chart options and condition legend",
+      "summary": "Chooses the dataset, summary statistic, floor and mutation-count display, and uses a clickable legend to choose which conditions appear in the plot and on the structure.",
+      "views": [
+        "form",
+        "list"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/v0/index.html",
+          "start": 137,
+          "end": 178,
+          "role": "markup",
+          "anchor": "cea5813a010e",
+          "first": "<div class=\"submenu\">"
+        },
+        {
+          "file": "code/v0/css/sidebar.css",
+          "start": 99,
+          "end": 101,
+          "role": "style",
+          "symbol": ".legend",
+          "anchor": "12c695c70d70",
+          "first": ".legend {"
+        },
+        {
+          "file": "code/v0/js/main.js",
+          "start": 369,
+          "end": 402,
+          "role": "logic",
+          "symbol": "setUpChartOptionListeners",
+          "anchor": "99a2e8292800",
+          "first": "function setUpChartOptionListeners() {"
+        },
+        {
+          "file": "code/v0/js/tool.js",
+          "start": 358,
+          "end": 484,
+          "role": "logic",
+          "symbol": "updateSelectedDataset",
+          "anchor": "19c27d615ad2",
+          "first": "updateSelectedDataset(node) {"
+        },
+        {
+          "file": "code/v0/js/tool.js",
+          "start": 488,
+          "end": 510,
+          "role": "logic",
+          "symbol": "updateChartOptions",
+          "anchor": "1c00dfb0a582",
+          "first": "updateChartOptions(node) {"
+        },
+        {
+          "file": "code/v0/js/tool.js",
+          "start": 570,
+          "end": 581,
+          "role": "logic",
+          "symbol": "updateProteinCondition",
+          "anchor": "a24b7caf0b7e",
+          "first": "updateProteinCondition(condition) {"
+        },
+        {
+          "file": "code/v0/js/tool.js",
+          "start": 585,
+          "end": 596,
+          "role": "logic",
+          "symbol": "updateChartConditions",
+          "anchor": "7a590a577b29",
+          "first": "updateChartConditions(conditions) {"
+        },
+        {
+          "file": "code/v0/js/tool.js",
+          "start": 625,
+          "end": 630,
+          "role": "logic",
+          "symbol": "selectAllSites",
+          "anchor": "b8d2b30f78bc",
+          "first": "selectAllSites() {"
+        },
+        {
+          "file": "code/v0/js/legend.js",
+          "start": 91,
+          "end": 230,
+          "role": "logic",
+          "symbol": "renderLegend",
+          "anchor": "fc1e731d29cf",
+          "first": "renderLegend() {"
+        },
+        {
+          "file": "code/v0/js/legend.js",
+          "start": 231,
+          "end": 262,
+          "role": "logic",
+          "symbol": "selectProteinCondition",
+          "anchor": "3a93dad5de2f",
+          "first": "selectProteinCondition(datum) {"
+        },
+        {
+          "file": "code/v0/js/legend.js",
+          "start": 263,
+          "end": 292,
+          "role": "logic",
+          "symbol": "selectChartConditions",
+          "anchor": "bba2192c886e",
+          "first": "selectChartConditions(datum) {"
+        },
+        {
+          "file": "code/v0/js/legend.js",
+          "start": 293,
+          "end": 335,
+          "role": "logic",
+          "symbol": "deselectChartConditions",
+          "anchor": "44f0e5740b9f",
+          "first": "deselectChartConditions(datum) {"
+        },
+        {
+          "file": "code/v0/js/utils.js",
+          "start": 6,
+          "end": 60,
+          "role": "logic",
+          "symbol": "summarizeMetricData",
+          "anchor": "78c59af1552f",
+          "first": "export function summarizeMetricData(data, excludedAminoAcids = null) {"
+        }
+      ]
+    },
+    {
+      "id": "site-filters",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Filter sites",
+      "summary": "Builds one threshold slider for each filter column in the data; moving a slider hides mutations below the cutoff, and every view recomputes.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/v0/index.html",
+          "start": 306,
+          "end": 306,
+          "role": "markup",
+          "symbol": "#filters",
+          "anchor": "40ee9e9398b9",
+          "first": "<div id=\"filters\"></div>"
+        },
+        {
+          "file": "code/v0/index.html",
+          "start": 305,
+          "end": 305,
+          "role": "markup",
+          "symbol": "#default-filters",
+          "anchor": "8fe701a9bf26",
+          "first": "<div id=\"default-filters\"></div>"
+        },
+        {
+          "file": "code/v0/css/sidebar.css",
+          "start": 83,
+          "end": 88,
+          "role": "style",
+          "symbol": ".app-sidebar .accordion-option .output",
+          "anchor": "3ccde5e26fc1",
+          "first": ".app-sidebar .accordion-option .output {"
+        },
+        {
+          "file": "code/v0/js/tool.js",
+          "start": 324,
+          "end": 354,
+          "role": "logic",
+          "symbol": "initFilter",
+          "anchor": "d4c7fa111e4a",
+          "first": "initFilter(column, label, min, max, value) {"
+        },
+        {
+          "file": "code/v0/js/tool.js",
+          "start": 600,
+          "end": 621,
+          "role": "logic",
+          "symbol": "updateFilter",
+          "anchor": "a91e076bbdf1",
+          "first": "updateFilter(node) {"
+        },
+        {
+          "file": "code/v0/js/tool.js",
+          "start": 410,
+          "end": 445,
+          "role": "logic",
+          "anchor": "4c5fffff4d77",
+          "first": "// Populate Filter Sites"
+        }
+      ]
+    },
+    {
+      "id": "site-chart",
+      "level": "view",
+      "parent": null,
+      "title": "Context strip, focus plot and per-site mutation heatmap",
+      "summary": "Shows a summary value for every site along the sequence, zooms the focus plot via a brush on the context strip, selects sites by click or brush, and shows a heatmap of every substitution at the chosen site.",
+      "views": [
+        "line chart",
+        "heatmap"
+      ],
+      "interactions": [
+        "brush",
+        "select",
+        "multi-select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail",
+        "focus and context",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/v0/index.html",
+          "start": 357,
+          "end": 357,
+          "role": "markup",
+          "symbol": "#chart",
+          "anchor": "d262985fffe9",
+          "first": "<div class=\"chart\" id=\"chart\"></div>"
+        },
+        {
+          "file": "code/v0/css/visualization.css",
+          "start": 5,
+          "end": 19,
+          "role": "style",
+          "symbol": ".focus-tooltip",
+          "anchor": "468281f51dda",
+          "first": ".focus-tooltip {"
+        },
+        {
+          "file": "code/v0/css/visualization.css",
+          "start": 21,
+          "end": 24,
+          "role": "style",
+          "symbol": ".heatmap-tooltip",
+          "anchor": "1ada62ed3931",
+          "first": ".heatmap-tooltip {"
+        },
+        {
+          "file": "code/v0/css/visualization.css",
+          "start": 57,
+          "end": 63,
+          "role": "style",
+          "symbol": ".axis",
+          "anchor": "35badffb225e",
+          "first": ".axis {"
+        },
+        {
+          "file": "code/v0/css/visualization.css",
+          "start": 65,
+          "end": 69,
+          "role": "style",
+          "symbol": ".heatmap .y-axis text",
+          "anchor": "4174b69391cc",
+          "first": ".heatmap .y-axis text {"
+        },
+        {
+          "file": "code/v0/css/visualization.css",
+          "start": 71,
+          "end": 74,
+          "role": "style",
+          "symbol": ".axis-label",
+          "anchor": "a37b8f504723",
+          "first": ".axis-label {"
+        },
+        {
+          "file": "code/v0/js/chart.js",
+          "start": 47,
+          "end": 377,
+          "role": "logic",
+          "symbol": "initVis",
+          "anchor": "84002a693596",
+          "first": "initVis() {"
+        },
+        {
+          "file": "code/v0/js/chart.js",
+          "start": 381,
+          "end": 681,
+          "role": "logic",
+          "symbol": "updateVis",
+          "anchor": "4199dd1db792",
+          "first": "updateVis() {"
+        },
+        {
+          "file": "code/v0/js/chart.js",
+          "start": 685,
+          "end": 954,
+          "role": "logic",
+          "symbol": "renderVis",
+          "anchor": "88f29888d4dc",
+          "first": "renderVis() {"
+        },
+        {
+          "file": "code/v0/js/chart.js",
+          "start": 958,
+          "end": 987,
+          "role": "logic",
+          "symbol": "brushed",
+          "anchor": "4a6f983c0c2d",
+          "first": "brushed(selection) {"
+        },
+        {
+          "file": "code/v0/js/chart.js",
+          "start": 1024,
+          "end": 1047,
+          "role": "logic",
+          "symbol": "handleBrushedPoints",
+          "anchor": "a48db379ab13",
+          "first": "handleBrushedPoints(evt) {"
+        },
+        {
+          "file": "code/v0/js/chart.js",
+          "start": 1051,
+          "end": 1090,
+          "role": "logic",
+          "symbol": "selectSites",
+          "anchor": "f6858180903d",
+          "first": "selectSites(selectedSites = null) {"
+        },
+        {
+          "file": "code/v0/js/chart.js",
+          "start": 1094,
+          "end": 1133,
+          "role": "logic",
+          "symbol": "deselectSites",
+          "anchor": "4cc8ca515ea8",
+          "first": "deselectSites(selectedSites = null) {"
+        },
+        {
+          "file": "code/v0/js/chart.js",
+          "start": 1137,
+          "end": 1317,
+          "role": "logic",
+          "symbol": "updateHeatmap",
+          "anchor": "81f53f231c0e",
+          "first": "updateHeatmap(datum) {"
+        },
+        {
+          "file": "code/v0/js/chart.js",
+          "start": 991,
+          "end": 1020,
+          "role": "logic",
+          "symbol": "renderEmpty",
+          "anchor": "1cb69e858dfd",
+          "first": "renderEmpty() {"
+        }
+      ]
+    },
+    {
+      "id": "structure-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "3D protein structure",
+      "summary": "Loads the reference structure, colors the data chains by the summary score for the chosen condition, highlights the sites selected in the plot, and offers representation, color and opacity options.",
+      "views": [
+        "3d structure viewer"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "hover for detail",
+        "keyboard shortcuts",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/v0/index.html",
+          "start": 359,
+          "end": 359,
+          "role": "markup",
+          "symbol": "#viewport",
+          "anchor": "970691b79149",
+          "first": "<div class=\"protein\" id=\"viewport\"></div>"
+        },
+        {
+          "file": "code/v0/index.html",
+          "start": 180,
+          "end": 294,
+          "role": "markup",
+          "anchor": "e1872a5f276d",
+          "first": "<div class=\"submenu\">"
+        },
+        {
+          "file": "code/v0/css/layout.css",
+          "start": 52,
+          "end": 54,
+          "role": "style",
+          "symbol": ".protein",
+          "anchor": "48cf1cf110e9",
+          "first": ".protein {"
+        },
+        {
+          "file": "code/v0/css/visualization.css",
+          "start": 26,
+          "end": 42,
+          "role": "style",
+          "symbol": ".protein-tooltip",
+          "anchor": "d45f67d5075f",
+          "first": ".protein-tooltip {"
+        },
+        {
+          "file": "code/v0/js/protein.js",
+          "start": 24,
+          "end": 102,
+          "role": "logic",
+          "symbol": "initStage",
+          "anchor": "13baab2ac5fb",
+          "first": "initStage() {"
+        },
+        {
+          "file": "code/v0/js/protein.js",
+          "start": 106,
+          "end": 179,
+          "role": "logic",
+          "symbol": "load",
+          "anchor": "08ae8395059f",
+          "first": "load() {"
+        },
+        {
+          "file": "code/v0/js/protein.js",
+          "start": 183,
+          "end": 274,
+          "role": "logic",
+          "symbol": "updateRepresentation",
+          "anchor": "2f46df770439",
+          "first": "updateRepresentation() {"
+        },
+        {
+          "file": "code/v0/js/protein.js",
+          "start": 278,
+          "end": 422,
+          "role": "logic",
+          "symbol": "updateData",
+          "anchor": "ee85c44159b2",
+          "first": "updateData() {"
+        },
+        {
+          "file": "code/v0/js/protein.js",
+          "start": 427,
+          "end": 473,
+          "role": "logic",
+          "symbol": "selectSites",
+          "anchor": "a444e7388af8",
+          "first": "selectSites(sites) {"
+        },
+        {
+          "file": "code/v0/js/protein.js",
+          "start": 528,
+          "end": 551,
+          "role": "data",
+          "symbol": "aminoAcidMap",
+          "anchor": "4aff01dc87b6",
+          "first": "const aminoAcidMap = {"
+        },
+        {
+          "file": "code/v0/js/main.js",
+          "start": 405,
+          "end": 459,
+          "role": "logic",
+          "symbol": "setUpProteinOptionListeners",
+          "anchor": "5ef96e2735e6",
+          "first": "function setUpProteinOptionListeners() {"
+        },
+        {
+          "file": "code/v0/js/tool.js",
+          "start": 514,
+          "end": 566,
+          "role": "logic",
+          "symbol": "updateProteinOptions",
+          "anchor": "4d3b9f19ac94",
+          "first": "updateProteinOptions(node) {"
+        }
+      ]
+    },
+    {
+      "id": "export",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Download session",
+      "summary": "Saves the structure and the plot as images, and keeps every setting in the URL so the view can be shared.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/v0/index.html",
+          "start": 311,
+          "end": 326,
+          "role": "markup",
+          "anchor": "80266e82d08e",
+          "first": "<div class=\"submenu\">"
+        },
+        {
+          "file": "code/v0/js/main.js",
+          "start": 462,
+          "end": 471,
+          "role": "logic",
+          "symbol": "setUpDownloadButtonListeners",
+          "anchor": "61ec65fa7948",
+          "first": "function setUpDownloadButtonListeners() {"
+        },
+        {
+          "file": "code/v0/js/chart.js",
+          "start": 1342,
+          "end": 1389,
+          "role": "logic",
+          "symbol": "saveImage",
+          "anchor": "d312cb1965c8",
+          "first": "async saveImage() {"
+        },
+        {
+          "file": "code/v0/js/protein.js",
+          "start": 500,
+          "end": 522,
+          "role": "logic",
+          "symbol": "saveImage",
+          "anchor": "2b2f0eb49dae",
+          "first": "saveImage() {"
+        },
+        {
+          "file": "code/v0/js/tool.js",
+          "start": 734,
+          "end": 769,
+          "role": "logic",
+          "symbol": "updateURLParams",
+          "anchor": "2dea7791737e",
+          "first": "updateURLParams() {"
+        },
+        {
+          "file": "code/v0/js/tool.js",
+          "start": 634,
+          "end": 730,
+          "role": "logic",
+          "symbol": "setState",
+          "anchor": "75ba2725963f",
+          "first": "setState() {"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "3d structure viewer"
+    }
+  ]
+}

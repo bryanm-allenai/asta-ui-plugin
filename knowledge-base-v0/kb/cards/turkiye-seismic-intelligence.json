@@ -1,0 +1,521 @@
+{
+  "schema": "astaui.card/1",
+  "id": "turkiye-seismic-intelligence",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T04:40:59Z"
+  },
+  "app": {
+    "title": "DepremNabız AI — Seismic catalogue analytics, exposure screening and Sentinel-1 pair planning",
+    "summary": "A person picks an earthquake catalogue source: bundled demo data, a live query of the public USGS catalogue with a lookback and minimum magnitude, or an uploaded CSV or Excel file that is normalised to a common event schema. A headline row then shows the event count, the maximum magnitude, the median depth, the share of shallow events and a Gutenberg–Richter b-value. Tabs show the events on a map with exploratory DBSCAN clusters, daily counts, magnitude through time, the magnitude distribution, magnitude against depth, a rolling event-rate anomaly screen, and a data-quality table. Two more tabs count user-supplied exposure points within a chosen radius of the largest events, and search Sentinel-1 acquisitions to plan same-orbit image pairs and summarise uploaded displacement points. The cleaned catalogue can be downloaded as a CSV.",
+    "task": {
+      "text": "Load an event catalogue for a region, summarise its magnitudes, depths and rates, flag unusual daily activity, and screen the largest events against nearby exposure points and satellite acquisitions.",
+      "verbs": [
+        "summarize",
+        "explore",
+        "derive",
+        "identify",
+        "plan"
+      ]
+    },
+    "data": {
+      "text": "A catalogue of timestamped events with coordinates, depth and magnitude. Alongside it come a table of exposure points with optional categories and weights, a catalogue of satellite acquisitions with orbit metadata, and optional processed displacement points.",
+      "item": "one earthquake event with time, latitude, longitude, depth and magnitude",
+      "shapes": [
+        "table",
+        "events",
+        "geospatial",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "exploring and summarising a freshly retrieved event catalogue, before detailed hazard or deformation studies",
+      "terms": [
+        "explore",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar sets the source and filters, and every view on the page is recomputed from the resulting cleaned catalogue: headline statistics, then tabbed maps and charts. The exposure and satellite tabs each take their own upload or search, combined with the catalogue or the acquisition list, and show the results as tables and maps.",
+      "views": [
+        "summary stats",
+        "map",
+        "bar chart",
+        "scatter plot",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "hover for detail",
+        "zoom and pan",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "earthquake-catalogue statistics with InSAR acquisition planning in seismology",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "seismology",
+        "earthquake catalogue",
+        "insar"
+      ]
+    },
+    "workflow": {
+      "name": "summarize an event catalogue and screen it against nearby points of interest",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A radio chooses demo data, live USGS or an uploaded CSV or Excel file. Sliders set the lookback in days and a minimum magnitude, and uploads are normalised and cleaned into a common event schema.",
+          "parts": [
+            "data-source"
+          ]
+        },
+        {
+          "step": "check the data for problems",
+          "here": "The Data quality tab lists missing values, duplicates, invalid coordinates and timestamp coverage for the loaded catalogue.",
+          "parts": [
+            "quality-tab"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Events go on a map sized and coloured by magnitude, with hover showing DBSCAN cluster labels, next to daily-count bars, magnitude through time, a magnitude histogram and a magnitude–depth scatter with depth reversed.",
+          "parts": [
+            "catalogue-tab",
+            "event-map"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Headline metrics give the count, maximum magnitude, median depth and share of events at 20 km or shallower. A b-value is estimated above a completeness magnitude taken from the minimum-magnitude slider, and daily counts are z-scored against a 14-day rolling baseline, with anomalies marked by crosses.",
+          "parts": [
+            "headline-metrics",
+            "anomaly-screen"
+          ]
+        },
+        {
+          "step": "count nearby points within a radius",
+          "here": "Exposure points are uploaded (or demo points used), a radius slider sets the screening distance, and the largest events are listed with nearby point counts and summed weights, sorted by weight, beside a map of the points.",
+          "parts": [
+            "exposure-tab"
+          ]
+        },
+        {
+          "step": "plan follow-up acquisitions",
+          "here": "A Sentinel-1 catalogue is loaded from the demo or searched live over a date range, same-orbit pairs within a maximum gap are listed, and an optional upload of processed displacement points gives summary statistics and a diverging-colour map.",
+          "parts": [
+            "satellite-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "A button downloads the filtered, cleaned catalogue as a CSV.",
+          "parts": [
+            "catalogue-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The b-value uses a completeness magnitude tied to the minimum-magnitude filter, and is withheld when fewer than 20 events lie above it.",
+        "Rate anomalies are rolling z-scores of daily counts, framed explicitly as statistical deviations and not forecasts.",
+        "Exposure is a proximity proxy: weighted point counts within a radius of the largest events, not damage or loss.",
+        "Satellite acquisitions are grouped by relative orbit and orbit direction and paired chronologically for downstream interferometry, rather than processed in the app.",
+        "Every view is labelled with the active data source and the latest record time, so demo and live data are never confused."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-source",
+      "level": "view",
+      "parent": null,
+      "title": "Data source sidebar",
+      "summary": "Chooses demo, live or uploaded catalogue data, sets lookback and minimum magnitude, and reports the active source and record count.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 43,
+          "end": 76,
+          "role": "logic",
+          "anchor": "1bba4899f617",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 53,
+          "end": 54,
+          "role": "logic",
+          "symbol": "cached_usgs",
+          "anchor": "772ad8e5e8af",
+          "first": "def cached_usgs(live_days: int, minimum: float) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/depremnabiz/pipeline.py",
+          "start": 39,
+          "end": 60,
+          "role": "logic",
+          "symbol": "normalise_events",
+          "anchor": "2652ce24e042",
+          "first": "def normalise_events(raw: pd.DataFrame, source: str = \"LOCAL\") -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/depremnabiz/pipeline.py",
+          "start": 84,
+          "end": 89,
+          "role": "logic",
+          "symbol": "clean_events",
+          "anchor": "ad3497e93e00",
+          "first": "def clean_events(frame: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/depremnabiz/providers/usgs.py",
+          "start": 13,
+          "end": 16,
+          "role": "logic",
+          "symbol": "fetch_events",
+          "anchor": "064734b007d9",
+          "first": "def fetch_events("
+        },
+        {
+          "file": "code/data/demo/earthquakes.csv",
+          "start": 1,
+          "end": 621,
+          "role": "data",
+          "anchor": "00ea7b33c867",
+          "first": "event_id,time_utc,latitude,longitude,depth_km,magnitude,magnitude_type,place,source,url"
+        }
+      ]
+    },
+    {
+      "id": "headline-metrics",
+      "level": "view",
+      "parent": null,
+      "title": "Headline catalogue metrics",
+      "summary": "Shows the event count, maximum magnitude, median depth, shallow share and b-value estimate for the loaded catalogue.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 78,
+          "end": 86,
+          "role": "logic",
+          "anchor": "527dab218eb1",
+          "first": "metrics = summary(frame)"
+        },
+        {
+          "file": "code/src/depremnabiz/analytics.py",
+          "start": 12,
+          "end": 29,
+          "role": "logic",
+          "symbol": "summary",
+          "anchor": "ff3ea0da0b26",
+          "first": "def summary(frame: pd.DataFrame) -> dict[str, float | int | str | None]:"
+        },
+        {
+          "file": "code/src/depremnabiz/analytics.py",
+          "start": 63,
+          "end": 72,
+          "role": "logic",
+          "symbol": "estimate_b_value",
+          "anchor": "00e79c13ef6d",
+          "first": "def estimate_b_value(frame: pd.DataFrame, completeness_magnitude: float = 2.0) -> dict[str, float | int | None]:"
+        }
+      ]
+    },
+    {
+      "id": "catalogue-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Catalogue analytics tab",
+      "summary": "Lays out temporal, magnitude and depth charts of the catalogue around the map and anomaly screen, and offers the catalogue CSV download.",
+      "views": [
+        "bar chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 88,
+          "end": 92,
+          "role": "markup",
+          "anchor": "aff387e869de",
+          "first": "catalogue_tab, quality_tab, exposure_tab, satellite_tab, methods_tab = st.tabs("
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 111,
+          "end": 143,
+          "role": "logic",
+          "anchor": "aaa650aeb8ed",
+          "first": "left, right = st.columns(2)"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 160,
+          "end": 169,
+          "role": "logic",
+          "anchor": "6185a2d138c2",
+          "first": "export_frame = frame.copy()"
+        },
+        {
+          "file": "code/src/depremnabiz/analytics.py",
+          "start": 32,
+          "end": 40,
+          "role": "logic",
+          "symbol": "daily_counts",
+          "anchor": "22eaba9b1e62",
+          "first": "def daily_counts(frame: pd.DataFrame) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "event-map",
+      "level": "component",
+      "parent": "catalogue-tab",
+      "title": "Earthquake-event map with clusters",
+      "summary": "Plots events on a street map sized and coloured by magnitude, with hover details including a DBSCAN spatial-cluster label.",
+      "views": [
+        "map"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 93,
+          "end": 109,
+          "role": "logic",
+          "anchor": "e0cc866c7891",
+          "first": "if not frame.empty:"
+        },
+        {
+          "file": "code/src/depremnabiz/analytics.py",
+          "start": 75,
+          "end": 78,
+          "role": "logic",
+          "symbol": "spatial_clusters",
+          "anchor": "c948bbb0bcea",
+          "first": "def spatial_clusters("
+        }
+      ]
+    },
+    {
+      "id": "anomaly-screen",
+      "level": "component",
+      "parent": "catalogue-tab",
+      "title": "Rolling event-rate anomaly screen",
+      "summary": "Draws daily counts against a rolling baseline and marks days whose z-score passes a threshold.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 145,
+          "end": 158,
+          "role": "logic",
+          "anchor": "97017933617f",
+          "first": "anomaly = rolling_rate_anomalies(frame)"
+        },
+        {
+          "file": "code/src/depremnabiz/analytics.py",
+          "start": 43,
+          "end": 46,
+          "role": "logic",
+          "symbol": "rolling_rate_anomalies",
+          "anchor": "8bc9b2f8b254",
+          "first": "def rolling_rate_anomalies("
+        }
+      ]
+    },
+    {
+      "id": "quality-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Data quality tab",
+      "summary": "Lists catalogue-level quality indicators such as missing values, duplicates and invalid coordinates as a metric table.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 171,
+          "end": 179,
+          "role": "logic",
+          "anchor": "2ef5acb76ce0",
+          "first": "with quality_tab:"
+        },
+        {
+          "file": "code/src/depremnabiz/pipeline.py",
+          "start": 63,
+          "end": 81,
+          "role": "logic",
+          "symbol": "quality_report",
+          "anchor": "00c23360442a",
+          "first": "def quality_report(frame: pd.DataFrame) -> dict[str, float | int]:"
+        }
+      ]
+    },
+    {
+      "id": "exposure-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Urban exposure screening",
+      "summary": "Counts uploaded or demo exposure points within an adjustable radius of the largest events, ranks events by summed weight, and maps the points by category.",
+      "views": [
+        "table view",
+        "map"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "sort",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 181,
+          "end": 213,
+          "role": "logic",
+          "anchor": "1a77289458dc",
+          "first": "with exposure_tab:"
+        },
+        {
+          "file": "code/src/depremnabiz/exposure.py",
+          "start": 18,
+          "end": 21,
+          "role": "logic",
+          "symbol": "screen_exposure",
+          "anchor": "a6af7b33ae77",
+          "first": "def screen_exposure("
+        },
+        {
+          "file": "code/src/depremnabiz/exposure.py",
+          "start": 9,
+          "end": 15,
+          "role": "logic",
+          "symbol": "haversine_km",
+          "anchor": "2b99eb52cc38",
+          "first": "def haversine_km(lat1: float, lon1: float, lat2: np.ndarray, lon2: np.ndarray) -> np.ndarray:"
+        },
+        {
+          "file": "code/data/demo/exposure_points.csv",
+          "start": 1,
+          "end": 181,
+          "role": "data",
+          "anchor": "0b75bbd76354",
+          "first": "name,category,latitude,longitude,weight,source"
+        }
+      ]
+    },
+    {
+      "id": "satellite-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Satellite acquisition and deformation tab",
+      "summary": "Loads or searches Sentinel-1 acquisitions over a date range, lists candidate same-orbit pairs, and summarises and maps uploaded displacement points.",
+      "views": [
+        "table view",
+        "map",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "search",
+        "import",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 215,
+          "end": 269,
+          "role": "logic",
+          "anchor": "578b0a700f2d",
+          "first": "with satellite_tab:"
+        },
+        {
+          "file": "code/src/depremnabiz/satellite.py",
+          "start": 6,
+          "end": 34,
+          "role": "logic",
+          "symbol": "build_pair_plan",
+          "anchor": "1d46a5d03439",
+          "first": "def build_pair_plan(catalogue: pd.DataFrame, max_gap_days: int = 24) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/depremnabiz/satellite.py",
+          "start": 37,
+          "end": 49,
+          "role": "logic",
+          "symbol": "summarise_displacement",
+          "anchor": "e3304f935636",
+          "first": "def summarise_displacement(points: pd.DataFrame) -> dict[str, float | int | None]:"
+        },
+        {
+          "file": "code/src/depremnabiz/providers/copernicus.py",
+          "start": 13,
+          "end": 18,
+          "role": "logic",
+          "symbol": "search_sentinel1",
+          "anchor": "3402c055018e",
+          "first": "def search_sentinel1("
+        },
+        {
+          "file": "code/data/demo/sentinel_catalog.csv",
+          "start": 1,
+          "end": 31,
+          "role": "data",
+          "anchor": "5de304c125c0",
+          "first": "item_id,datetime,platform,orbit_state,relative_orbit,instrument_mode,polarizations,stac_url,source"
+        }
+      ]
+    }
+  ]
+}

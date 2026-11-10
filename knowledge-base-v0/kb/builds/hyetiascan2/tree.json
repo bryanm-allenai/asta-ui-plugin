@@ -1,0 +1,726 @@
+{
+ "interface": {
+  "title": "HyetiaScan 2.1.2",
+  "field": "Hydrology / hydrometeorology (rain-gauge precipitation analysis)",
+  "stage_of_work": "data cleaning and exploratory analysis of rain events",
+  "what_it_is_for": "Load a rain-gauge (pluviometer) time series, fix duplicate, negative, outlier and missing readings, then find rainfall events and describe them with Huff curves, frequency curves, intensity histograms and rolling-window accumulations."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "I uploaded lluvia_ejemplo_5min.csv with the default load settings (decimal point, utf-8). It has 12955 readings at 5-minute intervals from 2024-03-01 to 2024-04-14, in the columns fechahora (datetime64) and precipitacion_mm (float64). Before cleaning the app counted 6 missing, 2 duplicate, 1 corrupt and 1 outlier reading, with a total of 643.4 mm. After cleaning there were 12960 correct readings and 605.5 mm. With the expected settings (duplicates keep first, corrupt delete, outliers delete, missing as zero) it found 30 events, as the repository says it should."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Turn a raw rain-gauge record into a set of described rainfall events",
+  "specific": "Analyse a pluviometer CSV in HyetiaScan and characterise its precipitation events",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Load and check the data",
+    "specific": "Archivo tab and the sidebar",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load a time-series file and confirm which columns hold time and value",
+      "specific": "Upload the CSV and check the detected fechahora / precipitacion_mm columns and their types",
+      "screens": [
+       "screens/005.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Upload and gave it lluvia_ejemplo_5min.csv",
+        "screens": [
+         "screens/004.webp",
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged the 'Cantidad a visualizar' slider to 2480 rows",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the 'Seleccione columna de precipitación' dropdown (only precipitacion_mm offered)",
+        "screens": [
+         "screens/007.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Set the file parsing options",
+      "specific": "In Configurar carga, choose the decimal separator and text encoding",
+      "screens": [
+       "screens/059.webp",
+       "screens/060.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Configurar carga tab",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Separador decimal 'Coma' (no numeric column found, analysis stops)",
+        "screens": [
+         "screens/059.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "switched back to 'Punto' and opened the Codificación list (utf-8/utf-16/utf-32/latin-1/iso-8859-1/ascii)",
+        "screens": [
+         "screens/060.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Quality-control the readings",
+    "specific": "Lecturas tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Look at the totals over time and the share of bad readings",
+      "specific": "Lecturas agrupadas chart grouped by Dia/Mes/Año, with a pie chart of correctas/perdidas/duplicadas/corruptas/atípicas",
+      "screens": [
+       "screens/008.webp",
+       "screens/009.webp",
+       "screens/010.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose grouping 'Dia'",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose grouping 'Año' (hovered the point: 643.4 mm)",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "expanded 'Detalle de lecturas' to see the grouped and individual reading tables",
+        "screens": [
+         "screens/012.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Find where the abnormal readings are in time",
+      "specific": "Lecturas anormales stacked bar chart, filtered by type, with a tooltip on each bar",
+      "screens": [
+       "screens/050.webp",
+       "screens/051.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "removed the 'duplicadas' tag from the Lecturas anormales filter",
+        "screens": [
+         "screens/050.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the tall bar: 6 missing readings on Mar 28, 2024",
+        "screens": [
+         "screens/051.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Choose a fix for each kind of bad reading until none remain",
+      "specific": "Control de lecturas anormales: Duplicadas, Corruptas, Atípicas (with Umbral atípicas) and Perdidas",
+      "screens": [
+       "screens/019.webp",
+       "screens/020.webp"
+      ],
+      "condition": {
+       "general": "Later event steps stay locked until no abnormal readings remain",
+       "specific": "Before cleaning, the Eventos tab shows only 'Aún quedan lecturas anormales por controlar'; it unlocks once the pie shows 100% correctas",
+       "screens": [
+        "screens/013.webp"
+       ]
+      },
+      "children": [
+       {
+        "kind": "task",
+        "general": "Resolve duplicate timestamps",
+        "specific": "Duplicadas: No modificar / Dejar primera / Dejar última / Sumar / Promediar / Borrar",
+        "screens": [
+         "screens/016.webp",
+         "screens/049.webp",
+         "screens/057.webp"
+        ],
+        "branch": "one-of",
+        "children": [
+         {
+          "kind": "action",
+          "label": "chose 'Dejar primera' (abnormal count fell from 10 to 8)",
+          "screens": [
+           "screens/016.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "later chose 'Sumar' (30 events, mean P_acumulada 19.91 instead of 19.81)",
+          "screens": [
+           "screens/049.webp",
+           "screens/057.webp"
+          ]
+         }
+        ],
+        "id": "t6",
+        "check": "replayed"
+       },
+       {
+        "kind": "task",
+        "general": "Remove negative values",
+        "specific": "Corruptas: Borrar (the deleted reading then counts as missing, 7)",
+        "screens": [
+         "screens/017.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "chose Corruptas 'Borrar'",
+          "screens": [
+           "screens/017.webp"
+          ]
+         }
+        ],
+        "id": "t7",
+        "check": "replayed"
+       },
+       {
+        "kind": "task",
+        "general": "Set an outlier threshold and remove values above it",
+        "specific": "Atípicas with Umbral atípicas (mm)",
+        "screens": [
+         "screens/018.webp",
+         "screens/019.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "typed 5 in Umbral atípicas (about 11 outliers flagged)",
+          "screens": [
+           "screens/018.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "typed 20 again and chose Atípicas 'Borrar'",
+          "screens": [
+           "screens/019.webp"
+          ]
+         }
+        ],
+        "id": "t8",
+        "check": "replayed"
+       },
+       {
+        "kind": "task",
+        "general": "Fill gaps in the record",
+        "specific": "Perdidas: Asumir 0 (cero)",
+        "screens": [
+         "screens/020.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "chose 'Asumir 0 (cero)' (pie shows 12960 correct, 100%)",
+          "screens": [
+           "screens/020.webp"
+          ]
+         }
+        ],
+        "id": "t9",
+        "check": "replayed"
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Detect events",
+    "specific": "Eventos tab, left-hand parameter column",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Split the series into events using duration, intensity and dry-spell rules",
+      "specific": "Set Duración mínima/máxima, Intensidad mínima, Pausa máxima and Manejo de pausa máxima, then read the event statistics",
+      "screens": [
+       "screens/021.webp",
+       "screens/022.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Eventos with the defaults (20 / 9999 / 3 / 10 / Incluir): 30 events",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the help on Manejo de pausa máxima and chose 'Separar (es interrupción)': 32 events",
+        "screens": [
+         "screens/023.webp",
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 60 in Duración mínima: 18 events",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 10 in Intensidad mínima: 24 events",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 30 in Pausa máxima: still 30 events, but mean duration 82.8 min",
+        "screens": [
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Limit the analysis to a date window",
+      "specific": "Use the Fecha inicial / Fecha final calendars",
+      "screens": [
+       "screens/044.webp",
+       "screens/057.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "set Fecha final to 2024-03-15 in the calendar: 8 events",
+        "screens": [
+         "screens/041.webp",
+         "screens/042.webp",
+         "screens/044.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "picked 2024-04-13 as Fecha final to clear a stale filter: 30 events again",
+        "screens": [
+         "screens/055.webp",
+         "screens/057.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Describe the events",
+    "specific": "Detalle / Huff / Frecuencia / Rangos / Acumulados sub-tabs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "List the events with chosen attributes and summary statistics",
+      "specific": "Detalle: Columnas a visualizar, Estadísticas de eventos, Detalle de eventos table",
+      "screens": [
+       "screens/046.webp",
+       "screens/048.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "added 'Q_Huff' to Columnas a visualizar",
+        "screens": [
+         "screens/045.webp",
+         "screens/046.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "used the table's Search to find 'Q4' (3 results)",
+        "screens": [
+         "screens/048.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Characterise how rain is spread through each event",
+      "specific": "Huff curves by quartile Q1–Q4, with the Intervalo de percentiles slider and the Ver valores percentiles table",
+      "screens": [
+       "screens/033.webp",
+       "screens/035.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged Intervalo de percentiles from 10 to 20",
+        "screens": [
+         "screens/035.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened 'Ver valores percentiles'",
+        "screens": [
+         "screens/034.webp",
+         "screens/035.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Compare event duration and depth against exceedance probability",
+      "specific": "Frecuencia: probability curves (General and Q1–Q4) and interpolated probability tables for duracion and P_acumulada",
+      "screens": [
+       "screens/036.webp",
+       "screens/058.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Frecuencia tab and scrolled to the tables",
+        "screens": [
+         "screens/036.webp",
+         "screens/058.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Bin events by intensity",
+      "specific": "Rangos: histogram of intensity ranges by Huff quartile, with a Número de rangos slider",
+      "screens": [
+       "screens/037.webp",
+       "screens/039.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged Número de rangos from 3 to 4",
+        "screens": [
+         "screens/039.webp"
+        ]
+       }
+      ],
+      "id": "t16",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Summarise the largest accumulation over rolling windows",
+      "specific": "Acumulados: lapse 10–120 min statistics and a per-event table",
+      "screens": [
+       "screens/040.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Acumulados tab",
+        "screens": [
+         "screens/040.webp"
+        ]
+       }
+      ],
+      "id": "t17",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Abnormal-reading audit with per-type fix policies",
+   "general": "Count and plot the bad readings in a time series by type, choose a fix for each type, and watch the counts drop until the data are clean enough for later steps",
+   "specific": "The Lecturas anormales stacked bar chart and type filter, next to Control de lecturas anormales (Duplicadas, Corruptas, Atípicas with Umbral atípicas, Perdidas) and the reading-quality pie chart. The Eventos tab stays blocked until none remain.",
+   "steps": [
+    "look at the stacked bar chart and pie of perdidas/duplicadas/corruptas/atípicas",
+    "filter the chart to the types of interest and hover a bar to date it",
+    "choose a fix for duplicates (keep first/last, sum, average, delete)",
+    "delete corrupt (negative) readings and outliers above an adjustable threshold",
+    "set missing readings to zero; the pie shows 100% correct and Eventos unlocks"
+   ],
+   "serves_tasks": [
+    "Choose a fix for each kind of bad reading until none remain",
+    "Find where the abnormal readings are in time"
+   ],
+   "screens": [
+    "screens/011.webp",
+    "screens/016.webp",
+    "screens/017.webp",
+    "screens/018.webp",
+    "screens/019.webp",
+    "screens/020.webp",
+    "screens/051.webp",
+    "screens/013.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Time-aggregated totals chart",
+   "general": "Switch a cumulative-total chart between day, month and year bins and hover to read values",
+   "specific": "Lecturas agrupadas line chart with Dia/Mes/Año radio buttons, plus the Detalle de lecturas grouped table",
+   "steps": [
+    "choose Dia, Mes or Año",
+    "hover a point to read the date and P_acumulada",
+    "expand Detalle de lecturas to see the grouped counts per bin"
+   ],
+   "serves_tasks": [
+    "Look at the totals over time and the share of bad readings"
+   ],
+   "screens": [
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/010.webp",
+    "screens/012.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Threshold-based event segmentation",
+   "general": "Split a continuous series into discrete episodes using minimum/maximum duration, minimum intensity, maximum gap and a rule for gaps exactly at the limit, limited to a date window, with summary statistics updating live",
+   "specific": "Eventos parameter column (Fecha inicial/final, Duración mínima/máxima, Intensidad mínima, Pausa máxima, Manejo de pausa máxima Incluir/Separar) feeding Estadísticas de eventos",
+   "steps": [
+    "pick the date window with the calendars",
+    "set minimum and maximum duration",
+    "set minimum intensity (mm/h)",
+    "set maximum pause and whether a pause of exactly that length is included or splits the event",
+    "read the event count and the describe() table"
+   ],
+   "serves_tasks": [
+    "Split the series into events using duration, intensity and dry-spell rules",
+    "Limit the analysis to a date window"
+   ],
+   "screens": [
+    "screens/021.webp",
+    "screens/023.webp",
+    "screens/024.webp",
+    "screens/026.webp",
+    "screens/028.webp",
+    "screens/032.webp",
+    "screens/044.webp"
+   ],
+   "id": "f3",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Huff dimensionless mass curves with adjustable resolution",
+   "general": "Classify each event by the quarter of its duration in which most of its rain falls, plot the average cumulative curve for each class, and change the percentile step and read the values as a table",
+   "specific": "Huff tab: Q1–Q4 curves of % precipitation against % duration, the Intervalo de percentiles slider and the Ver valores percentiles popover. Q_Huff is also available as an event column.",
+   "steps": [
+    "open the Huff tab to see the Q1–Q4 curves",
+    "drag Intervalo de percentiles (5–50)",
+    "open Ver valores percentiles for the numbers",
+    "add Q_Huff to the event table to see each event's class"
+   ],
+   "serves_tasks": [
+    "Characterise how rain is spread through each event",
+    "List the events with chosen attributes and summary statistics"
+   ],
+   "screens": [
+    "screens/033.webp",
+    "screens/035.webp",
+    "screens/046.webp"
+   ],
+   "id": "f4",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Exceedance-probability curves by class",
+   "general": "Plot exceedance probability against event duration and depth, overall and for each class, with interpolated lookup tables",
+   "specific": "Frecuencia tab: Duracion and P_acumulada against Probabilidad (General, Q1–Q4), plus the 'Probabilidad (interpolada) vs …' tables",
+   "steps": [
+    "open the Frecuencia tab",
+    "compare the General and per-quartile curves",
+    "read the interpolated value for a probability in the tables"
+   ],
+   "serves_tasks": [
+    "Compare event duration and depth against exceedance probability"
+   ],
+   "screens": [
+    "screens/036.webp",
+    "screens/058.webp"
+   ],
+   "id": "f5",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Binned intensity histogram by class",
+   "general": "Group events into a chosen number of intensity bins and show counts per class as grouped bars",
+   "specific": "Rangos tab with the Número de rangos slider (2–10) and bars coloured by Huff quartile",
+   "steps": [
+    "open the Rangos tab",
+    "drag Número de rangos",
+    "read the counts per range and quartile"
+   ],
+   "serves_tasks": [
+    "Bin events by intensity"
+   ],
+   "screens": [
+    "screens/037.webp",
+    "screens/039.webp"
+   ],
+   "id": "f6",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Rolling-window maximum accumulation table",
+   "general": "For each event, compute the accumulated amount over fixed rolling windows and summarise each window across events",
+   "specific": "Acumulados tab: Estadísticas de acumulados (lapso 10–120 min) and the Detalle de acumulados table per event",
+   "steps": [
+    "open the Acumulados tab",
+    "read the count/mean/quantiles for each lapse",
+    "look at the per-event table (None where an event is shorter than the lapse)"
+   ],
+   "serves_tasks": [
+    "Summarise the largest accumulation over rolling windows"
+   ],
+   "screens": [
+    "screens/040.webp",
+    "screens/044.webp"
+   ],
+   "id": "f7",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Configurable event table",
+   "general": "Choose which attributes to show in a results table, set how many rows to show, and search within it",
+   "specific": "Columnas a visualizar multiselect (inicia, termina, duracion, P_acumulada, intensidad, conteo, lecturas, porcentajes, Q_Huff), the Cantidad a visualizar slider and the dataframe Search",
+   "steps": [
+    "add or remove columns in Columnas a visualizar",
+    "set the number of rows",
+    "search the table, e.g. for 'Q4'"
+   ],
+   "serves_tasks": [
+    "List the events with chosen attributes and summary statistics"
+   ],
+   "screens": [
+    "screens/045.webp",
+    "screens/046.webp",
+    "screens/048.webp"
+   ],
+   "id": "f8",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Time-series file import with parsing options and type detection",
+   "general": "Import a delimited time-series file with a chosen decimal separator and text encoding, see which columns were detected as time and value with their data types, choose the value column, and preview a chosen number of rows",
+   "specific": "Archivo tab: Configurar carga (Separador decimal Punto/Coma, Codificación utf-8/utf-16/utf-32/latin-1/iso-8859-1/ascii), the Upload button, the 'Seleccione columna de precipitación' dropdown, the preview table with detected dtypes (fechahora datetime64[s], precipitacion_mm float64) and the Cantidad a visualizar slider. With the wrong decimal separator no numeric column is found and the analysis stops.",
+   "steps": [
+    "set the decimal separator and encoding in Configurar carga",
+    "upload the CSV",
+    "check the detected time and value columns and their dtypes",
+    "choose the precipitation column from the dropdown",
+    "set how many preview rows to show"
+   ],
+   "serves_tasks": [
+    "Load a time-series file and confirm which columns hold time and value",
+    "Set the file parsing options"
+   ],
+   "screens": [
+    "screens/003.webp",
+    "screens/004.webp",
+    "screens/005.webp",
+    "screens/006.webp",
+    "screens/007.webp",
+    "screens/059.webp",
+    "screens/060.webp"
+   ],
+   "id": "f9",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Fullscreen views of the charts and tables (buttons seen, not opened)",
+  "The Show data and Copy Vega-Lite spec views of the Altair charts"
+ ],
+ "not_done": [
+  "Downloading the event table as CSV: I clicked 'Download as CSV' but browser_downloads stayed empty, probably because the headless browser does not handle the save dialog. No file was saved.",
+  "PNG download of the charts was not tried.",
+  "Some duplicate options were not tried: Dejar última, Promediar and Borrar. I only tried Dejar primera and Sumar.",
+  "Only utf-8 encoding was used; I listed the other encodings but did not load the file with them.",
+  "Duración máxima was left at 9999 and not changed.",
+  "Uploading a second file with the '+' (Add files) button was not tried; only one test file was available.",
+  "Possible bug: after leaving and coming back to the Eventos tab, Fecha final showed 2024-04-14 while the results still used the earlier 2024-03-15 filter (8 events). Picking a new end date in the calendar brought back 30 events (screens/053.webp, screens/057.webp)."
+ ],
+ "applied": [
+  "Added feature f9 (file import with decimal/encoding options, column and dtype detection, preview) serving t1 and t2; its check is taken from the replays of t1 and t2, which exercised the same steps",
+  "Folded t10 into t5 as a condition (Eventos locked until no abnormal readings remain), keeping its screen 013",
+  "Removed t10 from f1.serves_tasks",
+  "Reordered t1's actions so the slider (006) comes before the column dropdown (007)",
+  "Added screens/049.webp to t6's screens so the Lecturas screen showing Sumar is cited alongside 057"
+ ],
+ "open_fixes": [
+  "Add an 'Export the event and accumulation results' task under 'Describe the events': the download was attempted, but its only screenshot (047) was not kept, so no kept screen shows the result. A new run that captures the download (or its failure) on a kept screen is needed; for now it stays in not_done.",
+  "Add a task for checking how sensitive the events are to the cleaning choices: only Dejar primera and Sumar were compared, so a new run should try the other duplicate, outlier-threshold and missing-value options and record the event counts.",
+  "f9 could include the sidebar warning for wrong column types, but the run never triggered it, so a new run with a mistyped file is needed.",
+  "Optionally fold f8 into a 'results table with download' feature, but only once a working download has been recorded."
+ ],
+ "screens_at": "pilot/public/runs/hyetiascan2/20261101-091430/",
+ "screens_filed": {
+  "screens/005.webp": "screens/005.webp",
+  "screens/008.webp": "screens/008.webp",
+  "screens/021.webp": "screens/021.webp",
+  "screens/046.webp": "screens/046.webp"
+ }
+}

@@ -1,0 +1,554 @@
+{
+ "interface": {
+  "title": "Glycan Mass Spec Annotator",
+  "field": "Glycomics / mass spectrometry",
+  "stage_of_work": "Data analysis: first-pass composition annotation of MS1 peak lists",
+  "what_it_is_for": "Match observed m/z peaks to theoretical monoisotopic m/z values of glycan compositions (Hex, HexNAc, Fuc, NeuAc, NeuGc) under a chosen ion model, charge and ppm tolerance, entirely in the browser, and export the ranked matches as CSV."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "Used the built-in 2-peak example (Load example) and the uploaded test file peaks_glycan_panel.csv (5 peaks, one with a blank intensity), plus short peak lists typed by hand. Only one ion species and one charge run at a time. So peak 1112.403229 matched Hex(1)HexNAc(1)Fuc(1)NeuAc(2) at z=1 and Hex(5)HexNAc(4)NeuAc(2) at z=2, both at 4.00 ppm. Peak 1422.518049 matched Hex(4)HexNAc(3)Fuc(1) only at z=1 (-5.00 ppm). The near-miss peak 1441.094836 did not appear at z=1 even at 60 ppm. It appeared only at [M+2H]2+ with 60 ppm, as Hex(6)HexNAc(5)Fuc(2)NeuAc(2) at 50.00 ppm. This differs from the repo notes, which expect both matches from one run."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Propose candidate compositions for measured signals by matching measured values to theoretical values within an error tolerance",
+  "specific": "Annotate an m/z peak list with candidate glycan compositions ranked by ppm error",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Bring in the measurements",
+    "specific": "Provide the observed m/z peak list",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load a built-in demonstration dataset and see a finished result",
+      "specific": "Load the 2-peak example, which fills the inputs, resets the settings to defaults and runs automatically",
+      "branch": "one-of",
+      "screens": [
+       "screens/003.webp",
+       "screens/020.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Load example",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Load example again after changing settings (all settings reset to defaults)",
+        "screens": [
+         "screens/020.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Upload a measurement file",
+      "specific": "Choose peaks_glycan_panel.csv in the peak-list file input; it fills the 'Observed m/z values' textarea",
+      "branch": "one-of",
+      "screens": [
+       "screens/004.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "uploaded peaks_glycan_panel.csv via Choose File",
+        "screens": [
+         "screens/004.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Paste measurements as plain text",
+      "specific": "Type one m/z per line (no intensity) into the textarea",
+      "branch": "one-of",
+      "screens": [
+       "screens/016.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 1057.396137 / 1112.403229 / 1422.518049 into Observed m/z values",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Annotate peaks",
+        "screens": [
+         "screens/016.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Get told exactly which input line is malformed",
+      "specific": "Enter a list with a non-numeric line; the app reports 'Invalid peak at line 2' and clears the results",
+      "branch": "when input is malformed",
+      "screens": [
+       "screens/017.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed '1057.39<TAB>100 / abc / -5' into Observed m/z values",
+        "screens": [
+         "screens/017.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Annotate peaks",
+        "screens": [
+         "screens/017.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Run a first pass with default settings",
+    "specific": "Annotate the loaded peak list once with the default bounds, ion model, charge and tolerance",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Run the match with default settings",
+      "specific": "Annotate the 5-peak panel with Hex 6 / HexNAc 5 / Fuc 2 / NeuAc 2 / NeuGc 0, [M+zH]z+, z=1, 10 ppm (377 compositions)",
+      "screens": [
+       "screens/005.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Annotate peaks",
+        "screens": [
+         "screens/005.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Define the search space",
+    "specific": "Set residue maxima and re-annotate; out-of-range maxima or tolerance are rejected",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Narrow or widen the candidate space for a given compound class",
+      "specific": "Change maximum residue counts and re-annotate",
+      "branch": "repeat",
+      "screens": [
+       "screens/014.webp",
+       "screens/015.webp",
+       "screens/019.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "at [M+2H]2+, 10 ppm, set NeuAc to 0 and pressed Annotate peaks (125 compositions; sialylated match lost)",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "set NeuAc 2, NeuGc 2, Charge |z| = 1 and pressed Annotate peaks (1133 compositions)",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "set Hex 20, HexNAc 20, Fuc 5, NeuAc 4 and pressed Annotate peaks (39,689 compositions)",
+        "screens": [
+         "screens/019.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Get told when a setting is out of range",
+      "specific": "Out-of-range residue maxima or tolerance show an error and clear the results (the 50,000-combination search ceiling was not reached)",
+      "branch": "when a value is out of range",
+      "screens": [
+       "screens/013.webp",
+       "screens/018.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 50000 in Tolerance (ppm) and pressed Annotate peaks ('must be greater than 0 and no more than 1,000 ppm')",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 50 in Hex and pressed Annotate peaks ('Hex maximum must be a whole number from 0 to 40')",
+        "screens": [
+         "screens/018.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Compare alternative explanations for each signal",
+    "specific": "Compare ion models and charge states, and loosen the tolerance",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Test which measurement model explains each signal",
+      "specific": "Switch between [M+zH]z+, [M−zH]z− and [M+Na]+, and charge 1 vs 2, re-annotating each time",
+      "branch": "repeat",
+      "screens": [
+       "screens/006.webp",
+       "screens/007.webp",
+       "screens/008.webp",
+       "screens/009.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "selected Charge |z| = 2 (results did not refresh by themselves)",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Annotate peaks (peak 1 = Hex(5)HexNAc(4)NeuAc(2) [M+2H]2+)",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected Ion species [M−zH]z−, Charge 1, pressed Annotate peaks (peak 1 = Hex(3)HexNAc(3))",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected Ion species [M+Na]+ (Charge locked to 1), pressed Annotate peaks (no matches)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Recover near-misses by loosening the error tolerance",
+      "specific": "Raise the tolerance to 60 ppm; peak 1441.094836 matches only at [M+2H]2+ (50.00 ppm)",
+      "screens": [
+       "screens/010.webp",
+       "screens/011.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "selected [M+zH]z+, typed 60 in Tolerance (ppm), pressed Annotate peaks (still no match at z=1)",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected Charge |z| = 2, pressed Annotate peaks",
+        "screens": [
+         "screens/011.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Triage signals: unexplained vs ambiguous",
+    "specific": "Separate 'No match' peaks from peaks with several candidate compositions (a composition match is not an identification or a confidence score)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Find signals with no plausible explanation",
+      "specific": "Read the 'No match' rows (e.g., 250.123456 and 980.654321) and the summary line 'N peaks · M with candidate matches'",
+      "screens": [
+       "screens/005.webp",
+       "screens/009.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Annotate peaks on the panel and read the No match rows",
+        "screens": [
+         "screens/005.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Find signals with several competing explanations, ranked by error",
+      "specific": "Spot peaks listed with more than one composition, ranked by |ppm|, including candidates with identical mass",
+      "screens": [
+       "screens/012.webp",
+       "screens/015.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 1000 in Tolerance (ppm), pressed Annotate peaks (peak 1 has 2 candidates at 4.00 and -454.44 ppm)",
+        "screens": [
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "set NeuGc 2 at 10 ppm, z=1, pressed Annotate peaks (Hex(1)HexNAc(1)Fuc(1)NeuAc(2) and HexNAc(1)Fuc(2)NeuAc(1)NeuGc(1), both 4.00 ppm)",
+        "screens": [
+         "screens/015.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Save the results",
+    "specific": "Export the ranked candidate table as CSV",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Download the results table for records",
+      "specific": "Press Export CSV to download glycan-composition-matches.csv (columns peak_index, observed_mz, intensity, composition, neutral_mass, theoretical_mz, error_ppm, total_matches)",
+      "branch": "repeat",
+      "screens": [
+       "screens/003.webp",
+       "screens/015.webp",
+       "check/screens/006.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Export CSV after the example run and read back the downloaded glycan-composition-matches.csv",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Export CSV after the NeuGc run and read back the download (two candidates for peak 1, blank rows for unmatched peaks)",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "replay: downloaded glycan-composition-matches.csv and checked its header and blank no-match rows",
+        "screens": [
+         "check/screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Peak-list input with file loader and line-level validation",
+   "general": "Paste or upload a list of measured values (with an optional second column) and get the exact line number of any bad entry",
+   "specific": "Type into the 'Observed m/z values' textarea (one m/z per line, or CSV/TSV with optional intensity, optional header) or load a peak-list file that fills the textarea; on Annotate, bad lines are reported as 'Invalid peak at line N'",
+   "steps": [
+    "Paste values or choose a file",
+    "Check the file contents now shown in the textarea and edit them if needed",
+    "Press Annotate peaks",
+    "Fix any line named in the error message and run again"
+   ],
+   "serves_tasks": [
+    "Upload a measurement file",
+    "Paste measurements as plain text",
+    "Get told exactly which input line is malformed"
+   ],
+   "screens": [
+    "screens/004.webp",
+    "screens/016.webp",
+    "screens/017.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Bounded combinatorial search-space editor",
+   "general": "Set a maximum count for each building block to limit which combinations are generated, and see how many were searched",
+   "specific": "Set Hex/HexNAc/Fuc/NeuAc/NeuGc maxima (each a whole number from 0 to 40); the summary reports 'N compositions searched' (125, 377, 1133, 39,689 in the tests); out-of-range values give an error. A 50,000-combination search ceiling is documented but was not reached in these runs",
+   "steps": [
+    "Edit the maximum count for each residue",
+    "Press Annotate peaks",
+    "Read the compositions-searched count and the matches gained or lost",
+    "Fix any out-of-range value named in the error"
+   ],
+   "serves_tasks": [
+    "Narrow or widen the candidate space for a given compound class",
+    "Get told when a setting is out of range"
+   ],
+   "screens": [
+    "screens/014.webp",
+    "screens/015.webp",
+    "screens/018.webp",
+    "screens/019.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Ion-model and charge selector with ppm tolerance",
+   "general": "Choose how the measured value relates to the underlying mass (adduct and charge) and how much error to allow, then re-run to compare explanations",
+   "specific": "Ion species dropdown ([M+zH]z+, [M−zH]z−, [M+Na]+) with Charge |z| 1–5 (only 1 and 2 tried; disabled for [M+Na]+) and Tolerance (ppm), limited to more than 0 and at most 1000; changes take effect only after Annotate peaks",
+   "steps": [
+    "Pick an ion species",
+    "Pick a charge (if the ion species allows it)",
+    "Set the ppm tolerance",
+    "Press Annotate peaks and compare the table with the previous run"
+   ],
+   "serves_tasks": [
+    "Test which measurement model explains each signal",
+    "Recover near-misses by loosening the error tolerance"
+   ],
+   "screens": [
+    "screens/007.webp",
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/011.webp",
+    "screens/013.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Ranked candidate-match table with ambiguity and no-match rows",
+   "general": "Show each measured item with all candidates within tolerance, sorted by error, plus explicit 'no match' rows and a summary count",
+   "specific": "Candidate annotations table (Peak, Observed m/z, Intensity, Composition, Theoretical m/z, Error ppm), several rows per peak ranked by |ppm|, up to 20 shown per peak (cap not reached in testing), 'No match' rows, and a summary line '5 peaks · 2 with candidate matches · 377 compositions searched · 2 matches'",
+   "steps": [
+    "Run the annotation",
+    "Read the summary line",
+    "Scan for peaks with several rows (ambiguous) or 'No match' (unexplained)",
+    "Compare the ppm errors of competing candidates"
+   ],
+   "serves_tasks": [
+    "Find signals with no plausible explanation",
+    "Find signals with several competing explanations, ranked by error",
+    "Run the match with default settings"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/012.webp",
+    "screens/015.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "CSV export of match results",
+   "general": "Download the current results table, including unmatched items, as a spreadsheet-ready file",
+   "specific": "Export CSV (disabled until a valid run) downloads glycan-composition-matches.csv with peak_index, observed_mz, intensity, composition, neutral_mass, theoretical_mz, error_ppm, total_matches; unmatched peaks get blank composition fields and total_matches 0",
+   "steps": [
+    "Run a valid annotation (Export becomes enabled)",
+    "Press Export CSV",
+    "Open the downloaded file"
+   ],
+   "serves_tasks": [
+    "Download the results table for records"
+   ],
+   "screens": [
+    "screens/003.webp",
+    "screens/013.webp",
+    "screens/015.webp",
+    "check/screens/006.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "No other views exist; the app is a single page with input and results panels."
+ ],
+ "not_done": [
+  "Could not compare ion models side by side in one run: only one ion species and charge apply per run, so I compared them by re-running. The repo notes expect Hex5HexNAc4NeuAc2 [M+2H]2+ and Hex4HexNAc3Fuc1 [M+H]+ from one run; that is not possible.",
+  "The exported CSV has no ion species or charge column, so files exported under different ion models cannot be told apart by their contents.",
+  "Did not hit the 20-candidates-per-peak display cap; the widest search (39,689 compositions, 1000 ppm) gave only 4 candidates for one peak.",
+  "Did not hit the 50,000-combination search ceiling ('Composition search exceeds 50,000 combinations; reduce bounds'); the widest search tried was 39,689 compositions.",
+  "Did not test the 5,000-peak / 1 MB input limits; there is no large test file and typing one is impractical.",
+  "Did not try charge states 3–5.",
+  "Did not record the app's stated assumptions (underivatized, free/released glycans with terminal H2O; a composition match is not a structure) from any screen."
+ ],
+ "applied": [
+  "Renamed the 'Judge how reliable each assignment is' phase to 'Triage signals: unexplained vs ambiguous' and noted in its specific label that a match is not a confidence score",
+  "Relabelled t11's general label as 'several competing explanations, ranked by error' so it covers both screen 012 and screen 015",
+  "Added the replay's download screen (check/screens/006.webp) and a replay action to t12, and added the same screen to f5; t12's actions now say the downloaded file was read back",
+  "Dropped ion species and charge from the search-space phase label, now 'Define the search space'",
+  "Moved t5 (default run) into its own 'Run a first pass with default settings' phase between input and search space",
+  "Noted in t7 and f2 that the 50,000-combination ceiling was not reached, and listed it under not_done",
+  "Added the run context to t6 actions (014 was at [M+2H]2+, 10 ppm; 015 switched back to z=1)",
+  "Marked the untested parts in f3 (charges 3–5) and f4 (20-per-peak cap)",
+  "Listed the unrecorded assumptions notice under not_done"
+ ],
+ "open_fixes": [
+  "Take a screen during the CSV download in the original run, or file downloads/glycan-composition-matches.csv as cited evidence for t12/f5. Kept screens 003 and 015 show only the results table, and evidence must be a kept screen.",
+  "Trigger the 50,000-combination ceiling (e.g., Hex 40, HexNAc 40, Fuc 5, NeuAc 4) and add the error to t7 and f2. No run reached it.",
+  "Try charges 3–5 for [M+zH]z+ and [M−zH]z− to confirm the full charge range in f3. Only 1 and 2 were run.",
+  "Test the 5,000-peak / 1 MB input limits with a generated large file. No such file was available.",
+  "Capture the app's assumptions/limitations text (underivatized, terminal H2O, composition only), add it as context before the triage phase, and consider it as a small feature. No kept screen shows it.",
+  "Find a case that exceeds the 20-candidate display cap to confirm f4's truncation behaviour. The widest search gave only 4 candidates."
+ ],
+ "screens_at": "pilot/public/runs/glycan-mass-spec-annotator/20261031-090541/",
+ "screens_filed": {
+  "screens/003.webp": "screens/003.webp",
+  "screens/005.webp": "screens/005.webp",
+  "screens/014.webp": "screens/014.webp",
+  "screens/006.webp": "screens/006.webp"
+ }
+}

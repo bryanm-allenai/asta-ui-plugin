@@ -1,0 +1,447 @@
+{
+  "schema": "astaui.card/1",
+  "id": "kinetiqc-pet-explorer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T06:28:01Z"
+  },
+  "app": {
+    "title": "KinetiQC Research Explorer",
+    "summary": "A person opens an overview of a finished robustness benchmark: headline counts, an audit-failure count and the endpoint error for each shortened acquisition. They choose a subject and condition, scrub through the frames of the dynamic scan, and pick a region. For that region they see the clean time-activity curve alongside its corrupted and reconstructed versions, with the area-under-curve error of each. They then set the degradation levels for duration, frame sampling, counts and motion, and an endpoint family, and read the per-subject metric for that scenario and how it changes across the levels. Further tabs set clean and degraded region-by-region correlation matrices next to their difference, and per-frame texture-feature trajectories next to robustness rankings. What they come away with is a judgement of which quantitative endpoints stay reliable under which acquisition shortcuts.",
+    "task": {
+      "text": "Judge how far a dynamic imaging acquisition can be shortened or degraded before each quantitative endpoint stops agreeing with the clean reference.",
+      "verbs": [
+        "compare",
+        "explore",
+        "summarize",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "Precomputed benchmark outputs: per-region time-activity curves for clean, degraded and reconstructed versions of each scan, subject-level reliability metrics per endpoint and scenario, region-by-region correlation matrices, per-frame texture features with robustness rankings, plus an optional raw 4-D scan for viewing one frame.",
+      "item": "one subject's scan under one acquisition-degradation scenario, summarised per brain region",
+      "shapes": [
+        "time series",
+        "image collection",
+        "table",
+        "versions",
+        "network",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "comparing degraded acquisitions with the clean reference after the benchmark pipeline has run, before writing it up",
+      "terms": [
+        "compare",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "Six tabs share one set of cached result tables. In each tab, dropdowns for subject, condition, region and scenario filter the tables. The tab then draws the clean and degraded versions together: overlaid curves, adjacent heatmaps with a difference panel, or per-subject lines across degradation levels, each with a metric table underneath.",
+      "views": [
+        "summary stats",
+        "image viewer",
+        "line chart",
+        "table view",
+        "heatmap",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select",
+        "filter",
+        "time slider",
+        "toggle view",
+        "multi-select"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "acquisition robustness of kinetic quantification in dynamic brain PET",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "dynamic pet",
+        "kinetic modelling",
+        "radiomics"
+      ]
+    },
+    "workflow": {
+      "name": "compare degraded versions of a measurement against a clean reference to see which results stay reliable",
+      "steps": [
+        {
+          "step": "look over every item at a glance",
+          "here": "The Overview tab shows the number of subjects, subject-level rows, stress scenarios and audit failures. It also lists the normalized-AUC error, with its bootstrap interval, for each truncated duration.",
+          "parts": [
+            "overview"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The person picks a subject and a baseline or displaced condition, then drags a frame slider to see the middle slice of the 4-D scan, which is loaded one frame at a time.",
+          "parts": [
+            "tac-explorer",
+            "frame-viewer"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "For a chosen atlas region, the clean, 40%-masked, linearly interpolated and TCN-reconstructed curves are overlaid. A table gives each curve's duration-weighted AUC and its relative error against the clean curve.",
+          "parts": [
+            "tac-comparison"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Dropdowns set the levels for duration, sampling, counts and motion. A radio button picks which constraint to display, and another dropdown picks the endpoint family (model-free, intervention, connectivity or radiomics).",
+          "parts": [
+            "reliability-lab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The tab shows the mean primary and secondary metrics for the chosen scenario, a per-subject table, and a line per subject tracing the primary metric across that constraint's levels.",
+          "parts": [
+            "reliability-lab"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "The clean and degraded Pearson region-correlation matrices are drawn as heatmaps next to their difference, with edge correlation, Frobenius distance and top-edge Jaccard. A separate tab plots texture-feature trajectories for several selected scenarios.",
+          "parts": [
+            "connectivity",
+            "radiomics"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "The most and least robust radiomic endpoints are ranked side by side. Known changed-region recovery and ground-truth tables show whether the intervention effect survives degradation.",
+          "parts": [
+            "radiomics",
+            "kinetic-quant"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Degradations are organised along four separate axes (scan duration, frame sampling, count level, motion), and the person views one axis at a time instead of a full factorial grid.",
+        "Errors are computed from duration-weighted integrals that respect unequal frame lengths, not from a plain mean over frames.",
+        "Reconstruction methods (zero fill, interpolation, a small temporal network) are judged by how well they recover a downstream quantity, not by how smooth the curve looks.",
+        "Each correlation matrix is shown next to its clean reference and a difference panel, with matrix-similarity metrics underneath.",
+        "The interface only reads cached outputs and never reruns the pipeline. Missing raw scans disable the frame viewer and nothing else."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "overview",
+      "level": "view",
+      "parent": null,
+      "title": "Overview",
+      "summary": "Opens the tabbed explorer on headline counts, the audit-failure count and per-duration endpoint errors with confidence intervals.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/app.py",
+          "start": 82,
+          "end": 122,
+          "role": "logic",
+          "symbol": "overview",
+          "anchor": "6dd73cec7130",
+          "first": "def overview() -> None:"
+        },
+        {
+          "file": "code/app/app.py",
+          "start": 459,
+          "end": 490,
+          "role": "markup",
+          "symbol": "main",
+          "anchor": "7309b4fe5cb3",
+          "first": "def main() -> None:"
+        },
+        {
+          "file": "code/app/app.py",
+          "start": 57,
+          "end": 61,
+          "role": "data",
+          "symbol": "_table",
+          "anchor": "6e9351efa6bb",
+          "first": "def _table(name: str) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/outputs/final-benchmark/tables/audit_results.csv",
+          "start": 1,
+          "end": 15,
+          "role": "data",
+          "anchor": "4869e2bff21b",
+          "first": "check,passed,severity,evidence"
+        }
+      ]
+    },
+    {
+      "id": "tac-explorer",
+      "level": "view",
+      "parent": null,
+      "title": "4-D PET / TAC Explorer",
+      "summary": "Lets the person choose a subject and condition, view one frame of the scan, and compare one region's curves across reconstruction methods.",
+      "views": [
+        "image viewer",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/app.py",
+          "start": 130,
+          "end": 202,
+          "role": "logic",
+          "symbol": "tac_explorer",
+          "anchor": "b226921da084",
+          "first": "def tac_explorer() -> None:"
+        }
+      ]
+    },
+    {
+      "id": "frame-viewer",
+      "level": "component",
+      "parent": "tac-explorer",
+      "title": "PET frame slice viewer",
+      "summary": "Loads one frame of the 4-D scan lazily and shows its middle slice, with a slider to move through the frames.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "time slider"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/app.py",
+          "start": 125,
+          "end": 127,
+          "role": "data",
+          "symbol": "_pet_record",
+          "anchor": "8fc4e1ff07c8",
+          "first": "def _pet_record(subject: str, session: str) -> Optional[Path]:"
+        },
+        {
+          "file": "code/app/app.py",
+          "start": 132,
+          "end": 153,
+          "role": "logic",
+          "anchor": "7a7ef0497aac",
+          "first": "subject = st.selectbox(\"Subject\", [\"000101\", \"000102\", \"000103\"], key=\"tac_subject\")"
+        }
+      ]
+    },
+    {
+      "id": "tac-comparison",
+      "level": "component",
+      "parent": "tac-explorer",
+      "title": "Clean vs corrupted vs reconstructed TAC",
+      "summary": "Overlays one region's clean, corrupted and reconstructed curves and tabulates each curve's AUC error against the clean one.",
+      "views": [
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/app.py",
+          "start": 154,
+          "end": 202,
+          "role": "logic",
+          "anchor": "621bd7fbbbe6",
+          "first": "clean = read_csv("
+        },
+        {
+          "file": "code/app/app.py",
+          "start": 53,
+          "end": 54,
+          "role": "logic",
+          "symbol": "_subject_series",
+          "anchor": "032051a030f0",
+          "first": "def _subject_series(series: pd.Series) -> pd.Series:"
+        },
+        {
+          "file": "code/outputs/connectivity-real/ml_tacs/reconstructed_atlas_tacs.csv",
+          "start": 1,
+          "end": 145,
+          "role": "data",
+          "anchor": "89ac88ecdcaa",
+          "first": "subject,session,roi,reconstruction_method,frame,mid_s,duration_s,mean"
+        }
+      ]
+    },
+    {
+      "id": "reliability-lab",
+      "level": "view",
+      "parent": null,
+      "title": "Reliability Lab",
+      "summary": "Lets the person set degradation levels on four axes, choose one axis and an endpoint family, and read the metrics plus a per-subject curve across that axis's levels.",
+      "views": [
+        "summary stats",
+        "table view",
+        "line chart"
+      ],
+      "interactions": [
+        "select",
+        "filter",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/app.py",
+          "start": 205,
+          "end": 272,
+          "role": "logic",
+          "symbol": "reliability_lab",
+          "anchor": "3fac2baf664f",
+          "first": "def reliability_lab() -> None:"
+        },
+        {
+          "file": "code/app/app.py",
+          "start": 64,
+          "end": 65,
+          "role": "logic",
+          "symbol": "_line_plot",
+          "anchor": "941064033d14",
+          "first": "def _line_plot("
+        }
+      ]
+    },
+    {
+      "id": "kinetic-quant",
+      "level": "view",
+      "parent": null,
+      "title": "Kinetic Quantification",
+      "summary": "Shows one subject's model-free features by region, how well the known changed-region effect is recovered, the ground-truth comparison, and the status of the reference-region model.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/app.py",
+          "start": 275,
+          "end": 312,
+          "role": "logic",
+          "symbol": "kinetic_quantification",
+          "anchor": "0ea4f646b218",
+          "first": "def kinetic_quantification() -> None:"
+        }
+      ]
+    },
+    {
+      "id": "connectivity",
+      "level": "view",
+      "parent": null,
+      "title": "Regional kinetic covariance",
+      "summary": "Draws the clean and degraded region-correlation matrices next to their difference and lists matrix-similarity metrics for the chosen scenario.",
+      "views": [
+        "heatmap",
+        "side-by-side panes",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "filter"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/app.py",
+          "start": 315,
+          "end": 386,
+          "role": "logic",
+          "symbol": "connectivity_view",
+          "anchor": "04b530d8030e",
+          "first": "def connectivity_view() -> None:"
+        },
+        {
+          "file": "code/app/app.py",
+          "start": 335,
+          "end": 343,
+          "role": "logic",
+          "symbol": "matrix_for",
+          "anchor": "cffab798b22a",
+          "first": "def matrix_for(name):"
+        },
+        {
+          "file": "code/app/app.py",
+          "start": 40,
+          "end": 42,
+          "role": "data",
+          "symbol": "read_npz",
+          "anchor": "e10869d4f820",
+          "first": "def read_npz(path: str):"
+        }
+      ]
+    },
+    {
+      "id": "radiomics",
+      "level": "view",
+      "parent": null,
+      "title": "Dynamic Features / Radiomics",
+      "summary": "Plots a per-frame texture feature over time for the selected scenarios and ranks endpoints from most to least robust against acquisition changes.",
+      "views": [
+        "line chart",
+        "table view",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "filter"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/app.py",
+          "start": 389,
+          "end": 456,
+          "role": "logic",
+          "symbol": "radiomics_view",
+          "anchor": "0324d6540e63",
+          "first": "def radiomics_view() -> None:"
+        }
+      ]
+    }
+  ]
+}

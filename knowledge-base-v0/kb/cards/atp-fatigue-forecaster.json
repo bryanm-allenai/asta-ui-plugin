@@ -1,0 +1,466 @@
+{
+  "schema": "astaui.card/1",
+  "id": "atp-fatigue-forecaster",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T07:31:51Z"
+  },
+  "app": {
+    "title": "ATP Fatigue Forecaster",
+    "summary": "A person picks two competitors from a looked-up roster, or types in their rank, recent workload, rest, form and head-to-head values by hand, chooses the playing surface, and runs the inference. They get a split win-probability bar, the predicted winner with a confidence level, and generated commentary that ties the load, rest and form differences to a fatigue framework. Two what-if sweeps then show how the probability would move with more rest for one side or a different 28-day load for the other. Further tabs check that the model is worth trusting: its scores against simple rank baselines, ROC and calibration curves, feature importance, and an ablation that adds feature groups one at a time. A separate tab estimates the win probability from a live score state alone.",
+    "task": {
+      "text": "Predict which of two competitors wins from pre-match workload, rest and form features, and test whether those features add predictive signal beyond ranking alone.",
+      "verbs": [
+        "derive",
+        "compare",
+        "explore",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Historical match records with dates, ranks, surface, round and duration, turned into rolling pre-match workload, rest, form and head-to-head features for each side; plus point-by-point score logs for a second, score-state model.",
+      "item": "one match between two competitors, described by each side's features from before the match",
+      "shapes": [
+        "table",
+        "events"
+      ]
+    },
+    "stage": {
+      "text": "analysing match records with a trained forecasting model and checking that the load features hold up against baselines",
+      "terms": [
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar form fills in each side's features, either from a roster lookup or from manual sliders, and the inference tab turns them into a probability bar, a radar comparison, commentary and counterfactual sweep curves. Separate validation tabs show the same trained model against baselines and as a staged feature ablation, and an in-match tab recomputes the probability live as the score-state inputs change.",
+      "views": [
+        "form",
+        "side-by-side panes",
+        "summary stats",
+        "line chart",
+        "bar chart",
+        "table view",
+        "radar chart"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "match-outcome forecasting from training-load features with ablation testing, in sports science",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "sports science",
+        "sports analytics",
+        "training load"
+      ]
+    },
+    "workflow": {
+      "name": "predict a two-sided outcome with a trained model and test which feature groups add signal",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Match seasons are fetched from a pinned source and turned into rolling pre-match features, built in date and match order so no window includes the match being predicted; a freshness badge shows how recent the data is",
+          "parts": [
+            "model-validation"
+          ]
+        },
+        {
+          "step": "set up the two items to compare",
+          "here": "The sidebar switches between Player Lookup, which fills both sides' stats and head-to-head from history, and Manual Entry, with sliders for rank, 7/14/28-day minutes, rest days, form and head-to-head; a surface picker applies to both",
+          "parts": [
+            "match-setup"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run Inference sends the features to a calibrated gradient-boosting model, which gives a split probability bar, predicted winner, a HIGH/MEDIUM/LOW confidence label, surface, and commentary on the load, rest, head-to-head and surface differences",
+          "parts": [
+            "match-inference"
+          ]
+        },
+        {
+          "step": "vary one input and watch the prediction respond",
+          "here": "What-if curves sweep 0–14 extra rest days for one side and 0–1200 minutes of 28-day load for the other, holding everything else fixed, and report the largest change",
+          "parts": [
+            "counterfactual-sweeps"
+          ]
+        },
+        {
+          "step": "compare the model against simpler baselines",
+          "here": "Accuracy, ROC-AUC, CV AUC, Brier and log loss on a chronological hold-out, a table and ROC curves against higher-rank, rank-logistic and Elo-style baselines, a reliability diagram, and the top-10 feature importances",
+          "parts": [
+            "model-validation"
+          ]
+        },
+        {
+          "step": "add feature groups one at a time and measure the lift",
+          "here": "Bars of test AUC for ranking only, then adding load, form, head-to-head and opponent quality, and finally the full set, with the change from each step and a hypothesis-result verdict",
+          "parts": [
+            "ablation-study"
+          ]
+        },
+        {
+          "step": "estimate the outcome from the current state",
+          "here": "Format, server, sets, games and point number go into a score-state model trained on point-by-point data; it returns a live probability bar and a curve across 0–6 games in the current set",
+          "parts": [
+            "in-match-probability"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Workload is cumulative minutes in 7, 14 and 28-day windows, weighted by surface and round multipliers",
+        "Leakage guards: features are computed before each match enters a player's history, the sort is stable within a tournament, labels for the two sides are randomised, and the in-match model is split by match rather than by point",
+        "A staged ablation tests a stated research hypothesis: does load add signal beyond rank?",
+        "The pre-match model is isotonic-calibrated and checked with a reliability diagram, while the in-match model is deliberately left uncalibrated",
+        "Commentary maps each feature difference onto the stages of a fatigue cascade taken from a systematic review"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "match-setup",
+      "level": "view",
+      "parent": null,
+      "title": "Match setup sidebar",
+      "summary": "Lets the person choose two competitors from history, or enter each side's rank, load, rest, form and head-to-head by hand, pick the surface and run inference.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/app.py",
+          "start": 1105,
+          "end": 1196,
+          "role": "markup",
+          "anchor": "4976fc091016",
+          "first": "# ── SIDEBAR ──"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 745,
+          "end": 824,
+          "role": "logic",
+          "symbol": "build_player_stats",
+          "anchor": "28b658565f7d",
+          "first": "def build_player_stats(_df_raw: pd.DataFrame) -> dict:"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 234,
+          "end": 254,
+          "role": "data",
+          "symbol": "load_raw_data",
+          "anchor": "07a8b64843bb",
+          "first": "def load_raw_data(years: int = 8) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "match-inference",
+      "level": "view",
+      "parent": null,
+      "title": "Match inference",
+      "summary": "Shows the two sides' stats next to each other with a radar chart, then, after Run Inference, a split probability bar, the predicted winner, a confidence label and fatigue-linked commentary.",
+      "views": [
+        "side-by-side panes",
+        "summary stats",
+        "radar chart"
+      ],
+      "interactions": [],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/src/app.py",
+          "start": 1575,
+          "end": 1684,
+          "role": "markup",
+          "anchor": "2baf64e931c5",
+          "first": "with tab1:"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 110,
+          "end": 142,
+          "role": "style",
+          "anchor": "545f8b5a4053",
+          "first": ".prob-container {"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 161,
+          "end": 190,
+          "role": "style",
+          "anchor": "e60f366a102d",
+          "first": ".player-card {"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 830,
+          "end": 839,
+          "role": "logic",
+          "symbol": "render_prob_bar",
+          "anchor": "a7dafaff6dbd",
+          "first": "def render_prob_bar(prob_p1: float, name1: str, name2: str):"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 877,
+          "end": 905,
+          "role": "logic",
+          "symbol": "render_radar",
+          "anchor": "ee8dcf9c2b50",
+          "first": "def render_radar(p1_stats, p2_stats, name1, name2):"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 908,
+          "end": 955,
+          "role": "logic",
+          "symbol": "generate_commentary",
+          "anchor": "4830eb1e7b5a",
+          "first": "def generate_commentary(prob_p1, p1_stats, p2_stats, name1, name2, surface_name):"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 1618,
+          "end": 1641,
+          "role": "logic",
+          "symbol": "build_input_dict",
+          "anchor": "2c942a10762c",
+          "first": "def build_input_dict(p1_d, p2_d, surf_enc):"
+        }
+      ]
+    },
+    {
+      "id": "counterfactual-sweeps",
+      "level": "component",
+      "parent": "match-inference",
+      "title": "What-if simulator",
+      "summary": "Sweeps one side's rest days and the other side's 28-day load through the model, holding everything else fixed, and plots how the win probability responds.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/app.py",
+          "start": 1685,
+          "end": 1784,
+          "role": "logic",
+          "anchor": "7c1372a4a613",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 214,
+          "end": 225,
+          "role": "style",
+          "anchor": "6e745afe62b8",
+          "first": "/* Counterfactual highlight */"
+        }
+      ]
+    },
+    {
+      "id": "model-validation",
+      "level": "view",
+      "parent": null,
+      "title": "Model performance",
+      "summary": "Scores the calibrated model on a chronological hold-out against rank-based baselines, with summary metrics, a comparison table, ROC curves, a calibration diagram and feature importance bars.",
+      "views": [
+        "summary stats",
+        "table view",
+        "line chart",
+        "bar chart"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/app.py",
+          "start": 1207,
+          "end": 1313,
+          "role": "markup",
+          "anchor": "d84ea522d9b8",
+          "first": "with tab2:"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 144,
+          "end": 148,
+          "role": "style",
+          "anchor": "9c7f16d0d7c0",
+          "first": ".fi-row { display: flex; align-items: center; margin: 6px 0; gap: 12px; }"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 342,
+          "end": 476,
+          "role": "logic",
+          "symbol": "engineer_features",
+          "anchor": "338bcb6e1248",
+          "first": "def engineer_features(df_raw: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 592,
+          "end": 635,
+          "role": "logic",
+          "symbol": "train_model",
+          "anchor": "6f02f2a43a06",
+          "first": "def train_model(_df: pd.DataFrame):"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 977,
+          "end": 997,
+          "role": "logic",
+          "symbol": "render_roc_comparison",
+          "anchor": "8cf127b8bf19",
+          "first": "def render_roc_comparison(y_test, model_probs_dict):"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 958,
+          "end": 974,
+          "role": "logic",
+          "symbol": "render_calibration_chart",
+          "anchor": "c5eea9db873e",
+          "first": "def render_calibration_chart(y_test, y_prob):"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 842,
+          "end": 874,
+          "role": "logic",
+          "symbol": "render_feature_importance",
+          "anchor": "009047ce4285",
+          "first": "def render_feature_importance(importances, feature_cols):"
+        }
+      ]
+    },
+    {
+      "id": "ablation-study",
+      "level": "view",
+      "parent": null,
+      "title": "Ablation study",
+      "summary": "Trains the same model on progressively richer feature groups and shows the test AUC of each step, its change from the previous one, and a verdict on whether load adds signal beyond rank.",
+      "views": [
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/app.py",
+          "start": 1318,
+          "end": 1386,
+          "role": "markup",
+          "anchor": "dfdcf1094bf3",
+          "first": "with tab3:"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 642,
+          "end": 738,
+          "role": "logic",
+          "symbol": "evaluate_baselines_and_ablations",
+          "anchor": "f437fc858d6d",
+          "first": "def evaluate_baselines_and_ablations(_df: pd.DataFrame):"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 1000,
+          "end": 1034,
+          "role": "logic",
+          "symbol": "render_ablation_chart",
+          "anchor": "3dd11c8cf846",
+          "first": "def render_ablation_chart(ablation_results):"
+        }
+      ]
+    },
+    {
+      "id": "in-match-probability",
+      "level": "view",
+      "parent": null,
+      "title": "In-match win probability",
+      "summary": "Takes the match format, server, sets, games and point number, and gives a live win probability from a score-state model, plus a curve across games in the current set.",
+      "views": [
+        "form",
+        "summary stats",
+        "line chart"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/app.py",
+          "start": 1789,
+          "end": 1910,
+          "role": "markup",
+          "anchor": "7416c5e390d3",
+          "first": "with tab6:"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 514,
+          "end": 563,
+          "role": "logic",
+          "symbol": "train_inmatch_model",
+          "anchor": "e8dc26d0e5dc",
+          "first": "def train_inmatch_model():"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 565,
+          "end": 585,
+          "role": "logic",
+          "symbol": "inmatch_win_prob",
+          "anchor": "dcffbd3f89e3",
+          "first": "def inmatch_win_prob(model, set1, set2, gm1, gm2, p1_serving, pt_number, is_bo5):"
+        },
+        {
+          "file": "code/src/app.py",
+          "start": 497,
+          "end": 511,
+          "role": "logic",
+          "symbol": "_build_inmatch_features",
+          "anchor": "129ae4432e6b",
+          "first": "def _build_inmatch_features(df):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "radar chart"
+    }
+  ]
+}

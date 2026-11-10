@@ -1,0 +1,632 @@
+{
+ "interface": {
+  "title": "Primer Design Tool (Streamlit)",
+  "field": "Molecular biology / PCR assay design",
+  "stage_of_work": "Experiment planning: designing and ordering oligonucleotide primers before a PCR experiment",
+  "what_it_is_for": "Turn a DNA template (pasted, uploaded, or fetched from NCBI) into ranked Primer3 primer pairs for a chosen amplicon size range, with Tm, GC, binding positions, hairpin and dimer checks, and an order-ready CSV."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "I uploaded the three test FASTA files: sample_template.fasta (472 bp, valid), sample_with_ambiguous_base.fasta and sample_too_short.fasta (80 bp). I also pasted a 321-nt test sequence that I wrote myself, three ways: as FASTA with a lowercase header, as GenBank-style numbered lines, and as a version containing R and Y. On sample_template.fasta every pair showed 'Analysis unavailable' and an empty Tm difference ('None'), and no secondary-structure table appeared. Each pair also carried a warning that its binding sites are not unique (3 or 6 possible products). The hairpin and dimer tables only appeared for my own pasted sequence. I did not press 'Fetch sequence from NCBI', because this environment has no network access."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Design ranked, order-ready PCR primer pairs for a DNA template and check them before ordering",
+  "specific": "Generate Primer3 primer pairs within a product-size range, review Tm/GC/positions/secondary structure, and download the order-ready CSV",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Supply the template sequence",
+    "specific": "Choose the DNA sequence source and provide a template",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load a sequence file as the template",
+      "specific": "Upload sample_template.fasta in 'Paste or upload a sequence' mode",
+      "screens": [
+       "screens/014.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "uploaded sample_template.fasta via Upload",
+        "screens": [
+         "screens/014.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Paste a sequence as plain or FASTA text",
+      "specific": "Paste FASTA (with header, lowercase) or GenBank-style numbered sequence lines into 'Or paste the DNA template'; a GenBank paste that still contains the 'ORIGIN' and '//' lines is rejected ('Unsupported template character(s): /, I, N, O, R')",
+      "screens": [
+       "screens/038.webp",
+       "screens/049.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed a FASTA sequence with '>my_test_gene' header in lowercase",
+        "screens": [
+         "screens/036.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Remove sample_template.fasta (the uploaded file overrides pasted text)",
+        "screens": [
+         "screens/037.webp",
+         "screens/038.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pasted GenBank-style numbered, space-separated lines (without ORIGIN or '//')",
+        "screens": [
+         "screens/048.webp",
+         "screens/049.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Read why an input was rejected, so it can be corrected before designing",
+      "specific": "'Primer design failed: …' messages for empty input, N or R/Y bases, a template shorter than the maximum product size, and NCBI mode with nothing fetched ('Fetch an NCBI sequence before designing primers')",
+      "screens": [
+       "screens/010.webp",
+       "screens/012.webp",
+       "screens/013.webp",
+       "screens/052.webp",
+       "screens/009.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Design primers in NCBI mode without fetching",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Design primers with no sequence",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "uploaded sample_with_ambiguous_base.fasta and pressed Design primers",
+        "screens": [
+         "screens/011.webp",
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "uploaded sample_too_short.fasta and pressed Design primers",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pasted a sequence containing R and Y and pressed Design primers",
+        "screens": [
+         "screens/051.webp",
+         "screens/052.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Set up retrieval of a region from a public sequence database",
+      "specific": "Switch to 'Fetch a sequence from NCBI'; the form has accession, contact email (help tooltip), 'Retrieve a defined sequence interval' checkbox, start/stop and Sequence strand. Fetch not pressed (no network), so the returned record was never seen",
+      "screens": [
+       "screens/004.webp",
+       "screens/005.webp",
+       "screens/006.webp",
+       "screens/007.webp",
+       "screens/009.webp"
+      ],
+      "branch": "sequence",
+      "children": [
+       {
+        "kind": "action",
+        "label": "selected 'Fetch a sequence from NCBI' radio",
+        "screens": [
+         "screens/004.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'Reverse-complement strand' in Sequence strand dropdown",
+        "screens": [
+         "screens/006.webp",
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "unticked 'Retrieve a defined sequence interval'",
+        "screens": [
+         "screens/007.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Set the design constraints and run the design",
+    "specific": "Product settings: minimum/maximum product size and number of primer pairs, then Design primers",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Generate candidate pairs with the default size range",
+      "specific": "150–250 bp, 5 pairs, Design primers",
+      "screens": [
+       "screens/014.webp",
+       "screens/015.webp",
+       "screens/039.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Design primers",
+        "screens": [
+         "screens/014.webp",
+         "screens/038.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Change the target amplicon size and the number of candidates, then re-run",
+      "specific": "Type 300/400 bp and 8 pairs, or use the −/+ steppers (min 140, pairs 6)",
+      "screens": [
+       "screens/022.webp",
+       "screens/023.webp",
+       "screens/024.webp",
+       "screens/047.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 300 in Minimum product size, leaving max 250 (rejected: minimum must be smaller)",
+        "screens": [
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 400 in Maximum product size and 8 in Number of primer pairs, pressed Design primers",
+        "screens": [
+         "screens/023.webp",
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed + on Number of primer pairs and − on Minimum product size, pressed Design primers",
+        "screens": [
+         "screens/047.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Review and compare the candidates",
+    "specific": "Primer-pair summary table and per-pair Detailed results expanders",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Compare candidates side by side in a ranked table",
+      "specific": "Read rank, sequences, forward/reverse Tm, Tm difference, GC%, product size, Primer3 penalty, warnings and recommendation ('Recommended for specificity checking', which is done outside this tool); sort, search, column hiding and fullscreen are Streamlit's built-in dataframe toolbar, not controls designed by this app",
+      "screens": [
+       "screens/015.webp",
+       "screens/016.webp",
+       "screens/039.webp",
+       "screens/040.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled the summary table horizontally",
+        "screens": [
+         "screens/016.webp",
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Product size column header twice (ascending, then descending)",
+        "screens": [
+         "screens/025.webp",
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "searched the table for reverse primer GTACGCATGGATCCGATCGT",
+        "screens": [
+         "screens/027.webp",
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hid the 'Tm difference' column via Show/hide columns",
+        "screens": [
+         "screens/029.webp",
+         "screens/030.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Fullscreen on the table",
+        "screens": [
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Inspect one candidate's balance and binding locations",
+      "specific": "Open a 'Primer pair N' expander for Tm, GC, length, forward/reverse binding positions, pair penalty and warnings; when the binding sites are not unique (as on every pair of sample_template.fasta) the analysis step fails and the Tm difference and recommendation are missing ('Analysis unavailable')",
+      "screens": [
+       "screens/017.webp",
+       "screens/018.webp",
+       "screens/019.webp",
+       "screens/043.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded Primer pair 1 — 150 bp",
+        "screens": [
+         "screens/017.webp",
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "expanded Primer pair 3 — 200 bp",
+        "screens": [
+         "screens/019.webp",
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "expanded Primer pair 2 — 242 bp (pasted template)",
+        "screens": [
+         "screens/043.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check each candidate for self-folding and primer–primer binding risk",
+      "specific": "Read the Secondary-structure analysis table (forward/reverse hairpin, homodimers, heterodimer: predicted, Tm, ΔG) and the warning box; the table is absent when binding sites are not unique (every pair of sample_template.fasta), leaving only the warning box",
+      "screens": [
+       "screens/041.webp",
+       "screens/042.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded Primer pair 1 — 160 bp (pasted template) and scrolled to Secondary-structure analysis",
+        "screens": [
+         "screens/041.webp",
+         "screens/042.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check that the same template given in two formats yields the same design (stand-in for the pasted-versus-database-fetched agreement check)",
+      "specific": "Stand-in for the README's pasted-vs-NCBI-fetched check, which needs network: FASTA paste and GenBank-numbered paste both give 321 bp and the same top pair TGGCTAGCAAGTTCGAACGT / TGAGAGGCAAACGCTTCGAT",
+      "screens": [
+       "screens/039.webp",
+       "screens/050.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Design primers on the GenBank-style paste and compared rank 1",
+        "screens": [
+         "screens/050.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Hand the chosen primers off for ordering",
+    "specific": "Copy primer sequences or download the order-ready CSV",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Copy one pair's sequences to paste elsewhere",
+      "specific": "Copy to clipboard button on the Forward/Reverse code block",
+      "screens": [
+       "screens/035.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Copy to clipboard on Primer pair 8 (clipboard held 'Forward: 5′-AGCATGCGTACCGATCGTAG-3′ / Reverse: 5′-GTACGCATGGATCCGATCGT-3′')",
+        "screens": [
+         "screens/034.webp",
+         "screens/035.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export all candidates as a vendor-ready file",
+      "specific": "Download order-ready CSV (primer_results.csv: one row per oligo with name, orientation, 5'→3' sequence, length, Tm, GC, rank, size, penalty, recommendation, warning). Downloading reruns the page and clears the displayed results; the cited screens show that cleared page, not the file",
+      "screens": [
+       "screens/021.webp",
+       "screens/044.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Download order-ready CSV (sample_template run); page reran and results cleared",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download order-ready CSV (pasted template run); page reran and results cleared",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Sequence input with source switch and validation",
+   "general": "Pick where an input sequence comes from (file, pasted text, or remote database), clean it, and get a plain error if it can't be used",
+   "specific": "Radio 'Paste or upload a sequence' / 'Fetch a sequence from NCBI'; file uploader (FASTA/FA/FNA/TXT) or paste box; headers, case, digits and spaces are stripped; GenBank text that keeps 'ORIGIN' and '//' is rejected; non-ACGT bases, empty input, too-short templates and NCBI mode with nothing fetched give 'Primer design failed: …' messages",
+   "steps": [
+    "choose the sequence source radio",
+    "upload a FASTA file or paste FASTA or numbered GenBank sequence lines (an uploaded file overrides pasted text)",
+    "press Design primers",
+    "read the template length, or the validation error naming the bad characters or the length conflict"
+   ],
+   "serves_tasks": [
+    "Load a sequence file as the template",
+    "Paste a sequence as plain or FASTA text",
+    "Read why an input was rejected, so it can be corrected before designing",
+    "Check that the same template given in two formats yields the same design (stand-in for the pasted-versus-database-fetched agreement check)"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/012.webp",
+    "screens/013.webp",
+    "screens/038.webp",
+    "screens/049.webp",
+    "screens/052.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Remote region fetch form (accession, interval, strand)",
+   "general": "Specify a sub-region of a record in a public database by ID, start/stop and strand, and retrieve it as the working input",
+   "specific": "NCBI nucleotide accession, contact email (help tooltip), 'Retrieve a defined sequence interval' checkbox, Start/Stop coordinates, Sequence strand dropdown (Forward / Reverse-complement), 'Fetch sequence from NCBI'; pressing Enter in a field submits the fetch. The retrieved record and anything after it were never reached (no network)",
+   "steps": [
+    "enter an accession and contact email",
+    "tick the interval box and set start/stop coordinates",
+    "choose forward or reverse-complement strand",
+    "press Fetch sequence from NCBI, then Design primers"
+   ],
+   "serves_tasks": [
+    "Set up retrieval of a region from a public sequence database"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/006.webp",
+    "screens/007.webp",
+    "screens/008.webp",
+    "screens/009.webp"
+   ],
+   "id": "f2",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Design constraints form with range validation",
+   "general": "Set a numeric target range and a result count, check they are consistent, and re-run the design",
+   "specific": "Product settings: Minimum/Maximum product size (bp) spinners (step 10) and Number of primer pairs; rejects min ≥ max and max > template length",
+   "steps": [
+    "type or step the minimum and maximum product size",
+    "set the number of primer pairs",
+    "press Design primers",
+    "read the success count or the range error"
+   ],
+   "serves_tasks": [
+    "Generate candidate pairs with the default size range",
+    "Change the target amplicon size and the number of candidates, then re-run"
+   ],
+   "screens": [
+    "screens/022.webp",
+    "screens/023.webp",
+    "screens/024.webp",
+    "screens/047.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Ranked candidate table (on Streamlit's built-in dataframe toolbar)",
+   "general": "Compare ranked candidates in a table: sort by any metric, find a specific item, hide columns you don't need, expand to full screen",
+   "specific": "Primer-pair summary dataframe (Rank, Forward/Reverse primer 5'→3', Tm, Tm difference, GC%, Product size, Primer3 penalty, Warnings, Recommendation). The columns are this app's; sorting by header click and the Show/hide columns, Download as CSV, Search and Fullscreen toolbar are built into Streamlit's dataframe, not designed by this app",
+   "steps": [
+    "scroll across the metrics",
+    "click a column header to sort ascending, then descending",
+    "search for a primer sequence and step through the matches",
+    "hide an unneeded column",
+    "open the table full screen"
+   ],
+   "serves_tasks": [
+    "Compare candidates side by side in a ranked table"
+   ],
+   "screens": [
+    "screens/016.webp",
+    "screens/026.webp",
+    "screens/028.webp",
+    "screens/030.webp",
+    "screens/032.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Per-candidate detail card with secondary-structure risk table",
+   "general": "Expand one ranked candidate to see its key metrics, positions, quality flags and a risk table, and copy its identifiers",
+   "specific": "'Primer pair N — X bp' expander: copyable Forward/Reverse 5'→3' code block, Expected product, Forward/Reverse Tm metrics, GC, length, binding positions, Primer3 pair penalty, Tm difference, Recommendation, Secondary-structure analysis table (hairpin/homodimer/heterodimer: Predicted, Tm, ΔG), and a warning box (non-unique binding sites, or 'No current design warnings'). When the analysis step fails because binding sites are not unique (every pair of sample_template.fasta), the structure table, Tm difference and recommendation are missing ('Analysis unavailable') and only the warning box shows",
+   "steps": [
+    "expand a primer-pair row",
+    "compare forward vs reverse Tm, GC and binding positions",
+    "read the hairpin/homodimer/heterodimer predictions with Tm and ΔG (absent if analysis failed)",
+    "read the warning box",
+    "copy the pair's sequences to the clipboard"
+   ],
+   "serves_tasks": [
+    "Inspect one candidate's balance and binding locations",
+    "Check each candidate for self-folding and primer–primer binding risk",
+    "Copy one pair's sequences to paste elsewhere"
+   ],
+   "screens": [
+    "screens/018.webp",
+    "screens/041.webp",
+    "screens/042.webp",
+    "screens/043.webp",
+    "screens/035.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Order-ready oligo CSV export",
+   "general": "Export all candidates as one row per item to order, ready to send to a supplier",
+   "specific": "'Download order-ready CSV' → primer_results.csv with pair_rank, product_size_bp, primer3_pair_penalty, recommendation, warning_summary, primer_name (Primer_pair_N_forward/reverse), orientation, sequence_5_to_3, length_nt, tm_c, gc_percent; clicking it reruns the page and clears the displayed results (the cited screens show that cleared page, not the file)",
+   "steps": [
+    "run a design",
+    "press Download order-ready CSV",
+    "open the file: one row per oligo with names and sequences",
+    "re-run the design if you need the results on screen again"
+   ],
+   "serves_tasks": [
+    "Export all candidates as a vendor-ready file"
+   ],
+   "screens": [
+    "screens/021.webp",
+    "screens/044.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "A fetched NCBI sequence and the primer results built on it: 'Fetch sequence from NCBI' was not pressed because there is no network access",
+  "The retrieved-record confirmation view (record ID, header, length, FASTA preview, 'Clear retrieved sequence'), which only appears after a successful NCBI fetch",
+  "A filled secondary-structure table for sample_template.fasta: every pair showed 'Analysis unavailable' and the table did not appear, though it did for my pasted sequence",
+  "The contents of the downloaded primer_results.csv: the file was read but no kept screen shows it"
+ ],
+ "not_done": [
+  "Fetching a region from an NCBI accession and designing primers on it: no network access in this environment, so I set up the form but never fetched",
+  "Confirming the returned NCBI record (ID, header, length, preview) and clearing it to refetch: needs a successful fetch",
+  "Checking that primers from a pasted sequence match those from the same region fetched from NCBI: needs an NCBI fetch. As a stand-in I compared two pasted formats of the same sequence, which agreed (screens/039.webp, screens/050.webp)",
+  "Checking the chosen pairs' specificity against a genome elsewhere: the app recommends it ('Recommended for specificity checking') but it is a manual step outside the tool and was not done",
+  "Pasting the exact contents of sample_template.fasta: I could not read the file's text, so I uploaded it instead and pasted a sequence I wrote myself",
+  "The table toolbar's own 'Download as CSV' button made no downloaded file in this headless browser (screens/031.webp); the app's 'Download order-ready CSV' button did work",
+  "Pressing 'Download order-ready CSV' reran the page and cleared the results, so the table and details had to be generated again (screens/021.webp, screens/044.webp)",
+  "Hovering the contact-email help icon (screens/008.webp) is not a work step and was dropped from the tree",
+  "The 'Deploy' and main-menu buttons are Streamlit's own controls, not part of the app, and were not explored"
+ ],
+ "applied": [
+  "t4 branch changed from 'one-of' to 'sequence'",
+  "moved 'pressed Design primers without fetching' from t4 into t3 (added screens/009.webp to t3)",
+  "dropped the help-icon hover action from t4 and noted it in not_done",
+  "t4 specific reworded to say only what was set and that the returned record was never seen",
+  "t10 labelled as a stand-in for the pasted-vs-fetched agreement check",
+  "t2 general relabelled 'Paste a sequence as plain or FASTA text'; specific notes ORIGIN/'//' paste is rejected",
+  "t3 reframed as an optional 'read why an input was rejected, so it can be corrected' step",
+  "t12 and f6 record that downloading reruns the page and clears results, and that the cited screens show the cleared page, not the file",
+  "t8, t9 and f5 note the structure table, Tm difference and recommendation are missing when binding sites are not unique",
+  "f4 renamed and specific reworded to credit sort/search/hide/fullscreen to Streamlit's built-in dataframe toolbar",
+  "f1 specific adds the ORIGIN/'//' rejection and the NCBI-not-fetched error; serves_tasks updated to new labels",
+  "f2 specific notes Enter submits the fetch and that the retrieved record was never reached",
+  "t7 specific notes the specificity recommendation is acted on outside the tool",
+  "added the record-confirmation view and CSV contents to screens_never_reached, and record confirmation and outside specificity check to not_done"
+ ],
+ "open_fixes": [
+  "Add a phase-1 task for fetching the NCBI region and confirming the returned record (ID, header, length, preview, clear): it was never done and no kept screen shows it, so it needs a run with network access",
+  "Add a feature for the retrieved-record confirmation panel and end f2's steps with checking the record: the panel was never reached, so it needs a successful fetch to evidence it",
+  "Replace t12's evidence with a screen showing the downloaded CSV: the run read the file but kept no screenshot of its contents, so a new run should open and capture primer_results.csv",
+  "Add an optional hand-off node for checking specificity outside the tool: the run never performed or showed that step, so it needs a run that carries a pair to an outside specificity check (or the README text cited) before it can be a task",
+  "Run the pasted-vs-fetched agreement check itself so t10 no longer needs to be a stand-in: requires network access for the NCBI fetch"
+ ],
+ "screens_at": "pilot/public/runs/pcr-primer-design-tool/20261029-133756/",
+ "screens_filed": {
+  "screens/014.webp": "screens/014.webp",
+  "screens/015.webp": "screens/015.webp",
+  "screens/035.webp": "screens/035.webp"
+ }
+}

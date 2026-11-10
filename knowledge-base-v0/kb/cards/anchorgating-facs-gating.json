@@ -1,0 +1,831 @@
+{
+  "schema": "astaui.card/1",
+  "id": "anchorgating-facs-gating",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T09:26:19Z"
+  },
+  "app": {
+    "title": "Anchorgating: FACS gating with anchor samples",
+    "summary": "A person loads flow cytometry files into a replicate tab, or starts from simulated demo data. The tool picks an analysis protocol from the parameter names, chooses a control sample as each group's anchor and places starting gates on it. The person then adjusts a hierarchy of rectangle, polygon, quadrant and range gates on the anchor's plots. The other samples in the group follow those gates, and any one of them can override a single gate by dragging it. The person checks every sample in a side-by-side grid and reads population counts and percentages in a table. They plot condition means across replicates as bar charts with Welch t-test marks, or as overlaid histograms. Finally they export publication-sized figures, CSV statistics and a JSON gate template.",
+    "task": {
+      "text": "Gate cytometry events into nested populations on a reference sample, apply those gates to its group across replicates, and compare population fractions between conditions in publication figures.",
+      "verbs": [
+        "derive",
+        "compare",
+        "summarize",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "List-mode flow cytometry files: one table of per-event measurements on several channels for each sample. Samples are grouped by cell line and condition and repeated across replicate experiments, with a hierarchy of gates defined over them.",
+      "item": "a sample tube: one flow cytometry file of events measured on several channels",
+      "shapes": [
+        "table",
+        "hierarchy",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "gating raw cytometer files into populations and comparing fractions across conditions",
+      "terms": [
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "The sidebar lists samples by group, with an anchor marker and a follow/override link on each one. The gate tree shows the current sample's hierarchy with percentages. Gates are drawn and dragged on canvas scatter or histogram plot cards, and changes spread live from the anchor to its followers. A compare-samples grid shows the same plot for every sample. The right panel turns the gated populations into a statistics table, bar plots with replicate dots and significance marks, or histogram overlays, and these export as sized PNG/SVG, CSV or a gate template.",
+      "views": [
+        "sidebar list",
+        "tree view",
+        "scatter plot",
+        "heatmap",
+        "small multiples",
+        "table view",
+        "bar chart",
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "brush",
+        "drag to arrange",
+        "inline edit",
+        "toggle view",
+        "hover for detail",
+        "keyboard shortcuts",
+        "undo",
+        "export"
+      ],
+      "patterns": [
+        "master-detail",
+        "linked views",
+        "small multiples",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "hierarchical gating of flow cytometry data in cell biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "flow cytometry",
+        "apoptosis assay",
+        "cell cycle analysis"
+      ]
+    },
+    "workflow": {
+      "name": "set boundaries on a reference item, propagate them to its group, and compare the resulting fractions",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "'FCS 불러오기' or dropping .fcs/.lmd files adds samples to the current replicate tab. Files are parsed in the browser, with stored spillover compensation applied. The protocol (apoptosis, cell cycle or custom) is detected from parameter names.",
+          "parts": [
+            "topbar",
+            "sample-sidebar"
+          ]
+        },
+        {
+          "step": "choose a reference item for each group",
+          "here": "Each group gets an anchor: a control-named sample is picked automatically and seeded with auto gates, and the ⚓ button reassigns it. The other samples' link buttons make them follow the anchor or keep their own gates.",
+          "parts": [
+            "sample-sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Rectangle, polygon, quadrant and range tools draw gates on scatter and histogram plot cards. Each child plot is gated on its parent. Axis pickers set parameter and lin/log/biex scale, and the gate tree shows each population's %parent and count.",
+          "parts": [
+            "gating-plots",
+            "gate-tree"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "'샘플 비교' tiles the same gated plot for every sample in the replicate. Dragging a gate on a follower records an override that can be reverted. Gates can be copied and pasted to selected samples.",
+          "parts": [
+            "compare-grid",
+            "gate-tree"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The stats tab lists %Parent, %Total and #Events for every population of every sample. The Plot tab draws condition means ± SD/SEM across replicates, with replicate dots and Welch t-test stars against a reference condition, or as offset histogram overlays.",
+          "parts": [
+            "plot-panel",
+            "stats-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The export menu saves bar and histogram figures as PNG at 300–1200 dpi, sized in mm/pt, or as editable SVG. It also saves statistics and plot CSVs and a gate-template JSON for reuse.",
+          "parts": [
+            "export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The anchor-and-follower model: gates set on one control sample per group carry over live to the group's other samples, and a follower can override a single gate, which is flagged and can be reverted.",
+        "Gates form a parent/child hierarchy, and every percentage is reported relative to its parent population as well as to all events.",
+        "Replicate tabs keep independent gates and match samples across replicates by condition name, so bar plots show the mean and spread over replicates.",
+        "Protocol presets (apoptosis quadrants, cell-cycle DNA-content ranges) are chosen from channel names and seed the automatic gates.",
+        "Figures are sized in mm/pt with dpi metadata, and a gate-template JSON is meant to accompany the methods for reproducibility."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "topbar",
+      "level": "view",
+      "parent": null,
+      "title": "Load and replicate tabs",
+      "summary": "Loads FCS files into the active replicate and switches between replicate experiments, with undo/redo.",
+      "views": [],
+      "interactions": [
+        "import",
+        "toggle view",
+        "undo"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/00_shell.html",
+          "start": 269,
+          "end": 284,
+          "role": "markup",
+          "anchor": "d14ce96f1b41",
+          "first": "<header class=\"topbar\">"
+        },
+        {
+          "file": "code/src/00_shell.html",
+          "start": 53,
+          "end": 53,
+          "role": "style",
+          "symbol": ".rep-tab",
+          "anchor": "129ca96cecb2",
+          "first": ".rep-tab{display:flex; align-items:center; gap:6px; border:0; background:transparent; padding:5px 10px; border-radius:7p"
+        },
+        {
+          "file": "code/src/00_shell.html",
+          "start": 48,
+          "end": 48,
+          "role": "style",
+          "symbol": ".topbar",
+          "anchor": "91da0b15f5ad",
+          "first": ".topbar{grid-area:top; display:flex; align-items:center; gap:14px; flex-wrap:wrap; min-height:44px}"
+        },
+        {
+          "file": "code/src/60_boot.js",
+          "start": 22,
+          "end": 52,
+          "role": "logic",
+          "symbol": "loadFiles",
+          "anchor": "87fd54e7c829",
+          "first": "async function loadFiles(fileList) {"
+        },
+        {
+          "file": "code/src/60_boot.js",
+          "start": 10,
+          "end": 21,
+          "role": "logic",
+          "symbol": "initGroupGates",
+          "anchor": "3a08b5856791",
+          "first": "function initGroupGates(rep, g) {"
+        },
+        {
+          "file": "code/src/10_core.js",
+          "start": 143,
+          "end": 203,
+          "role": "logic",
+          "symbol": "parseFCS",
+          "anchor": "4a0279a5c4ca",
+          "first": "function parseFCS(buf, fileName) {"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 49,
+          "end": 64,
+          "role": "logic",
+          "symbol": "renderRepTabs",
+          "anchor": "743fac312d57",
+          "first": "function renderRepTabs() {"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 65,
+          "end": 71,
+          "role": "logic",
+          "symbol": "switchRep",
+          "anchor": "e3d8fa51ebe8",
+          "first": "function switchRep(id) {"
+        },
+        {
+          "file": "code/src/25_protocol.js",
+          "start": 15,
+          "end": 22,
+          "role": "logic",
+          "symbol": "detectProtocol",
+          "anchor": "48bcfb808c76",
+          "first": "function detectProtocol(samples) {"
+        }
+      ]
+    },
+    {
+      "id": "sample-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Samples by group with anchors",
+      "summary": "Lists the replicate's samples by group, showing which one is the anchor and which follow it or override it. Samples can be reordered, renamed and multi-selected.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "drag to arrange",
+        "inline edit"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/00_shell.html",
+          "start": 286,
+          "end": 291,
+          "role": "markup",
+          "anchor": "cffc28e30cbe",
+          "first": "<aside class=\"panel side\">"
+        },
+        {
+          "file": "code/src/00_shell.html",
+          "start": 91,
+          "end": 91,
+          "role": "style",
+          "symbol": ".srow",
+          "anchor": "1c587c738177",
+          "first": ".srow{display:grid; grid-template-columns:26px minmax(0,1fr) auto 22px 22px; align-items:center; gap:2px; padding:2px 4p"
+        },
+        {
+          "file": "code/src/00_shell.html",
+          "start": 97,
+          "end": 97,
+          "role": "style",
+          "symbol": ".anchor-btn",
+          "anchor": "78ec963f8345",
+          "first": ".anchor-btn{width:24px; height:24px; border-radius:6px; border:0; background:transparent; color:var(--line-2); display:g"
+        },
+        {
+          "file": "code/src/00_shell.html",
+          "start": 101,
+          "end": 101,
+          "role": "style",
+          "symbol": ".link-btn",
+          "anchor": "fc5b38bd6366",
+          "first": ".link-btn{width:22px; height:22px; border-radius:6px; border:0; background:transparent; display:grid; place-items:center"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 80,
+          "end": 137,
+          "role": "logic",
+          "symbol": "renderSamples",
+          "anchor": "9df19ce6271f",
+          "first": "function renderSamples() {"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 138,
+          "end": 143,
+          "role": "logic",
+          "symbol": "doToggleAnchor",
+          "anchor": "d9192adce12a",
+          "first": "function doToggleAnchor(s) {"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 170,
+          "end": 179,
+          "role": "logic",
+          "symbol": "reorderSample",
+          "anchor": "03c6d0787d78",
+          "first": "function reorderSample(id, targetId, after) {"
+        },
+        {
+          "file": "code/src/20_model.js",
+          "start": 280,
+          "end": 300,
+          "role": "logic",
+          "symbol": "toggleAnchor",
+          "anchor": "7fdce235e235",
+          "first": "function toggleAnchor(s) {"
+        },
+        {
+          "file": "code/src/20_model.js",
+          "start": 301,
+          "end": 305,
+          "role": "logic",
+          "symbol": "setFollow",
+          "anchor": "624ed9e8e96d",
+          "first": "function setFollow(s, on) {"
+        },
+        {
+          "file": "code/src/20_model.js",
+          "start": 88,
+          "end": 92,
+          "role": "logic",
+          "symbol": "effTree",
+          "anchor": "0955b235ee6c",
+          "first": "function effTree(s) {"
+        },
+        {
+          "file": "code/src/25_protocol.js",
+          "start": 148,
+          "end": 157,
+          "role": "logic",
+          "symbol": "renderProtocol",
+          "anchor": "2103bc3d1928",
+          "first": "function renderProtocol() {"
+        }
+      ]
+    },
+    {
+      "id": "gate-tree",
+      "level": "component",
+      "parent": "sample-sidebar",
+      "title": "Gate hierarchy",
+      "summary": "Shows the current sample's nested gates with %parent and counts, marks overridden gates, and copies or pastes the whole gate set to other samples.",
+      "views": [
+        "tree view"
+      ],
+      "interactions": [
+        "select",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/00_shell.html",
+          "start": 292,
+          "end": 299,
+          "role": "markup",
+          "anchor": "992d32af8122",
+          "first": "<div class=\"tree-wrap\">"
+        },
+        {
+          "file": "code/src/00_shell.html",
+          "start": 112,
+          "end": 112,
+          "role": "style",
+          "symbol": ".trow",
+          "anchor": "1ffcf37412b7",
+          "first": ".trow{display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:6px; padding:3px 6px; border-"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 246,
+          "end": 285,
+          "role": "logic",
+          "symbol": "renderTree",
+          "anchor": "0bffd2e2cbb8",
+          "first": "function renderTree() {"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 217,
+          "end": 221,
+          "role": "logic",
+          "symbol": "doCopy",
+          "anchor": "788140a80bb5",
+          "first": "function doCopy() {"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 228,
+          "end": 243,
+          "role": "logic",
+          "symbol": "pasteMenu",
+          "anchor": "e148379b350e",
+          "first": "function pasteMenu(anchor) {"
+        },
+        {
+          "file": "code/src/20_model.js",
+          "start": 310,
+          "end": 327,
+          "role": "logic",
+          "symbol": "pasteTo",
+          "anchor": "88a60aaeec17",
+          "first": "function pasteTo(targets) {"
+        },
+        {
+          "file": "code/src/20_model.js",
+          "start": 328,
+          "end": 328,
+          "role": "logic",
+          "symbol": "revertOverride",
+          "anchor": "5d757bb53bc6",
+          "first": "function revertOverride(s, gid) { delete s.overrides[gid]; markDirty([s]); }"
+        }
+      ]
+    },
+    {
+      "id": "gating-plots",
+      "level": "view",
+      "parent": null,
+      "title": "Gating plot chain",
+      "summary": "Draws the current sample's plots as a chain from parent to child gate, where the person draws and drags rectangle, polygon, quadrant and range gates and sets the axes.",
+      "views": [
+        "scatter plot",
+        "heatmap",
+        "line chart"
+      ],
+      "interactions": [
+        "brush",
+        "select",
+        "keyboard shortcuts",
+        "inline edit"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/00_shell.html",
+          "start": 303,
+          "end": 322,
+          "role": "markup",
+          "anchor": "3eeddf7a434c",
+          "first": "<main class=\"panel center\">"
+        },
+        {
+          "file": "code/src/00_shell.html",
+          "start": 143,
+          "end": 143,
+          "role": "style",
+          "symbol": ".pcard",
+          "anchor": "658d076af588",
+          "first": ".pcard{background:var(--paper); color:var(--paper-ink); border:1px solid var(--line); border-radius:10px; display:flex; "
+        },
+        {
+          "file": "code/src/00_shell.html",
+          "start": 130,
+          "end": 130,
+          "role": "style",
+          "symbol": ".tool",
+          "anchor": "c23cf792bb93",
+          "first": ".tool{border:1px solid transparent; background:transparent; border-radius:8px; padding:5px 8px; display:inline-flex; ali"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 387,
+          "end": 394,
+          "role": "logic",
+          "symbol": "renderChain",
+          "anchor": "690a9f1f4cd9",
+          "first": "function renderChain(s, box) {"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 341,
+          "end": 386,
+          "role": "logic",
+          "symbol": "plotCard",
+          "anchor": "b558528f6823",
+          "first": "function plotCard(s, plot, compact) {"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 299,
+          "end": 320,
+          "role": "logic",
+          "symbol": "renderContext",
+          "anchor": "a084f745fb07",
+          "first": "function renderContext() {"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 445,
+          "end": 488,
+          "role": "logic",
+          "symbol": "openAxisPop",
+          "anchor": "3a7dc1745dca",
+          "first": "function openAxisPop(btn, view, which) {"
+        },
+        {
+          "file": "code/src/30_plot.js",
+          "start": 369,
+          "end": 464,
+          "role": "logic",
+          "symbol": "bindView",
+          "anchor": "30b5ea8e1023",
+          "first": "function bindView(view) {"
+        },
+        {
+          "file": "code/src/30_plot.js",
+          "start": 210,
+          "end": 298,
+          "role": "logic",
+          "symbol": "drawOverlay",
+          "anchor": "fe6e553e78fa",
+          "first": "function drawOverlay(ctx, view, k) {"
+        },
+        {
+          "file": "code/src/30_plot.js",
+          "start": 471,
+          "end": 478,
+          "role": "logic",
+          "symbol": "createGate",
+          "anchor": "eacb3e07de28",
+          "first": "function createGate(view, type, g) {"
+        },
+        {
+          "file": "code/src/20_model.js",
+          "start": 135,
+          "end": 162,
+          "role": "logic",
+          "symbol": "evalNode",
+          "anchor": "59f4955a6309",
+          "first": "function evalNode(s, n, par, pops) {"
+        }
+      ]
+    },
+    {
+      "id": "compare-grid",
+      "level": "component",
+      "parent": "gating-plots",
+      "title": "Sample comparison grid",
+      "summary": "Tiles the same gated plot for every sample so gate placement can be checked across the group, and lets a follower's gate be overridden in place.",
+      "views": [
+        "small multiples",
+        "scatter plot"
+      ],
+      "interactions": [
+        "brush",
+        "toggle view"
+      ],
+      "patterns": [
+        "small multiples",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/src/00_shell.html",
+          "start": 323,
+          "end": 323,
+          "role": "markup",
+          "anchor": "757ef10166d8",
+          "first": "<div id=\"gridView\" class=\"grid\" hidden></div>"
+        },
+        {
+          "file": "code/src/00_shell.html",
+          "start": 161,
+          "end": 161,
+          "role": "style",
+          "symbol": ".tile .pc-head",
+          "anchor": "26e341ce0a9a",
+          "first": ".tile .pc-head{padding:5px 6px 2px 4px; min-height:30px}"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 401,
+          "end": 417,
+          "role": "logic",
+          "symbol": "renderGrid",
+          "anchor": "90da2376dd9a",
+          "first": "function renderGrid(box) {"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 395,
+          "end": 400,
+          "role": "logic",
+          "symbol": "gridPlotKey",
+          "anchor": "30f88b1a7d3e",
+          "first": "function gridPlotKey(s) {"
+        }
+      ]
+    },
+    {
+      "id": "plot-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Bar plot and histogram",
+      "summary": "Summarises chosen populations per condition as bar plots of the mean ± SD/SEM across replicates, with dots and Welch t-test marks, or as overlaid histograms.",
+      "views": [
+        "bar chart",
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view",
+        "drag to arrange"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/00_shell.html",
+          "start": 327,
+          "end": 338,
+          "role": "markup",
+          "anchor": "0a4d0f528381",
+          "first": "<aside class=\"panel right\">"
+        },
+        {
+          "file": "code/src/00_shell.html",
+          "start": 186,
+          "end": 186,
+          "role": "style",
+          "symbol": ".chart-box",
+          "anchor": "ac393125ef27",
+          "first": ".chart-box{background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:6px; color:var(--paper-ink"
+        },
+        {
+          "file": "code/src/50_bar.js",
+          "start": 164,
+          "end": 179,
+          "role": "logic",
+          "symbol": "renderBar",
+          "anchor": "1dfbae038e1c",
+          "first": "function renderBar() {"
+        },
+        {
+          "file": "code/src/50_bar.js",
+          "start": 29,
+          "end": 70,
+          "role": "logic",
+          "symbol": "barModel",
+          "anchor": "0cd176ccf1f8",
+          "first": "function barModel() {"
+        },
+        {
+          "file": "code/src/50_bar.js",
+          "start": 7,
+          "end": 14,
+          "role": "logic",
+          "symbol": "welchP",
+          "anchor": "293b09e8483c",
+          "first": "function welchP(a, b) {"
+        },
+        {
+          "file": "code/src/50_bar.js",
+          "start": 181,
+          "end": 248,
+          "role": "logic",
+          "symbol": "buildBarControls",
+          "anchor": "38d1cc620e2b",
+          "first": "function buildBarControls(box, M) {"
+        },
+        {
+          "file": "code/src/57_hist.js",
+          "start": 232,
+          "end": 239,
+          "role": "logic",
+          "symbol": "renderHistPanel",
+          "anchor": "c23b269491a8",
+          "first": "function renderHistPanel() {"
+        },
+        {
+          "file": "code/src/57_hist.js",
+          "start": 33,
+          "end": 73,
+          "role": "logic",
+          "symbol": "histModel",
+          "anchor": "60bd49fc0075",
+          "first": "function histModel() {"
+        }
+      ]
+    },
+    {
+      "id": "stats-table",
+      "level": "component",
+      "parent": "plot-panel",
+      "title": "Population statistics",
+      "summary": "Lists event counts, %parent and %total for every population of the current sample, and for all samples in the replicate.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/00_shell.html",
+          "start": 190,
+          "end": 190,
+          "role": "style",
+          "symbol": "table.st",
+          "anchor": "27f869350391",
+          "first": "table.st{width:100%; border-collapse:collapse; font-size:12px}"
+        },
+        {
+          "file": "code/src/40_ui.js",
+          "start": 601,
+          "end": 621,
+          "role": "logic",
+          "symbol": "renderStats",
+          "anchor": "9fe050de22f1",
+          "first": "function renderStats() {"
+        },
+        {
+          "file": "code/src/20_model.js",
+          "start": 163,
+          "end": 170,
+          "role": "logic",
+          "symbol": "popStats",
+          "anchor": "92b5ddddae71",
+          "first": "function popStats(s, key) {"
+        },
+        {
+          "file": "code/src/50_bar.js",
+          "start": 274,
+          "end": 278,
+          "role": "logic",
+          "symbol": "saveStatsCSV",
+          "anchor": "1eb41d8b0106",
+          "first": "function saveStatsCSV() {"
+        }
+      ]
+    },
+    {
+      "id": "export",
+      "level": "component",
+      "parent": "topbar",
+      "title": "Figure and data export",
+      "summary": "Saves figures as PNG at a chosen dpi and size in mm/pt or as editable SVG, saves CSVs, and saves or loads a gate-template JSON.",
+      "views": [],
+      "interactions": [
+        "export",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/00_shell.html",
+          "start": 216,
+          "end": 216,
+          "role": "style",
+          "symbol": ".exp-grid",
+          "anchor": "640ae9ac27e1",
+          "first": ".exp-grid{display:grid; grid-template-columns:minmax(260px, 320px) minmax(0,1fr); gap:18px; align-items:start}"
+        },
+        {
+          "file": "code/src/50_bar.js",
+          "start": 303,
+          "end": 317,
+          "role": "logic",
+          "symbol": "exportMenu",
+          "anchor": "011b73ec6722",
+          "first": "function exportMenu(btn) {"
+        },
+        {
+          "file": "code/src/50_bar.js",
+          "start": 279,
+          "end": 285,
+          "role": "logic",
+          "symbol": "templateJSON",
+          "anchor": "edc17762a623",
+          "first": "function templateJSON() {"
+        },
+        {
+          "file": "code/src/50_bar.js",
+          "start": 286,
+          "end": 302,
+          "role": "logic",
+          "symbol": "applyTemplate",
+          "anchor": "1a74d9ffddaa",
+          "first": "function applyTemplate(o) {"
+        },
+        {
+          "file": "code/src/55_export.js",
+          "start": 160,
+          "end": 208,
+          "role": "logic",
+          "symbol": "openExport",
+          "anchor": "af2c8bc6afb4",
+          "first": "function openExport(target) {"
+        },
+        {
+          "file": "code/src/55_export.js",
+          "start": 150,
+          "end": 159,
+          "role": "logic",
+          "symbol": "exportPNG",
+          "anchor": "b8779a33b90b",
+          "first": "async function exportPNG(target, o, out) {"
+        }
+      ]
+    }
+  ]
+}

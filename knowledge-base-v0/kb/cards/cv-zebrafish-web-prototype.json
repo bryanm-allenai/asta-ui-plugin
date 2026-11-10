@@ -1,0 +1,385 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cv-zebrafish-web-prototype",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T21:01:50Z"
+  },
+  "app": {
+    "title": "CV Zebrafish web prototype: fin and tail kinematics from a pose-tracking CSV",
+    "summary": "The person picks a species, then uploads one pose-tracking CSV, or uses the bundled sample, with an optional config that names the body points. The file is checked, its body parts are matched against the config, and the kinematic calculations run. The results page shows a summary table of the main measurements and a fin-angle and tail-distance plot that a frame-range slider narrows. Below that is the full per-frame results table, and the person downloads the results as a CSV.",
+    "task": {
+      "text": "Turn one pose-tracking file into per-frame fin, tail and head kinematics, look over them, and download the results table.",
+      "verbs": [
+        "derive",
+        "summarize",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A tracked-pose table with x, y and likelihood for each named body point in every video frame, plus a JSON config that maps body points to anatomy and sets the analysis parameters.",
+      "item": "a video frame of one tracked animal",
+      "shapes": [
+        "table",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "analysing pose-tracking output after markerless tracking, before plotting and reporting",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar shows the steps (Species, Load, Results). Each page unlocks the next one: the analysis runs as soon as a file is loaded. On the results page, a range slider redraws the time-series plot for the chosen frames, and the summary, plot, full table and download sit one above the other.",
+      "views": [
+        "form",
+        "summary stats",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "time slider",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "kinematic analysis of markerless pose-tracking data in animal behaviour",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "pose estimation",
+        "swimming kinematics",
+        "behavioural neuroscience"
+      ]
+    },
+    "workflow": {
+      "name": "compute derived measures from one tracked recording and export them",
+      "steps": [
+        {
+          "step": "choose the kind of subject, which sets the analysis path",
+          "here": "a Species dropdown with Continue sends zebrafish to the analysis and mouse to a placeholder page",
+          "parts": [
+            "species-page",
+            "step-sidebar"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "upload a DeepLabCut CSV or press 'Use the bundled sample file'; an optional config JSON can be uploaded under 'Config (optional)'",
+          "parts": [
+            "load-page",
+            "config-upload"
+          ]
+        },
+        {
+          "step": "check the input against the expected structure before computing",
+          "here": "the CSV is checked for its format, and body parts named in the config but missing from the file stop the run with a list of both",
+          "parts": [
+            "load-page"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "fin angles, tail distance, head yaw, spine angles and swim bouts are computed for every frame",
+          "parts": [
+            "load-page"
+          ]
+        },
+        {
+          "step": "summarize the result",
+          "here": "a table gives the unit, mean, min and max of the main measurements",
+          "parts": [
+            "summary-table"
+          ]
+        },
+        {
+          "step": "narrow the plot to one period",
+          "here": "a 'Frame range' slider redraws the fin-angle and tail-distance plot for the chosen frames",
+          "parts": [
+            "fin-tail-plot"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "the full per-frame results open in an expander, and 'Download results CSV' saves them",
+          "parts": [
+            "results-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "the analysis is driven by a config that maps tracked point names to anatomy (fins, head, spine, tail), so the same code serves different tracking set-ups",
+        "a mismatch between the config's body parts and the file's stops the run instead of returning empty results",
+        "the measurements are angles and distances relative to the body's own axis, computed for every video frame",
+        "the slider's default range comes from the config's first time range"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "step-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Step sidebar",
+      "summary": "Shows which step of Species, Load and Results the person is on, with the chosen species.",
+      "views": [
+        "list"
+      ],
+      "interactions": [],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/web_prototype/app.py",
+          "start": 53,
+          "end": 60,
+          "role": "data",
+          "anchor": "f1d20c705394",
+          "first": "# Pages: species → zebrafish_load → zebrafish_results, or species → mouse_load → mouse_analysis."
+        },
+        {
+          "file": "code/web_prototype/app.py",
+          "start": 80,
+          "end": 111,
+          "role": "style",
+          "anchor": "25636348730d",
+          "first": "def _style() -> None:"
+        },
+        {
+          "file": "code/web_prototype/app.py",
+          "start": 114,
+          "end": 136,
+          "role": "logic",
+          "anchor": "592eeb60569f",
+          "first": "def _sidebar(page: str) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "species-page",
+      "level": "view",
+      "parent": null,
+      "title": "Species selection",
+      "summary": "Lets the person pick the subject species, which decides whether the analysis or a placeholder page comes next.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web_prototype/app.py",
+          "start": 149,
+          "end": 158,
+          "role": "markup",
+          "anchor": "430a3c94a653",
+          "first": "def page_species() -> None:"
+        },
+        {
+          "file": "code/web_prototype/app.py",
+          "start": 249,
+          "end": 280,
+          "role": "markup",
+          "anchor": "33b9a2ee4a3d",
+          "first": "def page_mouse_load() -> None:"
+        }
+      ]
+    },
+    {
+      "id": "load-page",
+      "level": "view",
+      "parent": null,
+      "title": "Load tracking CSV",
+      "summary": "Takes an uploaded tracking CSV or the sample file, checks it and its body parts against the config, and runs the kinematic analysis.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web_prototype/app.py",
+          "start": 161,
+          "end": 199,
+          "role": "markup",
+          "anchor": "8e854ed5c2a2",
+          "first": "def page_zebrafish_load() -> None:"
+        },
+        {
+          "file": "code/web_prototype/adapter.py",
+          "start": 65,
+          "end": 117,
+          "role": "logic",
+          "anchor": "73bd78ef8aa6",
+          "first": "def config_bodyparts(config: Dict[str, Any]) -> List[str]:"
+        }
+      ]
+    },
+    {
+      "id": "config-upload",
+      "level": "component",
+      "parent": "load-page",
+      "title": "Optional config upload",
+      "summary": "Replaces the sample config with an uploaded JSON that maps body points and sets parameters, and reports invalid JSON.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web_prototype/app.py",
+          "start": 174,
+          "end": 187,
+          "role": "markup",
+          "anchor": "72018762048e",
+          "first": "with st.expander(\"Config (optional)\"):"
+        },
+        {
+          "file": "code/web_prototype/adapter.py",
+          "start": 61,
+          "end": 62,
+          "role": "logic",
+          "anchor": "7ed3cad6007c",
+          "first": "def load_sample_config() -> Dict[str, Any]:"
+        }
+      ]
+    },
+    {
+      "id": "results-page",
+      "level": "view",
+      "parent": null,
+      "title": "Results",
+      "summary": "Shows the file name, frame count and warnings above the summary, plot, full table and download.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/web_prototype/app.py",
+          "start": 202,
+          "end": 214,
+          "role": "markup",
+          "anchor": "4662dc7a2ff2",
+          "first": "def page_zebrafish_results() -> None:"
+        }
+      ]
+    },
+    {
+      "id": "summary-table",
+      "level": "component",
+      "parent": "results-page",
+      "title": "Summary of key measurements",
+      "summary": "Gives the unit, mean, min and max of the main measurements: fin angles, tail distance and head yaw.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "sort"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web_prototype/app.py",
+          "start": 216,
+          "end": 222,
+          "role": "markup",
+          "anchor": "9838670d05f9",
+          "first": "st.subheader(\"Summary\")"
+        },
+        {
+          "file": "code/web_prototype/adapter.py",
+          "start": 120,
+          "end": 128,
+          "role": "logic",
+          "anchor": "ca3557d2ff56",
+          "first": "def summary_table(results: pd.DataFrame) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "fin-tail-plot",
+      "level": "component",
+      "parent": "results-page",
+      "title": "Fin angles and tail distance plot with frame range",
+      "summary": "Plots left and right fin angles and tail distance over the frames picked with a range slider.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "time slider",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web_prototype/app.py",
+          "start": 224,
+          "end": 233,
+          "role": "markup",
+          "anchor": "d03c66a256af",
+          "first": "st.subheader(\"Fin angles + tail distance\")"
+        },
+        {
+          "file": "code/web_prototype/adapter.py",
+          "start": 131,
+          "end": 158,
+          "role": "logic",
+          "anchor": "10cdb58d8421",
+          "first": "def fin_tail_figure(results: pd.DataFrame, config: Dict[str, Any]) -> tuple[Optional[go.Figure], List[str]]:"
+        }
+      ]
+    },
+    {
+      "id": "results-export",
+      "level": "component",
+      "parent": "results-page",
+      "title": "All result columns and CSV download",
+      "summary": "Opens the full per-frame results table and saves it as a CSV named after the input file.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web_prototype/app.py",
+          "start": 235,
+          "end": 246,
+          "role": "markup",
+          "anchor": "f79e7ea97ca8",
+          "first": "with st.expander(\"All result columns\"):"
+        }
+      ]
+    }
+  ]
+}

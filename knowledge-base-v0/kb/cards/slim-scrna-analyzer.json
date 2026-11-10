@@ -1,0 +1,448 @@
+{
+  "schema": "astaui.card/1",
+  "id": "slim-scrna-analyzer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:21:05Z"
+  },
+  "app": {
+    "title": "SLIM — Single-cell Analysis in Minutes",
+    "summary": "A person loads a cell-by-gene count matrix, or a sample dataset, and sees how many cells and genes it has. They then go through a series of tabs, and each tab unlocks only after the one before it is done. First they filter out low-quality cells with threshold sliders. Then they normalise the data, pick the most variable genes and reduce dimensions, checking an elbow plot. Next they cluster the cells and view them on a 2-D embedding, check marker genes per cluster in a dot plot, and type a cell-type name for each cluster. Finally they test one group against the rest or against another group for differentially expressed genes, read a volcano plot and a ranked table, and export the annotated dataset, the gene results (including a reformatted CSV for a downstream pathway tool) and a timestamped log of every step.",
+    "task": {
+      "text": "Take single-cell RNA-seq counts through quality filtering, clustering, cell-type labelling and differential expression without writing code, and export the labelled dataset and gene results.",
+      "verbs": [
+        "derive",
+        "clean",
+        "annotate",
+        "compare",
+        "organize"
+      ]
+    },
+    "data": {
+      "text": "A sparse matrix of gene counts for each cell, with per-cell metadata. From it the app derives cluster assignments, a 2-D embedding, per-cluster marker summaries and a table of differential-expression statistics for each gene.",
+      "item": "a single cell with its gene expression profile",
+      "shapes": [
+        "table",
+        "categories",
+        "events"
+      ]
+    },
+    "stage": {
+      "text": "analysing single-cell counts from the raw matrix through clustering to differential expression, before pathway analysis",
+      "terms": [
+        "analyze",
+        "clean",
+        "annotate"
+      ]
+    },
+    "mechanism": {
+      "text": "Tabs run as a gated pipeline. Each tab takes parameters from sliders, runs one computation on a stored copy of the previous tab's result, and draws a diagnostic chart (violins, elbow, embedding scatter, dot plot, volcano) before the next tab unlocks. Every run is added to an analysis log that is shown next to the download buttons.",
+      "views": [
+        "scatter plot",
+        "line chart",
+        "table view",
+        "summary stats",
+        "form",
+        "strip plot"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "toggle view",
+        "inline edit",
+        "apply label",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline"
+      ]
+    },
+    "field": {
+      "text": "single-cell RNA-seq clustering and differential expression in genomics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "single cell rna seq",
+        "transcriptomics",
+        "differential expression"
+      ]
+    },
+    "workflow": {
+      "name": "run a gated analysis pipeline from raw measurements to group differences",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pick h5ad, CSV or a zipped 10x folder and submit, or load a sample dataset; cell and gene counts and a metadata preview appear",
+          "parts": [
+            "upload-view"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Sliders set minimum genes, maximum genes and maximum mitochondrial %, with a warning above 30%; Apply QC filters the cells and shows violin plots and the number of cells left",
+          "parts": [
+            "qc-view"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Sliders set how many highly variable genes and principal components to keep; the run normalises, log-transforms, scales and runs PCA, then shows an elbow plot of variance explained",
+          "parts": [
+            "preprocess-view"
+          ]
+        },
+        {
+          "step": "group items into clusters",
+          "here": "Neighbour-count and resolution sliders, with a warning above 1.5, run neighbour-graph clustering and an embedding; the app shows the cluster count and an embedding scatter coloured by cluster",
+          "parts": [
+            "cluster-view"
+          ]
+        },
+        {
+          "step": "apply a label from a set to each group",
+          "here": "Type marker genes to see a dot plot of mean expression and the share of expressing cells per cluster, then type a cell-type name for each cluster and apply the names; the embedding is redrawn by cell type",
+          "parts": [
+            "annotate-view"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Choose to group by cluster or by cell type, pick a target group and either 'rest' or one reference group, and run a rank test; a volcano plot with fold-change and significance cutoffs and a table of the top genes appear",
+          "parts": [
+            "deg-view"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download the annotated h5ad, the gene results CSV, or a CSV reformatted for the downstream pathway tool with an added signed significance column; the timestamped analysis log is shown as a table",
+          "parts": [
+            "deg-view",
+            "export-view"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each tab works on a copy of the previous stage's stored result and stays locked until that stage exists, so the pipeline runs strictly in order",
+        "Domain guard-rails warn when a threshold is in a risky range: high mitochondrial % or high clustering resolution",
+        "Clusters are named by hand from a marker-gene dot plot that shows mean expression and the fraction of cells expressing each gene",
+        "Differential expression can be one group versus the rest or versus one chosen group, and the results can be reformatted for a sister bulk-RNA pathway tool",
+        "Every step's parameters are written to a timestamped provenance log that can be read alongside the exports"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "upload-view",
+      "level": "view",
+      "parent": null,
+      "title": "Upload",
+      "summary": "Loads a count matrix in one of three formats, or a sample dataset, and shows the number of cells and genes and a metadata preview.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 77,
+          "end": 116,
+          "role": "markup",
+          "anchor": "e415b92413cc",
+          "first": "with tab_upload:"
+        },
+        {
+          "file": "code/slim/utils.py",
+          "start": 15,
+          "end": 44,
+          "role": "logic",
+          "symbol": "load_adata",
+          "anchor": "04e331df5c0e",
+          "first": "def load_adata(uploaded_file, file_type):"
+        }
+      ]
+    },
+    {
+      "id": "qc-view",
+      "level": "view",
+      "parent": null,
+      "title": "QC",
+      "summary": "Filters out low-quality cells with gene-count and mitochondrial-% thresholds and shows the distributions that remain.",
+      "views": [
+        "strip plot",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 119,
+          "end": 145,
+          "role": "markup",
+          "anchor": "ba0a02bbf243",
+          "first": "with tab_qc:"
+        },
+        {
+          "file": "code/slim/qc.py",
+          "start": 4,
+          "end": 28,
+          "role": "logic",
+          "symbol": "run_qc",
+          "anchor": "c4910af4bc09",
+          "first": "def run_qc(adata, min_genes, max_genes, max_mito_pct):"
+        },
+        {
+          "file": "code/slim/visualization.py",
+          "start": 6,
+          "end": 13,
+          "role": "logic",
+          "symbol": "plot_violin_qc",
+          "anchor": "08fa82eff4c6",
+          "first": "def plot_violin_qc(adata):"
+        }
+      ]
+    },
+    {
+      "id": "preprocess-view",
+      "level": "view",
+      "parent": null,
+      "title": "Preprocess",
+      "summary": "Normalises the data, selects highly variable genes and runs PCA, then shows an elbow plot to judge how many components matter.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 148,
+          "end": 168,
+          "role": "markup",
+          "anchor": "66d1a26c6f2d",
+          "first": "with tab_preprocess:"
+        },
+        {
+          "file": "code/slim/preprocess.py",
+          "start": 3,
+          "end": 17,
+          "role": "logic",
+          "symbol": "run_preprocess",
+          "anchor": "aa177789e3e3",
+          "first": "def run_preprocess(adata, n_top_genes, n_pcs):"
+        },
+        {
+          "file": "code/slim/preprocess.py",
+          "start": 19,
+          "end": 23,
+          "role": "logic",
+          "symbol": "get_elbow_data",
+          "anchor": "d4e2f86c90ac",
+          "first": "def get_elbow_data(adata):"
+        },
+        {
+          "file": "code/slim/visualization.py",
+          "start": 52,
+          "end": 59,
+          "role": "logic",
+          "symbol": "plot_elbow",
+          "anchor": "8d92c71f3eff",
+          "first": "def plot_elbow(variance_ratio):"
+        }
+      ]
+    },
+    {
+      "id": "cluster-view",
+      "level": "view",
+      "parent": null,
+      "title": "Cluster",
+      "summary": "Builds a neighbour graph, clusters the cells at a chosen resolution and shows the clusters on a 2-D embedding.",
+      "views": [
+        "scatter plot",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 171,
+          "end": 196,
+          "role": "markup",
+          "anchor": "577660722fda",
+          "first": "with tab_cluster:"
+        },
+        {
+          "file": "code/slim/cluster.py",
+          "start": 3,
+          "end": 11,
+          "role": "logic",
+          "symbol": "run_clustering",
+          "anchor": "4e47d3c1b94b",
+          "first": "def run_clustering(adata, n_neighbors, resolution, n_pcs=20):"
+        },
+        {
+          "file": "code/slim/visualization.py",
+          "start": 15,
+          "end": 30,
+          "role": "logic",
+          "symbol": "plot_umap",
+          "anchor": "15f42edb6a6a",
+          "first": "def plot_umap(adata, color):"
+        }
+      ]
+    },
+    {
+      "id": "annotate-view",
+      "level": "view",
+      "parent": null,
+      "title": "Annotate",
+      "summary": "Shows per-cluster expression of typed marker genes in a dot plot and lets the person name each cluster's cell type.",
+      "views": [
+        "scatter plot",
+        "form"
+      ],
+      "interactions": [
+        "search",
+        "inline edit",
+        "apply label"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 199,
+          "end": 232,
+          "role": "markup",
+          "anchor": "ca9127ebb6bb",
+          "first": "with tab_annotate:"
+        },
+        {
+          "file": "code/slim/visualization.py",
+          "start": 32,
+          "end": 50,
+          "role": "logic",
+          "symbol": "plot_dotplot",
+          "anchor": "6892a45fc3c4",
+          "first": "def plot_dotplot(adata, marker_genes):"
+        },
+        {
+          "file": "code/slim/annotate.py",
+          "start": 23,
+          "end": 29,
+          "role": "logic",
+          "symbol": "assign_labels",
+          "anchor": "dc2277ee8f88",
+          "first": "def assign_labels(adata, label_dict):"
+        }
+      ]
+    },
+    {
+      "id": "deg-view",
+      "level": "view",
+      "parent": null,
+      "title": "DEG",
+      "summary": "Tests a target group against the rest or against one reference group for differentially expressed genes, shows a volcano plot and a ranked table, and exports a CSV for the downstream pathway tool.",
+      "views": [
+        "scatter plot",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 235,
+          "end": 270,
+          "role": "markup",
+          "anchor": "5a589d71b96b",
+          "first": "with tab_deg:"
+        },
+        {
+          "file": "code/slim/deg.py",
+          "start": 4,
+          "end": 21,
+          "role": "logic",
+          "symbol": "run_deg_scanpy",
+          "anchor": "6cd03f056239",
+          "first": "def run_deg_scanpy(adata, groupby, group, reference):"
+        },
+        {
+          "file": "code/slim/visualization.py",
+          "start": 61,
+          "end": 78,
+          "role": "logic",
+          "symbol": "plot_volcano",
+          "anchor": "690578357dab",
+          "first": "def plot_volcano(deg_df, padj_th=0.05, lfc_th=1.0):"
+        },
+        {
+          "file": "code/slim/utils.py",
+          "start": 46,
+          "end": 61,
+          "role": "logic",
+          "symbol": "export_deg_for_brim",
+          "anchor": "eafeff486bce",
+          "first": "def export_deg_for_brim(deg_df):"
+        }
+      ]
+    },
+    {
+      "id": "export-view",
+      "level": "view",
+      "parent": null,
+      "title": "Export",
+      "summary": "Shows the timestamped log of every analysis step and offers downloads of the annotated dataset and the gene results.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "version history"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 273,
+          "end": 296,
+          "role": "markup",
+          "anchor": "35a81c69be3c",
+          "first": "with tab_export:"
+        },
+        {
+          "file": "code/slim/utils.py",
+          "start": 9,
+          "end": 13,
+          "role": "logic",
+          "symbol": "log_analysis",
+          "anchor": "ddf5d147faf3",
+          "first": "def log_analysis(analysis_log, action, details=\"\"):"
+        }
+      ]
+    }
+  ]
+}

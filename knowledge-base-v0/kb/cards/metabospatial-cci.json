@@ -1,0 +1,355 @@
+{
+  "schema": "astaui.card/1",
+  "id": "metabospatial-cci",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T15:09:48Z"
+  },
+  "app": {
+    "title": "MetaboSpatial-CCI",
+    "summary": "A person loads a spatial transcriptomics dataset, either seeded demo data or an uploaded file, picks a version of the reference database, and sets the quality-control, diffusion-solver and statistics parameters in a sidebar. They run the pipeline. It filters and normalises the spots, infers how much each spot secretes from enzyme expression, models how each metabolite diffuses across the tissue, scores metabolite-receptor pairs and tests them by permutation, and aggregates the results into a cell-type communication network. They then go through tabs: an overview of counts and top hits, paired spatial maps for one chosen metabolite, a ranked table and chart of every pair marked by significance, and a sender-receiver network heatmap. At the end they download the interaction and hub tables as CSV.",
+    "task": {
+      "text": "Infer and rank spatially resolved, statistically tested signalling interactions from expression data on a tissue section, and summarise them as a sender-receiver network between cell types.",
+      "verbs": [
+        "derive",
+        "identify",
+        "summarize",
+        "explore",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "A spatial expression matrix of spots by genes, with x-y coordinates for each spot, scored against a curated reference database that links each signalling molecule to its receptors, synthesis and degradation enzymes and transporters.",
+      "item": "a measured spot on a tissue section, with coordinates and gene expression counts",
+      "shapes": [
+        "table",
+        "geospatial",
+        "field",
+        "network",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "analysing spatial expression data after it is collected, to infer and rank signalling interactions",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar parameters feed one cached pipeline run, triggered by a button. Its results fill tabbed views: summary metrics with top-ranked tables, two spatial scatter maps side by side for a metabolite chosen from a dropdown, a sortable table of all pairs with a bar chart coloured by significance, and a sender-by-receiver heatmap with paired bars. A final tab exports the tables as CSV.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view",
+        "map",
+        "side-by-side panes",
+        "bar chart",
+        "heatmap"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "toggle view",
+        "sort",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "cell-cell communication inference with reaction-diffusion modelling on spatial transcriptomics, in biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "spatial transcriptomics",
+        "cell cell communication",
+        "reaction diffusion modelling"
+      ]
+    },
+    "workflow": {
+      "name": "run a parameterised analysis pipeline over a dataset and export ranked, significance-tested results",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A radio button picks seeded demo data or an uploaded file with spatial coordinates. A dropdown picks which version of the reference database to score against. The status metric shows Ready or Waiting for data.",
+          "parts": [
+            "data-input",
+            "sidebar-params"
+          ]
+        },
+        {
+          "step": "set the analysis parameters and compute a value from the data",
+          "here": "Sliders set minimum genes and counts per spot, the normalisation target, pixel size and the number of permutations. Dropdowns pick an FFT or finite-difference diffusion solver and an NNLS or mean-score deconvolution. Run Analysis then runs QC, secretion inference, diffusion, receptor scoring, a permutation test with Moran's I, deconvolution and network building.",
+          "parts": [
+            "sidebar-params"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The Overview tab shows counts of spots, genes, metabolites and interactions, the top 10 metabolite-receptor pairs with p-values and significance stars, and the top hub cell types.",
+          "parts": [
+            "overview-tab"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "In the Metabolites tab a dropdown picks one metabolite. Two maps side by side show its net secretion or uptake per spot and its predicted diffused concentration, each with mean, maximum and minimum.",
+          "parts": [
+            "metabolite-maps"
+          ]
+        },
+        {
+          "step": "rank all items and flag the significant ones",
+          "here": "The Interactions tab lists every pair with mean score, z-score, p-value, Moran's I and a yes/no significance flag, sorted by score, with counts of the total and the significant. A horizontal bar chart of the top 15 colours significant pairs red.",
+          "parts": [
+            "interactions-tab"
+          ]
+        },
+        {
+          "step": "summarise the items as a network between groups",
+          "here": "The CCI Network tab draws a sender-by-receiver heatmap of communication strength between cell types, with paired bars of each type's sender and receiver strength.",
+          "parts": [
+            "cci-network-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The Download tab saves the full interaction table and the hub cell-type table as CSV files.",
+          "parts": [
+            "download-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Spatial spread is modelled physically: a steady-state reaction-diffusion equation turns the secretion at each spot into a concentration field, with a choice between an FFT and a finite-difference solver.",
+        "Secretion is inferred from synthesis enzymes minus degradation enzymes, using a curated database that the person can switch between versions.",
+        "Each metabolite-receptor pair is tested for significance by spatial permutation against Moran's I, and the significance is carried through the tables and the colours of the chart.",
+        "Spots are deconvolved into cell-type proportions so that interactions at the spot level roll up into a sender-receiver network with hub detection.",
+        "For each metabolite, the secretion map and the diffused-concentration map are shown side by side."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar-params",
+      "level": "view",
+      "parent": null,
+      "title": "Parameters sidebar",
+      "summary": "Collects the database choice, QC, diffusion and statistics settings, and runs the cached pipeline when Run Analysis is pressed.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 286,
+          "end": 325,
+          "role": "markup",
+          "anchor": "b2393e9493b6",
+          "first": "# Database selection"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 335,
+          "end": 361,
+          "role": "logic",
+          "anchor": "0578bafb9f74",
+          "first": "# Info bar"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 61,
+          "end": 136,
+          "role": "logic",
+          "symbol": "run_pipeline_cached",
+          "anchor": "9f18335da564",
+          "first": "def run_pipeline_cached(adata_bytes, db_path, min_genes, min_counts,"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 53,
+          "end": 54,
+          "role": "logic",
+          "symbol": "load_db",
+          "anchor": "616a21c73e5e",
+          "first": "def load_db(db_path):"
+        }
+      ]
+    },
+    {
+      "id": "data-input",
+      "level": "component",
+      "parent": "sidebar-params",
+      "title": "Data input",
+      "summary": "Lets the person choose seeded demo data on a hexagonal grid of spots, or upload their own file with spatial coordinates.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 249,
+          "end": 284,
+          "role": "markup",
+          "anchor": "8def929e4bfb",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 143,
+          "end": 243,
+          "role": "data",
+          "symbol": "generate_demo_data",
+          "anchor": "722de4c48f33",
+          "first": "def generate_demo_data(random_seed=42):"
+        }
+      ]
+    },
+    {
+      "id": "overview-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis overview",
+      "summary": "Shows dataset and interaction counts, the top 10 metabolite-receptor pairs with p-values and significance stars, and the top hub cell types.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view",
+        "sort"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 363,
+          "end": 428,
+          "role": "markup",
+          "anchor": "f7dcd8a7332b",
+          "first": "# Display results if available"
+        }
+      ]
+    },
+    {
+      "id": "metabolite-maps",
+      "level": "view",
+      "parent": null,
+      "title": "Metabolite secretion and concentration maps",
+      "summary": "For a metabolite picked from a dropdown, maps its net secretion and its predicted diffused concentration across the tissue side by side, each with summary values.",
+      "views": [
+        "map",
+        "side-by-side panes",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 430,
+          "end": 472,
+          "role": "markup",
+          "anchor": "7a1f4475536f",
+          "first": "with tab2:"
+        }
+      ]
+    },
+    {
+      "id": "interactions-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Metabolite-receptor interactions",
+      "summary": "Lists every pair ranked by mean score, with z-score, p-value, Moran's I and a significance flag, and charts the top 15 with significant pairs in red.",
+      "views": [
+        "table view",
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "sort"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 474,
+          "end": 520,
+          "role": "markup",
+          "anchor": "79638a4e6dbd",
+          "first": "with tab3:"
+        }
+      ]
+    },
+    {
+      "id": "cci-network-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Cell-cell communication network",
+      "summary": "Shows communication strength from sender to receiver cell types as a heatmap, with each type's sender and receiver strength as paired bars.",
+      "views": [
+        "heatmap",
+        "bar chart"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 522,
+          "end": 562,
+          "role": "markup",
+          "anchor": "41d00e2d32d3",
+          "first": "with tab4:"
+        }
+      ]
+    },
+    {
+      "id": "download-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Download results",
+      "summary": "Exports the full interaction table and the hub cell-type table as CSV files.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 564,
+          "end": 598,
+          "role": "markup",
+          "anchor": "7c2f17a96020",
+          "first": "with tab5:"
+        }
+      ]
+    }
+  ]
+}

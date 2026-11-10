@@ -1,0 +1,490 @@
+{
+  "schema": "astaui.card/1",
+  "id": "haridra-nir-chemometrics",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T21:32:22Z"
+  },
+  "app": {
+    "title": "METASPEQ Haridra NIR — NIR Quality Analysis",
+    "summary": "The person picks how many PLS latent variables to use and how to preprocess the spectra. Every metric and chart then recomputes with sample-wise cross-validation, and a coloured verdict rates the model's usefulness from its RPD. They pick a measured spectrum from the study, choosing a sample and one of its replicate scans, or upload a 256-point absorbance CSV. They get a predicted concentration with a green, amber or red confidence zone, set by how close it is to the calibration range. They can also overlay spectra by concentration level before and after preprocessing, check model diagnostics (predicted against reference, error against number of components, residuals), review a second assay's linearity and error at each level, and download the model card as JSON.",
+    "task": {
+      "text": "Build and check a multivariate calibration that predicts an analyte's concentration from a near-infrared spectrum, and flag predictions that fall outside the range the model can support.",
+      "verbs": [
+        "derive",
+        "decide",
+        "explore",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Near-infrared absorbance spectra on a fixed wavelength grid. Each spectrum belongs to a physical sample that has several replicate scans and a reference concentration made by weighing. A second table pairs reference and predicted values for an assay at several levels.",
+      "item": "an absorbance spectrum (one replicate scan of one blended sample) with its reference concentration",
+      "shapes": [
+        "table",
+        "time series",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "developing and checking a spectroscopic calibration, then screening new samples against it",
+      "terms": [
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls for the number of components and the preprocessing drive everything: the headline metrics, the RPD verdict and every tab are recomputed under leave-one-sample-out cross-validation. Tabs separate prediction for one spectrum (with a confidence zone and the spectrum plotted with the model band shaded), a spectral overlay, diagnostic plots with a metrics table, a second assay's linearity, and the model card with its download.",
+      "views": [
+        "summary stats",
+        "line chart",
+        "scatter plot",
+        "bar chart",
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "import",
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "PLS calibration of NIR spectra for herbal-extract quality control in analytical chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "chemometrics",
+        "nir spectroscopy",
+        "multivariate calibration"
+      ]
+    },
+    "workflow": {
+      "name": "predict a quantity from a measurement with a validated calibration and flag when to trust it",
+      "steps": [
+        {
+          "step": "set up the model that will compute the result",
+          "here": "A slider sets the number of PLS latent variables (1–14) and a select box sets the preprocessing. Below 6 components, a warning says the model underfits.",
+          "parts": [
+            "model-config"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Leave-one-sample-out cross-validation gives R², RMSECV, bias, RPD and the calibration range. A coloured banner turns the RPD into a statement of what the model is fit for.",
+          "parts": [
+            "performance-header",
+            "diagnostics"
+          ]
+        },
+        {
+          "step": "check that the result holds",
+          "here": "The diagnostics show predicted against reference with an identity line and a fitted line, RMSECV against the number of latent variables with the chosen value marked, residuals against concentration with a ±SEP band, and a table of metrics.",
+          "parts": [
+            "diagnostics"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Spectra at a chosen number of concentration levels are overlaid, shaded by level. A toggle switches between raw absorbance and preprocessed spectra cut to the model band.",
+          "parts": [
+            "spectral-explorer"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "Pick a study sample and one of its replicate scans, or upload a headerless CSV of 256 absorbance values. A file of any other length is rejected.",
+          "parts": [
+            "predict"
+          ]
+        },
+        {
+          "step": "decide whether a result can be used",
+          "here": "The prediction gets a GREEN, AMBER or RED confidence zone by its distance from the calibration range, measured in RMSECV. For study samples, the reference value and the difference from it are shown too.",
+          "parts": [
+            "predict"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The model card (provenance, metrics and limitations) is shown as JSON and can be downloaded, beside a written statement of scope and limitations.",
+          "parts": [
+            "model-card"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Cross-validation holds out all replicate scans of a physical sample together, so the model is always scored on a sample it has not seen.",
+        "Predictions get a three-colour confidence zone measured against the calibration range ± one RMSECV. A red prediction is extrapolation and should not be reported.",
+        "RPD is turned into a statement of fitness for use (screening, QC, release), shown as a coloured banner.",
+        "The number of components is chosen at the elbow of an RMSECV curve, with the current choice marked on it.",
+        "A second assay's absolute error is shown at each level against SEP, and from it the app sets a working range below which no number should be reported."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "model-config",
+      "level": "view",
+      "parent": null,
+      "title": "Model configuration sidebar",
+      "summary": "Sets the number of PLS latent variables and the preprocessing, warns when the model underfits, and states how the model is validated.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 83,
+          "end": 108,
+          "role": "logic",
+          "anchor": "b68e42d2a58c",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 58,
+          "end": 59,
+          "role": "logic",
+          "symbol": "get_model",
+          "anchor": "6810e974a630",
+          "first": "def get_model(n_components: int, method: str):"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 53,
+          "end": 54,
+          "role": "logic",
+          "symbol": "get_data",
+          "anchor": "69abe98ed051",
+          "first": "def get_data():"
+        },
+        {
+          "file": "code/src/chemometrics.py",
+          "start": 215,
+          "end": 232,
+          "role": "logic",
+          "symbol": "train_starch_model",
+          "anchor": "1a4007bb99f8",
+          "first": "def train_starch_model(n_components: int = DEFAULT_N_COMPONENTS,"
+        },
+        {
+          "file": "code/src/chemometrics.py",
+          "start": 53,
+          "end": 70,
+          "role": "logic",
+          "symbol": "preprocess",
+          "anchor": "068f95fdcfdf",
+          "first": "def preprocess(spectra: np.ndarray, method: str = \"snv\") -> np.ndarray:"
+        }
+      ]
+    },
+    {
+      "id": "performance-header",
+      "level": "component",
+      "parent": null,
+      "title": "Cross-validated metrics and RPD verdict",
+      "summary": "Shows R², RMSECV, bias, RPD and the calibration range, with a banner coloured by RPD that says what the model is fit for.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 37,
+          "end": 47,
+          "role": "style",
+          "anchor": "07f99e02964d",
+          "first": "st.markdown("
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 113,
+          "end": 131,
+          "role": "logic",
+          "anchor": "6b7618fdbe90",
+          "first": "st.title(\"Haridra Dry Extract — NIR Quality Analysis\")"
+        },
+        {
+          "file": "code/src/chemometrics.py",
+          "start": 141,
+          "end": 150,
+          "role": "logic",
+          "symbol": "interpret_rpd",
+          "anchor": "e114f1218030",
+          "first": "def interpret_rpd(rpd: float) -> str:"
+        },
+        {
+          "file": "code/src/chemometrics.py",
+          "start": 121,
+          "end": 138,
+          "role": "logic",
+          "symbol": "compute_metrics",
+          "anchor": "7a25c42d7b58",
+          "first": "def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Metrics:"
+        }
+      ]
+    },
+    {
+      "id": "predict",
+      "level": "view",
+      "parent": null,
+      "title": "Predict",
+      "summary": "Takes a study replicate scan or an uploaded 256-point CSV and shows the predicted concentration, its confidence zone and uncertainty, and the spectrum with the model band shaded.",
+      "views": [
+        "form",
+        "summary stats",
+        "line chart"
+      ],
+      "interactions": [
+        "select",
+        "import"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 139,
+          "end": 220,
+          "role": "logic",
+          "anchor": "a33ed059774c",
+          "first": "with tabs[0]:"
+        },
+        {
+          "file": "code/src/chemometrics.py",
+          "start": 203,
+          "end": 208,
+          "role": "logic",
+          "symbol": "predict",
+          "anchor": "485c2dbd84f3",
+          "first": "def predict(self, spectra: np.ndarray) -> np.ndarray:"
+        },
+        {
+          "file": "code/src/chemometrics.py",
+          "start": 210,
+          "end": 212,
+          "role": "logic",
+          "symbol": "in_calibration_range",
+          "anchor": "333f9eec66a0",
+          "first": "def in_calibration_range(self, value: float) -> bool:"
+        }
+      ]
+    },
+    {
+      "id": "spectral-explorer",
+      "level": "view",
+      "parent": null,
+      "title": "Spectral explorer",
+      "summary": "Overlays spectra at a chosen number of concentration levels, shaded by level, as raw absorbance or after preprocessing.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 225,
+          "end": 262,
+          "role": "logic",
+          "anchor": "8eb3a401dcc1",
+          "first": "with tabs[1]:"
+        },
+        {
+          "file": "code/src/chemometrics.py",
+          "start": 97,
+          "end": 99,
+          "role": "logic",
+          "symbol": "band_mask",
+          "anchor": "aa54d4288e67",
+          "first": "def band_mask(wavelengths: np.ndarray, band=DEFAULT_BAND) -> np.ndarray:"
+        },
+        {
+          "file": "code/src/chemometrics.py",
+          "start": 35,
+          "end": 42,
+          "role": "logic",
+          "symbol": "snv",
+          "anchor": "ba175145943e",
+          "first": "def snv(spectra: np.ndarray) -> np.ndarray:"
+        },
+        {
+          "file": "code/src/chemometrics.py",
+          "start": 45,
+          "end": 50,
+          "role": "logic",
+          "symbol": "savgol",
+          "anchor": "5ed8f0748cbd",
+          "first": "def savgol(spectra: np.ndarray, window: int = 11, poly: int = 2,"
+        }
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "level": "view",
+      "parent": null,
+      "title": "Model diagnostics",
+      "summary": "Shows cross-validated predicted against reference, RMSECV against the number of latent variables with the chosen value marked, residuals against concentration with a ±SEP band, and a table of metrics.",
+      "views": [
+        "scatter plot",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 267,
+          "end": 326,
+          "role": "logic",
+          "anchor": "e76cd39b64a9",
+          "first": "with tabs[2]:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 63,
+          "end": 66,
+          "role": "logic",
+          "symbol": "get_cv_predictions",
+          "anchor": "559256a82fdd",
+          "first": "def get_cv_predictions(n_components: int, method: str):"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 70,
+          "end": 73,
+          "role": "logic",
+          "symbol": "get_component_scan",
+          "anchor": "477df3a43bfe",
+          "first": "def get_component_scan(method: str):"
+        },
+        {
+          "file": "code/src/chemometrics.py",
+          "start": 157,
+          "end": 171,
+          "role": "logic",
+          "symbol": "leave_one_sample_out",
+          "anchor": "8dbc03b24f24",
+          "first": "def leave_one_sample_out(X: np.ndarray, y: np.ndarray, groups: np.ndarray,"
+        },
+        {
+          "file": "code/src/chemometrics.py",
+          "start": 174,
+          "end": 186,
+          "role": "logic",
+          "symbol": "component_scan",
+          "anchor": "e5b19989001d",
+          "first": "def component_scan(X: np.ndarray, y: np.ndarray, groups: np.ndarray,"
+        }
+      ]
+    },
+    {
+      "id": "assay-linearity",
+      "level": "view",
+      "parent": null,
+      "title": "Curcuminoid assay linearity",
+      "summary": "Plots a second assay's predicted values against reference with a fitted line, colours the absolute error at each level against SEP, and states the working range that follows.",
+      "views": [
+        "scatter plot",
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 331,
+          "end": 380,
+          "role": "logic",
+          "anchor": "dcdef2fdfc4d",
+          "first": "with tabs[3]:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 77,
+          "end": 78,
+          "role": "logic",
+          "symbol": "get_curcuminoid",
+          "anchor": "036e229c652c",
+          "first": "def get_curcuminoid():"
+        },
+        {
+          "file": "code/data/curcuminoid_linearity.csv",
+          "start": 1,
+          "end": 31,
+          "role": "data",
+          "anchor": "9b972303bd6a",
+          "first": "reference_pct_ww,nir_predicted_pct_ww"
+        }
+      ]
+    },
+    {
+      "id": "model-card",
+      "level": "view",
+      "parent": null,
+      "title": "Model card",
+      "summary": "Shows the model's provenance and metrics as JSON with a download button, beside a statement of scope and limitations.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 385,
+          "end": 418,
+          "role": "logic",
+          "anchor": "24ac8b81eeae",
+          "first": "with tabs[4]:"
+        },
+        {
+          "file": "code/src/train.py",
+          "start": 23,
+          "end": 85,
+          "role": "logic",
+          "symbol": "main",
+          "anchor": "3cc371c13285",
+          "first": "def main() -> None:"
+        }
+      ]
+    }
+  ]
+}

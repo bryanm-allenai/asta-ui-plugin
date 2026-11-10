@@ -1,0 +1,761 @@
+{
+  "schema": "astaui.card/1",
+  "id": "gps-field-logger",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T09:07:52Z"
+  },
+  "app": {
+    "title": "Field Logger: randomized block field session logger",
+    "summary": "The person names a session, defines the study's measurement scenarios and blocks, and records the session's conditions: a weather snapshot for the site and, for each receiver, when it was powered on and when it reached RTK fix. From the blocks and scenarios the app builds a seeded, randomized visit schedule with an estimated total time, which the person can re-shuffle before beginning. They then step through the points one at a time, starting and stopping a timer at each. A completed point can be redone with a logged reason. At the end they export the session as CSV and JSON, and finished sessions stay in a history where they can be exported again.",
+    "task": {
+      "text": "Run a structured field data-collection session on a randomized block design, timestamping each measurement point and the session's equipment and conditions so the session can be analysed later.",
+      "verbs": [
+        "record",
+        "plan",
+        "monitor",
+        "curate"
+      ]
+    },
+    "data": {
+      "text": "A field session record: user-defined blocks and scenarios, a generated schedule of points (one per block × scenario) with start and end timestamps and re-collection counts, receiver power-on and fix events, a weather snapshot, settings and free-text notes.",
+      "item": "a measurement point: one block × scenario combination, visited in scheduled order with start and end times",
+      "shapes": [
+        "events",
+        "table",
+        "categories",
+        "notes"
+      ]
+    },
+    "stage": {
+      "text": "collecting timed measurements in the field, following a randomized schedule",
+      "terms": [
+        "collect",
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "A Setup tab gathers the design (scenarios, blocks), the session conditions and the settings, and shows a live preview of the seeded schedule. Begin stays hidden until the design is complete and a receiver has a fix. The Collect tab then shows one point card at a time with start and stop controls, a progress bar and a timeline grouped by block, where tapping a completed point opens it for re-collection with a reason.",
+      "views": [
+        "form",
+        "detail panel",
+        "list",
+        "timeline",
+        "summary stats"
+      ],
+      "interactions": [
+        "inline edit",
+        "select",
+        "export",
+        "write notes",
+        "import"
+      ],
+      "patterns": [
+        "review queue",
+        "status pipeline",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "randomized complete block field trials logging GNSS receiver sessions in agricultural engineering",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "rcbd",
+        "rtk gnss",
+        "precision agriculture"
+      ]
+    },
+    "workflow": {
+      "name": "log timed measurements at points on a randomized schedule",
+      "steps": [
+        {
+          "step": "define the categories the study is built from",
+          "here": "Measurement scenarios are added with a name, an optional description and an emoji icon. Study blocks are added with a name and condition notes. Both can be removed until collection begins.",
+          "parts": [
+            "design-builder"
+          ]
+        },
+        {
+          "step": "record the conditions of the session",
+          "here": "Weather is fetched from device GPS, a place-name search with a picker, or manual lat/lon. Each receiver logs Power On and RTK Fixed taps, and time-to-first-fix is computed from them. Free-text field notes are also kept.",
+          "parts": [
+            "weather-snapshot",
+            "receiver-log",
+            "setup-tab"
+          ]
+        },
+        {
+          "step": "lay out the order of the work",
+          "here": "One point is made per block × scenario. Block order and the scenario order within each block are shuffled with a seeded RNG. The preview shows the seed, the point count and the estimated total hours, and can be re-shuffled. BEGIN DATA COLLECTION appears only when receivers, scenarios and blocks exist and a receiver has an RTK fix.",
+          "parts": [
+            "schedule-preview"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "A card shows the current point's scenario, block, visit order, point ID and block notes. START COLLECTION starts a running timer, and END COLLECTION stamps the end time and moves to the next point.",
+          "parts": [
+            "collect-tab"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "A progress bar counts completed points against the total, and a timeline grouped by block shows each point's status and times.",
+          "parts": [
+            "collect-tab"
+          ]
+        },
+        {
+          "step": "redo an item, with a reason",
+          "here": "Tapping a completed point opens it. RE-COLLECT THIS POINT opens a sheet of fixed reasons (equipment lost fix, tripod bumped, wrong location, and others). The point returns to pending, and its re-collect count goes up.",
+          "parts": [
+            "recollect-sheet"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "When all points are done, JSON and CSV exports and Finish appear. Finish archives the session to History, where past sessions can be viewed and exported again.",
+          "parts": [
+            "collect-tab",
+            "session-history"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Collection cannot begin until at least one receiver has reached an RTK fix, and time-to-first-fix is logged per receiver",
+        "The visit schedule is a randomized complete block design: block order and the scenario order within each block are shuffled with a seed, and the seed is recorded in the exports",
+        "An estimated total session time is computed from the points × (dwell time + travel/setup time)",
+        "Re-collections are counted and keep a reason from a fixed list, so redone points show up in the exported data",
+        "A weather snapshot for the site is stored with the session and included in the export"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "setup-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Setup tab",
+      "summary": "Collects everything needed before collection: clocks, weather, receivers, scenarios, blocks, settings and field notes, and shows what is still missing before Begin appears.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "write notes"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 611,
+          "end": 785,
+          "role": "logic",
+          "symbol": "rSetup",
+          "anchor": "cd370bc58ab6",
+          "first": "function rSetup(s) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 593,
+          "end": 609,
+          "role": "logic",
+          "symbol": "rSession",
+          "anchor": "b284848fcc38",
+          "first": "function rSession(app) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 761,
+          "end": 783,
+          "role": "markup",
+          "anchor": "5a01fca158ae",
+          "first": "<!-- Collection Settings -->"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 467,
+          "end": 467,
+          "role": "logic",
+          "symbol": "updateSetting",
+          "anchor": "baab0ea9997b",
+          "first": "function updateSetting(k,v) { US(s=>({...s,settings:{...s.settings,[k]:Number(v)}})); }"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 468,
+          "end": 468,
+          "role": "logic",
+          "symbol": "updateNotes",
+          "anchor": "1d649cb88f76",
+          "first": "function updateNotes(v) { US(s=>({...s,notes:v})); }"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 360,
+          "end": 377,
+          "role": "logic",
+          "symbol": "startNewSession",
+          "anchor": "23342c6f8a5e",
+          "first": "function startNewSession() {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 549,
+          "end": 554,
+          "role": "logic",
+          "anchor": "fa1e6f0fe296",
+          "first": "// ─────────────────────────────────────────────"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 27,
+          "end": 56,
+          "role": "style",
+          "anchor": "9ff14b341f0a",
+          "first": "/* ── Header ── */"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 108,
+          "end": 118,
+          "role": "style",
+          "anchor": "465f7cfb99e5",
+          "first": "/* ── Settings ── */"
+        }
+      ]
+    },
+    {
+      "id": "weather-snapshot",
+      "level": "component",
+      "parent": "setup-tab",
+      "title": "Weather snapshot",
+      "summary": "Fetches current conditions for the field site by device location, a place-name search or typed coordinates, and stores them with the session.",
+      "views": [
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "search",
+        "select",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 647,
+          "end": 689,
+          "role": "markup",
+          "anchor": "39f283c2f77e",
+          "first": "<!-- Weather -->"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 380,
+          "end": 425,
+          "role": "logic",
+          "symbol": "doFetchWeather",
+          "anchor": "ba21f0eac194",
+          "first": "function doFetchWeather(mode) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 291,
+          "end": 299,
+          "role": "logic",
+          "symbol": "fetchWeatherByCoords",
+          "anchor": "2a006499265c",
+          "first": "async function fetchWeatherByCoords(lat, lon, locationName) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 302,
+          "end": 312,
+          "role": "logic",
+          "symbol": "geocodePlace",
+          "anchor": "d8c8f9efa0ff",
+          "first": "async function geocodePlace(name) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 289,
+          "end": 289,
+          "role": "data",
+          "symbol": "WX_CODES",
+          "anchor": "1406748c7e66",
+          "first": "const WX_CODES = {0:\"Clear\",1:\"Mostly Clear\",2:\"Partly Cloudy\",3:\"Overcast\",45:\"Foggy\",48:\"Rime Fog\",51:\"Light Drizzle\","
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 58,
+          "end": 77,
+          "role": "style",
+          "anchor": "4680111a2495",
+          "first": "/* ── Weather ── */"
+        }
+      ]
+    },
+    {
+      "id": "receiver-log",
+      "level": "component",
+      "parent": "setup-tab",
+      "title": "Receiver event log",
+      "summary": "Lists each receiver with Power On and RTK Fixed buttons that timestamp the two events, and shows the time to first fix between them.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 691,
+          "end": 707,
+          "role": "markup",
+          "anchor": "13e74b1940ac",
+          "first": "<!-- GPS Receivers -->"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 428,
+          "end": 433,
+          "role": "logic",
+          "symbol": "addGPS",
+          "anchor": "ea2e76864c83",
+          "first": "function addGPS() {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 434,
+          "end": 434,
+          "role": "logic",
+          "symbol": "removeGPS",
+          "anchor": "3d7822125061",
+          "first": "function removeGPS(id) { US(s=>({...s,gps_receivers:s.gps_receivers.filter(g=>g.id!==id)})); }"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 435,
+          "end": 435,
+          "role": "logic",
+          "symbol": "togglePower",
+          "anchor": "c5e3cbc6199a",
+          "first": "function togglePower(id) { US(s=>({...s,gps_receivers:s.gps_receivers.map(g=>g.id===id?{...g,powered_on_at:g.powered_on_"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 436,
+          "end": 436,
+          "role": "logic",
+          "symbol": "toggleRTK",
+          "anchor": "7fbaecc7f261",
+          "first": "function toggleRTK(id)   { US(s=>({...s,gps_receivers:s.gps_receivers.map(g=>g.id===id?{...g,rtk_fixed_at:g.rtk_fixed_at"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 88,
+          "end": 98,
+          "role": "style",
+          "anchor": "74bb26c54433",
+          "first": "/* ── GPS receiver cards ── */"
+        }
+      ]
+    },
+    {
+      "id": "design-builder",
+      "level": "component",
+      "parent": "setup-tab",
+      "title": "Scenarios and blocks builder",
+      "summary": "Defines the two factors of the design: measurement scenarios, each with a description and icon, and study blocks with condition notes.",
+      "views": [
+        "list",
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 709,
+          "end": 759,
+          "role": "markup",
+          "anchor": "a455f36cffbc",
+          "first": "<!-- Scenarios -->"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 439,
+          "end": 450,
+          "role": "logic",
+          "symbol": "addScenario",
+          "anchor": "a2c36c5fbe29",
+          "first": "function addScenario() {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 451,
+          "end": 451,
+          "role": "logic",
+          "symbol": "removeScenario",
+          "anchor": "70b8440b3953",
+          "first": "function removeScenario(id) { US(s=>({...s,scenarios:s.scenarios.filter(sc=>sc.id!==id)})); }"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 454,
+          "end": 463,
+          "role": "logic",
+          "symbol": "addBlock",
+          "anchor": "a6dd44a3186a",
+          "first": "function addBlock() {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 464,
+          "end": 464,
+          "role": "logic",
+          "symbol": "removeBlock",
+          "anchor": "a2fdf6b75b68",
+          "first": "function removeBlock(id) { US(s=>({...s,blocks:s.blocks.filter(b=>b.id!==id)})); }"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 561,
+          "end": 886,
+          "role": "logic",
+          "symbol": "renderEmojiPicker",
+          "anchor": "cdb28eab03f9",
+          "first": "function renderEmojiPicker(selectedEmoji, callbackCode) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 787,
+          "end": 787,
+          "role": "logic",
+          "symbol": "pickScenarioEmoji",
+          "anchor": "d067e869713d",
+          "first": "function pickScenarioEmoji(e) { state._pendingScenarioIcon = e; render(); }"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 559,
+          "end": 559,
+          "role": "data",
+          "symbol": "EMOJI_LIST",
+          "anchor": "34767f41c301",
+          "first": "const EMOJI_LIST = ['📍','🌱','🌿','🌾','🌽','🌻','🌳','💧','🔥','⚡','🏔','🏕','🛰','📡','🔬','🧪','🏷','🔵','🟢','🟡','🟠','🔴','⬛','⬜','🔶',"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 100,
+          "end": 106,
+          "role": "style",
+          "anchor": "d724f028a302",
+          "first": "/* ── Scenario / Block builder cards ── */"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 186,
+          "end": 189,
+          "role": "style",
+          "anchor": "4de41eee727f",
+          "first": "/* ── Emoji picker ── */"
+        }
+      ]
+    },
+    {
+      "id": "schedule-preview",
+      "level": "component",
+      "parent": "setup-tab",
+      "title": "Randomized schedule preview",
+      "summary": "Builds the seeded block × scenario visit order, grouped by block, with the point count and estimated total time, and lets the person re-shuffle it before beginning collection.",
+      "views": [
+        "list",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 618,
+          "end": 637,
+          "role": "markup",
+          "anchor": "87759719a62c",
+          "first": "// Schedule preview"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 253,
+          "end": 282,
+          "role": "logic",
+          "symbol": "generateSchedule",
+          "anchor": "fb95580c517e",
+          "first": "function generateSchedule(blocks, scenarios, seed) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 231,
+          "end": 237,
+          "role": "logic",
+          "symbol": "seededRandom",
+          "anchor": "7080a114ab80",
+          "first": "function seededRandom(seed) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 238,
+          "end": 245,
+          "role": "logic",
+          "symbol": "shuffleArray",
+          "anchor": "186864aaaaf0",
+          "first": "function shuffleArray(arr, rng) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 480,
+          "end": 486,
+          "role": "logic",
+          "symbol": "regenPreview",
+          "anchor": "4af97b928c55",
+          "first": "function regenPreview() {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 471,
+          "end": 479,
+          "role": "logic",
+          "symbol": "beginCollection",
+          "anchor": "a818af433927",
+          "first": "function beginCollection() {"
+        }
+      ]
+    },
+    {
+      "id": "collect-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Collect tab",
+      "summary": "Shows one point at a time with start and stop timing, a progress bar and a block-grouped timeline of all points, and offers export and Finish once every point is done.",
+      "views": [
+        "detail panel",
+        "timeline",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "review queue",
+        "overview and detail",
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 789,
+          "end": 861,
+          "role": "logic",
+          "symbol": "rLocs",
+          "anchor": "01f37f0f5fd4",
+          "first": "function rLocs(s) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 489,
+          "end": 489,
+          "role": "logic",
+          "symbol": "startLocation",
+          "anchor": "6dbf67cfcf6f",
+          "first": "function startLocation(i) { US(s=>{const l=[...s.locations];l[i]={...l[i],start_time:new Date().toISOString(),status:'co"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 490,
+          "end": 490,
+          "role": "logic",
+          "symbol": "endLocation",
+          "anchor": "4afaec9ab2c7",
+          "first": "function endLocation(i)   { US(s=>{const l=[...s.locations];l[i]={...l[i],end_time:new Date().toISOString(),status:'comp"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 504,
+          "end": 512,
+          "role": "logic",
+          "symbol": "completeSession",
+          "anchor": "40e8e56153a5",
+          "first": "function completeSession() {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 120,
+          "end": 160,
+          "role": "style",
+          "anchor": "4f272aa3a35b",
+          "first": "/* ── Progress / Collect ── */"
+        }
+      ]
+    },
+    {
+      "id": "recollect-sheet",
+      "level": "component",
+      "parent": "collect-tab",
+      "title": "Re-collect reason sheet",
+      "summary": "Sends a completed point back to pending after the person picks a reason from a fixed list, and counts the re-collection.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "select",
+        "undo"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 800,
+          "end": 811,
+          "role": "markup",
+          "anchor": "1594a69bb5ce",
+          "first": "// Re-collect modal"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 492,
+          "end": 492,
+          "role": "logic",
+          "symbol": "promptRecollect",
+          "anchor": "1a5d6fe7610c",
+          "first": "function promptRecollect(i) { state._recollectIdx=i; state._showRecollect=true; render(); }"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 493,
+          "end": 501,
+          "role": "logic",
+          "symbol": "recollectLocation",
+          "anchor": "1b5e67faa970",
+          "first": "function recollectLocation(i, reason) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 191,
+          "end": 193,
+          "role": "style",
+          "anchor": "c4571f8d898e",
+          "first": "/* ── Re-collect modal ── */"
+        }
+      ]
+    },
+    {
+      "id": "session-history",
+      "level": "view",
+      "parent": null,
+      "title": "History and export",
+      "summary": "Lists finished sessions, opens one with its design, receivers and timed points, and exports any session as CSV or JSON.",
+      "views": [
+        "list",
+        "detail panel"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 863,
+          "end": 871,
+          "role": "logic",
+          "symbol": "rHist",
+          "anchor": "783a8ebf72cf",
+          "first": "function rHist() {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 873,
+          "end": 885,
+          "role": "logic",
+          "symbol": "rPast",
+          "anchor": "1ab12e69742b",
+          "first": "function rPast(app) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 514,
+          "end": 514,
+          "role": "logic",
+          "symbol": "viewPast",
+          "anchor": "243adc6dde9b",
+          "first": "function viewPast(id) { const s=Storage.get('gps_session_'+id); if(s){state.viewingPast=s;render();} }"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 515,
+          "end": 515,
+          "role": "logic",
+          "symbol": "closePast",
+          "anchor": "91b8af684de9",
+          "first": "function closePast() { state.viewingPast=null; render(); }"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 513,
+          "end": 513,
+          "role": "logic",
+          "symbol": "discardSession",
+          "anchor": "7b5da266c9be",
+          "first": "function discardSession() { if(!confirm('Discard current session? This cannot be undone.')) return; Storage.del('gps_act"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 524,
+          "end": 545,
+          "role": "logic",
+          "symbol": "exportCSV",
+          "anchor": "82e057d506ca",
+          "first": "function exportCSV(s) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 519,
+          "end": 523,
+          "role": "logic",
+          "symbol": "exportJSON",
+          "anchor": "16a4ef1b8eff",
+          "first": "function exportJSON(s) {"
+        },
+        {
+          "file": "code/gps-field-logger.html",
+          "start": 162,
+          "end": 166,
+          "role": "style",
+          "anchor": "064f8104033d",
+          "first": "/* ── History ── */"
+        }
+      ]
+    }
+  ]
+}

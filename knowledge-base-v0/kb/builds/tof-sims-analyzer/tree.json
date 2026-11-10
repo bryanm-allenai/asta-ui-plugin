@@ -1,0 +1,648 @@
+{
+ "interface": {
+  "title": "TOF-SIMS データ解析アプリ (TOF-SIMS Analyzer v1.0, Streamlit)",
+  "field": "Surface analysis / time-of-flight secondary ion mass spectrometry (TOF-SIMS)",
+  "stage_of_work": "Exploratory analysis after acquisition: comparing spectra across samples and exporting results for downstream use",
+  "what_it_is_for": "Load several TOF-SIMS mass spectra, put them on one binned m/z axis, normalize and scale them, and compare samples with overlays, a two-sample difference spectrum, PCA and hierarchical clustering, then export CSVs."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "Most work used the built-in demo (?demo=1): six synthetic spectra, demo_A1–A3 (Si-rich) and demo_B1–B3 (PDMS-contaminated, m/z 73 marker). The two uploaded test files (sample_positive_spectrum.csv and sample_negative_spectrum.csv) also parsed and aligned, giving 2 samples and 102 bins, and the difference spectrum worked on them. Opening / without demo shows an empty-state prompt (screens/047.webp). Checking デモデータを使用 while files are uploaded keeps the uploads (still 2 samples; screens/053.webp). With only two samples, the PCA and HCA tabs both stop with a StreamlitInvalidMinMaxError. The UI is in Japanese. st.dataframe tables render (the pyarrow problem is fixed)."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Find compositional differences between groups of samples from their mass spectra",
+  "specific": "Compare Si-rich and PDMS-contaminated TOF-SIMS spectra and find the m/z peaks that separate them (e.g. m/z 73)",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Bring the spectra in and put them on a common axis",
+    "specific": "Load spectra and align them to a binned m/z grid",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load a set of spectra",
+      "specific": "Turn on demo data or upload .asc/.txt/.csv files in the sidebar (uploads take priority over the demo checkbox)",
+      "screens": [
+       "screens/005.webp",
+       "screens/047.webp",
+       "screens/049.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened /?demo=1 (デモデータを使用 checked, 6 samples loaded)",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Upload and gave sample_positive_spectrum.csv + sample_negative_spectrum.csv",
+        "screens": [
+         "screens/048.webp",
+         "screens/049.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Choose the bin width of the shared axis",
+      "specific": "Set ビン幅 (m/z Da) to 0.1 / 0.5 / 1.0 Da",
+      "screens": [
+       "screens/014.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened ビン幅 dropdown (0.1, 0.5, 1.0 Da)",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 0.5 Da (bins went from 102 to 201)",
+        "screens": [
+         "screens/014.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Inspect the aligned data table",
+      "specific": "Look at the アライメント後データテーブル (samples × m/z bins)",
+      "screens": [
+       "screens/006.webp",
+       "screens/044.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to アライメント後データテーブル",
+        "screens": [
+         "screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Normalize the intensities and check the effect on the overlay",
+    "specific": "Choose 規格化 and view the overlaid spectra",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Normalize spectra and compare raw and normalized overlays",
+      "specific": "Switch 規格化 between なし and TIC規格化 and toggle 規格化後を表示 / 対数スケール; optionally double-click a legend entry to isolate one spectrum",
+      "screens": [
+       "screens/008.webp",
+       "screens/009.webp",
+       "screens/012.webp",
+       "screens/061.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "checked 規格化後を表示 (TIC-normalized overlay)",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "checked 対数スケール (Y軸)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 規格化 なし (overlay back to counts)",
+        "screens": [
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose TIC規格化 again",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "optional: double-clicked demo_A1.asc in the legend (only that trace shown)",
+        "screens": [
+         "screens/061.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Compare two samples directly",
+    "specific": "差分スペクトル解析 (sample B − sample A)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Compute a difference spectrum between a reference and a comparison sample and list the largest differences",
+      "specific": "Pick サンプルA（基準） and サンプルB（比較）, read the signed bar plot and the 差分上位ピーク（絶対値） table; optionally box-zoom and hover a bar for its exact value (the table's built-in CSV download gave no file; see not_done)",
+      "screens": [
+       "screens/016.webp",
+       "screens/017.webp",
+       "screens/056.webp",
+       "screens/050.webp",
+       "screens/057.webp",
+       "screens/058.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened 差分スペクトル解析 tab (default A1 vs A2)",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose サンプルB = demo_B1.asc (m/z 73 ranked #2, +0.1007)",
+        "screens": [
+         "screens/016.webp",
+         "screens/017.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose サンプルA = demo_B2.asc vs B = demo_A2.asc (m/z 73 at −0.141, sign flipped)",
+        "screens": [
+         "screens/055.webp",
+         "screens/056.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "on uploaded files: positive vs negative spectrum (top: m/z 28, 16, 17)",
+        "screens": [
+         "screens/050.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "optional: dragged a zoom box over m/z 65–80",
+        "screens": [
+         "screens/057.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "optional: hovered the m/z 73 bar (tooltip 73, −0.1410451)",
+        "screens": [
+         "screens/058.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Find groupings across all samples with multivariate analysis",
+    "specific": "Choose スケーリング, then the 主成分分析 (PCA) and クラスタリング (HCA) tabs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Choose a centering/scaling method for the multivariate steps",
+      "specific": "Pick スケーリング: なし / 平均中心化 / オートスケーリング / ポアソンスケーリング (affects PCA/HCA, not the overlay)",
+      "screens": [
+       "screens/011.webp",
+       "screens/019.webp",
+       "screens/026.webp",
+       "screens/027.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose オートスケーリング (overlay unchanged; PCA PC1 55.6%)",
+        "screens": [
+         "screens/011.webp",
+         "screens/019.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose ポアソンスケーリング (PCA PC1 97.8%)",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 平均中心化 (PCA PC1 97.8%, PC2 1.5%)",
+        "screens": [
+         "screens/027.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check whether samples separate into groups on a principal-component score plot, then read which variables drive the separation in the loadings",
+      "specific": "Set 主成分数, choose score-plot X/Y axes and see whether A and B samples split (they split along PC1), read 寄与率 and the ローディングプロット (PC1: m/z 12, 15, 73)",
+      "screens": [
+       "screens/019.webp",
+       "screens/020.webp",
+       "screens/024.webp",
+       "screens/025.webp",
+       "screens/030.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened 主成分分析 (PCA) tab (groups A and B split along PC1)",
+        "screens": [
+         "screens/018.webp",
+         "screens/019.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to 寄与率 and ローディングプロット PC1 (m/z 12, 15, 73 negative)",
+        "screens": [
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged 表示する上位m/z数 slider 30→15",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 表示する主成分 = PC2",
+        "screens": [
+         "screens/025.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged 主成分数 slider 3→5",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Y軸 = PC3 (0.6%)",
+        "screens": [
+         "screens/030.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Cluster samples hierarchically and view their pairwise distances",
+      "specific": "クラスタリング対象 = サンプル（行）, choose 距離計算 and リンク法, read the dendrogram and サンプル間距離ヒートマップ",
+      "screens": [
+       "screens/032.webp",
+       "screens/033.webp",
+       "screens/037.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened クラスタリング (HCA) tab (ward / euclidean: A and B clusters)",
+        "screens": [
+         "screens/031.webp",
+         "screens/032.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to サンプル間距離ヒートマップ",
+        "screens": [
+         "screens/033.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose リンク法 = average",
+        "screens": [
+         "screens/034.webp",
+         "screens/035.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 距離計算 = correlation",
+        "screens": [
+         "screens/036.webp",
+         "screens/037.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Cluster the most variable variables to find co-varying markers",
+      "specific": "クラスタリング対象 = 主要m/z（列）, set 使用するm/z数（分散上位）",
+      "screens": [
+       "screens/039.webp",
+       "screens/042.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose 主要m/z（列） (50 top-variance m/z)",
+        "screens": [
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged 使用するm/z数 slider 50→20 (m/z 11.5–15.5 and 72.5–73.5 cluster together)",
+        "screens": [
+         "screens/041.webp",
+         "screens/042.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Export results for downstream use",
+    "specific": "Download CSVs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Export the principal-component scores",
+      "specific": "Press 📥 スコアをCSVでダウンロード (pca_scores.csv: sample × PC1..PCn)",
+      "screens": [
+       "screens/022.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 📥 スコアをCSVでダウンロード",
+        "screens": [
+         "screens/022.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the aligned sample × variable table",
+      "specific": "Press 📥 アライメントデータをCSVでダウンロード (aligned_spectra.csv, raw counts per bin at the chosen ビン幅; 1 Da is only the default)",
+      "screens": [
+       "screens/044.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 📥 アライメントデータをCSVでダウンロード",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Reopen the tool directly on a chosen analysis view (a convenience for sharing, not an analysis step)",
+      "specific": "Load /?demo=1&tab=pca|diff (?tab=raw|diff|pca|hca moves that tab to first position; other settings return to defaults)",
+      "screens": [
+       "screens/045.webp",
+       "screens/054.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "navigated to /?demo=1&tab=pca",
+        "screens": [
+         "screens/045.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "navigated to /?demo=1&tab=diff",
+        "screens": [
+         "screens/054.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Multi-spectrum loader with binning to a common axis",
+   "general": "Load several 1-D spectra from files (or a built-in demo set), resample them onto one shared binned axis with a chosen bin width, show a summary of sample count, axis range and bin count, and download the aligned table",
+   "specific": "Upload .asc/.txt/.csv files or check データを使用, pick ビン幅 0.1/0.5/1.0 Da, read the green banner (e.g. 6 サンプル | m/z 0.5–100.5 | ビン数 201), the アライメント後データテーブル and 📥 アライメントデータをCSVでダウンロード (raw counts at the chosen bin width)",
+   "steps": [
+    "Upload several spectrum files or enable the demo set",
+    "Choose the bin width",
+    "Read the summary banner",
+    "Inspect the aligned samples × bins table",
+    "Download the aligned table as CSV"
+   ],
+   "serves_tasks": [
+    "Load a set of spectra",
+    "Choose the bin width of the shared axis",
+    "Inspect the aligned data table",
+    "Export the aligned sample × variable table"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/014.webp",
+    "screens/049.webp",
+    "screens/006.webp",
+    "screens/044.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Overlay plot with normalization and log toggles",
+   "general": "Overlay many spectra in one interactive plot and switch between raw and normalized intensities and between linear and log y-axis; isolate traces from the legend",
+   "specific": "読み込みスペクトル（重ね書きプロット） with 規格化後を表示 and 対数スケール (Y軸) checkboxes, driven by the sidebar 規格化 (なし / TIC規格化); Plotly legend double-click isolates a sample",
+   "steps": [
+    "Pick a normalization in the sidebar",
+    "Check 'show normalized'",
+    "Toggle log y-axis",
+    "Double-click a legend entry to isolate one spectrum"
+   ],
+   "serves_tasks": [
+    "Normalize spectra and compare raw and normalized overlays"
+   ],
+   "screens": [
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/012.webp",
+    "screens/061.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Two-sample difference spectrum with ranked peak table",
+   "general": "Pick a reference and a comparison sample, plot their signed difference per bin coloured by which sample is higher, and list the bins with the largest absolute difference; zoom and hover to read a peak",
+   "specific": "差分スペクトル解析: サンプルA（基準） / サンプルB（比較） dropdowns, red/blue bar chart of B−A ('X 増加' legend), 差分上位ピーク（絶対値） table; box-zoom and hover tooltip on bars",
+   "steps": [
+    "Choose reference sample A",
+    "Choose comparison sample B",
+    "Read the signed difference bar chart",
+    "Read the top-|difference| m/z table",
+    "Box-zoom a region and hover a bar for its exact value"
+   ],
+   "serves_tasks": [
+    "Compute a difference spectrum between a reference and a comparison sample and list the largest differences"
+   ],
+   "screens": [
+    "screens/016.webp",
+    "screens/017.webp",
+    "screens/056.webp",
+    "screens/057.webp",
+    "screens/058.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "PCA explorer: scores, explained variance, loadings, export",
+   "general": "Run PCA with a chosen number of components on centered/scaled data, plot any pair of components as a labelled score plot, show explained variance per component, show the top-N loadings for a chosen component, and download the scores",
+   "specific": "主成分分析 (PCA): 主成分数 slider (2–6), X軸/Y軸 dropdowns with % variance, 寄与率 bar chart, ローディングプロット with 表示する主成分 and 表示する上位m/z数 (10–100) slider, 📥 スコアをCSVでダウンロード; results depend on the sidebar スケーリング choice",
+   "steps": [
+    "Pick a centering/scaling method in the sidebar",
+    "Set number of components",
+    "Choose score-plot X and Y components",
+    "Choose the component and top-N for the loading plot",
+    "Download the scores CSV"
+   ],
+   "serves_tasks": [
+    "Check whether samples separate into groups on a principal-component score plot, then read which variables drive the separation in the loadings",
+    "Choose a centering/scaling method for the multivariate steps",
+    "Export the principal-component scores"
+   ],
+   "screens": [
+    "screens/019.webp",
+    "screens/020.webp",
+    "screens/024.webp",
+    "screens/025.webp",
+    "screens/026.webp",
+    "screens/030.webp",
+    "screens/022.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Hierarchical clustering of rows or top-variance columns with distance heatmap",
+   "general": "Cluster either the samples or the N most variable variables with a chosen distance metric and linkage on the centered/scaled data, show the dendrogram, and (for samples) a pairwise distance heatmap",
+   "specific": "クラスタリング (HCA): input follows the sidebar スケーリング; クラスタリング対象 サンプル（行）/主要m/z（列）, 距離計算 euclidean/cosine/correlation/cityblock, リンク法 ward/complete/average/single, 使用するm/z数（分散上位） slider (10–200) in column mode, matplotlib dendrogram + Plotly サンプル間距離ヒートマップ",
+   "steps": [
+    "Pick a centering/scaling method in the sidebar",
+    "Choose whether to cluster samples or variables",
+    "Choose the distance metric and linkage",
+    "In variable mode set how many top-variance m/z to use",
+    "Read the dendrogram (and the distance heatmap for samples)"
+   ],
+   "serves_tasks": [
+    "Choose a centering/scaling method for the multivariate steps",
+    "Cluster samples hierarchically and view their pairwise distances",
+    "Cluster the most variable variables to find co-varying markers"
+   ],
+   "screens": [
+    "screens/032.webp",
+    "screens/033.webp",
+    "screens/037.webp",
+    "screens/039.webp",
+    "screens/042.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "PCA and HCA tabs with the uploaded test files: both show StreamlitInvalidMinMaxError (主成分数 slider min = max = 2 when only 2 samples are loaded, app.py line 410), which also stops the HCA tab (screens/051.webp, screens/052.webp)",
+  "Sample-distance heatmap in 主要m/z（列） mode: none was shown in that mode"
+ ],
+ "not_done": [
+  "PCA/HCA on the uploaded files: blocked by the 2-sample slider error. Uploaded files also replace the demo data rather than adding to it, so no third sample could be added.",
+  "Dead end in the difference task (t7): the built-in 'Download as CSV' icon on the 差分上位ピーク table did not produce a file in this browser (screens/059.webp), so the peak list was not exported. The app has no dedicated export button for it.",
+  "The aligned CSV export contains raw counts only. The app gives no way to export normalized or scaled data, loadings or the HCA result.",
+  "The 規格化 control offers only なし and TIC規格化. Mean-centering, autoscaling and Poisson scaling are under スケーリング and change only PCA/HCA, not the overlay (screens/011.webp).",
+  "Overlay y-axis label still reads [TIC規格化] when normalization is なし (screens/012.webp). The matplotlib dendrogram shows tofu boxes in place of Japanese title and axis text (no CJK font).",
+  "Did not try the 0.1 Da bin width, the cosine and cityblock distances, or complete and single linkage, to stay within about 100 actions.",
+  "After isolating demo_A1 by double-clicking the legend, a single click on demo_B1 did not bring it back (screens/062.webp). Not explored further."
+ ],
+ "applied": [
+  "Moved t5 (scaling) to the start of the multivariate phase and relabelled its general 'Choose a centering/scaling method for the multivariate steps'",
+  "Renamed the overlay phase to normalization only",
+  "Fixed t13 specific: raw counts at the chosen bin width, 1 Da only the default",
+  "Dropped the empty-state and demo-while-uploaded actions from t1's one-of branch and recorded both as context in the data note",
+  "Folded t6 into t4 and t8 into t7 as optional actions, merging their screens into the parent tasks",
+  "Removed the deep-link phase; kept t14 as an optional task in the export phase, labelled as a convenience, not an analysis step",
+  "Made t9's general outcome explicit: check group separation on the score plot, then read the driving m/z in the loadings",
+  "Noted the failed peak-table export in t7's specific and labelled it as a t7 dead end in not_done",
+  "Added the aligned-CSV download step and task to f1",
+  "Credited the scaling choice to f5 as well as f4 (step and serves_tasks)",
+  "Updated feature serves_tasks for the merged and relabelled tasks"
+ ],
+ "open_fixes": [
+  "Confirm that the スケーリング choice changes the HCA dendrogram and heatmap. This run only compared PCA results across scaling methods, so f5's dependence on scaling rests on the tree's own description.",
+  "Whether a standalone preprocessing-panel feature is warranted depends on seeing scaling affect HCA, so that waits on the check above. For now scaling is credited to both f4 and f5.",
+  "Retry exporting the 差分上位ピーク table in another browser or download setup. In this run the table's built-in download produced no file."
+ ],
+ "screens_at": "pilot/public/runs/tof-sims-analyzer/20261031-001831/",
+ "screens_filed": {
+  "screens/005.webp": "screens/005.webp",
+  "screens/008.webp": "screens/008.webp",
+  "screens/016.webp": "screens/016.webp",
+  "screens/011.webp": "screens/011.webp",
+  "screens/022.webp": "screens/022.webp"
+ }
+}

@@ -1,0 +1,869 @@
+{
+  "schema": "astaui.card/1",
+  "id": "ouvia-translation-study",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T14:15:46Z"
+  },
+  "app": {
+    "title": "Ouvia Study Portal: multi-role human evaluation of speech translation",
+    "summary": "A researcher loads source passages with comprehension questions, participants and assignments from CSV files, and each passage becomes an entry that moves through fixed stages: recorded, translated, evaluated, validated and completed. A sender reads the passage aloud and saves a recording. After the speech is machine-translated offline, a receiver reads the translation and answers the questions in the target language. A bilingual validator listens to the source audio, marks each answer correct or incorrect, flags any audio-text mismatch and rates the translation on a slider. Finally the sender rates satisfaction, trust and reliance on Likert scales, first without and then with the validator's results. The researcher follows progress in counts and charts, then exports the entries and a full JSON snapshot for analysis.",
+    "task": {
+      "text": "Run a staged, multi-role user study where each item passes from speaker to listener to checker, collecting answers, correctness judgements and ratings about each machine translation.",
+      "verbs": [
+        "record",
+        "rate",
+        "review",
+        "annotate",
+        "monitor",
+        "curate"
+      ]
+    },
+    "data": {
+      "text": "Source passages with comprehension questions and reference answers; one audio recording and one machine translation per assigned entry; free-text answers, correct/incorrect marks, quality scores and Likert survey ratings tied to entries and to participants with demographic fields.",
+      "item": "a conversation entry: one source passage assigned to one speaker, with its recording, translation, answers and judgements",
+      "shapes": [
+        "table",
+        "text corpus",
+        "media",
+        "judgements",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "collecting human judgements in a user study of translation output, before statistical analysis",
+      "terms": [
+        "collect",
+        "review"
+      ]
+    },
+    "mechanism": {
+      "text": "Each role gets a task page that shows only the materials it needs and saves a locked submission, which moves the entry to the next stage of a fixed status pipeline. Admin pages upload CSVs, list and bulk-edit entries by status, chart progress by status and gender, and export the results.",
+      "views": [
+        "form",
+        "table view",
+        "list",
+        "document reader",
+        "summary stats",
+        "bar chart",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "score",
+        "accept or reject",
+        "search",
+        "sort",
+        "multi-select",
+        "filter",
+        "inline edit",
+        "hover for detail"
+      ],
+      "patterns": [
+        "status pipeline",
+        "review queue",
+        "rubric",
+        "dashboard",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "user-centred human evaluation of speech translation in NLP",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "speech translation",
+        "human evaluation",
+        "question answering evaluation"
+      ]
+    },
+    "workflow": {
+      "name": "pass each item through a chain of participant roles that each add a judgement",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "The admin uploads CSVs of conversations (passage, questions, answers, translated questions), users, entries, and receiver and validator assignments. Participants can also sign up by role link, which samples their assignments.",
+          "parts": [
+            "admin-dashboard"
+          ]
+        },
+        {
+          "step": "record a spoken version of each source item",
+          "here": "The sender reads the passage and clicks Record. A countdown and live waveform run while recording, and Re-record is allowed until Save, which locks the audio and marks the entry recorded.",
+          "parts": [
+            "sender-recorder",
+            "participant-home"
+          ]
+        },
+        {
+          "step": "answer questions about each item from the translated version only",
+          "here": "The receiver sees the machine-translated conversation beside the translated questions and types an answer to each, or NA. Every answer must be filled before saving.",
+          "parts": [
+            "receiver-answers"
+          ]
+        },
+        {
+          "step": "score each item against criteria",
+          "here": "The validator listens to the source audio, marks each receiver answer Yes/No for correctness, ticks an audio-text mismatch box and sets a 0–6 meaning-preservation slider. Save stays blocked until every question is marked and the slider has been moved.",
+          "parts": [
+            "validator-review"
+          ]
+        },
+        {
+          "step": "rate the item on fixed scales, before and after seeing feedback",
+          "here": "The sender rates satisfaction, trust and reliance on 1–5 Likert scales. Part 1 shows only the source and the translation. Part 2 adds the validator's per-question results and quality score, and the sender rates again.",
+          "parts": [
+            "final-survey"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "Participants see a progress bar and get a confirmation code when they finish. The admin sees per-user task counts and charts of assignments and entry status by gender.",
+          "parts": [
+            "participant-home",
+            "study-stats"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The admin searches and bulk-edits the entries table, exports it as CSV and downloads a full JSON snapshot of entries, responses, reviews and surveys.",
+          "parts": [
+            "entries-table"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each entry passes through a fixed lifecycle (ready, recorded, translated, evaluated, validated, completed). Moving an entry back a stage deletes everything recorded after that stage, and the app lists those deletions before it runs.",
+        "Each role sees only part of the material: receivers see only the translation, validators judge answers against the source audio, and senders rate the translation first without and then with the validator's results.",
+        "Translation quality is measured by whether comprehension questions are answered correctly from the translation, alongside a holistic 0–6 rating.",
+        "Assignments can be balanced by participant gender and trans status, and the admin can require that a sender's assignments match the sender's gender.",
+        "The receiver interface can be switched to the target language with a locale file, and admins can preview every role's page with mock data."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "admin-dashboard",
+      "level": "view",
+      "parent": null,
+      "title": "Admin dashboard",
+      "summary": "Upload conversations, users, entries and assignments as CSV, toggle study settings and copy role sign-up links.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/ouvia/templates/dashboard.html",
+          "start": 67,
+          "end": 75,
+          "role": "markup",
+          "symbol": "form.needs-validation:1",
+          "anchor": "ac8e6153a695",
+          "first": "<form method=\"post\" enctype=\"multipart/form-data\" class=\"needs-validation\" novalidate>"
+        },
+        {
+          "file": "code/ouvia/templates/dashboard.html",
+          "start": 121,
+          "end": 129,
+          "role": "markup",
+          "symbol": "form.needs-validation:2",
+          "anchor": "4e106cdd8a43",
+          "first": "<form method=\"post\" enctype=\"multipart/form-data\" class=\"needs-validation\" novalidate>"
+        },
+        {
+          "file": "code/ouvia/templates/dashboard.html",
+          "start": 187,
+          "end": 195,
+          "role": "markup",
+          "symbol": "form.needs-validation:3",
+          "anchor": "2982772a8525",
+          "first": "<form method=\"post\" enctype=\"multipart/form-data\" class=\"needs-validation\" novalidate>"
+        },
+        {
+          "file": "code/ouvia/templates/dashboard.html",
+          "start": 259,
+          "end": 267,
+          "role": "markup",
+          "symbol": "form.needs-validation:4",
+          "anchor": "c410d1f68154",
+          "first": "<form method=\"post\" enctype=\"multipart/form-data\" class=\"needs-validation\" novalidate>"
+        },
+        {
+          "file": "code/ouvia/templates/dashboard.html",
+          "start": 347,
+          "end": 355,
+          "role": "markup",
+          "symbol": "form.needs-validation:5",
+          "anchor": "d13f103f61b9",
+          "first": "<form method=\"post\" enctype=\"multipart/form-data\" class=\"needs-validation\" novalidate>"
+        },
+        {
+          "file": "code/ouvia/templates/dashboard.html",
+          "start": 417,
+          "end": 426,
+          "role": "markup",
+          "symbol": "form.d-flex:2",
+          "anchor": "874c289f79c4",
+          "first": "<form method=\"post\" class=\"d-flex flex-column flex-md-row align-items-md-center gap-3\">"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 2145,
+          "end": 2316,
+          "role": "logic",
+          "symbol": "dashboard",
+          "anchor": "8c023358cc05",
+          "first": "def dashboard():"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 711,
+          "end": 748,
+          "role": "logic",
+          "symbol": "handle_conversation_upload",
+          "anchor": "c9ffff0cbf43",
+          "first": "def handle_conversation_upload(uploaded_file):"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 1224,
+          "end": 1321,
+          "role": "logic",
+          "symbol": "handle_conversation_entry_upload",
+          "anchor": "1fa9a59af61a",
+          "first": "def handle_conversation_entry_upload(uploaded_file):"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 1547,
+          "end": 1638,
+          "role": "logic",
+          "symbol": "handle_receiver_assignment_upload",
+          "anchor": "297515ac84bc",
+          "first": "def handle_receiver_assignment_upload(uploaded_file):"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 1641,
+          "end": 1732,
+          "role": "logic",
+          "symbol": "handle_validator_assignment_upload",
+          "anchor": "38810ad96958",
+          "first": "def handle_validator_assignment_upload(uploaded_file):"
+        }
+      ]
+    },
+    {
+      "id": "study-stats",
+      "level": "view",
+      "parent": null,
+      "title": "Study statistics",
+      "summary": "Charts and tables of assignments per role and entry status, broken down by participant gender.",
+      "views": [
+        "bar chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/ouvia/templates/admin_stats.html",
+          "start": 25,
+          "end": 44,
+          "role": "markup",
+          "symbol": "table.table:1",
+          "anchor": "d34a9c74e2dd",
+          "first": "<table class=\"table table-sm table-striped mb-0 align-middle\">"
+        },
+        {
+          "file": "code/ouvia/templates/admin_stats.html",
+          "start": 47,
+          "end": 47,
+          "role": "markup",
+          "symbol": "#assignmentsByGenderChart",
+          "anchor": "20860f85bd88",
+          "first": "<canvas id=\"assignmentsByGenderChart\" height=\"160\"></canvas>"
+        },
+        {
+          "file": "code/ouvia/templates/admin_stats.html",
+          "start": 68,
+          "end": 68,
+          "role": "markup",
+          "symbol": "#statusCountsChart",
+          "anchor": "87b65ad4756e",
+          "first": "<canvas id=\"statusCountsChart\" height=\"140\"></canvas>"
+        },
+        {
+          "file": "code/ouvia/templates/admin_stats.html",
+          "start": 77,
+          "end": 77,
+          "role": "markup",
+          "symbol": "#statusByGenderChart",
+          "anchor": "46afe13d3941",
+          "first": "<canvas id=\"statusByGenderChart\" height=\"220\"></canvas>"
+        },
+        {
+          "file": "code/ouvia/templates/admin_stats.html",
+          "start": 80,
+          "end": 99,
+          "role": "markup",
+          "symbol": "table.table:2",
+          "anchor": "757f46ee61f1",
+          "first": "<table class=\"table table-sm table-striped mb-0 align-middle\">"
+        },
+        {
+          "file": "code/ouvia/templates/admin_stats.html",
+          "start": 112,
+          "end": 160,
+          "role": "logic",
+          "anchor": "a36804d0032a",
+          "first": "const genders = {{ genders|tojson }};"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 2321,
+          "end": 2432,
+          "role": "logic",
+          "symbol": "admin_stats",
+          "anchor": "b09e558b9571",
+          "first": "def admin_stats():"
+        }
+      ]
+    },
+    {
+      "id": "entries-table",
+      "level": "view",
+      "parent": null,
+      "title": "Conversation entries",
+      "summary": "A searchable list of all entries with their status and roles, where the admin can select several to delete or reassign, and can export them as CSV or as a JSON snapshot.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "search",
+        "sort",
+        "multi-select",
+        "inline edit",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/ouvia/templates/conversation_entries.html",
+          "start": 61,
+          "end": 106,
+          "role": "markup",
+          "symbol": "#conversation-entries-table",
+          "anchor": "06f13bd14ca3",
+          "first": "<table id=\"conversation-entries-table\" class=\"table table-striped table-hover align-middle mb-0\">"
+        },
+        {
+          "file": "code/ouvia/templates/conversation_entries.html",
+          "start": 38,
+          "end": 56,
+          "role": "markup",
+          "symbol": "#bulk-toolbar",
+          "anchor": "400a4f60ea2b",
+          "first": "<div id=\"bulk-toolbar\" class=\"card border-0 shadow-sm mb-3\">"
+        },
+        {
+          "file": "code/ouvia/templates/conversation_entries.html",
+          "start": 140,
+          "end": 158,
+          "role": "markup",
+          "symbol": "#roleEditModal",
+          "anchor": "52b4b014c64f",
+          "first": "<div class=\"modal fade\" id=\"roleEditModal\" tabindex=\"-1\" aria-hidden=\"true\">"
+        },
+        {
+          "file": "code/ouvia/templates/conversation_entries.html",
+          "start": 8,
+          "end": 8,
+          "role": "style",
+          "symbol": "#bulk-toolbar.active",
+          "anchor": "15be9aac05d8",
+          "first": "#bulk-toolbar.active { display: flex; }"
+        },
+        {
+          "file": "code/ouvia/templates/conversation_entries.html",
+          "start": 186,
+          "end": 190,
+          "role": "logic",
+          "symbol": "getSelectedIds",
+          "anchor": "9d682ba88374",
+          "first": "function getSelectedIds() {"
+        },
+        {
+          "file": "code/ouvia/templates/conversation_entries.html",
+          "start": 192,
+          "end": 200,
+          "role": "logic",
+          "symbol": "updateToolbar",
+          "anchor": "bdad5457c9e4",
+          "first": "function updateToolbar() {"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 2464,
+          "end": 2530,
+          "role": "logic",
+          "symbol": "conversation_entries",
+          "anchor": "7774cf11ab11",
+          "first": "def conversation_entries():"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 2535,
+          "end": 2612,
+          "role": "logic",
+          "symbol": "export_conversation_entries",
+          "anchor": "97169498975f",
+          "first": "def export_conversation_entries():"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 2739,
+          "end": 2886,
+          "role": "logic",
+          "symbol": "export_snapshot_json",
+          "anchor": "4d2d9a44f9e1",
+          "first": "def export_snapshot_json():"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 2675,
+          "end": 2734,
+          "role": "logic",
+          "symbol": "bulk_update_entry_role",
+          "anchor": "7ced357172ef",
+          "first": "def bulk_update_entry_role():"
+        }
+      ]
+    },
+    {
+      "id": "participant-home",
+      "level": "view",
+      "parent": null,
+      "title": "Participant assignments",
+      "summary": "Lists the participant's assigned entries with status and Start/Continue buttons, shows progress and role instructions, and gives a confirmation code when all tasks are done.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "search",
+        "select"
+      ],
+      "patterns": [
+        "review queue"
+      ],
+      "spans": [
+        {
+          "file": "code/ouvia/templates/participant_home.html",
+          "start": 141,
+          "end": 164,
+          "role": "markup",
+          "symbol": "#entries-table",
+          "anchor": "013cea612462",
+          "first": "<table id=\"entries-table\" class=\"table table-striped table-hover align-middle mb-0\">"
+        },
+        {
+          "file": "code/ouvia/templates/participant_home.html",
+          "start": 25,
+          "end": 25,
+          "role": "markup",
+          "symbol": "#confirmationCode",
+          "anchor": "29b34f649560",
+          "first": "<input type=\"text\" class=\"form-control form-control-lg font-monospace fw-bold text-center\" id=\"confirmationCode\" value=\""
+        },
+        {
+          "file": "code/ouvia/templates/participant_home.html",
+          "start": 178,
+          "end": 214,
+          "role": "markup",
+          "symbol": "#instructionsModal",
+          "anchor": "38e8bac230a7",
+          "first": "<div class=\"modal fade\" id=\"instructionsModal\" tabindex=\"-1\" aria-labelledby=\"instructionsModalLabel\" aria-hidden=\"true\""
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 3875,
+          "end": 4073,
+          "role": "logic",
+          "symbol": "participant_home",
+          "anchor": "afe6a58c717c",
+          "first": "def participant_home():"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 4305,
+          "end": 4367,
+          "role": "logic",
+          "symbol": "_calculate_user_progress",
+          "anchor": "fd5634ed9f4b",
+          "first": "def _calculate_user_progress(user: \"User\") -> Optional[dict[str, int]]:"
+        }
+      ]
+    },
+    {
+      "id": "sender-recorder",
+      "level": "view",
+      "parent": null,
+      "title": "Sender recording task",
+      "summary": "Shows the passage to read and records it, with a countdown, a live waveform, playback, re-record and a save that locks the audio.",
+      "views": [
+        "document reader",
+        "line chart"
+      ],
+      "interactions": [
+        "record",
+        "undo"
+      ],
+      "patterns": [
+        "review queue"
+      ],
+      "spans": [
+        {
+          "file": "code/ouvia/templates/sender_annotation.html",
+          "start": 18,
+          "end": 96,
+          "role": "markup",
+          "anchor": "be9575f417ca",
+          "first": "<div class=\"row justify-content-center\">"
+        },
+        {
+          "file": "code/ouvia/templates/sender_annotation.html",
+          "start": 136,
+          "end": 178,
+          "role": "logic",
+          "symbol": "drawWaveform",
+          "anchor": "e3b9c8264127",
+          "first": "const drawWaveform = () => {"
+        },
+        {
+          "file": "code/ouvia/templates/sender_annotation.html",
+          "start": 193,
+          "end": 211,
+          "role": "logic",
+          "symbol": "startCountdown",
+          "anchor": "5cd3a27954b7",
+          "first": "const startCountdown = () => {"
+        },
+        {
+          "file": "code/ouvia/templates/sender_annotation.html",
+          "start": 229,
+          "end": 243,
+          "role": "logic",
+          "symbol": "setButtonsForRecording",
+          "anchor": "c9c9f0942790",
+          "first": "const setButtonsForRecording = () => {"
+        },
+        {
+          "file": "code/ouvia/templates/sender_annotation.html",
+          "start": 245,
+          "end": 254,
+          "role": "logic",
+          "symbol": "setButtonsForPlayback",
+          "anchor": "959ed617fffe",
+          "first": "const setButtonsForPlayback = () => {"
+        },
+        {
+          "file": "code/ouvia/templates/sender_annotation.html",
+          "start": 280,
+          "end": 302,
+          "role": "logic",
+          "symbol": "initializeExistingRecording",
+          "anchor": "7632e62ee224",
+          "first": "const initializeExistingRecording = () => {"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 5179,
+          "end": 5269,
+          "role": "logic",
+          "symbol": "save_sender_recording",
+          "anchor": "a29122b1cf87",
+          "first": "def save_sender_recording(entry_id: int):"
+        }
+      ]
+    },
+    {
+      "id": "receiver-answers",
+      "level": "view",
+      "parent": null,
+      "title": "Receiver comprehension task",
+      "summary": "Shows the machine-translated conversation beside translated questions, and saves the receiver's typed answers once every question has one.",
+      "views": [
+        "side-by-side panes",
+        "document reader",
+        "form"
+      ],
+      "interactions": [
+        "write notes"
+      ],
+      "patterns": [
+        "review queue"
+      ],
+      "spans": [
+        {
+          "file": "code/ouvia/templates/receiver_annotation.html",
+          "start": 77,
+          "end": 159,
+          "role": "markup",
+          "anchor": "f6777205f8dd",
+          "first": "<div class=\"row justify-content-center\">"
+        },
+        {
+          "file": "code/ouvia/templates/receiver_annotation.html",
+          "start": 13,
+          "end": 23,
+          "role": "style",
+          "symbol": ".receiver-translation-card",
+          "anchor": "0c15cac82a93",
+          "first": ".receiver-translation-card {"
+        },
+        {
+          "file": "code/ouvia/templates/receiver_annotation.html",
+          "start": 7,
+          "end": 11,
+          "role": "style",
+          "symbol": ".receiver-translation-wrapper",
+          "anchor": "9e5c29ff53f8",
+          "first": ".receiver-translation-wrapper {"
+        },
+        {
+          "file": "code/ouvia/templates/receiver_annotation.html",
+          "start": 211,
+          "end": 217,
+          "role": "logic",
+          "symbol": "setStatus",
+          "anchor": "6b6445a4fb33",
+          "first": "const setStatus = (message, cssClass = '') => {"
+        },
+        {
+          "file": "code/ouvia/templates/receiver_annotation.html",
+          "start": 219,
+          "end": 223,
+          "role": "logic",
+          "symbol": "updateNextButton",
+          "anchor": "8ef517b51324",
+          "first": "const updateNextButton = () => {"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 5274,
+          "end": 5420,
+          "role": "logic",
+          "symbol": "save_receiver_responses",
+          "anchor": "44ad442c3367",
+          "first": "def save_receiver_responses(entry_id: int):"
+        }
+      ]
+    },
+    {
+      "id": "validator-review",
+      "level": "view",
+      "parent": null,
+      "title": "Validator review task",
+      "summary": "Plays the source audio, has the validator mark each receiver answer correct or incorrect and flag audio-text mismatch, and takes a 0–6 translation quality score on a labelled slider.",
+      "views": [
+        "table view",
+        "document reader",
+        "form"
+      ],
+      "interactions": [
+        "accept or reject",
+        "score"
+      ],
+      "patterns": [
+        "rubric",
+        "review queue"
+      ],
+      "spans": [
+        {
+          "file": "code/ouvia/templates/validator_annotation.html",
+          "start": 120,
+          "end": 286,
+          "role": "markup",
+          "anchor": "57b359483dc6",
+          "first": "<div class=\"col-xl-9\">"
+        },
+        {
+          "file": "code/ouvia/templates/validator_annotation.html",
+          "start": 5,
+          "end": 8,
+          "role": "style",
+          "symbol": ".slider-wrapper",
+          "anchor": "b4b22991d5ab",
+          "first": ".slider-wrapper {"
+        },
+        {
+          "file": "code/ouvia/templates/validator_annotation.html",
+          "start": 24,
+          "end": 31,
+          "role": "style",
+          "symbol": ".ticks",
+          "anchor": "e5692b260011",
+          "first": ".ticks {"
+        },
+        {
+          "file": "code/ouvia/templates/validator_annotation.html",
+          "start": 46,
+          "end": 50,
+          "role": "style",
+          "symbol": ".slider-labels",
+          "anchor": "d023403b648a",
+          "first": ".slider-labels {"
+        },
+        {
+          "file": "code/ouvia/templates/validator_annotation.html",
+          "start": 10,
+          "end": 18,
+          "role": "style",
+          "symbol": ".sticky-original-prompt",
+          "anchor": "e557b87bf3da",
+          "first": ".sticky-original-prompt {"
+        },
+        {
+          "file": "code/ouvia/templates/validator_annotation.html",
+          "start": 339,
+          "end": 350,
+          "role": "logic",
+          "symbol": "updateScoreValue",
+          "anchor": "193a12633fcd",
+          "first": "const updateScoreValue = () => {"
+        },
+        {
+          "file": "code/ouvia/templates/validator_annotation.html",
+          "start": 358,
+          "end": 368,
+          "role": "logic",
+          "symbol": "getAnswersPayload",
+          "anchor": "bc583c319a3c",
+          "first": "const getAnswersPayload = () => {"
+        },
+        {
+          "file": "code/ouvia/templates/validator_annotation.html",
+          "start": 372,
+          "end": 375,
+          "role": "logic",
+          "symbol": "hasAllAnswers",
+          "anchor": "25fd2f9d2116",
+          "first": "const hasAllAnswers = () => {"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 5024,
+          "end": 5174,
+          "role": "logic",
+          "symbol": "save_validator_review",
+          "anchor": "d96e7ff7ead2",
+          "first": "def save_validator_review(entry_id: int):"
+        }
+      ]
+    },
+    {
+      "id": "final-survey",
+      "level": "view",
+      "parent": null,
+      "title": "Sender final survey",
+      "summary": "Asks the sender to rate satisfaction, trust and reliance on 1–5 scales, first from the source and translation alone, then again after showing the validator's per-question results and score.",
+      "views": [
+        "form",
+        "side-by-side panes",
+        "table view"
+      ],
+      "interactions": [
+        "score"
+      ],
+      "patterns": [
+        "rubric",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/ouvia/templates/final_survey.html",
+          "start": 53,
+          "end": 117,
+          "role": "markup",
+          "anchor": "9892d269e88f",
+          "first": "<div class=\"row justify-content-center g-4\">"
+        },
+        {
+          "file": "code/ouvia/templates/final_survey.html",
+          "start": 241,
+          "end": 266,
+          "role": "markup",
+          "symbol": "table.table:2",
+          "anchor": "0caa4ff3ffbb",
+          "first": "<table class=\"table table-striped table-hover align-middle mb-0\">"
+        },
+        {
+          "file": "code/ouvia/templates/final_survey.html",
+          "start": 303,
+          "end": 442,
+          "role": "markup",
+          "symbol": "form.mt-4",
+          "anchor": "ae349d5e9a71",
+          "first": "<form method=\"post\" class=\"mt-4\">"
+        },
+        {
+          "file": "code/ouvia/templates/final_survey.html",
+          "start": 21,
+          "end": 24,
+          "role": "style",
+          "symbol": ".survey-scale-row",
+          "anchor": "4431e7bd2620",
+          "first": ".survey-scale-row {"
+        },
+        {
+          "file": "code/ouvia/templates/final_survey.html",
+          "start": 5,
+          "end": 10,
+          "role": "style",
+          "symbol": ".form-check-input[type=\"radio\"]",
+          "anchor": "77f5d929cfce",
+          "first": ".form-check-input[type=\"radio\"] {"
+        },
+        {
+          "file": "code/ouvia/app.py",
+          "start": 4523,
+          "end": 4778,
+          "role": "logic",
+          "symbol": "sender_final_survey",
+          "anchor": "f69c69ba4fbb",
+          "first": "def sender_final_survey(entry_id: int):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "interactions",
+      "term": "record"
+    }
+  ]
+}

@@ -1,0 +1,460 @@
+{
+  "schema": "astaui.card/1",
+  "id": "dunceious-msa-viewer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T05:09:36Z"
+  },
+  "app": {
+    "title": "Dunceious: browser genome and multiple sequence alignment workbench",
+    "summary": "A person loads GenBank or FASTA records by picking or dropping files, then applies an alignment by uploading a pre-aligned FASTA or by sending the records to a remote alignment service. They read the alignment in a zoomable viewer where annotations follow the gaps and a conservation track is drawn. They compare every row against a chosen reference, and search for motifs with IUPAC, whole-query or local search, turning hits into annotations. They then curate annotations and sequence details in an index and export the chosen subset as FASTA, GenBank, GFF3 or a project file.",
+    "task": {
+      "text": "Align annotated sequences, read and compare them against a reference, search them and curate their annotations before exporting them in standard formats.",
+      "verbs": [
+        "explore",
+        "compare",
+        "locate",
+        "annotate",
+        "curate",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "Nucleotide or protein sequence records with feature annotations and source details, optionally overlaid with a multiple alignment, plus interval or score tracks.",
+      "item": "a sequence record with its annotated features, one row of the alignment",
+      "shapes": [
+        "sequence",
+        "spans",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "exploring and annotating aligned sequences after sequencing, before downstream analysis",
+      "terms": [
+        "explore",
+        "annotate",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar ingests files and drives search and alignment, while a virtualized viewer stacks every record as annotation bars over a residue track with semantic zoom, a minimap and a reference-comparison highlight. Search hits are marked in the viewer and can become annotations, which are managed in a separate Annotation Hub index that opens an export dialog with a contents preview.",
+      "views": [
+        "sequence track",
+        "sidebar list",
+        "list",
+        "detail panel",
+        "form",
+        "heatmap"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "brush",
+        "search",
+        "select",
+        "hover for detail",
+        "filter",
+        "sort",
+        "inline edit",
+        "toggle view",
+        "keyboard shortcuts",
+        "undo",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "master-detail",
+        "focus and context"
+      ]
+    },
+    "field": {
+      "text": "multiple sequence alignment and sequence annotation in bioinformatics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "bioinformatics",
+        "multiple sequence alignment",
+        "genome annotation"
+      ]
+    },
+    "workflow": {
+      "name": "align a set of sequences, compare them against a reference and curate their annotations",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Ingestion cards take GenBank/FASTA batches, GFF3/BED annotations or a project JSON by picking or dropping files; a session is locked to nucleotide or peptide",
+          "parts": [
+            "ingest-sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Upload a pre-aligned FASTA or send the records to MAFFT, Kalign, Clustal Omega or MUSCLE; features are transposed into aligned coordinates and a consensus/conservation track is computed",
+          "parts": [
+            "ingest-sidebar",
+            "alignment-viewer"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Virtualized rows stack annotation arrow bars over residues with semantic zoom from mismatch density to bases and translations, with a minimap and Pan/Select drag",
+          "parts": [
+            "alignment-viewer"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Compare picks a reference row and shows Differences (identical residues as dots) or Identity, never counting ambiguity codes",
+          "parts": [
+            "comparison-menu",
+            "alignment-viewer"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "IUPAC, whole-query (Myers, min identity) or local (Smith–Waterman, EMBOSS defaults) search on both strands; hits are marked per base and Annotate turns them into features",
+          "parts": [
+            "search-panel",
+            "alignment-viewer"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The Annotation Hub index groups, filters and sorts sequences and features; the feature editor changes location, strand, segments and qualifiers, with Undo for deletions",
+          "parts": [
+            "annotation-hub",
+            "feature-editor"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The export dialog picks a subset, a format (FASTA, GenBank/GenPept, GFF3, project) and options, and previews contents and omitted values before saving",
+          "parts": [
+            "export-dialog"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Feature coordinates stay ungapped while bars are transposed into alignment columns, so annotations follow the alignment without being cut at gaps.",
+        "Every computed number follows a cited reference tool (EMBOSS matcher/water, edlib, NCBI genetic codes), and metrics are defined beside their values.",
+        "Remote alignment needs explicit consent on each page load and locks edits to the record set while a job runs; aligning locally keeps all data in the browser.",
+        "Exports run through INSDC/GFF3 validation that counts every omitted qualifier or detail in a preview before the file is written.",
+        "Translation rows step at programmed ribosomal frameshifts, placing each codon in its own reading frame."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "ingest-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar: ingestion and alignment",
+      "summary": "Takes sequence, alignment, annotation and project files on drop cards and starts a remote alignment of the loaded records.",
+      "views": [
+        "sidebar list",
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/app/components/Sidebar.tsx",
+          "start": 95,
+          "end": 434,
+          "role": "markup",
+          "anchor": "3728f3cbbf90",
+          "first": "const Sidebar: React.FC<SidebarProps> = ({"
+        },
+        {
+          "file": "code/src/app/components/DropZone.tsx",
+          "start": 57,
+          "end": 110,
+          "role": "markup",
+          "anchor": "f5fb6558be76",
+          "first": "export default function DropZone({"
+        },
+        {
+          "file": "code/src/app/components/AlignmentSection.tsx",
+          "start": 32,
+          "end": 52,
+          "role": "markup",
+          "anchor": "a11ca28438a1",
+          "first": "export default function AlignmentSection({ count, state = { phase: 'idle' }, onOpen }: AlignmentSectionProps) {"
+        }
+      ]
+    },
+    {
+      "id": "alignment-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "Genome and alignment viewer",
+      "summary": "Draws every record as annotation bars over a residue track with semantic zoom, a conservation track and a minimap, and marks search hits and reference differences.",
+      "views": [
+        "sequence track",
+        "heatmap"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "brush",
+        "hover for detail",
+        "select",
+        "keyboard shortcuts"
+      ],
+      "patterns": [
+        "overview and detail",
+        "focus and context",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/app/viewer/GenomeViewer.tsx",
+          "start": 108,
+          "end": 556,
+          "role": "markup",
+          "anchor": "533eb64f31da",
+          "first": "const GenomeViewer: React.FC<Props> = ({"
+        },
+        {
+          "file": "code/src/app/viewer/Row.tsx",
+          "start": 80,
+          "end": 563,
+          "role": "markup",
+          "anchor": "04da3161c6cb",
+          "first": "export const Row = memo(({ index, style, data }: ListChildComponentProps<RowData>) => {"
+        },
+        {
+          "file": "code/src/app/viewer/tracks/SequenceTrack.tsx",
+          "start": 65,
+          "end": 413,
+          "role": "logic",
+          "anchor": "7391989e9ff8",
+          "first": "export const SequenceTrack: React.FC<SequenceTrackProps> = memo(({"
+        },
+        {
+          "file": "code/src/app/viewer/tracks/ConservationTrack.tsx",
+          "start": 23,
+          "end": 85,
+          "role": "logic",
+          "anchor": "8c350248a177",
+          "first": "export const ConservationTrack: React.FC<{"
+        },
+        {
+          "file": "code/src/app/viewer/Minimap.tsx",
+          "start": 97,
+          "end": 333,
+          "role": "markup",
+          "anchor": "2a27fe2c8ba1",
+          "first": "export const Minimap: React.FC<MinimapProps> = ({"
+        },
+        {
+          "file": "code/src/domain/bio/coordinate.ts",
+          "start": 152,
+          "end": 180,
+          "role": "logic",
+          "anchor": "facc4ced85bc",
+          "first": "export const processTransposition = (records: SeqRecord[]): SeqRecord[] => {"
+        },
+        {
+          "file": "code/src/domain/bio/consensus.ts",
+          "start": 28,
+          "end": 62,
+          "role": "logic",
+          "anchor": "9a5c80b55959",
+          "first": "export const calculateConsensus = (records: SeqRecord[]): string => {"
+        }
+      ]
+    },
+    {
+      "id": "comparison-menu",
+      "level": "component",
+      "parent": "alignment-viewer",
+      "title": "Compare against reference",
+      "summary": "Chooses a reference row and a highlight mode so residues that differ from, or match, the reference stand out.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/src/app/components/ComparisonMenu.tsx",
+          "start": 29,
+          "end": 217,
+          "role": "markup",
+          "anchor": "bc284e8f2adf",
+          "first": "const PREVIEW_REFERENCE = 'CAGGATGTTAAC';"
+        },
+        {
+          "file": "code/src/app/logic/alignmentComparison.ts",
+          "start": 108,
+          "end": 121,
+          "role": "logic",
+          "symbol": "residueStyle",
+          "anchor": "0b3354dedaf5",
+          "first": "export function residueStyle("
+        },
+        {
+          "file": "code/src/app/logic/alignmentComparison.ts",
+          "start": 64,
+          "end": 67,
+          "role": "logic",
+          "symbol": "resolveReference",
+          "anchor": "63dea9178351",
+          "first": "export function resolveReference(records: SeqRecord[], referenceId: string | null): SeqRecord | null {"
+        },
+        {
+          "file": "code/src/domain/bio/referenceComparison.ts",
+          "start": 47,
+          "end": 62,
+          "role": "logic",
+          "anchor": "9d06219a08f3",
+          "first": "export const compareToReference = ("
+        }
+      ]
+    },
+    {
+      "id": "search-panel",
+      "level": "component",
+      "parent": "ingest-sidebar",
+      "title": "Sequence search",
+      "summary": "Searches all records on both strands by IUPAC pattern, whole-query fuzzy or local alignment, lists hits with metrics and alignment text, and turns them into annotations.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "search",
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/app/components/SearchPanel.tsx",
+          "start": 76,
+          "end": 288,
+          "role": "markup",
+          "anchor": "b09d7090999e",
+          "first": "const SearchPanel: React.FC<SearchPanelProps> = ({"
+        }
+      ]
+    },
+    {
+      "id": "annotation-hub",
+      "level": "view",
+      "parent": null,
+      "title": "Annotation Hub",
+      "summary": "Indexes sequences and features with grouping, filters, sorting and search, so annotations and sequence details can be reviewed, edited, hidden or removed.",
+      "views": [
+        "list",
+        "sidebar list",
+        "detail panel"
+      ],
+      "interactions": [
+        "search",
+        "filter",
+        "sort",
+        "multi-select",
+        "inline edit",
+        "undo",
+        "keyboard shortcuts"
+      ],
+      "patterns": [
+        "master-detail",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/app/components/AnnotationHubPanel.tsx",
+          "start": 78,
+          "end": 208,
+          "role": "markup",
+          "anchor": "ea4cbaad3541",
+          "first": "export default function AnnotationHubPanel(props: AnnotationHubPanelProps) {"
+        }
+      ]
+    },
+    {
+      "id": "feature-editor",
+      "level": "component",
+      "parent": "annotation-hub",
+      "title": "Feature editor",
+      "summary": "Edits one annotation's type, name, location, strand, segments, colour and qualifiers, and warns about qualifiers that would not round-trip to GenBank.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/app/components/FeatureEditorModal.tsx",
+          "start": 30,
+          "end": 392,
+          "role": "markup",
+          "anchor": "9ccc612a9ea5",
+          "first": "const ISSUE_TEXT: Record<QualifierIssue, string> = {"
+        }
+      ]
+    },
+    {
+      "id": "export-dialog",
+      "level": "component",
+      "parent": "annotation-hub",
+      "title": "Export dialog",
+      "summary": "Picks a subset of sequences, a format and its options, and previews what the file will contain and what will be omitted before saving.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "multi-select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/app/components/hub/ExportDialog.tsx",
+          "start": 50,
+          "end": 206,
+          "role": "markup",
+          "anchor": "864dbf1af951",
+          "first": "export default function ExportDialog({ featureColors, records, state, onClose, onExport, onEditDetails }: ExportDialogPr"
+        },
+        {
+          "file": "code/src/app/logic/exportPlan.ts",
+          "start": 87,
+          "end": 87,
+          "role": "logic",
+          "symbol": "describeExport",
+          "anchor": "5fd323029180",
+          "first": "export function describeExport(records: SeqRecord[], format: HubExportFormat, options: ExportOptions = {}): { report: Ex"
+        },
+        {
+          "file": "code/src/app/logic/exportPlan.ts",
+          "start": 75,
+          "end": 75,
+          "role": "logic",
+          "symbol": "serializeExport",
+          "anchor": "4cec00fbc51a",
+          "first": "export function serializeExport(records: SeqRecord[], format: HubExportFormat, options: ExportOptions = {}): ExportResul"
+        }
+      ]
+    }
+  ]
+}

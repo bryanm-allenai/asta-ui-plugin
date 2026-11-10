@@ -1,0 +1,884 @@
+{
+ "interface": {
+  "title": "MLOmics — Cancer Subtype Classifier (Latent-Fusion Multi-Omics Classifier)",
+  "field": "Cancer genomics / multi-omics machine learning (TCGA breast BRCA and colon COAD molecular subtyping)",
+  "stage_of_work": "Analysis and interpretation: classifying patient samples with pre-trained models, explaining the predictions, and benchmarking the models",
+  "what_it_is_for": "Upload one or more patients' mRNA/miRNA/methylation/CNV profiles, get a predicted molecular subtype with a confidence tier from XGBoost or one of two deep fusion models, read which features drove each call and which KEGG pathways the pathway-aware model weights most for the cohort, compare the models' cross-validated performance, and turn raw per-modality lab files into a prediction-ready row."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "Used: sample_input_brca.csv (1 BRCA sample, also given by the in-app 'Download sample CSV' button), demo_patient_robert_okonkwo_COAD.csv (1 COAD patient), synthetic_coad_CMS1_MSI-Immune.csv (10 COAD samples), and the four amara_nwosu_*.csv per-modality files in the Data Converter. The Model Comparison tab shows built-in, precomputed 5-fold CV results. Not used: Sarah Mitchell BRCA demo, synthetic_brca_Basal-like.csv, sample_input_coad.csv. The AI Research Summary showed its expected 'GROQ_API_KEY not configured' message. The page first hung on 127.0.0.1 and loaded once opened on localhost:8501."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Assign patients to molecular subgroups with trained classifiers, check that each call is believable, and judge which model to trust",
+  "specific": "Predict BRCA/COAD molecular subtypes from multi-omics profiles with XGBoost, IntermediateFusion or PathwayAwareFusion, explain them with SHAP / Integrated Gradients, view cohort-level KEGG pathway attention, and review the CV benchmark",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Prepare patient data in the format the model expects",
+    "specific": "Lab Data Converter tab: raw per-modality hospital CSVs → prediction-ready row",
+    "branch": "when the data are raw per-modality lab exports",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Read what input normalisation the model needs",
+      "specific": "Open 'Before you upload — normalisation requirements' (z-scored ideal; log2, raw counts and beta values supported; single-sample caveat; missing modalities filled with 0)",
+      "screens": [
+       "screens/053.webp",
+       "screens/054.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 'Before you upload — normalisation requirements' expander",
+        "screens": [
+         "screens/053.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Describe the patient and how their data were scaled",
+      "specific": "Step 1: choose Cancer Type, type the Patient / Sample ID, pick the Data Format (z-scored / Log2 / Raw counts / Beta 0-1)",
+      "screens": [
+       "screens/054.webp",
+       "screens/055.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Data Format dropdown",
+        "screens": [
+         "screens/054.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'Log2-transformed (log2(TPM+1), M-values, etc.)'",
+        "screens": [
+         "screens/055.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed AMARA-NWOSU into Patient / Sample ID"
+       }
+      ],
+      "id": "t2",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Load one data file per measurement type",
+      "specific": "Step 2: upload mRNA, miRNA, Methylation and CNV CSVs (each optional)",
+      "screens": [
+       "screens/056.webp",
+       "screens/057.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "uploaded amara_nwosu_mrna.csv to mRNA CSV"
+       },
+       {
+        "kind": "action",
+        "label": "uploaded amara_nwosu_mirna.csv to miRNA CSV"
+       },
+       {
+        "kind": "action",
+        "label": "uploaded amara_nwosu_methylation.csv to Methylation CSV"
+       },
+       {
+        "kind": "action",
+        "label": "uploaded amara_nwosu_cnv.csv to CNV CSV",
+        "screens": [
+         "screens/057.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Convert, check how many expected features were found, and save the result",
+      "specific": "Step 3 Convert & Prepare File → Step 4 Coverage Report (mRNA 100%, miRNA 55% = 200/366, Methylation 100%, CNV 100%) → Download Prediction-Ready CSV; the 'Next step' banner points to uploading this row in the Prediction tab (not done in this run, see screens_never_reached)",
+      "screens": [
+       "screens/061.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Convert & Prepare File",
+        "screens": [
+         "screens/058.webp",
+         "screens/061.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download Prediction-Ready CSV (got mlomics_ready_AMARA-NWOSU_brca.csv, 1 row × 15,366 features)",
+        "screens": [
+         "screens/061.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Classify patients",
+    "specific": "Prediction tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Choose the disease cohort and the model",
+      "specific": "Sidebar radios: Cancer Type GS-BRCA / GS-COAD; Select Model XGBoost / Intermediate Fusion / Pathway-Aware Fusion",
+      "screens": [
+       "screens/006.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked XGBoost (Baseline)"
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Get an example input file",
+      "specific": "Download sample CSV from the welcome screen",
+      "screens": [
+       "screens/006.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 'Download sample CSV' (got sample_input_brca.csv)"
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Upload a patient profile and read the predicted class with its confidence",
+      "specific": "Upload CSV → Prediction Results card (subtype, % confidence, MODERATE/HIGH CONFIDENCE tier) + Confidence Distribution bar chart",
+      "screens": [
+       "screens/008.webp",
+       "screens/009.webp",
+       "screens/064.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "uploaded sample_input_brca.csv (GS-BRCA, XGBoost → Luminal A 75.7% MODERATE)",
+        "screens": [
+         "screens/008.webp",
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "uploaded demo_patient_robert_okonkwo_COAD.csv (GS-COAD, Pathway-Aware → CMS2 Canonical 100% HIGH)",
+        "screens": [
+         "screens/063.webp",
+         "screens/064.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "See what happens when the file does not match the chosen cohort",
+      "specific": "BRCA file kept loaded after switching to GS-COAD → 'Could not process the uploaded file' error with a Technical details expander",
+      "screens": [
+       "screens/062.webp"
+      ],
+      "branch": "when the sidebar cohort does not match the file",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked GS-COAD with sample_input_brca.csv still uploaded",
+        "screens": [
+         "screens/062.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Classify a batch and look at one sample in detail",
+      "specific": "Upload the 10-row synthetic COAD file → one result card per sample → 'Select sample for detailed view' drives the confidence chart and SHAP plot",
+      "screens": [
+       "screens/067.webp",
+       "screens/068.webp",
+       "screens/070.webp"
+      ],
+      "branch": "when the file holds several samples",
+      "children": [
+       {
+        "kind": "action",
+        "label": "uploaded synthetic_coad_CMS1_MSI-Immune.csv (10 samples, all CMS1)",
+        "screens": [
+         "screens/067.webp",
+         "screens/068.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened 'Select sample for detailed view' dropdown",
+        "screens": [
+         "screens/069.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose SYN.COAD.CMS1.005",
+        "screens": [
+         "screens/070.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the predictions",
+      "specific": "Export predictions as CSV (Sample, Predicted Subtype, Confidence)",
+      "screens": [
+       "screens/009.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 'Export predictions as CSV' (got mlomics_predictions.csv: 0, Luminal A, 0.757)"
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Re-run the same patient with other models and compare",
+      "specific": "Switch Select Model with the same file: BRCA sample Luminal A XGBoost 75.7% → IntermediateFusion 64.7% → PathwayAwareFusion 66.3%; Robert Okonkwo CMS2 PathwayAware 100% vs XGBoost 79.8%",
+      "screens": [
+       "screens/013.webp",
+       "screens/017.webp",
+       "screens/066.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Intermediate Fusion (Deep)",
+        "screens": [
+         "screens/012.webp",
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Pathway-Aware Fusion (Deep + Bio Prior)",
+        "screens": [
+         "screens/017.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked XGBoost (Baseline) with the Robert Okonkwo file loaded"
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Explain predictions",
+    "specific": "Feature Importance (per sample) and Pathway-Level Attention (per cohort) sections of the Prediction tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "See which input features pushed a tree model toward its call",
+      "specific": "SHAP waterfall (TreeSHAP) for XGBoost: top features such as mrna_UBE2T, mrna_ESR1 and cnv_GPR128 with signed contributions from E[f(x)] to f(x)",
+      "screens": [
+       "screens/010.webp",
+       "screens/011.webp",
+       "screens/071.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Feature Importance (SHAP) for the BRCA sample",
+        "screens": [
+         "screens/010.webp",
+         "screens/011.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to SHAP for SYN.COAD.CMS1.005 (CNV-dominated: cnv_MYO5B, cnv_DCC)",
+        "screens": [
+         "screens/071.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "See which input features pushed a neural model toward its call",
+      "specific": "Integrated Gradients top-15 bar chart (blue toward, grey away) with a 'Top 20 features by modality' count line (mirna: 20 for both fusion models)",
+      "screens": [
+       "screens/014.webp",
+       "screens/015.webp",
+       "screens/018.webp",
+       "screens/019.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Feature Importance (Integrated Gradients), IntermediateFusion",
+        "screens": [
+         "screens/014.webp",
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to Feature Importance (Integrated Gradients), PathwayAwareFusion",
+        "screens": [
+         "screens/018.webp",
+         "screens/019.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "See which known biological pathways the model weights most for this disease cohort",
+      "specific": "Pathway-Level Attention Weights: Top 10 Attended KEGG Pathways bar chart of precomputed cohort-level mean attention, the same for every patient in a cohort (GS-BRCA: Axon guidance, IL-17 signalling…; GS-COAD: Alcoholism, O-glycan biosynthesis, Notch…, matching the Model Comparison pathway attention values), with hover values and box zoom to separate the nearly uniform weights",
+      "screens": [
+       "screens/020.webp",
+       "screens/021.webp",
+       "screens/022.webp",
+       "screens/065.webp"
+      ],
+      "branch": "when the model is Pathway-Aware Fusion",
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered the IL-17 signaling pathway bar (tooltip 0.003691)",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged a zoom box over x 0.0033–0.0038",
+        "screens": [
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the GS-COAD pathway chart for Robert Okonkwo",
+        "screens": [
+         "screens/065.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Benchmark the models across cohorts",
+    "specific": "Model Comparison tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Compare summary scores of all models, for one cohort or for all",
+      "specific": "Filter by cancer type (All / GS-BRCA / GS-COAD) → best-model banner, KPI cards, metrics table with best cells highlighted",
+      "screens": [
+       "screens/023.webp",
+       "screens/024.webp",
+       "screens/027.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened 'Filter by cancer type'",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose All",
+        "screens": [
+         "screens/027.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Chart one chosen metric across models and cohorts",
+      "specific": "Chart metric dropdown (F1, Precision, Recall, AUC, NMI, ARI) → grouped bar chart with ±std error bars; legend click hides a model",
+      "screens": [
+       "screens/028.webp",
+       "screens/031.webp",
+       "screens/033.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Chart metric dropdown",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose AUC",
+        "screens": [
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked RandomForest in legend (trace hidden)",
+        "screens": [
+         "screens/033.webp"
+        ]
+       }
+      ],
+      "id": "t16",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check how stable discrimination is across folds, and how well calibrated the probabilities are",
+      "specific": "Per-fold AUC breakdown expander; Calibration table (ECE/MCE/Brier) with reliability diagrams",
+      "screens": [
+       "screens/034.webp",
+       "screens/035.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 'Per-fold AUC breakdown' expander",
+        "screens": [
+         "screens/034.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to Calibration Analysis",
+        "screens": [
+         "screens/035.webp"
+        ]
+       }
+      ],
+      "id": "t17",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Look at what the model learned and where it errs",
+      "specific": "t-SNE latent plots (true subtype vs correct/misclassified, 117/134), training-convergence curves",
+      "screens": [
+       "screens/036.webp",
+       "screens/037.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Latent Space Visualization",
+        "screens": [
+         "screens/036.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to Training Convergence",
+        "screens": [
+         "screens/037.webp"
+        ]
+       }
+      ],
+      "id": "t18",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Inspect per-class errors for a chosen model and cohort",
+      "specific": "Confusion Matrices: Select model + Select cancer type → best-fold heatmap",
+      "screens": [
+       "screens/041.webp",
+       "screens/046.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose GS-COAD in Select cancer type",
+        "screens": [
+         "screens/038.webp",
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose PathwayAwareFusion in Select model",
+        "screens": [
+         "screens/042.webp",
+         "screens/046.webp"
+        ]
+       }
+      ],
+      "id": "t19",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Check the model's top features against known biology",
+      "specific": "Biological Validation: significant KEGG enrichment for BRCA (Cell cycle, p53…), none for COAD; Known Cancer Pathway checks; 'Pathways not enriched' expander; Pathway Attention tables for both cohorts",
+      "screens": [
+       "screens/047.webp",
+       "screens/048.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 'Pathways not enriched' expander",
+        "screens": [
+         "screens/048.webp"
+        ]
+       }
+      ],
+      "id": "t20",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "See how much each data type contributes, and how robust the model is when data are missing",
+      "specific": "Ablation Studies (F1 when each modality is removed, BRCA vs COAD), Early vs Intermediate Fusion table, Missing Modality Robustness curve",
+      "screens": [
+       "screens/050.webp",
+       "screens/051.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Ablation Studies",
+        "screens": [
+         "screens/050.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to Early vs Intermediate Fusion and Missing Modality Robustness",
+        "screens": [
+         "screens/051.webp"
+        ]
+       }
+      ],
+      "id": "t21",
+      "check": "not_confirmed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Per-modality file converter with coverage report",
+   "general": "Collect separate measurement files for one subject, say how they were scaled, map them onto the feature list the model expects, report how much of each block was matched, and save one model-ready row",
+   "specific": "Lab Data Converter: Cancer Type + Patient ID + Data Format (z-scored / log2 / raw counts / beta) → four optional modality uploaders → Convert & Prepare File → per-modality coverage cards (e.g. miRNA 200/366) + normalisation warning → Download Prediction-Ready CSV",
+   "steps": [
+    "pick cohort and type a sample ID",
+    "pick the input data format (sets the normalisation transform)",
+    "upload one CSV per modality (any subset)",
+    "press Convert & Prepare File",
+    "read the per-modality coverage percentages and warnings",
+    "download the 1-row prediction-ready CSV"
+   ],
+   "serves_tasks": [
+    "Convert, check how many expected features were found, and save the result",
+    "Load one data file per measurement type",
+    "Describe the patient and how their data were scaled"
+   ],
+   "screens": [
+    "screens/055.webp",
+    "screens/057.webp",
+    "screens/061.webp"
+   ],
+   "id": "f1",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Model-switchable classification result cards with confidence tiers",
+   "general": "Run uploaded samples through a model chosen from a list and show each sample's predicted class, probability and a confidence label, re-running the same data when the model is changed",
+   "specific": "Sidebar Cancer Type + Select Model radios + CSV uploader → one Prediction Results card per sample (ID, subtype, %, MODERATE / HIGH CONFIDENCE) → Export predictions as CSV",
+   "steps": [
+    "choose cohort and model in the sidebar",
+    "upload a CSV of one or many samples",
+    "read the per-sample cards",
+    "switch the model to compare the call on the same data",
+    "export predictions as CSV"
+   ],
+   "serves_tasks": [
+    "Upload a patient profile and read the predicted class with its confidence",
+    "Re-run the same patient with other models and compare",
+    "Export the predictions"
+   ],
+   "screens": [
+    "screens/009.webp",
+    "screens/013.webp",
+    "screens/017.webp",
+    "screens/064.webp",
+    "screens/068.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Sample picker driving the class-probability chart",
+   "general": "In a batch result, pick one sample and see its full class-probability distribution; the same pick also sets which sample the attribution panel (f4) explains",
+   "specific": "'Select sample for detailed view' dropdown → Prediction Confidence by Subtype bar chart for that sample",
+   "steps": [
+    "upload a multi-row file",
+    "open 'Select sample for detailed view'",
+    "choose a sample ID",
+    "read its probability bars"
+   ],
+   "serves_tasks": [
+    "Classify a batch and look at one sample in detail"
+   ],
+   "screens": [
+    "screens/069.webp",
+    "screens/070.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Model-dependent attribution panel (SHAP waterfall or Integrated Gradients)",
+   "general": "Explain one prediction by ranking input features by their signed push toward or away from the predicted class, using the explanation method that suits the model type",
+   "specific": "Feature Importance section that swaps between a TreeSHAP waterfall (red toward / blue away, E[f(x)] → f(x)) for XGBoost and a Captum Integrated Gradients top-15 bar chart (blue / grey) plus a 'Top 20 features by modality' count for the fusion models; follows the sample chosen in the picker (f3); 'What is SHAP? / What are Integrated Gradients?' explainers",
+   "steps": [
+    "select a model",
+    "read the ranked feature contributions",
+    "note modality from the feature prefix (mrna_/mirna_/methy_/cnv_) and the modality count line",
+    "open the 'What is…' expander for method help"
+   ],
+   "serves_tasks": [
+    "See which input features pushed a tree model toward its call",
+    "See which input features pushed a neural model toward its call"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/011.webp",
+    "screens/014.webp",
+    "screens/015.webp",
+    "screens/018.webp",
+    "screens/071.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Cohort-level pathway attention bar chart with hover and box zoom",
+   "general": "Show the biological pathways a model attends to most across a whole cohort (fixed weights, not per-sample), and zoom in to separate weights that are nearly equal",
+   "specific": "Top 10 Attended KEGG Pathways (GS-BRCA or GS-COAD) horizontal bars of precomputed cohort-mean attention, identical for every patient in the cohort, shown only for Pathway-Aware Fusion; Plotly hover tooltip, drag-box zoom, double-click to reset",
+   "steps": [
+    "select Pathway-Aware Fusion and a cohort",
+    "read the top-10 pathways",
+    "hover a bar for its exact weight",
+    "drag a box to zoom the x-axis and see the differences",
+    "double-click to zoom back out"
+   ],
+   "serves_tasks": [
+    "See which known biological pathways the model weights most for this disease cohort"
+   ],
+   "screens": [
+    "screens/020.webp",
+    "screens/021.webp",
+    "screens/022.webp",
+    "screens/065.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Filterable benchmark table with metric-selectable bar chart",
+   "general": "Compare several methods' cross-validated scores, filtered by dataset, with the best value per column highlighted, and chart any one chosen metric with error bars",
+   "specific": "Filter by cancer type (All / GS-BRCA / GS-COAD) → best-model banner + KPI cards + highlighted metrics table; Chart metric dropdown (F1 / Precision / Recall / AUC / NMI / ARI) → grouped bars (mean ± std) per cohort; legend click hides a model",
+   "steps": [
+    "choose the cohort filter",
+    "read the best-model banner and highlighted table cells",
+    "choose a chart metric",
+    "click a legend entry to hide or isolate a model"
+   ],
+   "serves_tasks": [
+    "Compare summary scores of all models, for one cohort or for all",
+    "Chart one chosen metric across models and cohorts"
+   ],
+   "screens": [
+    "screens/023.webp",
+    "screens/027.webp",
+    "screens/028.webp",
+    "screens/031.webp",
+    "screens/033.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Confusion matrix viewer by model and dataset",
+   "general": "Pick a method and a dataset to view that method's per-class error heatmap",
+   "specific": "Confusion Matrices: 'Select model' (XGBoost / RandomForest / IntermediateFusion / PathwayAwareFusion) + 'Select cancer type' → best-fold confusion-matrix heatmap",
+   "steps": [
+    "choose cancer type",
+    "choose model",
+    "read the off-diagonal counts in the heatmap"
+   ],
+   "serves_tasks": [
+    "Inspect per-class errors for a chosen model and cohort"
+   ],
+   "screens": [
+    "screens/038.webp",
+    "screens/041.webp",
+    "screens/042.webp",
+    "screens/046.webp"
+   ],
+   "id": "f7",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Latent-space viewer: true class vs correct/misclassified",
+   "general": "Project a model's learned representation to 2-D twice, once coloured by true class and once by whether each sample was classified correctly, with an accuracy caption",
+   "specific": "Latent Space Visualization: paired t-SNE plots (coloured by true subtype; coloured correct vs misclassified, e.g. 117/134)",
+   "steps": [
+    "scroll to Latent Space Visualization",
+    "read how well true subtypes separate in the left plot",
+    "locate the misclassified points and the correct/total caption in the right plot"
+   ],
+   "serves_tasks": [
+    "Look at what the model learned and where it errs"
+   ],
+   "screens": [
+    "screens/036.webp"
+   ],
+   "id": "f8",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Calibration panel with reliability diagrams",
+   "general": "Judge whether predicted probabilities can be taken at face value: a table of calibration errors and Brier score per method, with a reliability diagram for each",
+   "specific": "Calibration Analysis: ECE / MCE / Brier table per model + reliability diagrams",
+   "steps": [
+    "scroll to Calibration Analysis",
+    "compare ECE, MCE and Brier across models",
+    "read each reliability diagram against the diagonal"
+   ],
+   "serves_tasks": [
+    "Check how stable discrimination is across folds, and how well calibrated the probabilities are"
+   ],
+   "screens": [
+    "screens/035.webp"
+   ],
+   "id": "f9",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Modality-removal ablation chart",
+   "general": "Show how much performance drops when each data type is left out, per dataset, with error bars",
+   "specific": "Ablation Studies: F1 with each modality (mRNA / miRNA / methylation / CNV) removed, GS-BRCA vs GS-COAD, with error bars",
+   "steps": [
+    "scroll to Ablation Studies",
+    "compare each left-out bar with the full-model bar",
+    "compare the pattern between cohorts"
+   ],
+   "serves_tasks": [
+    "See how much each data type contributes, and how robust the model is when data are missing"
+   ],
+   "screens": [
+    "screens/050.webp"
+   ],
+   "id": "f10",
+   "check": "not_confirmed"
+  }
+ ],
+ "screens_never_reached": [
+  "AI Research Summary with real text: GROQ_API_KEY is unset, so only the 'not configured' notice shows (expected)",
+  "Prediction on the converted Amara Nwosu file (the intended next step after t4 / the 'Prepare patient data' phase): the downloaded mlomics_ready_AMARA-NWOSU_brca.csv is not in the test-data folder, so it could not be uploaded back into the Prediction tab",
+  "Technical details expander under the cohort-mismatch error: seen but not opened",
+  "ROC curves (micro-avg OVR) and Multi-Metric radar profile: listed in the page text but no kept screen clearly shows them"
+ ],
+ "not_done": [
+  "Did not run the Sarah Mitchell BRCA demo, synthetic_brca_Basal-like.csv or sample_input_coad.csv (action budget)",
+  "Did not complete the converter → Prediction round trip: the converted file could not be uploaded because only the fixed test files can be given to the page",
+  "Did not try the converter's other data formats (z-scored, raw counts, beta), the GS-COAD converter cohort, or uploading only some modalities",
+  "Could not use the data-table toolbars (Download as CSV / Search / Show-hide columns) on the Model Comparison tables: the toolbar did not appear on hover and the ref timed out",
+  "The 'colour-coded by modality' attribution described in the README was not seen: SHAP colours bars by direction (red/blue) and IG by direction (blue/grey); modality shows only through feature-name prefixes and a 'Top 20 features by modality' text line",
+  "ROC curves and the Multi-Metric radar showed only GS-BRCA (they follow the sidebar cohort) even with the comparison filter on 'All'; I did not switch the sidebar to see the COAD ROC, and no kept screen is cited for them",
+  "Opened the 'Key Findings' expander and the Dark theme together in the last step; the dark theme is in screens/072.webp, but the Key Findings text was not captured. 'About this project' and 'How to use' were not opened",
+  "Did not try the Plotly PNG download, fullscreen buttons or the training-curve cancer-type selector"
+ ],
+ "applied": [
+  "Reworded t14's general label to cohort-level pathway weighting and noted in its specific label that the chart is the same for every patient in a cohort",
+  "Marked the 'Prepare patient data' phase conditional (raw per-modality lab exports)",
+  "Linked the unreached converter → Prediction round trip to t4 and the phase in t4's specific label and screens_never_reached (no task added: never done)",
+  "Changed t11's branch from 'one-of' to 'repeat'",
+  "Dropped the GS-COAD click and screen 062 from t5 (covered by t8)",
+  "Narrowed f3 to the sample picker plus probability bars and pointed it to f4; moved screen 071 to f4",
+  "Reworded f5 to say it shows fixed cohort-level weights, not per-sample ones",
+  "Added features f8 (latent-space correct/misclassified viewer), f9 (calibration/reliability panel) and f10 (modality-ablation chart)",
+  "Removed the unsupported ROC curves and radar claims and screen 033 from t17; relabelled t17 to per-fold AUC and calibration",
+  "Renamed the explanation phase so it no longer calls cohort-level pathway attention a per-prediction explanation; adjusted interface purpose and goal wording to match"
+ ],
+ "open_fixes": [
+  "Add a task for uploading the converted prediction-ready row in the Prediction tab: needs a run where the converter output can be fed back to the page",
+  "Add converter variants (z-scored, raw counts, beta formats; GS-COAD cohort; a subset of modalities): never tried",
+  "Restore ROC curves and the Multi-Metric radar to t17, and cover the second cohort by switching the sidebar to GS-COAD: no kept screen shows them",
+  "Add the AI Research Summary as an optional branch after a prediction: needs a configured GROQ_API_KEY and a captured screen"
+ ],
+ "screens_at": "pilot/public/runs/multiomics-cancer-subtype-demo/20261029-131253/",
+ "screens_filed": {
+  "screens/053.webp": "screens/053.webp",
+  "screens/006.webp": "screens/006.webp",
+  "screens/010.webp": "screens/010.webp",
+  "screens/023.webp": "screens/023.webp"
+ }
+}

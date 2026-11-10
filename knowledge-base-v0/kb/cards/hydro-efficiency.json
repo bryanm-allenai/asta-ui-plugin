@@ -1,0 +1,490 @@
+{
+  "schema": "astaui.card/1",
+  "id": "hydro-efficiency",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T20:26:10Z"
+  },
+  "app": {
+    "title": "Industrial park water-efficiency assessment API (AHP + CRITIC + TOPSIS)",
+    "summary": "A person downloads a template workbook (or uses the built-in sample) and fills in yearly park-level and network-level water statistics, per-enterprise water accounts for each year and, optionally, a pairwise-comparison matrix of the ten indicators. They upload it to a compute endpoint and set α, which says how much to trust the expert (AHP) weights against the data-driven (CRITIC) weights. The service turns the raw figures into ten indicators, combines the two sets of weights, checks the matrix for consistency, scores each year on three tiers, and ranks the latest year's enterprises with TOPSIS into four efficiency grades. They get back a multi-sheet Excel workbook, or JSON with previews, results and chart data.",
+    "task": {
+      "text": "Turn yearly water-use statistics into weighted indicator scores, then rank and grade the enterprises in an industrial park by water efficiency.",
+      "verbs": [
+        "derive",
+        "rate",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Spreadsheet tables of yearly water quantities at three tiers (the whole park, the reclaimed-water network and the individual enterprises), plus an expert pairwise-comparison matrix between the indicators.",
+      "item": "one year's water statistics for the park, or one enterprise's water accounts for a year",
+      "shapes": [
+        "table",
+        "time series",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "assessing and grading water efficiency once the yearly statistics are collected, before reporting",
+      "terms": [
+        "analyze",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "There is no screen of its own. The person works through the API's auto-generated Swagger form: one endpoint returns the template workbook, and the compute endpoint takes the uploaded workbook, the α weight-mix and an output format. One pipeline then runs indicators → AHP/CRITIC weights → tier scores → TOPSIS grades and returns everything as one result workbook or as JSON.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "toggle view"
+      ],
+      "patterns": []
+    },
+    "field": {
+      "text": "multi-criteria evaluation (AHP–CRITIC combined weighting with TOPSIS) of water-use efficiency in water resources engineering",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "water resources",
+        "multi criteria decision analysis",
+        "water use efficiency"
+      ]
+    },
+    "workflow": {
+      "name": "score and rank items against weighted indicators and assign grades",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Download the template workbook from /api/sample. It has sheets for the park tier, the network tier, one enterprise sheet per year and the AHP judgement matrix. Fill it in and upload it to /api/compute, or tick use_sample to run on the built-in data.",
+          "parts": [
+            "sample-template",
+            "compute-form"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Raw volumes become indicators C1–C10 (reuse rates, leakage rate, network coverage, year-on-year growth). Enterprise indicators are averaged into one row per year, and years with missing indicators are dropped.",
+          "parts": [
+            "indicator-calc"
+          ]
+        },
+        {
+          "step": "weigh the criteria",
+          "here": "Weights come from the AHP pairwise matrix, checked for consistency (CR < 0.1), and from CRITIC on the data, with leakage counted as a cost criterion. They are blended as α·AHP + (1−α)·CRITIC, with α set on the form.",
+          "parts": [
+            "compute-form",
+            "weighting"
+          ]
+        },
+        {
+          "step": "score each item against criteria",
+          "here": "Each year is min–max normalised and scored 0–100 on each of three tiers: park-wide cycle, network cycle and enterprise cycle. The tier scores are summed into a weighted total.",
+          "parts": [
+            "tier-scores"
+          ]
+        },
+        {
+          "step": "rank items and assign grades",
+          "here": "TOPSIS scores the latest year's enterprises by how close they come to the ideal solution, ranks them, and sorts them into four grades (leading, advanced, compliant, needs improvement), each with a warning colour.",
+          "parts": [
+            "topsis-grading"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The results come back as efficiency_result.xlsx with sheets for the indicator matrix, the weights, the tier scores, the tier weights and the TOPSIS ranking. Summary headers give the number of years, CR, consistency and the enterprise count. With format=json, they come back as previews, results, chart series and the workbook in base64.",
+          "parts": [
+            "result-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Subjective expert weights and objective data-driven weights are blended by one adjustable α.",
+        "The AHP judgement matrix is checked with a consistency ratio, and the result says whether it is consistent.",
+        "Indicators are grouped into three nested tiers (park, network, enterprise), each scored separately and then summed with its share of the weight.",
+        "Cost-type criteria (leakage) are normalised in reverse.",
+        "Final scores map to fixed grade thresholds (80/60/40), each with a warning colour."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sample-template",
+      "level": "component",
+      "parent": "compute-form",
+      "title": "Sample / template workbook",
+      "summary": "Downloads a workbook in the expected sheet layout, filled with sample data, for the person to replace with their own figures.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 407,
+          "end": 414,
+          "role": "logic",
+          "symbol": "sample_xlsx",
+          "anchor": "50f4054c893e",
+          "first": "def sample_xlsx() -> Response:"
+        },
+        {
+          "file": "code/src/efficiency/sample_data.py",
+          "start": 114,
+          "end": 125,
+          "role": "logic",
+          "symbol": "create_sample_xlsx",
+          "anchor": "1bd973a2abc3",
+          "first": "def create_sample_xlsx() -> BytesIO:"
+        },
+        {
+          "file": "code/src/efficiency/sample_data.py",
+          "start": 7,
+          "end": 16,
+          "role": "data",
+          "symbol": "macro_cycle_raw",
+          "anchor": "5a498f5f100f",
+          "first": "def macro_cycle_raw():"
+        },
+        {
+          "file": "code/src/efficiency/sample_data.py",
+          "start": 19,
+          "end": 26,
+          "role": "data",
+          "symbol": "meso_cycle_raw",
+          "anchor": "2884d3e2a5b2",
+          "first": "def meso_cycle_raw():"
+        },
+        {
+          "file": "code/src/efficiency/sample_data.py",
+          "start": 29,
+          "end": 111,
+          "role": "data",
+          "anchor": "2966bdd117dc",
+          "first": "def micro_cycle_raw_2024():"
+        }
+      ]
+    },
+    {
+      "id": "compute-form",
+      "level": "view",
+      "parent": null,
+      "title": "Compute request form",
+      "summary": "Takes the uploaded workbook (or a use-sample switch), the α weight-mix and the output format, and runs the whole assessment.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 362,
+          "end": 366,
+          "role": "logic",
+          "symbol": "compute",
+          "anchor": "ec40aac86708",
+          "first": "async def compute("
+        },
+        {
+          "file": "code/api.py",
+          "start": 85,
+          "end": 103,
+          "role": "logic",
+          "symbol": "_load_from_upload",
+          "anchor": "114fa41df9a3",
+          "first": "def _load_from_upload(xlsx_bytes: bytes):"
+        },
+        {
+          "file": "code/api.py",
+          "start": 106,
+          "end": 111,
+          "role": "logic",
+          "symbol": "_load_from_sample",
+          "anchor": "bb2062f6e10a",
+          "first": "def _load_from_sample():"
+        }
+      ]
+    },
+    {
+      "id": "indicator-calc",
+      "level": "component",
+      "parent": "compute-form",
+      "title": "Indicator calculation",
+      "summary": "Turns raw water volumes into the ten tiered indicators and averages the enterprise indicators into one row per year.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/efficiency/indicators.py",
+          "start": 6,
+          "end": 34,
+          "role": "logic",
+          "symbol": "calc_macro_indicators",
+          "anchor": "b3a3714abb37",
+          "first": "def calc_macro_indicators(df: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/efficiency/indicators.py",
+          "start": 37,
+          "end": 51,
+          "role": "logic",
+          "symbol": "calc_meso_indicators",
+          "anchor": "bc95e33ab388",
+          "first": "def calc_meso_indicators(df: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/efficiency/indicators.py",
+          "start": 54,
+          "end": 82,
+          "role": "logic",
+          "symbol": "calc_micro_indicators",
+          "anchor": "5205c7173944",
+          "first": "def calc_micro_indicators(df: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/efficiency/indicators.py",
+          "start": 85,
+          "end": 86,
+          "role": "logic",
+          "symbol": "aggregate_micro_by_year",
+          "anchor": "8ffedb6cf27a",
+          "first": "def aggregate_micro_by_year("
+        },
+        {
+          "file": "code/api.py",
+          "start": 133,
+          "end": 143,
+          "role": "logic",
+          "anchor": "f513ca0eb789",
+          "first": "ind_macro = calc_macro_indicators(df_macro)"
+        }
+      ]
+    },
+    {
+      "id": "weighting",
+      "level": "component",
+      "parent": "compute-form",
+      "title": "AHP + CRITIC combined weighting",
+      "summary": "Computes expert weights with a consistency check and data-driven weights, then blends them by α.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/efficiency/ahp.py",
+          "start": 9,
+          "end": 42,
+          "role": "logic",
+          "symbol": "ahp_weights",
+          "anchor": "d9e59eaa0a7b",
+          "first": "def ahp_weights(matrix: np.ndarray):"
+        },
+        {
+          "file": "code/src/efficiency/ahp.py",
+          "start": 45,
+          "end": 48,
+          "role": "logic",
+          "symbol": "combined_weights",
+          "anchor": "851a2f8d0d40",
+          "first": "def combined_weights("
+        },
+        {
+          "file": "code/src/efficiency/critic.py",
+          "start": 6,
+          "end": 8,
+          "role": "logic",
+          "symbol": "critic_weights",
+          "anchor": "6f47229c25c4",
+          "first": "def critic_weights("
+        },
+        {
+          "file": "code/src/efficiency/sample_data.py",
+          "start": 74,
+          "end": 103,
+          "role": "data",
+          "symbol": "default_ahp_matrix",
+          "anchor": "15d22fd8ae86",
+          "first": "def default_ahp_matrix():"
+        },
+        {
+          "file": "code/api.py",
+          "start": 145,
+          "end": 159,
+          "role": "logic",
+          "anchor": "8ba97ac61833",
+          "first": "directions = np.array([-1 if \"漏损\" in c else 1 for c in indicator_cols])"
+        }
+      ]
+    },
+    {
+      "id": "tier-scores",
+      "level": "component",
+      "parent": "compute-form",
+      "title": "Tiered yearly scores",
+      "summary": "Scores each year 0–100 on each of the park, network and enterprise tiers and sums them, weighted, into a total.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 62,
+          "end": 66,
+          "role": "data",
+          "anchor": "20a7452f9b08",
+          "first": "LAYER_GROUPS = {"
+        },
+        {
+          "file": "code/api.py",
+          "start": 161,
+          "end": 198,
+          "role": "logic",
+          "anchor": "1401337a353e",
+          "first": "layer_scores: dict[str, np.ndarray] = {}"
+        }
+      ]
+    },
+    {
+      "id": "topsis-grading",
+      "level": "component",
+      "parent": "compute-form",
+      "title": "TOPSIS enterprise ranking and grades",
+      "summary": "Ranks the latest year's enterprises by how close they come to the ideal solution and assigns each one of four efficiency grades with a warning colour.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/efficiency/topsis.py",
+          "start": 14,
+          "end": 17,
+          "role": "logic",
+          "symbol": "topsis_evaluate",
+          "anchor": "d19e601cbf37",
+          "first": "def topsis_evaluate("
+        },
+        {
+          "file": "code/src/efficiency/topsis.py",
+          "start": 69,
+          "end": 74,
+          "role": "logic",
+          "symbol": "classify",
+          "anchor": "745bd273b531",
+          "first": "def classify(score: float) -> tuple[str, str]:"
+        },
+        {
+          "file": "code/src/efficiency/topsis.py",
+          "start": 77,
+          "end": 80,
+          "role": "logic",
+          "symbol": "build_result_table",
+          "anchor": "f1604ac865ea",
+          "first": "def build_result_table("
+        },
+        {
+          "file": "code/src/efficiency/topsis.py",
+          "start": 5,
+          "end": 11,
+          "role": "data",
+          "anchor": "337fee51d251",
+          "first": "# 等级划分标准"
+        },
+        {
+          "file": "code/api.py",
+          "start": 200,
+          "end": 213,
+          "role": "logic",
+          "anchor": "44979fda5422",
+          "first": "# TOPSIS on the latest year's micro data"
+        }
+      ]
+    },
+    {
+      "id": "result-export",
+      "level": "component",
+      "parent": "compute-form",
+      "title": "Result workbook / JSON payload",
+      "summary": "Returns every intermediate and final table as a multi-sheet Excel file with summary headers, or as JSON with previews, chart series and the workbook embedded.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/api.py",
+          "start": 215,
+          "end": 242,
+          "role": "logic",
+          "anchor": "c57195233c64",
+          "first": "topsis_sheet_name = f\"TOPSIS企业评价({latest_year})\""
+        },
+        {
+          "file": "code/api.py",
+          "start": 268,
+          "end": 273,
+          "role": "logic",
+          "symbol": "_run_efficiency",
+          "anchor": "74ba381ac89b",
+          "first": "def _run_efficiency("
+        },
+        {
+          "file": "code/api.py",
+          "start": 283,
+          "end": 288,
+          "role": "logic",
+          "symbol": "_run_efficiency_full",
+          "anchor": "38246f8da663",
+          "first": "def _run_efficiency_full("
+        },
+        {
+          "file": "code/api.py",
+          "start": 391,
+          "end": 403,
+          "role": "logic",
+          "anchor": "e97557f75d86",
+          "first": "return Response("
+        },
+        {
+          "file": "code/hydro_api_helpers.py",
+          "start": 39,
+          "end": 44,
+          "role": "logic",
+          "symbol": "df_to_json_safe",
+          "anchor": "c86a3027a522",
+          "first": "def df_to_json_safe(df: pd.DataFrame | None) -> dict:"
+        }
+      ]
+    }
+  ]
+}

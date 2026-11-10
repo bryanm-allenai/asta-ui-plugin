@@ -1,0 +1,697 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cloud2grid-explorer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T18:20:50Z"
+  },
+  "app": {
+    "title": "Cloud2Grid Explorer (Streamlit)",
+    "summary": "A person picks a recorded weather event and a model, then plays the event or scrubs through it one time step at a time. At each step, a satellite image with the plant locations, a network diagram coloured by line loading or by model error, and a timeline of solar output and grid import all move together, so the model can be checked against the physics reference. A guided tour walks through the same event as captioned slides. Other pages set every model stage against the reference: how strongly each input moves the import, per-stage metric bars and verdicts, and a counterfactual that prices the extra import caused by cloud at historical market prices.",
+    "task": {
+      "text": "Compare a learned grid model's predicted network states and sensitivities with a physics-based reference across recorded weather events and model training stages.",
+      "verbs": [
+        "compare",
+        "explore",
+        "summarize",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "Precomputed bundles for a few weather events: satellite image frames every 15 minutes, satellite-derived solar output per plant, half-hourly simulated network states (bus voltages and branch flows) from a physics solver and from each model stage, per-stage summary metrics and regression slopes, and half-hourly market prices.",
+      "item": "a time step of a weather event: one satellite frame with the network state held for that half-hour, under the reference and under each model",
+      "shapes": [
+        "time series",
+        "image collection",
+        "network",
+        "geospatial",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "comparing frozen model predictions against the physics reference after training, and presenting the comparison",
+      "terms": [
+        "compare",
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "An event picker, a model switcher and a time slider or Play button drive three linked panels: a satellite image with plant overlays, a network diagram coloured by loading or error, and a timeline with a cursor. Separate pages put the model stages side by side as scatter panels, slope bars, metric bars and tables. A stepper turns the same event into a captioned guided tour.",
+      "views": [
+        "image viewer",
+        "map",
+        "network diagram",
+        "line chart",
+        "scatter plot",
+        "bar chart",
+        "summary stats",
+        "table view",
+        "small multiples"
+      ],
+      "interactions": [
+        "select",
+        "time slider",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views",
+        "side-by-side comparison",
+        "small multiples",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "evaluating a learned power-flow model against AC power flow in power systems engineering",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "power systems",
+        "power flow",
+        "grid foundation models"
+      ]
+    },
+    "workflow": {
+      "name": "replay recorded events and compare model predictions with a reference",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "choose a hero event from a select box; the frozen bundle for that event (frames, solar output, network states) loads",
+          "parts": [
+            "event-replay"
+          ]
+        },
+        {
+          "step": "choose which model to compare against the reference",
+          "here": "a segmented control switches the grid shown between the AC reference and each model stage, and a second one colours branches by loading or by error against AC",
+          "parts": [
+            "event-replay",
+            "network-panel"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "Play or the time slider moves through 15-minute satellite frames; the satellite image, the network state held from the half-hour and the timeline cursor all update together",
+          "parts": [
+            "replay-timeline",
+            "satellite-panel",
+            "network-panel"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "partial-residual scatter panels per model, a decomposition of one half-hour step's import change into PV, load and battery terms, and bars of each driver's slope against the AC slope",
+          "parts": [
+            "pv-response"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "metric bars, a metrics table with bootstrap intervals and the pre-registered verdict for each model stage, each set against its reference value",
+          "parts": [
+            "model-evolution"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "a five-stage stepper ends in an observed-versus-clear-sky counterfactual: the extra import per half-hour times the market price, summed over the day and the season",
+          "parts": [
+            "cloud-impact"
+          ]
+        },
+        {
+          "step": "write up the result",
+          "here": "a guided tour plays the event as captioned slides with Back, Next, Replay this scene and Auto-play; the numbers are filled into the captions from the bundle",
+          "parts": [
+            "guided-story"
+          ]
+        }
+      ],
+      "distinctive": [
+        "every panel is labelled with its provenance (observed, derived, simulated, predicted or hypothetical), so measured and modelled quantities are never mixed up",
+        "satellite frames are 15-minute but grid states are half-hourly; the last grid state is held between frames and labelled as held, never interpolated",
+        "models are judged on sensitivity (how much the import moves per MW of solar, load or battery) as well as on the absolute error of the state",
+        "a series of model training stages is compared against one physics reference on the same fixed set of states, with pre-registered pass or fail criteria",
+        "a counterfactual re-solve with only one plant changed separates the effect of cloud from everything else that changed at the same time"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "event-replay",
+      "level": "view",
+      "parent": null,
+      "title": "Event replay stage",
+      "summary": "Picks an event, a model and a branch colouring, and drives the linked satellite, network and timeline panels with a chain of live readouts running from clouds to solar to grid to model.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views",
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 148,
+          "end": 185,
+          "role": "markup",
+          "anchor": "5feb4c2d4028",
+          "first": "# ---------------------------------------------------------------- manual controls"
+        },
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 22,
+          "end": 35,
+          "role": "style",
+          "anchor": "eba923349d72",
+          "first": "_p = T.palette()"
+        },
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 188,
+          "end": 200,
+          "role": "logic",
+          "symbol": "flow",
+          "anchor": "60adfa2e2a54",
+          "first": "def flow(items: list[tuple[str, str, str, str, str]]) -> None:"
+        },
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 204,
+          "end": 431,
+          "role": "logic",
+          "symbol": "stage",
+          "anchor": "70d3593349a8",
+          "first": "def stage() -> None:"
+        },
+        {
+          "file": "code/demo/c2g/data.py",
+          "start": 79,
+          "end": 102,
+          "role": "data",
+          "symbol": "event",
+          "anchor": "58f8e83d4d76",
+          "first": "def event(bundle_id: str) -> Event:"
+        },
+        {
+          "file": "code/demo/c2g/data.py",
+          "start": 49,
+          "end": 75,
+          "role": "data",
+          "symbol": "Event",
+          "anchor": "a5b4bc1415cc",
+          "first": "class Event:"
+        }
+      ]
+    },
+    {
+      "id": "satellite-panel",
+      "level": "component",
+      "parent": "event-replay",
+      "title": "Satellite frame with plant overlay",
+      "summary": "Shows the satellite image for the current 15-minute step, cross-faded from the previous one, with the study-area box and the solar plants sized by capacity and shaded by estimated output.",
+      "views": [
+        "image viewer",
+        "map"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 330,
+          "end": 360,
+          "role": "markup",
+          "anchor": "66e9897777fb",
+          "first": "with left:"
+        },
+        {
+          "file": "code/demo/c2g/satellite.py",
+          "start": 48,
+          "end": 56,
+          "role": "logic",
+          "symbol": "render",
+          "anchor": "c1e7e90c8731",
+          "first": "def render("
+        },
+        {
+          "file": "code/demo/c2g/satellite.py",
+          "start": 33,
+          "end": 45,
+          "role": "logic",
+          "symbol": "_zoom_transform",
+          "anchor": "ccd60583d25a",
+          "first": "def _zoom_transform(bbox: list[float]) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "network-panel",
+      "level": "component",
+      "parent": "event-replay",
+      "title": "Network schematic",
+      "summary": "Draws the electrical network on a fixed schematic layout, with branches coloured by loading or by the selected model's error against the reference, and a line comparing max loading and power-balance error.",
+      "views": [
+        "network diagram"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 361,
+          "end": 397,
+          "role": "markup",
+          "anchor": "7299c7641538",
+          "first": "with mid:"
+        },
+        {
+          "file": "code/demo/c2g/figures.py",
+          "start": 14,
+          "end": 22,
+          "role": "logic",
+          "symbol": "network",
+          "anchor": "5fc9032437fc",
+          "first": "def network("
+        },
+        {
+          "file": "code/demo/c2g/theme.py",
+          "start": 542,
+          "end": 559,
+          "role": "logic",
+          "symbol": "network_legend",
+          "anchor": "4d3e002628ff",
+          "first": "def network_legend(mode: str) -> str:"
+        },
+        {
+          "file": "code/configs/app/network_layout.yaml",
+          "start": 1,
+          "end": 76,
+          "role": "data",
+          "anchor": "3613cd06976d",
+          "first": "# Cloud2Grid Explorer — manual ELECTRICAL SCHEMATIC of the Sundon 33 kV network (GENCO graph,"
+        }
+      ]
+    },
+    {
+      "id": "replay-timeline",
+      "level": "component",
+      "parent": "event-replay",
+      "title": "Player bar and timeline",
+      "summary": "A Play/Pause button and a time slider move through the event, and a timeline chart of solar output, reference import and model import marks the current step.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "time slider",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 399,
+          "end": 431,
+          "role": "markup",
+          "anchor": "0041dc314b09",
+          "first": "if not ss.story_on:  # player bar: Play sits next to the time it moves"
+        },
+        {
+          "file": "code/demo/c2g/figures.py",
+          "start": 245,
+          "end": 251,
+          "role": "logic",
+          "symbol": "timeline",
+          "anchor": "79a3801aedaf",
+          "first": "def timeline("
+        }
+      ]
+    },
+    {
+      "id": "guided-story",
+      "level": "component",
+      "parent": "event-replay",
+      "title": "Guided tour",
+      "summary": "Turns one event into captioned slides with progress dots, Back, Next, Replay this scene and Auto-play, filling each caption template with numbers from the bundle.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 101,
+          "end": 146,
+          "role": "markup",
+          "anchor": "31974c01989c",
+          "first": "# ---------------------------------------------------------------- hero header"
+        },
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 254,
+          "end": 311,
+          "role": "markup",
+          "anchor": "21dd6e9673d6",
+          "first": "if ss.story_on:"
+        },
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 46,
+          "end": 52,
+          "role": "logic",
+          "symbol": "_slides",
+          "anchor": "726f56cee48d",
+          "first": "def _slides() -> list[list[int]]:"
+        },
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 70,
+          "end": 72,
+          "role": "logic",
+          "symbol": "go_slide",
+          "anchor": "2a96443841c7",
+          "first": "def go_slide(k: int) -> None:"
+        },
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 75,
+          "end": 80,
+          "role": "logic",
+          "symbol": "slide_label",
+          "anchor": "5980e87cc817",
+          "first": "def slide_label(k: int) -> str:"
+        },
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 83,
+          "end": 85,
+          "role": "logic",
+          "symbol": "start_story",
+          "anchor": "796355482950",
+          "first": "def start_story() -> None:"
+        },
+        {
+          "file": "code/demo/views/explorer.py",
+          "start": 88,
+          "end": 98,
+          "role": "logic",
+          "symbol": "stop_story",
+          "anchor": "5181b9ddef3e",
+          "first": "def stop_story() -> None:"
+        },
+        {
+          "file": "code/demo/c2g/story.py",
+          "start": 36,
+          "end": 55,
+          "role": "logic",
+          "symbol": "beats",
+          "anchor": "2393087a72f0",
+          "first": "def beats() -> list[Beat]:"
+        },
+        {
+          "file": "code/demo/c2g/story.py",
+          "start": 107,
+          "end": 116,
+          "role": "logic",
+          "symbol": "caption",
+          "anchor": "61aadd7a72d0",
+          "first": "def caption(beat: Beat, t: pd.Timestamp, pv: float, ac: float, model_imp: float) -> str:"
+        },
+        {
+          "file": "code/demo/c2g/story.py",
+          "start": 119,
+          "end": 124,
+          "role": "logic",
+          "symbol": "band",
+          "anchor": "91a8ab1800fb",
+          "first": "def band(beat: Beat) -> tuple[pd.Timestamp, pd.Timestamp, str] | None:"
+        },
+        {
+          "file": "code/configs/app/story_jun15.yaml",
+          "start": 1,
+          "end": 93,
+          "role": "data",
+          "anchor": "d01044928930",
+          "first": "# Cloud2Grid Explorer — guided story for the frozen 15 June 2024 clearing (B02 + D01)."
+        }
+      ]
+    },
+    {
+      "id": "pv-response",
+      "level": "view",
+      "parent": null,
+      "title": "PV response",
+      "summary": "Sets each model's response of grid import to solar against the physics reference: a face-off of slopes, partial-residual scatter panels per model, a per-step decomposition of the import change by driver, and slope bars per driver.",
+      "views": [
+        "scatter plot",
+        "small multiples",
+        "bar chart",
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "time slider"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/demo/views/pv_response.py",
+          "start": 1,
+          "end": 235,
+          "role": "markup",
+          "anchor": "ff7630acf465",
+          "first": "\"\"\"The central finding: the PV blind spot (E4–E5c) and what closed it (E5d), with its limits.\"\"\""
+        },
+        {
+          "file": "code/demo/views/pv_response.py",
+          "start": 68,
+          "end": 103,
+          "role": "logic",
+          "symbol": "limitation",
+          "anchor": "a0676dc1dc9d",
+          "first": "def limitation() -> None:"
+        },
+        {
+          "file": "code/demo/c2g/figures.py",
+          "start": 415,
+          "end": 416,
+          "role": "logic",
+          "symbol": "partial_residuals",
+          "anchor": "5ee9b7c0daba",
+          "first": "def partial_residuals("
+        },
+        {
+          "file": "code/demo/c2g/figures.py",
+          "start": 383,
+          "end": 412,
+          "role": "logic",
+          "symbol": "decomposition",
+          "anchor": "207704d0fd74",
+          "first": "def decomposition(rows: pd.DataFrame, model: str) -> go.Figure:"
+        },
+        {
+          "file": "code/demo/c2g/figures.py",
+          "start": 500,
+          "end": 538,
+          "role": "logic",
+          "symbol": "slopes_bars",
+          "anchor": "ea9c5f33b998",
+          "first": "def slopes_bars(evo: pd.DataFrame, models: list[str]) -> go.Figure:"
+        },
+        {
+          "file": "code/demo/c2g/theme.py",
+          "start": 436,
+          "end": 448,
+          "role": "logic",
+          "symbol": "faceoff",
+          "anchor": "d29377c83a35",
+          "first": "def faceoff(*cells: tuple[str, str, str, str]) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "model-evolution",
+      "level": "view",
+      "parent": null,
+      "title": "Model evolution",
+      "summary": "Lays out each training stage with what it fixed, a metrics table with bootstrap confidence intervals, six metric bar charts against reference lines, and the pre-registered verdict for each stage.",
+      "views": [
+        "bar chart",
+        "table view",
+        "small multiples"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "small multiples",
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/demo/views/evolution.py",
+          "start": 1,
+          "end": 169,
+          "role": "markup",
+          "anchor": "3f65e2197ac1",
+          "first": "\"\"\"Model evolution: off-the-shelf → grid-tuned → envelope-tuned → generator-aware → response-aware"
+        },
+        {
+          "file": "code/demo/views/evolution.py",
+          "start": 44,
+          "end": 49,
+          "role": "logic",
+          "symbol": "ci",
+          "anchor": "50f4da7bf0c6",
+          "first": "def ci(col: str, m: str) -> str:"
+        },
+        {
+          "file": "code/demo/c2g/figures.py",
+          "start": 541,
+          "end": 548,
+          "role": "logic",
+          "symbol": "metric_bars",
+          "anchor": "46bf279b785c",
+          "first": "def metric_bars("
+        },
+        {
+          "file": "code/demo/c2g/theme.py",
+          "start": 487,
+          "end": 529,
+          "role": "logic",
+          "symbol": "learned_ladder",
+          "anchor": "4b64ae28c895",
+          "first": "def learned_ladder(evo: object, models: list[str], detail: dict[str, str] | None = None) -> None:"
+        },
+        {
+          "file": "code/demo/c2g/theme.py",
+          "start": 581,
+          "end": 589,
+          "role": "logic",
+          "symbol": "model_cards",
+          "anchor": "6fe46f6d83e9",
+          "first": "def model_cards(models: list[str]) -> None:"
+        },
+        {
+          "file": "code/demo/c2g/theme.py",
+          "start": 562,
+          "end": 578,
+          "role": "logic",
+          "symbol": "html_table",
+          "anchor": "24524e39198a",
+          "first": "def html_table(df: object, index: bool = False) -> None:"
+        },
+        {
+          "file": "code/demo/c2g/data.py",
+          "start": 34,
+          "end": 35,
+          "role": "data",
+          "symbol": "evolution",
+          "anchor": "76d6ecf0c626",
+          "first": "def evolution() -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "cloud-impact",
+      "level": "view",
+      "parent": null,
+      "title": "Cloud impact: clouds to grid to value",
+      "summary": "Walks through five stages of one event with a stepper and a time slider, then switches between observed and clear-sky scenarios to price the cloud-caused extra import per half-hour and over the season, and compares how accurately each method reproduces that value.",
+      "views": [
+        "image viewer",
+        "network diagram",
+        "line chart",
+        "bar chart",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "time slider",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/demo/views/cloud_impact.py",
+          "start": 1,
+          "end": 299,
+          "role": "markup",
+          "anchor": "8a21707a3f8a",
+          "first": "# ruff: noqa: E501"
+        },
+        {
+          "file": "code/demo/views/cloud_impact.py",
+          "start": 41,
+          "end": 43,
+          "role": "data",
+          "symbol": "bundle",
+          "anchor": "02ba7fc947d0",
+          "first": "def bundle() -> tuple[pd.DataFrame, dict, dict]:"
+        },
+        {
+          "file": "code/demo/views/cloud_impact.py",
+          "start": 46,
+          "end": 48,
+          "role": "logic",
+          "symbol": "badge",
+          "anchor": "85a12af2960f",
+          "first": "def badge(text: str, colour: str) -> str:"
+        },
+        {
+          "file": "code/demo/views/cloud_impact.py",
+          "start": 51,
+          "end": 52,
+          "role": "logic",
+          "symbol": "gbp",
+          "anchor": "d8101e5936ac",
+          "first": "def gbp(x: float, d: int = 0) -> str:"
+        },
+        {
+          "file": "code/demo/c2g/theme.py",
+          "start": 532,
+          "end": 539,
+          "role": "logic",
+          "symbol": "tiles",
+          "anchor": "af91f9c44f2c",
+          "first": "def tiles(items: list[tuple[str, str, str]]) -> None:"
+        }
+      ]
+    }
+  ]
+}

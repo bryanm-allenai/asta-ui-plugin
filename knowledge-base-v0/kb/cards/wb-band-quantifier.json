@@ -1,0 +1,430 @@
+{
+  "schema": "astaui.card/1",
+  "id": "wb-band-quantifier",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T09:42:53Z"
+  },
+  "app": {
+    "title": "Western Blot Quantifier: multi-threshold band detection",
+    "summary": "A person uploads a western blot image. The tool finds the horizontal rows of bands, and the person picks which row to analyse. They can set a merge threshold, then press Analyse. The tool finds every band in that row without being told how many lanes there are, draws a box around each band with its number, and marks it as strong or weak. It then shows the row's horizontal signal profile, bar charts of each band's volume and its intensity relative to the largest band, and a table the person can download as CSV.",
+    "task": {
+      "text": "Detect the bands in one row of a blot image, measure each band's background-subtracted volume, and export each lane's intensity as a percentage of the strongest band.",
+      "verbs": [
+        "derive",
+        "identify",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A single greyscale or colour image of a gel or membrane with dark bands in lanes, reduced to a table of per-band measurements.",
+      "item": "a band in one lane of a blot image",
+      "shapes": [
+        "image",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "measuring band intensities from a blot image after imaging, before comparing conditions",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "The uploaded image is shown next to a copy with the detected bands boxed and numbered, with count badges below. The chosen row and the merge threshold control the detection. Below, a profile plot, two bar charts and a table all number the bands the same way as the overlay, and the table can be downloaded as CSV.",
+      "views": [
+        "side-by-side panes",
+        "image viewer",
+        "line chart",
+        "bar chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "tune parameter",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "western blot densitometry in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "western blot",
+        "densitometry"
+      ]
+    },
+    "workflow": {
+      "name": "detect objects in an image and measure each one relative to the largest",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drag a PNG, JPG or TIFF blot image onto the uploader. It is shown at full width with its size and the number of band rows found.",
+          "parts": [
+            "image-panels"
+          ]
+        },
+        {
+          "step": "choose the region to work on",
+          "here": "Peaks in the vertical profile give the band rows. When there is more than one, a dropdown chooses which row to analyse.",
+          "parts": [
+            "row-picker"
+          ]
+        },
+        {
+          "step": "set how the detection behaves",
+          "here": "A merge-threshold slider sets how narrow a band can be, relative to the median width, before it is merged with its neighbour. A checkbox turns the profile plot on or off.",
+          "parts": [
+            "settings-sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Analyse runs multi-threshold erosion to find band centres. It clusters them into lanes, merges bands that are too narrow, fits each box to its profile, and sums the background-subtracted signal as the volume.",
+          "parts": [
+            "detection-overlay"
+          ]
+        },
+        {
+          "step": "check the result against the source",
+          "here": "Numbered boxes are drawn on the image, green for strong bands and yellow for weak ones, with counts in badges. The horizontal profile shows each band's span and peak.",
+          "parts": [
+            "detection-overlay",
+            "profile-plot"
+          ]
+        },
+        {
+          "step": "summarize per item",
+          "here": "Bar charts show each lane's volume and its relative intensity as a percentage of the largest volume, with a 100% reference line.",
+          "parts": [
+            "quant-charts"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "A table of lane, position, size, volume, mean intensity, type and relative % is downloaded as quantification_results.csv.",
+          "parts": [
+            "results-table-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The number of lanes is never entered: lane positions come from clustering band centres found at many threshold levels.",
+        "Bands that are too narrow compared with the median width are merged repeatedly, and one slider controls this.",
+        "Each lane's intensity is reported relative to the strongest band, not as an absolute amount.",
+        "Each band is classed as strong or weak by its peak intensity, and the class is shown by box colour and in the table."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "settings-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Settings sidebar",
+      "summary": "Holds the merge-threshold slider that controls how narrow bands are merged, a toggle for the profile plot, and a short how-to.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "tune parameter",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 417,
+          "end": 457,
+          "role": "markup",
+          "anchor": "4398f489f534",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 26,
+          "end": 27,
+          "role": "style",
+          "anchor": "46b65695e82e",
+          "first": "[data-testid=\"stSidebar\"] { background: #1e293b; }"
+        },
+        {
+          "file": "code/app.py",
+          "start": 177,
+          "end": 216,
+          "role": "logic",
+          "anchor": "7abcefa4e4db",
+          "first": "# Step 4: Iterative width merge"
+        }
+      ]
+    },
+    {
+      "id": "image-panels",
+      "level": "view",
+      "parent": null,
+      "title": "Original and detected image panes",
+      "summary": "Takes the uploaded blot and shows the original image next to the detection result, with the image size and the number of band rows found.",
+      "views": [
+        "side-by-side panes",
+        "image viewer"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 459,
+          "end": 469,
+          "role": "markup",
+          "anchor": "932f15539cef",
+          "first": "uploaded_file = st.file_uploader(\"\", type=['png', 'jpg', 'jpeg', 'tif', 'tiff'],"
+        },
+        {
+          "file": "code/app.py",
+          "start": 499,
+          "end": 521,
+          "role": "markup",
+          "anchor": "5196c434ceb8",
+          "first": "else:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 31,
+          "end": 32,
+          "role": "style",
+          "anchor": "d9893c0fc258",
+          "first": "[data-testid=\"stFileUploader\"] { background: white; border-radius: 16px; padding: 2rem; border: 2px dashed #0ea5e9; }"
+        },
+        {
+          "file": "code/app.py",
+          "start": 50,
+          "end": 60,
+          "role": "logic",
+          "symbol": "load_image",
+          "anchor": "e3e506653d4c",
+          "first": "def load_image(uploaded_file):"
+        }
+      ]
+    },
+    {
+      "id": "row-picker",
+      "level": "component",
+      "parent": "image-panels",
+      "title": "Band row selector",
+      "summary": "Finds the rows of bands from peaks in the vertical profile and lets the person choose which one to analyse.",
+      "views": [],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 63,
+          "end": 83,
+          "role": "logic",
+          "symbol": "detect_band_rows",
+          "anchor": "d29b244e22bc",
+          "first": "def detect_band_rows(gray):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 523,
+          "end": 529,
+          "role": "markup",
+          "anchor": "7840808af2e7",
+          "first": "# バンド行選択"
+        }
+      ]
+    },
+    {
+      "id": "detection-overlay",
+      "level": "component",
+      "parent": "image-panels",
+      "title": "Band detection overlay and counts",
+      "summary": "Runs the detection when Analyse is pressed, draws a numbered box on each band coloured by strength, and shows how many strong, weak and total bands were found.",
+      "views": [
+        "image viewer",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 86,
+          "end": 299,
+          "role": "logic",
+          "symbol": "detect_bands_v7",
+          "anchor": "799f825683bc",
+          "first": "def detect_bands_v7(gray, target_y, merge_threshold=0.68):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 302,
+          "end": 318,
+          "role": "logic",
+          "symbol": "create_overlay",
+          "anchor": "9682054de8c8",
+          "first": "def create_overlay(img, bands):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 531,
+          "end": 569,
+          "role": "logic",
+          "anchor": "8487c7ee54b4",
+          "first": "if st.button(\"🔬 解析\", type=\"primary\", use_container_width=True):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 37,
+          "end": 39,
+          "role": "style",
+          "anchor": "7e1757d64de6",
+          "first": ".result-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 6"
+        }
+      ]
+    },
+    {
+      "id": "profile-plot",
+      "level": "component",
+      "parent": "results-area",
+      "title": "Horizontal profile with band spans",
+      "summary": "Plots the background-subtracted signal across the chosen row, with each band's span shaded and its number marked at the peak.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 321,
+          "end": 359,
+          "role": "logic",
+          "symbol": "create_profile_plot",
+          "anchor": "06882780e375",
+          "first": "def create_profile_plot(gray, bands, target_y):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 573,
+          "end": 577,
+          "role": "markup",
+          "anchor": "27d7239f22a2",
+          "first": "if show_profile:"
+        }
+      ]
+    },
+    {
+      "id": "quant-charts",
+      "level": "component",
+      "parent": "results-area",
+      "title": "Volume and relative intensity charts",
+      "summary": "Shows each lane's band volume and its percentage of the largest volume as bar charts, with a 100% reference line and value labels.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 362,
+          "end": 398,
+          "role": "logic",
+          "symbol": "create_plot",
+          "anchor": "08b62ff38f38",
+          "first": "def create_plot(df):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 538,
+          "end": 553,
+          "role": "logic",
+          "anchor": "6975189ca8ac",
+          "first": "results = []"
+        },
+        {
+          "file": "code/app.py",
+          "start": 579,
+          "end": 581,
+          "role": "markup",
+          "anchor": "3230a8008098",
+          "first": "st.markdown('<div class=\"card-title\">📊 定量結果</div>', unsafe_allow_html=True)"
+        }
+      ]
+    },
+    {
+      "id": "results-area",
+      "level": "view",
+      "parent": null,
+      "title": "Quantification results",
+      "summary": "Stacks the profile, the charts and the data table below the images once a row has been analysed.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 571,
+          "end": 595,
+          "role": "markup",
+          "anchor": "a9e187a6aa91",
+          "first": "st.markdown(\"---\")"
+        }
+      ]
+    },
+    {
+      "id": "results-table-export",
+      "level": "component",
+      "parent": "results-area",
+      "title": "Data table and CSV download",
+      "summary": "Lists each band's lane, position, size, volume, mean intensity, strength and relative % and downloads them as a CSV file.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 585,
+          "end": 595,
+          "role": "markup",
+          "anchor": "35b55744b29c",
+          "first": "st.markdown('<div class=\"card-title\">📋 データ</div>', unsafe_allow_html=True)"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "interactions",
+      "term": "tune parameter"
+    }
+  ]
+}

@@ -1,0 +1,645 @@
+{
+  "schema": "astaui.card/1",
+  "id": "polar-pipeline-lite",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T04:20:31Z"
+  },
+  "app": {
+    "title": "Polar Pipeline (lite): File Search + Protein Figure Generator",
+    "summary": "A person browses a folder of tab- or comma-separated variant files and opens one. They build a stack of filter conditions, each a column, an operator, a value and whether to keep missing values. They then run the search, which keeps only the rows that meet every condition. They preview the first matching rows and download the filtered table. In a second tool they enter a protein's length, its structural regions and the positions of features for each allele, and generate an SVG figure of the protein's domains to download, saving the setup as a named preset to reload later.",
+    "task": {
+      "text": "Filter a variant table down to the rows that meet a set of column conditions, and draw a per-allele diagram of a protein's domains with marked feature positions.",
+      "verbs": [
+        "identify",
+        "derive",
+        "write"
+      ]
+    },
+    "data": {
+      "text": "Variant call tables (VCF, TSV or CSV) with a header line of columns such as position, quality, depth, allele frequency, gene, zygosity and consequence; for the figure, a protein length with named regions (start, stop, colour) and point features per allele.",
+      "item": "a variant row in a call table; for the figure, a structural region or feature position on a protein",
+      "shapes": [
+        "table",
+        "sequence",
+        "spans"
+      ]
+    },
+    "stage": {
+      "text": "filtering variant calls down to candidates and drawing figures of the affected protein, after variant calling",
+      "terms": [
+        "analyze",
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "A folder browser leads to a page where the person stacks filter blocks, each with a column picked from the file's header, an operator, a value and a missing-value switch. A server pass works out each column's type, writes the rows that pass every block to a TSV, and shows them in a preview table with a download link. A separate form collects protein regions and features for one allele (homozygous) or two (heterozygous, optionally the same structure). The server draws them as coloured bars on a scaled line in an SVG, and the setup can be saved and reloaded as presets.",
+      "views": [
+        "list",
+        "form",
+        "table view",
+        "sequence track",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select",
+        "filter",
+        "toggle view",
+        "inline edit",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "variant filtering and protein domain figures in genomics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "genomics",
+        "variant filtering",
+        "protein domains"
+      ]
+    },
+    "workflow": {
+      "name": "filter a table by stacked column conditions and export the matching rows",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Files are copied into an input folder, and the person browses its directories in a list, folders first, then clicks a file to open it for search.",
+          "parts": [
+            "file-browser"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Add Parameter stacks blocks of column (autocompleted from the file's header line), operator (==, >=, <=, >, <, !=, Contains), value and an Include N/As checkbox. The blocks are remembered in local storage for the next file.",
+          "parts": [
+            "filter-builder"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Search infers each filtered column as integer, float or text from its values, treating '-' and '.' as missing, and writes the rows that pass every block to a timestamped TSV.",
+          "parts": [
+            "filter-builder"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A preview page shows the header and up to the first 50 matching rows in a striped table with a sticky header.",
+          "parts": [
+            "result-preview"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "A Download button sends the filtered TSV as a file.",
+          "parts": [
+            "result-preview"
+          ]
+        },
+        {
+          "step": "write up the result",
+          "here": "In the figure generator the person picks zygosity and whether both alleles share a structure. They then enter protein length, coloured structure ranges and named feature positions per allele, and Generate draws an SVG to download.",
+          "parts": [
+            "figure-form",
+            "figure-result"
+          ]
+        },
+        {
+          "step": "keep a record of changes",
+          "here": "Save Preset stores the whole figure setup under a name in an INI file; Load Preset refills the form from a chosen preset.",
+          "parts": [
+            "figure-presets"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each filter condition has its own switch for whether missing values ('-' or '.') pass, as variant tables often lack quality or frequency.",
+        "Column types are inferred from the data at search time, so the same operators compare numbers numerically and text as strings.",
+        "The header is found by skipping '#' metadata lines in VCF-style files, and the column picker is filled from that header.",
+        "The protein figure is drawn per allele (0|1 and 1|0 for heterozygous, 1|1 for homozygous), with the two alleles' bars scaled to the longer protein.",
+        "Overlapping feature labels are raised by adding '^' characters to the feature name, one level per caret."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "file-browser",
+      "level": "view",
+      "parent": null,
+      "title": "Input folder browser",
+      "summary": "Lists the folders and files in the input directory, with an up-level link, so the person can navigate to a table and open it for filtering.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/polarpipeline/templates/filesearchbrowse.html",
+          "start": 167,
+          "end": 192,
+          "role": "markup",
+          "anchor": "4c6f409d2033",
+          "first": "<div class=\"container\">"
+        },
+        {
+          "file": "code/web/polarpipeline/templates/filesearchbrowse.html",
+          "start": 31,
+          "end": 37,
+          "role": "style",
+          "symbol": ".file-list",
+          "anchor": "211de9a2fda6",
+          "first": ".file-list {"
+        },
+        {
+          "file": "code/web/polarpipeline/templates/filesearchbrowse.html",
+          "start": 39,
+          "end": 47,
+          "role": "style",
+          "symbol": ".file-list-item",
+          "anchor": "78e5afb7d732",
+          "first": ".file-list-item {"
+        },
+        {
+          "file": "code/web/polarpipeline/app.py",
+          "start": 37,
+          "end": 52,
+          "role": "logic",
+          "symbol": "filesearchbrowse",
+          "anchor": "152a85505bd6",
+          "first": "def filesearchbrowse(path=None):"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/filesearchbrowse.js",
+          "start": 13,
+          "end": 17,
+          "role": "logic",
+          "symbol": "openFileOptionsModal",
+          "anchor": "827199db6ed9",
+          "first": "function openFileOptionsModal(fileName, filepath) {"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/filesearchbrowse.js",
+          "start": 4,
+          "end": 11,
+          "role": "logic",
+          "symbol": "copyToClipboard",
+          "anchor": "f61c322964b4",
+          "first": "function copyToClipboard(text) {"
+        }
+      ]
+    },
+    {
+      "id": "filter-builder",
+      "level": "view",
+      "parent": null,
+      "title": "Stacked filter conditions",
+      "summary": "Lets the person add and delete condition blocks (column, operator, value, include missing) and run a search that keeps only rows meeting every block.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/polarpipeline/templates/filesearch.html",
+          "start": 170,
+          "end": 184,
+          "role": "markup",
+          "anchor": "5c6881a4da92",
+          "first": "<div class=\"container\" style=\"margin-top: 2rem; margin-bottom: 2rem;\">"
+        },
+        {
+          "file": "code/web/polarpipeline/templates/filesearch.html",
+          "start": 85,
+          "end": 90,
+          "role": "style",
+          "symbol": ".param-container",
+          "anchor": "22560058fc20",
+          "first": ".param-container {"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/filesearch.js",
+          "start": 7,
+          "end": 65,
+          "role": "logic",
+          "symbol": "addNewFeatureContainer",
+          "anchor": "091272eab011",
+          "first": "function addNewFeatureContainer(colname=\"\", operator=\"\", value=\"\", nas=false) {"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/filesearch.js",
+          "start": 67,
+          "end": 72,
+          "role": "logic",
+          "symbol": "deleteFeature",
+          "anchor": "bd914959c848",
+          "first": "function deleteFeature(num) {"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/filesearch.js",
+          "start": 74,
+          "end": 116,
+          "role": "logic",
+          "symbol": "submitSearch",
+          "anchor": "2b59588dca34",
+          "first": "function submitSearch(){"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/filesearch.js",
+          "start": 118,
+          "end": 141,
+          "role": "logic",
+          "symbol": "storeCurrentParams",
+          "anchor": "6d19ce77aa3b",
+          "first": "function storeCurrentParams(){"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/filesearch.js",
+          "start": 143,
+          "end": 154,
+          "role": "logic",
+          "symbol": "retrieveCurrentParams",
+          "anchor": "e0db05ab6ce6",
+          "first": "function retrieveCurrentParams(){"
+        },
+        {
+          "file": "code/web/polarpipeline/app.py",
+          "start": 67,
+          "end": 72,
+          "role": "logic",
+          "symbol": "filesearch",
+          "anchor": "cd7ad5b11d2c",
+          "first": "def filesearch(path=None):"
+        },
+        {
+          "file": "code/web/polarpipeline/app.py",
+          "start": 54,
+          "end": 64,
+          "role": "logic",
+          "symbol": "findHeaderLine",
+          "anchor": "55b6624c5bbe",
+          "first": "def findHeaderLine(file):"
+        },
+        {
+          "file": "code/web/polarpipeline/app.py",
+          "start": 76,
+          "end": 172,
+          "role": "logic",
+          "symbol": "filesearchbegin",
+          "anchor": "942ef4fe0fb1",
+          "first": "def filesearchbegin():"
+        },
+        {
+          "file": "code/web/input/example_variants.tsv",
+          "start": 1,
+          "end": 10,
+          "role": "data",
+          "anchor": "bcab44ab13df",
+          "first": "##fileformat=PolarPipelineLiteDemoVCFv1"
+        }
+      ]
+    },
+    {
+      "id": "result-preview",
+      "level": "view",
+      "parent": null,
+      "title": "Filtered result preview and download",
+      "summary": "Shows the first matching rows in a table under the file's header and offers the full filtered TSV as a download.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/polarpipeline/templates/filesearchpreview.html",
+          "start": 164,
+          "end": 204,
+          "role": "markup",
+          "anchor": "378b5f34f404",
+          "first": "<div class=\"container\" style=\"margin-top: 2rem;\">"
+        },
+        {
+          "file": "code/web/polarpipeline/templates/filesearchpreview.html",
+          "start": 116,
+          "end": 125,
+          "role": "style",
+          "symbol": "#notification",
+          "anchor": "24c54bcd2c4f",
+          "first": "#notification {"
+        },
+        {
+          "file": "code/web/polarpipeline/app.py",
+          "start": 175,
+          "end": 198,
+          "role": "logic",
+          "symbol": "filesearchpreview",
+          "anchor": "5f25692ce968",
+          "first": "def filesearchpreview():"
+        },
+        {
+          "file": "code/web/polarpipeline/app.py",
+          "start": 201,
+          "end": 209,
+          "role": "logic",
+          "symbol": "filesearchdownload",
+          "anchor": "d5e38bd202ff",
+          "first": "def filesearchdownload():"
+        }
+      ]
+    },
+    {
+      "id": "figure-form",
+      "level": "view",
+      "parent": null,
+      "title": "Protein figure options",
+      "summary": "Collects protein names, zygosity and whether both alleles share a structure, then protein length, coloured structure ranges and feature positions for each allele, either side by side or as one.",
+      "views": [
+        "form",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "toggle view",
+        "inline edit"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/web/polarpipeline/templates/figuregenerator.html",
+          "start": 112,
+          "end": 271,
+          "role": "markup",
+          "symbol": "#protein-form",
+          "anchor": "fd7cf32ae54e",
+          "first": "<form id=\"protein-form\">"
+        },
+        {
+          "file": "code/web/polarpipeline/templates/figuregenerator.html",
+          "start": 35,
+          "end": 45,
+          "role": "style",
+          "symbol": ".color-container",
+          "anchor": "5523864c70a7",
+          "first": ".color-container {"
+        },
+        {
+          "file": "code/web/polarpipeline/templates/figuregenerator.html",
+          "start": 49,
+          "end": 54,
+          "role": "style",
+          "symbol": ".round-container",
+          "anchor": "99145a9262ab",
+          "first": ".round-container {"
+        },
+        {
+          "file": "code/web/polarpipeline/templates/figuregenerator.html",
+          "start": 70,
+          "end": 72,
+          "role": "style",
+          "symbol": ".hidden",
+          "anchor": "0656d7345b65",
+          "first": ".hidden {"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/figuregenerator.js",
+          "start": 342,
+          "end": 351,
+          "role": "logic",
+          "symbol": "initializeStrucs",
+          "anchor": "99179b0d0dd2",
+          "first": "function initializeStrucs(){"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/figuregenerator.js",
+          "start": 353,
+          "end": 372,
+          "role": "logic",
+          "symbol": "homochecked",
+          "anchor": "5f271e34437d",
+          "first": "function homochecked(){"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/figuregenerator.js",
+          "start": 527,
+          "end": 595,
+          "role": "logic",
+          "symbol": "addNewStrucContainer",
+          "anchor": "92e755c71edf",
+          "first": "function addNewStrucContainer(side, disableUpdate=false) {"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/figuregenerator.js",
+          "start": 419,
+          "end": 458,
+          "role": "logic",
+          "symbol": "addNewFeatureContainer",
+          "anchor": "d938de73632b",
+          "first": "function addNewFeatureContainer(side) {"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/figuregenerator.js",
+          "start": 597,
+          "end": 641,
+          "role": "logic",
+          "symbol": "changeBackgroundColor",
+          "anchor": "c6417c28191b",
+          "first": "function changeBackgroundColor(identification) {"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/figuregenerator.js",
+          "start": 650,
+          "end": 655,
+          "role": "logic",
+          "symbol": "deleteStruc",
+          "anchor": "f98061f91867",
+          "first": "function deleteStruc(side, num) {"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/figuregenerator.js",
+          "start": 643,
+          "end": 648,
+          "role": "logic",
+          "symbol": "deleteFeature",
+          "anchor": "fa19591c1b86",
+          "first": "function deleteFeature(side, num) {"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/figuregenerator.js",
+          "start": 835,
+          "end": 880,
+          "role": "logic",
+          "symbol": "updateMirror",
+          "anchor": "3175538e5fe6",
+          "first": "function updateMirror() {"
+        }
+      ]
+    },
+    {
+      "id": "figure-result",
+      "level": "view",
+      "parent": null,
+      "title": "Generated protein figure",
+      "summary": "Draws each allele as a scaled line with coloured structure bars and red feature markers in an SVG, shows it, and lets the person download it.",
+      "views": [
+        "sequence track"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/polarpipeline/templates/figuregenerator.html",
+          "start": 278,
+          "end": 292,
+          "role": "markup",
+          "anchor": "91f19c490b6e",
+          "first": "<div class=\"container\">"
+        },
+        {
+          "file": "code/web/polarpipeline/templates/figuregenerator.html",
+          "start": 30,
+          "end": 34,
+          "role": "style",
+          "symbol": ".result-container",
+          "anchor": "668f8fbd889d",
+          "first": ".result-container {"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/figuregenerator.js",
+          "start": 666,
+          "end": 830,
+          "role": "logic",
+          "symbol": "generateFigure",
+          "anchor": "2e51e91d5049",
+          "first": "function generateFigure() {"
+        },
+        {
+          "file": "code/web/polarpipeline/app.py",
+          "start": 333,
+          "end": 647,
+          "role": "logic",
+          "symbol": "generatefigure",
+          "anchor": "6af72cabfb67",
+          "first": "def generatefigure():"
+        },
+        {
+          "file": "code/web/polarpipeline/app.py",
+          "start": 650,
+          "end": 660,
+          "role": "logic",
+          "symbol": "downloadfigure",
+          "anchor": "6c8b57c2ec97",
+          "first": "def downloadfigure():"
+        }
+      ]
+    },
+    {
+      "id": "figure-presets",
+      "level": "component",
+      "parent": "figure-form",
+      "title": "Save and load presets",
+      "summary": "Saves the whole figure setup under a name and refills the form from a chosen saved preset.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/polarpipeline/templates/figuregenerator.html",
+          "start": 296,
+          "end": 318,
+          "role": "markup",
+          "symbol": "#saveStateModal",
+          "anchor": "eff83a630f0a",
+          "first": "<div class=\"modal fade\" id=\"saveStateModal\" tabindex=\"-1\" role=\"dialog\" aria-labelledby=\"saveStateModalLabel\" aria-hidde"
+        },
+        {
+          "file": "code/web/polarpipeline/templates/figuregenerator.html",
+          "start": 320,
+          "end": 340,
+          "role": "markup",
+          "symbol": "#loadStateModal",
+          "anchor": "d68789c9245e",
+          "first": "<div class=\"modal fade\" id=\"loadStateModal\" tabindex=\"-1\" role=\"dialog\" aria-labelledby=\"loadStateModalLabel\" aria-hidde"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/figuregenerator.js",
+          "start": 1,
+          "end": 175,
+          "role": "logic",
+          "symbol": "saveInfo",
+          "anchor": "300f5eba76a7",
+          "first": "function saveInfo() {"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/figuregenerator.js",
+          "start": 177,
+          "end": 202,
+          "role": "logic",
+          "symbol": "loadStates",
+          "anchor": "f7044d1e469f",
+          "first": "function loadStates(){"
+        },
+        {
+          "file": "code/web/polarpipeline/static/js/figuregenerator.js",
+          "start": 222,
+          "end": 335,
+          "role": "logic",
+          "symbol": "loadInfo",
+          "anchor": "43a5c2358dcc",
+          "first": "function loadInfo(){"
+        },
+        {
+          "file": "code/web/polarpipeline/app.py",
+          "start": 231,
+          "end": 276,
+          "role": "logic",
+          "symbol": "saveState",
+          "anchor": "e6acd574f922",
+          "first": "def saveState():"
+        },
+        {
+          "file": "code/web/polarpipeline/app.py",
+          "start": 284,
+          "end": 290,
+          "role": "logic",
+          "symbol": "loadStates",
+          "anchor": "9e4a680cb719",
+          "first": "def loadStates():"
+        },
+        {
+          "file": "code/web/polarpipeline/app.py",
+          "start": 316,
+          "end": 326,
+          "role": "logic",
+          "symbol": "loadState",
+          "anchor": "5195c0fef24c",
+          "first": "def loadState():"
+        }
+      ]
+    }
+  ]
+}

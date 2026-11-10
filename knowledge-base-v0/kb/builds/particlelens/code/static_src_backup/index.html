@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ParticleLens</title>
+    <link rel="icon" href="./favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="./favicon-32x32.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <style>
+      /* Keep the cached document presentable until the full stylesheet is available. */
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #0b0d0f;
+        color-scheme: dark;
+      }
+
+      .app-shell {
+        visibility: hidden;
+      }
+
+      .runtime-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: #0b0d0f;
+        color: #f4f5f6;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+
+      .runtime-card {
+        display: grid;
+        justify-items: center;
+        width: min(420px, 100%);
+        gap: 14px;
+        padding: 32px;
+        border: 1px solid #2f343a;
+        border-radius: 18px;
+        background: #15181c;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+        text-align: center;
+      }
+
+      .runtime-card img {
+        width: 88px;
+        height: 88px;
+        object-fit: contain;
+      }
+
+      .runtime-card h1,
+      .runtime-card p {
+        margin: 0;
+      }
+
+      .runtime-card progress {
+        width: 100%;
+        height: 10px;
+        accent-color: #e6d54a;
+      }
+    </style>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <section id="runtimeLoader" class="runtime-loader" aria-live="polite" aria-busy="true">
+      <div class="runtime-card">
+        <img src="./particlelens-logo.png" alt="" width="88" height="88" />
+        <h1>ParticleLens</h1>
+        <p id="runtimePhase">Preparing the local detection engine</p>
+        <progress id="runtimeProgress"></progress>
+        <span id="runtimeBytes" class="runtime-bytes"></span>
+        <button id="runtimeRetry" type="button" hidden>Retry</button>
+        <a href="https://github.com/martin-lzh/ParticleLens/releases/latest" data-i18n="runtime.offline">Download the Windows offline app</a>
+      </div>
+    </section>
+
+    <main class="app-shell">
+      <header class="topbar" role="banner">
+        <button id="leftToggle" class="nav-button nav-icon-button panel-entry panel-entry-left" type="button" aria-controls="leftPanel" aria-expanded="true" title="Detection settings" data-i18n-title="nav.toolsPanel">
+          <span class="panel-entry-icon" aria-hidden="true">
+            <i data-lucide="scan-line"></i>
+          </span>
+          <span class="panel-entry-label" data-i18n="nav.toolsPanel">Detection settings</span>
+        </button>
+
+        <div class="nav-brand">
+          <img class="brand-mark" src="./particlelens-logo.png" alt="" aria-hidden="true" />
+          <div>
+            <strong data-i18n="brand.title">ParticleLens</strong>
+            <span data-i18n="brand.subtitle">Microscope particle sizing and correction</span>
+          </div>
+        </div>
+
+        <div class="nav-divider" aria-hidden="true"></div>
+
+        <button id="imageMenuTrigger" class="image-meta" type="button" title="Open an image" data-i18n-title="upload.openTitle">
+          <i data-lucide="image-plus" aria-hidden="true"></i>
+          <span>
+            <strong id="imageName" data-i18n="image.none">No image selected</strong>
+            <small id="imageAction" data-i18n="upload.openAction">Open an image</small>
+          </span>
+        </button>
+        <input id="imageInput" class="sr-only" type="file" accept="image/*" />
+        <span id="scaleReadout" class="scale-readout" data-i18n="scale.unset">Scale not set</span>
+
+        <span id="hintText" data-i18n="hint.initial">Choose an image to detect particles automatically or add circles manually.</span>
+
+        <div class="topbar-actions">
+          <button
+            id="actionManualTrigger"
+            class="nav-button nav-icon-button action-manual-trigger"
+            type="button"
+            aria-controls="actionManualDialog"
+            aria-haspopup="dialog"
+            aria-label="Mouse and touch controls"
+            title="Mouse and touch controls"
+            data-i18n-aria="manual.open"
+            data-i18n-title="manual.open"
+          >
+            <i data-lucide="circle-help" aria-hidden="true"></i>
+            <span class="sr-only" data-i18n="manual.open">Mouse and touch controls</span>
+          </button>
+
+          <button id="languageToggle" class="language-toggle" type="button" aria-label="Switch to Chinese" title="Switch to Chinese" data-i18n-aria="nav.languageToggle" data-i18n-title="nav.languageToggle">
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M2 12h20"></path>
+              <path d="M12 2a15.3 15.3 0 0 1 0 20"></path>
+              <path d="M12 2a15.3 15.3 0 0 0 0 20"></path>
+            </svg>
+            <span id="languageToggleText">中文</span>
+          </button>
+
+          <button id="rightToggle" class="nav-button nav-icon-button panel-entry panel-entry-right" type="button" aria-controls="rightPanel" aria-expanded="false" title="Analysis and export" data-i18n-title="nav.dataPanel">
+            <span class="panel-entry-label" data-i18n="nav.dataPanel">Analysis and export</span>
+            <span class="panel-entry-icon" aria-hidden="true">
+              <i data-lucide="bar-chart-3"></i>
+            </span>
+          </button>
+        </div>
+      </header>
+
+      <section class="workspace" aria-label="Image viewport" data-i18n-aria="workspace.aria">
+        <div class="canvas-wrap">
+          <nav class="quick-toolbar" aria-label="Image editing tools" data-i18n-aria="toolbar.aria">
+            <button id="quickSelectTool" class="quick-tool active" type="button" data-canvas-tool="select" aria-pressed="true" title="Select tool (V)" data-i18n-title="toolbar.selectTitle">
+              <i data-lucide="mouse-pointer-2" aria-hidden="true"></i>
+              <span class="sr-only" data-i18n="toolbar.select">Select</span>
+            </button>
+            <button id="quickPanTool" class="quick-tool" type="button" data-canvas-tool="pan" aria-pressed="false" title="Hand tool (H)" data-i18n-title="toolbar.panTitle">
+              <i data-lucide="hand" aria-hidden="true"></i>
+              <span class="sr-only" data-i18n="toolbar.pan">Hand</span>
+            </button>
+            <button id="quickDrawTool" class="quick-tool" type="button" data-canvas-tool="draw" aria-pressed="false" title="Draw circle by diameter (C)" data-i18n-title="toolbar.drawTitle">
+              <i data-lucide="circle-plus" aria-hidden="true"></i>
+              <span class="sr-only" data-i18n="toolbar.draw">Draw circle by diameter</span>
+            </button>
+            <button id="quickScaleTool" class="quick-tool" type="button" data-canvas-tool="scale" aria-pressed="false" title="Redraw scale bar (R)" data-i18n-title="toolbar.scaleTitle">
+              <i data-lucide="ruler" aria-hidden="true"></i>
+              <span class="sr-only" data-i18n="toolbar.scale">Redraw scale bar</span>
+            </button>
+            <span class="quick-toolbar-separator" aria-hidden="true"></span>
+            <button id="zoomOut" class="quick-tool" type="button" title="Zoom out" data-i18n-title="zoom.outTitle">
+              <i data-lucide="zoom-out" aria-hidden="true"></i>
+              <span class="sr-only" data-i18n="zoom.outTitle">Zoom out</span>
+            </button>
+            <span id="zoomReadout" class="quick-zoom-readout" aria-live="polite">100%</span>
+            <button id="zoomIn" class="quick-tool" type="button" title="Zoom in" data-i18n-title="zoom.inTitle">
+              <i data-lucide="zoom-in" aria-hidden="true"></i>
+              <span class="sr-only" data-i18n="zoom.inTitle">Zoom in</span>
+            </button>
+            <button id="quickFitView" class="quick-tool" type="button" data-canvas-action="fit" title="Fit view (F)" data-i18n-title="toolbar.fitTitle">
+              <i data-lucide="maximize-2" aria-hidden="true"></i>
+              <span class="sr-only" data-i18n="toolbar.fit">Fit view</span>
+            </button>
+            <button id="quickOriginalPreview" class="quick-tool" type="button" aria-pressed="false" title="Press and hold to view the original image" data-i18n-title="toolbar.originalPreviewTitle" disabled>
+              <i data-lucide="eye" aria-hidden="true"></i>
+              <span class="sr-only" data-i18n="toolbar.originalPreview">Hold to view original</span>
+            </button>
+            <button id="quickDeleteSelected" class="quick-tool danger" type="button" data-canvas-action="delete" title="Delete selected (Delete)" data-i18n-title="toolbar.deleteTitle">
+              <i data-lucide="trash-2" aria-hidden="true"></i>
+              <span class="sr-only" data-i18n="toolbar.delete">Delete selected</span>
+            </button>
+            <span class="quick-toolbar-separator" aria-hidden="true"></span>
+            <button id="quickToolbarPosition" class="quick-tool" type="button" aria-haspopup="menu" aria-expanded="false" title="Choose toolbar position" data-i18n-title="toolbar.positionTitle">
+              <i data-lucide="move" aria-hidden="true"></i>
+              <span class="sr-only" data-i18n="toolbar.position">Toolbar position</span>
+            </button>
+            <div id="quickToolbarPositionMenu" class="quick-toolbar-position-menu" role="menu" aria-label="Toolbar position" data-i18n-aria="toolbar.positionMenuAria" hidden>
+              <button type="button" role="menuitemradio" data-toolbar-position="left" aria-checked="true">
+                <i data-lucide="panel-left" aria-hidden="true"></i>
+                <span data-i18n="toolbar.positionLeft">Left</span>
+              </button>
+              <button type="button" role="menuitemradio" data-toolbar-position="right" aria-checked="false">
+                <i data-lucide="panel-right" aria-hidden="true"></i>
+                <span data-i18n="toolbar.positionRight">Right</span>
+              </button>
+              <button type="button" role="menuitemradio" data-toolbar-position="top" aria-checked="false">
+                <i data-lucide="panel-top" aria-hidden="true"></i>
+                <span data-i18n="toolbar.positionTop">Top</span>
+              </button>
+              <button type="button" role="menuitemradio" data-toolbar-position="bottom" aria-checked="false">
+                <i data-lucide="panel-bottom" aria-hidden="true"></i>
+                <span data-i18n="toolbar.positionBottom">Bottom</span>
+              </button>
+            </div>
+          </nav>
+
+          <canvas id="imageCanvas" tabindex="0" aria-label="Image editing canvas" aria-describedby="canvasGestureHint" data-i18n-aria="canvas.aria"></canvas>
+
+          <div class="mobile-canvas-status" aria-hidden="true">
+            <span class="mobile-live-dot"></span>
+            <span data-i18n="mobile.live">Live</span>
+            <span id="mobileScaleReadout">— µm/px</span>
+          </div>
+
+          <button
+            id="mobileOriginalPreview"
+            class="mobile-original-preview"
+            type="button"
+            aria-pressed="false"
+            aria-label="Press and hold to view the original image"
+            title="Press and hold to view the original image"
+            data-i18n-aria="toolbar.originalPreviewTitle"
+            data-i18n-title="toolbar.originalPreviewTitle"
+            disabled
+          >
+            <img src="./hold-original-icon.png" alt="" aria-hidden="true" />
+          </button>
+
+          <button id="emptyState" class="empty-state" type="button">
+            <span class="empty-state-icon"><i data-lucide="image-plus" aria-hidden="true"></i></span>
+            <strong data-i18n="emptyState.title">Open a microscope image</strong>
+            <span data-i18n="emptyState.detail">Click to choose a file or photo, or drop it here</span>
+          </button>
+
+          <section id="scaleLegendOverlay" class="scale-legend-overlay floating-overlay" data-overlay-id="scale-legend" aria-label="Scale and diameter legend" data-i18n-aria="legend.aria" hidden>
+            <header class="overlay-drag-handle">
+              <span data-i18n="legend.title">Scale legend</span>
+              <button id="hideScaleLegend" type="button" title="Hide scale legend" data-i18n-title="legend.hide">
+                <i data-lucide="x" aria-hidden="true"></i>
+                <span class="sr-only" data-i18n="legend.hide">Hide scale legend</span>
+              </button>
+            </header>
+            <canvas id="scaleLegendCanvas" class="scale-legend-canvas" aria-hidden="true"></canvas>
+            <p id="scaleLegendNotice" class="scale-legend-notice" data-i18n="legend.zoomOut" hidden>
+              One or more reference lengths exceed the legend width. Zoom out to see them in full.
+            </p>
+            <p id="scaleLegendDescription" class="sr-only" aria-live="polite"></p>
+          </section>
+
+          <section id="paretoOverlay" class="pareto-overlay floating-overlay" data-overlay-id="pareto" aria-label="Live Pareto distribution" data-i18n-aria="pareto.overlayAria" hidden>
+            <header class="overlay-drag-handle">
+              <span data-i18n="pareto.live">Live distribution</span>
+              <button id="hideParetoOverlay" type="button" title="Hide live distribution" data-i18n-title="pareto.hideOverlay">
+                <i data-lucide="x" aria-hidden="true"></i>
+                <span class="sr-only" data-i18n="pareto.hideOverlay">Hide live distribution</span>
+              </button>
+            </header>
+            <div id="paretoOverlayPlot" class="pareto-overlay-plot"></div>
+          </section>
+
+          <div id="canvasGestureHint" class="canvas-gesture-hint hidden" data-i18n="gesture.guide">
+            Tap to select · Drag to pan or move · Pinch to zoom
+          </div>
+        </div>
+      </section>
+
+      <section id="mobileTuningDrawer" class="mobile-tuning-drawer" aria-label="Image tuning controls" data-i18n-aria="mobile.tuningAria">
+        <button
+          id="mobileDrawerToggle"
+          class="mobile-drawer-toggle"
+          type="button"
+          aria-controls="mobileTuningContent"
+          aria-expanded="true"
+          aria-label="Collapse tuning controls"
+          data-i18n-aria="mobile.collapseTuning"
+        >
+          <span class="mobile-drawer-handle" aria-hidden="true"></span>
+          <span id="mobileDrawerCollapsedLabel" class="mobile-drawer-collapsed-label" aria-hidden="true">
+            <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+            <span>
+              <strong data-i18n="mobile.imageSettings">Image settings</strong>
+              <small data-i18n="mobile.processingParameters">Processing parameters</small>
+            </span>
+          </span>
+        </button>
+
+        <div id="mobileTuningContent" class="mobile-tuning-content">
+          <nav class="mobile-parameter-tabs" role="tablist" aria-label="Image parameters" data-i18n-aria="mobile.parameterAria">
+            <button class="mobile-parameter-tab active" type="button" role="tab" aria-selected="true" data-mobile-parameter="brightness">
+              <i data-lucide="sun" aria-hidden="true"></i>
+              <span data-i18n="adjustments.brightness">Brightness</span>
+            </button>
+            <button class="mobile-parameter-tab" type="button" role="tab" aria-selected="false" data-mobile-parameter="contrast">
+              <i data-lucide="contrast" aria-hidden="true"></i>
+              <span data-i18n="mobile.contrast">Contrast</span>
+            </button>
+            <button class="mobile-parameter-tab" type="button" role="tab" aria-selected="false" data-mobile-parameter="gamma">
+              <i data-lucide="line-chart" aria-hidden="true"></i>
+              <span data-i18n="adjustments.gamma">Gamma</span>
+            </button>
+            <button class="mobile-parameter-tab" type="button" role="tab" aria-selected="false" data-mobile-parameter="sensitivity">
+              <i data-lucide="crosshair" aria-hidden="true"></i>
+              <span data-i18n="labels.sensitivity">Sensitivity</span>
+            </button>
+            <button class="mobile-parameter-tab" type="button" role="tab" aria-selected="false" data-mobile-parameter="diameter">
+              <i data-lucide="circle-dot" aria-hidden="true"></i>
+              <span data-i18n="mobile.diameter">Diameter</span>
+            </button>
+          </nav>
+
+          <div class="mobile-parameter-panel" role="tabpanel">
+            <div class="mobile-parameter-heading">
+              <h2 id="mobileParameterTitle">Brightness</h2>
+              <button id="mobileParameterReset" type="button">
+                <i data-lucide="rotate-ccw" aria-hidden="true"></i>
+                <span data-i18n="mobile.reset">Reset</span>
+              </button>
+            </div>
+
+            <div id="mobileSingleParameter" class="mobile-single-parameter">
+              <div class="mobile-slider-row">
+                <button id="mobileParameterDecrease" type="button" aria-label="Decrease value" data-i18n-aria="mobile.decrease">
+                  <i data-lucide="minus" aria-hidden="true"></i>
+                </button>
+                <div class="mobile-slider-control">
+                  <output id="mobileParameterValue">0</output>
+                  <input id="mobileParameterRange" type="range" min="-100" max="100" step="1" value="0" />
+                </div>
+                <button id="mobileParameterIncrease" type="button" aria-label="Increase value" data-i18n-aria="mobile.increase">
+                  <i data-lucide="plus" aria-hidden="true"></i>
+                </button>
+              </div>
+              <div class="mobile-range-labels">
+                <span id="mobileParameterMin">-100</span>
+                <span id="mobileParameterNeutral"></span>
+                <span id="mobileParameterMax">+100</span>
+              </div>
+            </div>
+
+            <div id="mobileDiameterParameter" class="mobile-diameter-parameter" hidden>
+              <div class="mobile-diameter-values">
+                <label>
+                  <span data-i18n="mobile.minimum">Minimum</span>
+                  <strong><output id="mobileMinDiameterValue">4</output> µm</strong>
+                  <small><output id="mobileMinDiameterPx">8</output> px</small>
+                </label>
+                <label>
+                  <span data-i18n="mobile.maximum">Maximum</span>
+                  <strong><output id="mobileMaxDiameterValue">180</output> µm</strong>
+                  <small><output id="mobileMaxDiameterPx">360</output> px</small>
+                </label>
+              </div>
+              <div class="mobile-dual-range">
+                <div id="mobileDiameterTrack" class="mobile-dual-range-track"></div>
+                <input id="mobileMinDiameterRange" type="range" min="0.1" max="200" step="0.1" value="4" aria-label="Minimum diameter" data-i18n-aria="labels.minDiameter" />
+                <input id="mobileMaxDiameterRange" type="range" min="1" max="200" step="1" value="180" aria-label="Maximum diameter" data-i18n-aria="labels.maxDiameter" />
+              </div>
+            </div>
+
+            <p id="mobileParameterDescription" class="mobile-parameter-description"></p>
+          </div>
+
+          <button id="mobileAllSettings" class="mobile-all-settings" type="button">
+            <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+            <span data-i18n="mobile.allSettings">All settings</span>
+            <i data-lucide="chevron-up" aria-hidden="true"></i>
+          </button>
+
+          <div class="mobile-tuning-actions">
+            <button id="mobileFitView" type="button">
+              <i data-lucide="maximize-2" aria-hidden="true"></i>
+              <span data-i18n="toolbar.fit">Fit view</span>
+            </button>
+            <button id="mobileRunDetect" class="primary" type="button">
+              <i data-lucide="play" aria-hidden="true"></i>
+              <span data-i18n="buttons.runDetect">Run Detection</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <button id="panelBackdrop" class="panel-backdrop" type="button" aria-label="Close panels" data-i18n-aria="nav.closePanels"></button>
+
+      <aside id="leftPanel" class="left-panel" aria-label="Detection settings" data-i18n-aria="nav.toolsPanel">
+        <div
+          id="leftPanelResizeHandle"
+          class="panel-resize-handle"
+          data-panel-side="left"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize detection settings panel"
+          data-i18n-aria="nav.resizeToolsPanel"
+          tabindex="0"
+        ></div>
+        <div class="panel-inner">
+          <header class="panel-heading">
+            <button id="mobileSettingsBack" class="mobile-settings-back" type="button">
+              <i data-lucide="chevron-left" aria-hidden="true"></i>
+              <span data-i18n="mobile.image">Image</span>
+            </button>
+            <div>
+              <h1 data-i18n="detect.title">Particle detection</h1>
+              <p data-i18n="detect.subtitle">Tune recognition before running the local detector.</p>
+            </div>
+            <span id="statusBadge" class="status" data-i18n="status.idle">Waiting</span>
+          </header>
+
+          <section class="control-group first">
+            <div class="grid-two">
+              <label>
+                <span class="calibration-field-label" data-i18n="labels.scaleLength">Scale length (µm)</span>
+                <input id="scaleUm" type="number" min="0.1" step="0.1" value="50" />
+              </label>
+              <div id="micronsPerPixelField" class="field direct-scale-field">
+                <div class="field-label calibration-field-label">
+                  <label for="micronsPerPixel">
+                    <span id="micronsPerPixelLabel" data-i18n="labels.micronsPerPixel">Length per pixel (µm/px)</span>
+                  </label>
+                  <span id="micronsPerPixelInfo" class="info-point">
+                    <button class="info-point-trigger" type="button" aria-describedby="micronsPerPixelInfoText" aria-label="Show why this value cannot be edited" data-i18n-aria="labels.micronsPerPixelInfoAria">i</button>
+                    <span id="micronsPerPixelInfoText" class="info-tooltip" role="tooltip" data-i18n="labels.micronsPerPixelNoImageInfo">Open an image before editing this value.</span>
+                  </span>
+                </div>
+                <input id="micronsPerPixel" type="number" min="0.000001" step="any" value="0.625" />
+                <button id="removeScaleLine" class="remove-scale-line" type="button" hidden>
+                  <i data-lucide="x" aria-hidden="true"></i>
+                  <span data-i18n="buttons.removeScaleLine">Remove drawn scale bar</span>
+                </button>
+              </div>
+            </div>
+            <details id="advancedSettings" class="advanced-settings">
+              <summary>
+                <span data-i18n="advanced.title">Advanced settings</span>
+              </summary>
+              <div class="advanced-settings-body">
+                <p class="advanced-description" data-i18n="advanced.description">Adjust size limits, circle acceptance, edge extraction, and image preprocessing.</p>
+                <section class="advanced-parameter-group" aria-labelledby="houghSettingsTitle">
+                  <h3 id="houghSettingsTitle" data-i18n="advanced.houghGroup">Size and Hough detection</h3>
+                  <div class="grid-two advanced-grid">
+                    <div class="field">
+                      <div class="field-label">
+                        <label for="sensitivity" data-i18n="labels.sensitivity">Sensitivity</label>
+                        <span class="info-point">
+                          <button class="info-point-trigger" type="button" aria-describedby="sensitivityInfo" aria-label="Show sensitivity explanation" data-i18n-aria="labels.sensitivityInfoAria">i</button>
+                          <span id="sensitivityInfo" class="info-tooltip" role="tooltip" data-i18n="labels.sensitivityInfo">This is the circle detector's shape-confidence threshold (0.01–0.98), not a physical particle quantity.</span>
+                        </span>
+                      </div>
+                      <input id="sensitivity" type="number" min="0.01" max="0.98" step="0.01" value="0.88" />
+                    </div>
+                    <label>
+                      <span data-i18n="labels.minDiameter">Minimum diameter (µm)</span>
+                      <input id="minDiameter" type="number" min="0.1" step="0.1" value="4.0" />
+                    </label>
+                    <label>
+                      <span data-i18n="labels.maxDiameter">Maximum diameter (µm)</span>
+                      <input id="maxDiameter" type="number" min="1" step="1" value="180" />
+                    </label>
+                  </div>
+                </section>
+                <section class="advanced-parameter-group" aria-labelledby="edgeSettingsTitle">
+                  <h3 id="edgeSettingsTitle" data-i18n="advanced.edgeGroup">Edge extraction</h3>
+                  <div class="grid-two advanced-grid">
+                    <div class="field">
+                      <div class="field-label">
+                        <label for="edgeThresholdLow" data-i18n="labels.edgeThresholdLow">Edge threshold, low</label>
+                        <span class="info-point">
+                          <button class="info-point-trigger" type="button" aria-describedby="edgeThresholdLowInfo" aria-label="Show low edge threshold explanation" data-i18n-aria="labels.edgeThresholdLowInfoAria">i</button>
+                          <span id="edgeThresholdLowInfo" class="info-tooltip" role="tooltip" data-i18n="labels.edgeThresholdLowInfo">The lower gradient threshold keeps faint candidate edges. Lower values preserve weaker boundaries but can add noise. It must be below the high threshold.</span>
+                        </span>
+                      </div>
+                      <input id="edgeThresholdLow" type="number" min="0" max="254" step="1" value="50" />
+                    </div>
+                    <div class="field">
+                      <div class="field-label">
+                        <label for="edgeThresholdHigh" data-i18n="labels.edgeThresholdHigh">Edge threshold, high</label>
+                        <span class="info-point">
+                          <button class="info-point-trigger" type="button" aria-describedby="edgeThresholdHighInfo" aria-label="Show high edge threshold explanation" data-i18n-aria="labels.edgeThresholdHighInfoAria">i</button>
+                          <span id="edgeThresholdHighInfo" class="info-tooltip" role="tooltip" data-i18n="labels.edgeThresholdHighInfo">The upper gradient threshold identifies strong edges. Higher values favor sharper boundaries. It must be above the low threshold.</span>
+                        </span>
+                      </div>
+                      <input id="edgeThresholdHigh" type="number" min="1" max="255" step="1" value="140" />
+                    </div>
+                  </div>
+                </section>
+                <section class="advanced-parameter-group" aria-labelledby="contourSettingsTitle">
+                  <h3 id="contourSettingsTitle" data-i18n="advanced.contourGroup">Contour acceptance</h3>
+                  <div class="grid-two advanced-grid">
+                    <div class="field">
+                      <div class="field-label">
+                        <label for="minimumEdgeSupport" data-i18n="labels.minimumEdgeSupport">Minimum edge support</label>
+                        <span class="info-point">
+                          <button class="info-point-trigger" type="button" aria-describedby="minimumEdgeSupportInfo" aria-label="Show minimum edge support explanation" data-i18n-aria="labels.minimumEdgeSupportInfoAria">i</button>
+                          <span id="minimumEdgeSupportInfo" class="info-tooltip" role="tooltip" data-i18n="labels.minimumEdgeSupportInfo">The minimum fraction of the fitted circumference that must coincide with edge pixels. Lower values accept more broken rings.</span>
+                        </span>
+                      </div>
+                      <input id="minimumEdgeSupport" type="number" min="0" max="1" step="0.01" value="0.10" />
+                    </div>
+                    <div class="field">
+                      <div class="field-label">
+                        <label for="circleFitTolerance" data-i18n="labels.circleFitTolerance">Circle fit tolerance</label>
+                        <span class="info-point">
+                          <button class="info-point-trigger" type="button" aria-describedby="circleFitToleranceInfo" aria-label="Show circle fit tolerance explanation" data-i18n-aria="labels.circleFitToleranceInfoAria">i</button>
+                          <span id="circleFitToleranceInfo" class="info-tooltip" role="tooltip" data-i18n="labels.circleFitToleranceInfo">The maximum normalized radial error allowed when fitting a contour. Higher values accept less perfectly circular shapes.</span>
+                        </span>
+                      </div>
+                      <input id="circleFitTolerance" type="number" min="0.01" max="0.5" step="0.01" value="0.08" />
+                    </div>
+                    <div class="field">
+                      <div class="field-label">
+                        <label for="minimumContourCoverage" data-i18n="labels.minimumContourCoverage">Minimum contour coverage</label>
+                        <span class="info-point">
+                          <button class="info-point-trigger" type="button" aria-describedby="minimumContourCoverageInfo" aria-label="Show minimum contour coverage explanation" data-i18n-aria="labels.minimumContourCoverageInfoAria">i</button>
+                          <span id="minimumContourCoverageInfo" class="info-tooltip" role="tooltip" data-i18n="labels.minimumContourCoverageInfo">The minimum fraction of a circumference represented by one contour. Lower values accept more partial circles.</span>
+                        </span>
+                      </div>
+                      <input id="minimumContourCoverage" type="number" min="0.05" max="1" step="0.05" value="0.30" />
+                    </div>
+                  </div>
+                </section>
+                <section class="image-adjustments" aria-labelledby="imageAdjustmentsTitle">
+                  <div class="section-heading">
+                    <h2 id="imageAdjustmentsTitle" data-i18n="adjustments.title">Image adjustments</h2>
+                    <span id="previewStatus" class="preview-status" aria-live="polite"></span>
+                  </div>
+                  <div class="adjustment-control">
+                    <label for="brightness">
+                      <span data-i18n="adjustments.brightness">Brightness</span>
+                      <output id="brightnessValue" for="brightness">0</output>
+                    </label>
+                    <input id="brightness" type="range" min="-100" max="100" step="1" value="0" disabled />
+                  </div>
+                  <div class="adjustment-control">
+                    <label for="contrastAdjustment">
+                      <span data-i18n="adjustments.manualContrast">Manual contrast</span>
+                      <output id="contrastAdjustmentValue" for="contrastAdjustment">0</output>
+                    </label>
+                    <input id="contrastAdjustment" type="range" min="-100" max="100" step="1" value="0" disabled />
+                  </div>
+                  <div class="adjustment-control">
+                    <label for="gamma">
+                      <span data-i18n="adjustments.gamma">Gamma</span>
+                      <output id="gammaValue" for="gamma">1.00</output>
+                    </label>
+                    <input id="gamma" type="range" min="0.2" max="3" step="0.01" value="1" disabled />
+                  </div>
+                  <label>
+                    <span data-i18n="labels.contrast">Contrast preprocessing</span>
+                    <select id="contrastMode" disabled>
+                      <option value="clahe">CLAHE</option>
+                      <option value="background" data-i18n="contrast.background">Background correction</option>
+                      <option value="none" data-i18n="contrast.none">None</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span data-i18n="adjustments.colorMode">Preview and export color</span>
+                    <select id="colorMode" disabled>
+                      <option value="color" data-i18n="adjustments.color">Keep color</option>
+                      <option value="grayscale" data-i18n="adjustments.grayscale">Grayscale</option>
+                    </select>
+                  </label>
+                  <div class="adjustment-actions">
+                    <button id="resetAdjustments" type="button" disabled data-i18n="adjustments.reset">Reset adjustments</button>
+                  </div>
+                </section>
+              </div>
+            </details>
+            <label class="sidebar-toggle">
+              <input id="showScaleLegend" type="checkbox" checked />
+              <span data-i18n="legend.show">Show scale legend on image</span>
+            </label>
+            <button id="runDetect" class="primary detect-action" type="button" data-i18n="buttons.runDetect">Run Detection</button>
+            <p id="detectRequirement" class="detect-requirement" data-i18n="detect.scaleRequired">Set a scale bar or enter µm/px to enable detection.</p>
+          </section>
+
+          <div class="note detection-note">
+            <i data-lucide="shield-check" aria-hidden="true"></i>
+            <span data-i18n="detect.localNote">Detection runs locally in your browser. Your image is not uploaded.</span>
+          </div>
+        </div>
+      </aside>
+
+      <aside id="rightPanel" class="right-panel" aria-label="Analysis and export" data-i18n-aria="nav.dataPanel">
+        <div
+          id="rightPanelResizeHandle"
+          class="panel-resize-handle"
+          data-panel-side="right"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize analysis and export panel"
+          data-i18n-aria="nav.resizeDataPanel"
+          tabindex="0"
+        ></div>
+        <div class="panel-inner">
+          <header class="panel-heading right-panel-heading">
+            <button id="mobileAnalysisBack" class="mobile-analysis-back" type="button">
+              <i data-lucide="chevron-left" aria-hidden="true"></i>
+              <span data-i18n="mobile.image">Image</span>
+            </button>
+            <div class="right-panel-title">
+              <h1 class="desktop-analysis-title" data-i18n="nav.dataPanel">Analysis and export</h1>
+              <h1 class="mobile-analysis-title" data-i18n="mobile.analysis">Analysis</h1>
+              <p data-i18n="analysis.subtitle">Review measurements, distributions, and export options.</p>
+            </div>
+            <button id="mobileAnalysisLanguage" class="mobile-analysis-language" type="button" aria-label="Switch language" data-i18n-aria="nav.languageToggle">
+              <i data-lucide="globe" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <section class="mobile-results-overview" aria-live="polite">
+            <i data-lucide="bubbles" aria-hidden="true"></i>
+            <div>
+              <strong><span id="mobileCountStat">0</span> <span data-i18n="mobile.particles">particles</span></strong>
+            </div>
+          </section>
+
+          <section class="stats control-group first">
+            <div class="section-heading">
+              <h2 data-i18n="stats.title">Statistics</h2>
+              <span class="distribution-rule" data-i18n="stats.rule">Visible area ≥ 50%</span>
+            </div>
+            <dl>
+              <div><dt data-i18n="stats.count">Main distribution</dt><dd id="countStat">0</dd></div>
+              <div><dt data-i18n="stats.mean">Mean diameter</dt><dd id="meanStat">-</dd></div>
+              <div><dt data-i18n="stats.median">Median</dt><dd id="medianStat">-</dd></div>
+              <div><dt data-i18n="stats.range">Range</dt><dd id="rangeStat">-</dd></div>
+              <div class="mobile-visible-stat"><dt data-i18n="mobile.visibleArea">Visible area</dt><dd>&gt; 50%</dd></div>
+            </dl>
+          </section>
+
+          <nav class="tabs icon-tabs navigation-tabs" role="tablist" aria-label="Data views" data-i18n-aria="tabs.dataAria">
+            <button id="rightTabTable" class="tab navigation-tab active" data-right-tab="table" type="button" role="tab" aria-selected="true" aria-controls="rightPanelTable" tabindex="0" title="Data points" data-i18n-title="tabs.dataPoints">
+              <i data-lucide="table-2" aria-hidden="true"></i>
+              <span class="tab-label desktop-data-label" data-i18n="tabs.dataPoints">Data points</span>
+              <span class="tab-label mobile-data-label" data-i18n="mobile.data">Data</span>
+            </button>
+            <button id="rightTabPareto" class="tab navigation-tab" data-right-tab="pareto" type="button" role="tab" aria-selected="false" aria-controls="rightPanelPareto" tabindex="-1" title="Pareto distribution" data-i18n-title="tabs.pareto">
+              <i data-lucide="bar-chart-3" aria-hidden="true"></i>
+              <span class="tab-label" data-i18n="tabs.paretoShort">Distribution</span>
+            </button>
+            <button id="rightTabExport" class="tab navigation-tab" data-right-tab="export" type="button" role="tab" aria-selected="false" aria-controls="rightPanelExport" tabindex="-1" title="Export" data-i18n-title="tabs.export">
+              <i data-lucide="file-output" aria-hidden="true"></i>
+              <span class="tab-label" data-i18n="tabs.export">Export</span>
+            </button>
+          </nav>
+
+          <section id="rightPanelTable" class="right-tab-panel active" data-right-panel="table" role="tabpanel" aria-labelledby="rightTabTable">
+            <div class="table-wrap">
+              <div class="mobile-table-summary">
+                <span><strong id="mobileTableCount">0</strong> <span data-i18n="mobile.particles">particles</span></span>
+                <span data-i18n="stats.rule">Visible area ≥ 50%</span>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th data-i18n="table.source">Source</th>
+                    <th>X</th>
+                    <th>Y</th>
+                    <th data-i18n="table.radius">Radius (µm)</th>
+                    <th data-i18n="table.diameter">Diameter (µm)</th>
+                    <th data-i18n="table.visible">Visible area</th>
+                  </tr>
+                </thead>
+                <tbody id="particleTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="rightPanelPareto" class="right-tab-panel" data-right-panel="pareto" role="tabpanel" aria-labelledby="rightTabPareto" hidden>
+            <div class="pareto-controls">
+              <label class="bin-control">
+                <span><span data-i18n="pareto.binCount">Bin count</span><output id="paretoBinCountValue">10</output></span>
+                <input id="paretoBinCount" type="range" min="5" max="30" step="1" value="10" />
+              </label>
+              <div class="trace-toggles">
+                <label><input id="showHistogram" type="checkbox" checked /><span data-i18n="pareto.frequency">Frequency</span></label>
+                <label><input id="showCumulative" type="checkbox" checked /><span data-i18n="pareto.cumulative">Cumulative</span></label>
+                <label><input id="showParetoOverlay" type="checkbox" checked /><span data-i18n="pareto.overlay">Live overlay</span></label>
+              </div>
+            </div>
+            <div id="paretoPlot" class="pareto-plot" aria-label="Particle size Pareto diagram" data-i18n-aria="pareto.aria"></div>
+            <button id="downloadPareto" class="download-chart" type="button">
+              <i data-lucide="download" aria-hidden="true"></i>
+              <span data-i18n="pareto.download">Download current chart</span>
+            </button>
+          </section>
+
+          <section id="rightPanelExport" class="right-tab-panel" data-right-panel="export" role="tabpanel" aria-labelledby="rightTabExport" hidden>
+            <div class="control-group first">
+              <h2 data-i18n="groups.export">Export</h2>
+              <p class="section-description" data-i18n="export.description">Save corrected measurements, the annotated image, or both.</p>
+              <label>
+                <span data-i18n="labels.labelLimit">Image label count</span>
+                <input id="labelLimit" type="number" min="0" step="1" value="80" />
+              </label>
+              <fieldset class="export-options">
+                <legend>
+                  <span data-i18n="export.imageContents">Image contents</span>
+                  <span class="info-point export-info-point">
+                    <button class="info-point-trigger" type="button" aria-describedby="exportContentsInfo" aria-label="Explain exported image contents" data-i18n-aria="export.contentsInfoAria">i</button>
+                    <span id="exportContentsInfo" class="info-tooltip export-visual-tooltip" role="tooltip">
+                      <img src="./export-content-guide.png" alt="" />
+                      <strong data-i18n="export.contentsInfoTitle">Optional image annotations</strong>
+                      <span data-i18n="export.contentsInfoBody">Include the selected-particle ring, scale bar, and size legend in the exported image.</span>
+                    </span>
+                  </span>
+                </legend>
+                <label>
+                  <input id="exportSelection" type="checkbox" />
+                  <span data-i18n="export.selection">Selected particle highlight</span>
+                </label>
+                <label>
+                  <input id="exportScale" type="checkbox" />
+                  <span data-i18n="export.scale">Scale bar</span>
+                </label>
+                <label>
+                  <input id="exportLegend" type="checkbox" />
+                  <span data-i18n="export.legend">Scale and diameter legend</span>
+                </label>
+              </fieldset>
+              <div class="export-padding-options">
+                <div class="export-padding-field">
+                  <span class="export-field-label">
+                    <label for="exportPaddingColor" data-i18n="export.paddingColor">Margin color</label>
+                    <span class="info-point export-info-point">
+                      <button class="info-point-trigger" type="button" aria-describedby="exportMarginInfo" aria-label="Explain export margins" data-i18n-aria="export.marginInfoAria">i</button>
+                      <span id="exportMarginInfo" class="info-tooltip export-visual-tooltip" role="tooltip">
+                        <img src="./export-margin-guide.png" alt="" />
+                        <strong data-i18n="export.marginInfoTitle">Space around the image</strong>
+                        <span data-i18n="export.marginInfoBody">Margin adds the chosen number of pixels around every side of the exported image using this color.</span>
+                      </span>
+                    </span>
+                  </span>
+                  <input id="exportPaddingColor" type="color" value="#ffffff" />
+                </div>
+                <label>
+                  <span data-i18n="export.paddingWidth">Margin size (px)</span>
+                  <input
+                    id="exportPaddingWidth"
+                    type="number"
+                    min="0"
+                    max="500"
+                    step="1"
+                    value="0"
+                    inputmode="numeric"
+                  />
+                </label>
+              </div>
+              <div class="export-actions">
+                <button id="exportCsv" type="button"><i data-lucide="file-spreadsheet" aria-hidden="true"></i><span>CSV</span></button>
+                <button id="exportPng" type="button"><i data-lucide="image-down" aria-hidden="true"></i><span data-i18n="buttons.annotatedImage">Annotated Image</span></button>
+              </div>
+              <button id="exportAll" class="primary export-all" type="button" data-i18n="buttons.exportAll">Export CSV + Image</button>
+            </div>
+          </section>
+        </div>
+      </aside>
+    </main>
+
+    <dialog id="replaceImageDialog" class="replace-image-dialog">
+      <form method="dialog">
+        <span class="dialog-icon"><i data-lucide="triangle-alert" aria-hidden="true"></i></span>
+        <h2 data-i18n="replace.title">Replace the current image?</h2>
+        <p data-i18n="replace.warning">Opening another image will clear all detected particles, manual corrections, scale settings, and selections. Export anything you need first.</p>
+        <div class="dialog-actions">
+          <button value="cancel" data-i18n="replace.cancel">Cancel</button>
+          <button id="replaceExport" value="export" type="button" data-i18n="replace.export">Export data first</button>
+          <button id="replaceContinue" class="danger-confirm" value="replace" type="button" data-i18n="replace.continue">Replace image</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="actionManualDialog" class="action-manual-dialog" aria-labelledby="actionManualTitle">
+      <div class="action-manual-shell">
+        <header class="action-manual-header">
+          <span class="manual-dialog-icon"><i data-lucide="circle-help" aria-hidden="true"></i></span>
+          <div>
+            <h2 id="actionManualTitle" data-i18n="manual.title">Canvas controls</h2>
+            <p data-i18n="manual.subtitle">Select an input method to see how to inspect and correct particles.</p>
+          </div>
+          <button
+            id="actionManualClose"
+            class="manual-close"
+            type="button"
+            aria-label="Close controls"
+            title="Close controls"
+            data-i18n-aria="manual.close"
+            data-i18n-title="manual.close"
+          >
+            <i data-lucide="x" aria-hidden="true"></i>
+          </button>
+        </header>
+
+        <div class="manual-tabs navigation-tabs" role="tablist" aria-label="Input method" data-i18n-aria="manual.tabsAria">
+          <button
+            id="mouseManualTab"
+            class="manual-tab navigation-tab active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="mouseManualPanel"
+            tabindex="0"
+            data-manual-tab="mouse"
+          >
+            <i data-lucide="mouse-pointer-2" aria-hidden="true"></i>
+            <span data-i18n="manual.mouseTab">Mouse</span>
+          </button>
+          <button
+            id="touchManualTab"
+            class="manual-tab navigation-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="touchManualPanel"
+            tabindex="-1"
+            data-manual-tab="touch"
+          >
+            <i data-lucide="hand" aria-hidden="true"></i>
+            <span data-i18n="manual.touchTab">Touch</span>
+          </button>
+        </div>
+
+        <div class="manual-panels">
+          <section
+            id="mouseManualPanel"
+            class="manual-panel active"
+            role="tabpanel"
+            aria-labelledby="mouseManualTab"
+            data-manual-panel="mouse"
+          >
+            <ul class="manual-action-list">
+              <li>
+                <span class="manual-action-icon"><i data-lucide="mouse-pointer-2" aria-hidden="true"></i></span>
+                <div>
+                  <h3><kbd data-i18n="manual.mouse.selectInput">Left click / V</kbd><span aria-hidden="true">:</span><span data-i18n="manual.mouse.selectTitle">Select particles</span></h3>
+                  <p data-i18n="manual.mouse.selectBody">Left-click a circle. Shift-click to add or remove circles from the selection.</p>
+                </div>
+              </li>
+              <li>
+                <span class="manual-action-icon"><i data-lucide="move" aria-hidden="true"></i></span>
+                <div>
+                  <h3><kbd data-i18n="manual.mouse.moveInput">Left-drag</kbd><span aria-hidden="true">:</span><span data-i18n="manual.mouse.moveTitle">Move particles</span></h3>
+                  <p data-i18n="manual.mouse.moveBody">Left-drag a selected circle to move the entire selection.</p>
+                </div>
+              </li>
+              <li>
+                <span class="manual-action-icon"><i data-lucide="hand" aria-hidden="true"></i></span>
+                <div>
+                  <h3><kbd data-i18n="manual.mouse.panInput">Middle-drag / H</kbd><span aria-hidden="true">:</span><span data-i18n="manual.mouse.panTitle">Pan the image</span></h3>
+                  <p data-i18n="manual.mouse.panBody">Middle-drag anywhere, or choose the Hand tool and left-drag.</p>
+                </div>
+              </li>
+              <li>
+                <span class="manual-action-icon"><i data-lucide="circle-plus" aria-hidden="true"></i></span>
+                <div>
+                  <h3><kbd data-i18n="manual.mouse.drawInput">Right-drag / C</kbd><span aria-hidden="true">:</span><span data-i18n="manual.mouse.drawTitle">Add a particle</span></h3>
+                  <p data-i18n="manual.mouse.drawBody">Right-drag across a particle’s diameter, or use the Draw Circle tool and left-drag.</p>
+                </div>
+              </li>
+              <li>
+                <span class="manual-action-icon"><i data-lucide="zoom-in" aria-hidden="true"></i></span>
+                <div>
+                  <h3><kbd data-i18n="manual.mouse.zoomInput">Wheel</kbd><span aria-hidden="true">:</span><span data-i18n="manual.mouse.zoomTitle">Zoom</span></h3>
+                  <p data-i18n="manual.mouse.zoomBody">Scroll the wheel to zoom toward or away from the pointer.</p>
+                </div>
+              </li>
+              <li>
+                <span class="manual-action-icon"><i data-lucide="ruler" aria-hidden="true"></i></span>
+                <div>
+                  <h3><kbd data-i18n="manual.mouse.scaleInput">R</kbd><span aria-hidden="true">:</span><span data-i18n="manual.mouse.scaleTitle">Set the scale</span></h3>
+                  <p data-i18n="manual.mouse.scaleBody">Choose the Scale tool, then left-drag along the image’s scale bar.</p>
+                </div>
+              </li>
+            </ul>
+            <p class="manual-shortcuts" data-i18n="manual.mouse.shortcuts">Shortcuts: V Select · H Hand · C Draw · R Scale · F Fit view · Delete Remove selected</p>
+          </section>
+
+          <section
+            id="touchManualPanel"
+            class="manual-panel"
+            role="tabpanel"
+            aria-labelledby="touchManualTab"
+            data-manual-panel="touch"
+            hidden
+          >
+            <ul class="manual-action-list">
+              <li>
+                <span class="manual-action-icon"><i data-lucide="mouse-pointer-2" aria-hidden="true"></i></span>
+                <div>
+                  <h3><kbd data-i18n="manual.touch.selectInput">Tap</kbd><span aria-hidden="true">:</span><span data-i18n="manual.touch.selectTitle">Select a particle</span></h3>
+                  <p data-i18n="manual.touch.selectBody">Tap a circle to select it. Tap empty image space to clear the selection.</p>
+                </div>
+              </li>
+              <li>
+                <span class="manual-action-icon"><i data-lucide="move" aria-hidden="true"></i></span>
+                <div>
+                  <h3><kbd data-i18n="manual.touch.moveInput">Drag particle</kbd><span aria-hidden="true">:</span><span data-i18n="manual.touch.moveTitle">Move a particle</span></h3>
+                  <p data-i18n="manual.touch.moveBody">Drag a selected circle to reposition it.</p>
+                </div>
+              </li>
+              <li>
+                <span class="manual-action-icon"><i data-lucide="hand" aria-hidden="true"></i></span>
+                <div>
+                  <h3><kbd data-i18n="manual.touch.panInput">Drag canvas / Hand</kbd><span aria-hidden="true">:</span><span data-i18n="manual.touch.panTitle">Pan the image</span></h3>
+                  <p data-i18n="manual.touch.panBody">Drag empty image space, or choose the Hand tool and drag anywhere.</p>
+                </div>
+              </li>
+              <li>
+                <span class="manual-action-icon"><i data-lucide="circle-plus" aria-hidden="true"></i></span>
+                <div>
+                  <h3><kbd data-i18n="manual.touch.drawInput">Draw Circle tool</kbd><span aria-hidden="true">:</span><span data-i18n="manual.touch.drawTitle">Add a particle</span></h3>
+                  <p data-i18n="manual.touch.drawBody">Choose the Draw Circle tool, then drag from one edge of the particle to the other.</p>
+                </div>
+              </li>
+              <li>
+                <span class="manual-action-icon"><i data-lucide="zoom-in" aria-hidden="true"></i></span>
+                <div>
+                  <h3><kbd data-i18n="manual.touch.zoomInput">Two fingers</kbd><span aria-hidden="true">:</span><span data-i18n="manual.touch.zoomTitle">Zoom and pan</span></h3>
+                  <p data-i18n="manual.touch.zoomBody">Pinch with two fingers to zoom; move both fingers together to pan.</p>
+                </div>
+              </li>
+              <li>
+                <span class="manual-action-icon"><i data-lucide="ruler" aria-hidden="true"></i></span>
+                <div>
+                  <h3><kbd data-i18n="manual.touch.scaleInput">Scale tool</kbd><span aria-hidden="true">:</span><span data-i18n="manual.touch.scaleTitle">Set the scale</span></h3>
+                  <p data-i18n="manual.touch.scaleBody">Choose the Scale tool, then drag along the image’s scale bar.</p>
+                </div>
+              </li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </dialog>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

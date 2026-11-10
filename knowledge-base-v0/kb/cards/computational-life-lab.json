@@ -1,0 +1,562 @@
+{
+  "schema": "astaui.card/1",
+  "id": "computational-life-lab",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T08:20:06Z"
+  },
+  "app": {
+    "title": "Computational Life Lab",
+    "summary": "A person picks an experiment configuration and seed, or loads an earlier stored run from its last checkpoint, and then steps or plays the simulation forward one batch of epochs at a time. While it runs they watch a grid of the population, where repeated genomes are coloured, next to line charts of diversity, entropy and complexity proxies over epochs. As the run goes, the population is checked at intervals for candidate self-replicators, and every run is saved with its metrics, checkpoints and the epoch of the first detection. They can also open one organism to read its genome, instruction counts and lineage, score it, step through a paired execution by hand, scan a sample for the highest-scoring candidates, and overlay a metric across several stored runs.",
+    "task": {
+      "text": "Run a simulated population of self-modifying programs, watch its population statistics change, and spot and inspect candidate self-replicators when they emerge.",
+      "verbs": [
+        "monitor",
+        "identify",
+        "explore",
+        "derive",
+        "compare",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "A population of fixed-length byte genomes evolving over epochs. Each run keeps a per-epoch history of metrics, an event log, saved checkpoints and, optionally, recorded parent–child lineage.",
+      "item": "an organism: one fixed-length byte genome in the population, with its parents, generation and birth epoch",
+      "shapes": [
+        "time series",
+        "sequence",
+        "table",
+        "network",
+        "events"
+      ]
+    },
+    "stage": {
+      "text": "running and watching simulation experiments, then analysing and comparing their runs",
+      "terms": [
+        "explore",
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls set up, load and advance the simulation. Each step redraws a population grid and the metric line charts, and an organism index drives a detail panel with its genome tape, instruction bar chart, lineage graph and a step-by-step execution debugger. A sample scan ranks candidates and can send the top one to the inspector, and a separate panel overlays one metric across chosen stored runs.",
+      "views": [
+        "heatmap",
+        "line chart",
+        "bar chart",
+        "sequence track",
+        "network diagram",
+        "table view",
+        "summary stats",
+        "detail panel"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "hover for detail",
+        "zoom and pan",
+        "toggle view",
+        "import"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail",
+        "linked views",
+        "master-detail"
+      ]
+    },
+    "field": {
+      "text": "simulating self-replicating program soups in artificial life",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "artificial life",
+        "primordial soup",
+        "self replication"
+      ]
+    },
+    "workflow": {
+      "name": "run a simulation, watch it evolve and flag when a target structure first appears",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "choose a YAML configuration and an optional seed override and reinitialize, or pick a row in the table of every stored run and load it from its latest checkpoint",
+          "parts": [
+            "experiment-sidebar",
+            "run-browser"
+          ]
+        },
+        {
+          "step": "advance the process and watch it at a glance",
+          "here": "Step runs a set number of epochs and Play repeats it. The population grid colours the most frequent repeated genomes, and line charts track unique genomes, dominant frequency, Simpson diversity, entropy at three levels and complexity proxies",
+          "parts": [
+            "experiment-sidebar",
+            "population-grid",
+            "metrics-dashboard"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "with auto-scan on, a sample is scored for replication consistency every N epochs and the first epoch with a candidate replicator is flagged. Checkpoints are saved at their own interval, and lineage tracking can be turned on",
+          "parts": [
+            "experiment-sidebar",
+            "replicator-scan"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "type an organism index to see its ID, generation, age and parents, its genome rendered as instructions, NULL and NOP bytes, an instruction-count bar chart, a lineage DAG by generation and an on-demand replication score with its classification",
+          "parts": [
+            "genome-inspector"
+          ]
+        },
+        {
+          "step": "trace how one item behaves step by step",
+          "here": "load the organism and a partner as one 128-byte tape, then Step, Run to halt or Reset, with head0, head1 and the program counter highlighted on the tape",
+          "parts": [
+            "execution-debugger"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "run a scan over a sample of the population to list the top 20 by replication score, and load the top result into the genome inspector",
+          "parts": [
+            "replicator-scan",
+            "genome-inspector"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "choose a run database, multi-select stored runs and a metric, and overlay that metric's history across the runs on one line chart",
+          "parts": [
+            "run-comparison"
+          ]
+        }
+      ],
+      "distinctive": [
+        "there is no fitness function: replication is only observed by a separate analysis heuristic (a genome is paired with random partners over chained generations) that never feeds back into the simulation",
+        "only repeated genomes are coloured in the grid, because an exact duplicate is astronomically unlikely by chance, so any repeat is a real signal against a grey background",
+        "every run is deterministic from its configuration and seed and is persisted from the start (metrics, events and periodic checkpoints), so a multi-day run can be resumed later from its checkpoint",
+        "ancestry is a DAG with two parents per organism, drawn by generation and truncated to the nearest relatives instead of forced into a single founder tree",
+        "a hand-stepped interpreter debugger shows the two heads and the program counter on the shared tape"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "experiment-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Experiment and time controls",
+      "summary": "Sets the configuration and seed, the checkpoint interval, Step/Play time controls, how many organisms the grid draws, and the lineage tracking and auto-scan toggles.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 311,
+          "end": 346,
+          "role": "markup",
+          "anchor": "ef8794326a93",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 393,
+          "end": 439,
+          "role": "markup",
+          "anchor": "8a5b37d92bc5",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 104,
+          "end": 127,
+          "role": "logic",
+          "symbol": "_init_universe",
+          "anchor": "c277f581d260",
+          "first": "def _init_universe(config_name: str, seed_override: int | None) -> None:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 288,
+          "end": 301,
+          "role": "logic",
+          "symbol": "_step",
+          "anchor": "8da1905144e8",
+          "first": "def _step(num_epochs: int) -> None:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 202,
+          "end": 257,
+          "role": "logic",
+          "symbol": "_maybe_auto_scan",
+          "anchor": "34e78d8037a4",
+          "first": "def _maybe_auto_scan(universe: BffSoupUniverse) -> None:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 260,
+          "end": 285,
+          "role": "logic",
+          "symbol": "_maybe_checkpoint",
+          "anchor": "30574320d335",
+          "first": "def _maybe_checkpoint(universe: BffSoupUniverse) -> None:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 441,
+          "end": 476,
+          "role": "markup",
+          "anchor": "28c6a3e3beb3",
+          "first": "universe: BffSoupUniverse = st.session_state.universe"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 927,
+          "end": 930,
+          "role": "logic",
+          "anchor": "1a8ac40d653e",
+          "first": "if st.session_state.get(\"playing\"):"
+        }
+      ]
+    },
+    {
+      "id": "run-browser",
+      "level": "component",
+      "parent": "experiment-sidebar",
+      "title": "Browse and load stored runs",
+      "summary": "Lists every run across all run databases, most recent first, and loads the selected one from its latest checkpoint so it can be continued.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "import"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 347,
+          "end": 391,
+          "role": "markup",
+          "anchor": "c092254ca48b",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 177,
+          "end": 199,
+          "role": "logic",
+          "symbol": "_discover_all_runs",
+          "anchor": "0d5b48e3ccc5",
+          "first": "def _discover_all_runs() -> list[dict]:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 130,
+          "end": 174,
+          "role": "logic",
+          "symbol": "_load_stored_run",
+          "anchor": "5d31d05563bb",
+          "first": "def _load_stored_run(db_path: Path, run_id: int) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "population-grid",
+      "level": "view",
+      "parent": null,
+      "title": "Population grid",
+      "summary": "Draws the population (or a fixed sample of it) as a near-square grid of cells, with the most frequent repeated genomes in distinct colours and a legend of their counts and frequencies.",
+      "views": [
+        "heatmap"
+      ],
+      "interactions": [
+        "zoom and pan"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 478,
+          "end": 543,
+          "role": "markup",
+          "anchor": "e2cbfc2a0a08",
+          "first": "left, right = st.columns([2, 1])"
+        },
+        {
+          "file": "code/app/rendering.py",
+          "start": 38,
+          "end": 39,
+          "role": "logic",
+          "symbol": "select_display_sample",
+          "anchor": "2647ffa1e220",
+          "first": "def select_display_sample("
+        },
+        {
+          "file": "code/app/rendering.py",
+          "start": 55,
+          "end": 56,
+          "role": "logic",
+          "symbol": "population_to_highlight_grid",
+          "anchor": "a6b5adef4c5f",
+          "first": "def population_to_highlight_grid("
+        },
+        {
+          "file": "code/app/rendering.py",
+          "start": 28,
+          "end": 35,
+          "role": "logic",
+          "symbol": "grid_shape",
+          "anchor": "4bd58b895f22",
+          "first": "def grid_shape(n: int) -> tuple[int, int]:"
+        }
+      ]
+    },
+    {
+      "id": "metrics-dashboard",
+      "level": "view",
+      "parent": null,
+      "title": "Population, diversity, entropy and complexity charts",
+      "summary": "Plots the per-epoch history of unique genomes, dominant genome frequency, Simpson diversity, entropy at three levels and the compression-based complexity proxies.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 545,
+          "end": 628,
+          "role": "markup",
+          "anchor": "84a0088e8055",
+          "first": "with right:"
+        },
+        {
+          "file": "code/src/computational_life/experiments/bff_soup.py",
+          "start": 23,
+          "end": 42,
+          "role": "logic",
+          "symbol": "compute_metrics",
+          "anchor": "df2af582fb20",
+          "first": "def compute_metrics(universe: BffSoupUniverse) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "genome-inspector",
+      "level": "view",
+      "parent": null,
+      "title": "Genome inspector",
+      "summary": "For one organism index, shows its identity, generation and age, its genome as a styled instruction tape, an instruction-count bar chart, a lineage graph by generation and an on-demand replication score.",
+      "views": [
+        "detail panel",
+        "sequence track",
+        "bar chart",
+        "network diagram",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 630,
+          "end": 747,
+          "role": "markup",
+          "anchor": "3cb3bd647b4f",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/app/rendering.py",
+          "start": 140,
+          "end": 141,
+          "role": "logic",
+          "symbol": "render_tape_html",
+          "anchor": "1df1ac43cd3b",
+          "first": "def render_tape_html("
+        },
+        {
+          "file": "code/app/rendering.py",
+          "start": 170,
+          "end": 176,
+          "role": "logic",
+          "symbol": "instruction_distribution",
+          "anchor": "439b7cf8da0c",
+          "first": "def instruction_distribution(genome: bytes) -> dict[str, int]:"
+        },
+        {
+          "file": "code/app/rendering.py",
+          "start": 179,
+          "end": 184,
+          "role": "logic",
+          "symbol": "lineage_graph",
+          "anchor": "64e608fdc839",
+          "first": "def lineage_graph("
+        },
+        {
+          "file": "code/src/computational_life/analysis/replication.py",
+          "start": 94,
+          "end": 97,
+          "role": "logic",
+          "symbol": "replication_score",
+          "anchor": "c5a7742b3586",
+          "first": "def replication_score(genome: bytes, *, seed: int, **kwargs) -> int:"
+        },
+        {
+          "file": "code/src/computational_life/analysis/replication.py",
+          "start": 127,
+          "end": 142,
+          "role": "logic",
+          "symbol": "classify",
+          "anchor": "2b4659c8122f",
+          "first": "def classify(score: int, genome_length: int, *, high_fidelity_threshold: float = 0.9,"
+        }
+      ]
+    },
+    {
+      "id": "execution-debugger",
+      "level": "component",
+      "parent": "genome-inspector",
+      "title": "Execution debugger",
+      "summary": "Joins the inspected organism and a partner into one tape and lets the person step, run to halt or reset the interpreter, with the heads and program counter highlighted on the tape.",
+      "views": [
+        "sequence track",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 749,
+          "end": 812,
+          "role": "markup",
+          "anchor": "68a33636dbce",
+          "first": "with debugger_col:"
+        },
+        {
+          "file": "code/src/computational_life/substrates/bff/interpreter.py",
+          "start": 37,
+          "end": 191,
+          "role": "logic",
+          "symbol": "BffInterpreter",
+          "anchor": "220ce21b192c",
+          "first": "class BffInterpreter:"
+        },
+        {
+          "file": "code/app/rendering.py",
+          "start": 140,
+          "end": 141,
+          "role": "logic",
+          "symbol": "render_tape_html",
+          "anchor": "1df1ac43cd3b",
+          "first": "def render_tape_html("
+        }
+      ]
+    },
+    {
+      "id": "replicator-scan",
+      "level": "view",
+      "parent": null,
+      "title": "Scan for candidate replicators",
+      "summary": "Scores a sample of the population for replication consistency, lists the top 20 with their classification, and opens the best one in the genome inspector.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 814,
+          "end": 861,
+          "role": "markup",
+          "anchor": "4d045cb5ff08",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/src/computational_life/analysis/replication.py",
+          "start": 53,
+          "end": 60,
+          "role": "logic",
+          "symbol": "replication_scores",
+          "anchor": "d0e7a1f83aed",
+          "first": "def replication_scores("
+        }
+      ]
+    },
+    {
+      "id": "run-comparison",
+      "level": "view",
+      "parent": null,
+      "title": "Compare stored runs",
+      "summary": "Overlays the history of one chosen metric across several selected runs from a run database.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "multi-select",
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 863,
+          "end": 925,
+          "role": "markup",
+          "anchor": "8c3661f8ae25",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/src/computational_life/storage/database.py",
+          "start": 133,
+          "end": 142,
+          "role": "logic",
+          "symbol": "get_metrics_history",
+          "anchor": "b3cb3265a5dd",
+          "first": "def get_metrics_history(self, run_id: int) -> list[dict]:"
+        }
+      ]
+    }
+  ]
+}

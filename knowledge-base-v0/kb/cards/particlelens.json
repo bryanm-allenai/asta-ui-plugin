@@ -1,0 +1,772 @@
+{
+  "schema": "astaui.card/1",
+  "id": "particlelens",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T18:53:07Z"
+  },
+  "app": {
+    "title": "ParticleLens",
+    "summary": "A person opens a microscope image and sets its physical scale. They can let the tool find a scale bar in the lower-right corner, type a length per pixel, or draw a line across a scale of known length. They choose diameter limits and detection settings, adjust brightness, contrast and gamma in a live preview, and run automatic circle detection. They then check the circles on the image: they move or delete wrong ones, draw in missed ones by dragging across their diameter, and pick particles from the table. Last, they look at the count, mean, median and range and a size histogram with a cumulative line, and export a CSV of measurements and an annotated image.",
+    "task": {
+      "text": "Measure the diameters of roughly circular objects in a calibrated microscope image, correct the automatic detections by hand, and export the corrected size distribution.",
+      "verbs": [
+        "derive",
+        "identify",
+        "clean",
+        "summarize",
+        "annotate"
+      ]
+    },
+    "data": {
+      "text": "A single microscope image with a physical scale. Detection turns it into a table of fitted circles, each with a centre, radius, diameter in physical units, visible fraction and edge score.",
+      "item": "a detected circular particle or droplet in the image",
+      "shapes": [
+        "image",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "measuring particle sizes from raw micrographs, before comparing size distributions",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A settings sidebar drives detection on a zoomable image canvas, where circles are drawn and edited with a tool rail and keyboard shortcuts. A results panel with tabs links a particle table, summary statistics and a histogram to the canvas, and a separate tab holds the export options.",
+      "views": [
+        "image viewer",
+        "form",
+        "table view",
+        "summary stats",
+        "bar chart",
+        "line chart"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "drag to arrange",
+        "zoom and pan",
+        "keyboard shortcuts",
+        "exclude and refit",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "particle size analysis of microscope images by circle detection",
+      "disciplines": [
+        "materials science"
+      ],
+      "terms": [
+        "particle size distribution",
+        "droplet analysis",
+        "microscopy"
+      ]
+    },
+    "workflow": {
+      "name": "detect objects in an image automatically, correct them by hand, and export measurements",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Open or drag in a microscope image. Run Detection stays disabled until an image is loaded and a scale is set.",
+          "parts": [
+            "image-canvas"
+          ]
+        },
+        {
+          "step": "calibrate the measurement scale",
+          "here": "Enter a scale length and a length per pixel, rely on automatic lower-right scale-bar detection, or use the Redraw scale bar tool to draw across a bar of known length.",
+          "parts": [
+            "detection-settings",
+            "edit-toolbar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Set the minimum and maximum diameter, the sensitivity, the edge thresholds and the contour fit limits. Preview brightness, contrast, gamma and CLAHE or background correction, then run Hough and contour circle detection.",
+          "parts": [
+            "detection-settings",
+            "image-adjustments"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Select circles and drag or arrow-key them into place, delete false detections, and add missed particles by dragging across their diameter (shortcuts v, h, c, r and Delete). The statistics and histogram update after each edit.",
+          "parts": [
+            "edit-toolbar",
+            "image-canvas"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Click a row in the data table to select that particle on the canvas. The table shows each particle's source, centre, radius, diameter and visible fraction.",
+          "parts": [
+            "results-table"
+          ]
+        },
+        {
+          "step": "summarize the distribution",
+          "here": "Count, mean, median and range are computed over particles that are at least 50% visible. A histogram with an adjustable bin count shows a cumulative percentage line and can be shown as a floating overlay on the image.",
+          "parts": [
+            "results-table",
+            "distribution-chart"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Export the corrected measurements as CSV, an annotated PNG, or both. Options set how many particles get labels, whether to include the selection highlight, a scale bar and a legend, and an outer margin with its colour. The chart can be downloaded as a PNG.",
+          "parts": [
+            "export-panel",
+            "distribution-chart"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every measurement depends on a pixel-to-micron calibration, which can come from automatic scale-bar detection, a typed value or a line drawn by hand.",
+        "Particles cut off by the image edge get a visible fraction, and only those at least half visible count toward the distribution.",
+        "Detection combines a Hough circle pass with contour-based circle fitting and scores each circle by how much of its edge is supported.",
+        "Image adjustments change only the preview and the input to detection; the source image is kept, and a press-and-hold control shows the original.",
+        "Missed particles are added by dragging across their diameter, so the drawn line is itself a measurement."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "detection-settings",
+      "level": "view",
+      "parent": null,
+      "title": "Detection settings sidebar",
+      "summary": "Holds the scale calibration, the diameter limits, sensitivity and advanced detector parameters, and the Run Detection button, which stays disabled until there is an image and a scale.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/static_src_backup/index.html",
+          "start": 392,
+          "end": 588,
+          "role": "markup",
+          "symbol": "#leftPanel",
+          "anchor": "3b5ff6b8e671",
+          "first": "<aside id=\"leftPanel\" class=\"left-panel\" aria-label=\"Detection settings\" data-i18n-aria=\"nav.toolsPanel\">"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2234,
+          "end": 2277,
+          "role": "logic",
+          "symbol": "runDetection",
+          "anchor": "0db91dbd81a1",
+          "first": "async function runDetection() {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2212,
+          "end": 2227,
+          "role": "logic",
+          "symbol": "setScaleFromDirectInput",
+          "anchor": "1e8e283d9224",
+          "first": "function setScaleFromDirectInput() {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1753,
+          "end": 1770,
+          "role": "logic",
+          "symbol": "syncScaleInputState",
+          "anchor": "70549ed0da67",
+          "first": "function syncScaleInputState() {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2229,
+          "end": 2232,
+          "role": "logic",
+          "symbol": "removeScaleLine",
+          "anchor": "43aa0169d327",
+          "first": "function removeScaleLine() {"
+        },
+        {
+          "file": "code/particle_detection_core.py",
+          "start": 451,
+          "end": 494,
+          "role": "logic",
+          "symbol": "analyze_image_bytes",
+          "anchor": "c34efdb01856",
+          "first": "def analyze_image_bytes(image_bytes: bytes | bytearray | memoryview, options: dict[str, Any]) -> dict[str, Any]:"
+        },
+        {
+          "file": "code/particle_detection_core.py",
+          "start": 350,
+          "end": 365,
+          "role": "logic",
+          "symbol": "detect_particles",
+          "anchor": "b9043a4e2f12",
+          "first": "def detect_particles("
+        },
+        {
+          "file": "code/particle_detection_core.py",
+          "start": 63,
+          "end": 68,
+          "role": "logic",
+          "symbol": "detect_scale_bar",
+          "anchor": "3870a2e21822",
+          "first": "def detect_scale_bar("
+        }
+      ]
+    },
+    {
+      "id": "image-adjustments",
+      "level": "component",
+      "parent": "detection-settings",
+      "title": "Image adjustment preview",
+      "summary": "Brightness, contrast, gamma, contrast mode and colour mode controls that redraw a live processed preview without changing the source image; detection uses the same settings.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/static_src_backup/index.html",
+          "start": 528,
+          "end": 572,
+          "role": "markup",
+          "symbol": "section.image-adjustments",
+          "anchor": "1d4b18682a3e",
+          "first": "<section class=\"image-adjustments\" aria-labelledby=\"imageAdjustmentsTitle\">"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 853,
+          "end": 861,
+          "role": "logic",
+          "symbol": "imageAdjustmentOptions",
+          "anchor": "d021ee181df6",
+          "first": "function imageAdjustmentOptions() {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1158,
+          "end": 1163,
+          "role": "logic",
+          "symbol": "schedulePreview",
+          "anchor": "70df02c70795",
+          "first": "function schedulePreview(delay = 16) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1165,
+          "end": 1199,
+          "role": "logic",
+          "symbol": "renderPendingPreview",
+          "anchor": "b8a54929bc9f",
+          "first": "async function renderPendingPreview() {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1085,
+          "end": 1091,
+          "role": "logic",
+          "symbol": "setOriginalPreview",
+          "anchor": "04e9a73b17c6",
+          "first": "function setOriginalPreview(active) {"
+        },
+        {
+          "file": "code/particle_detection_core.py",
+          "start": 176,
+          "end": 177,
+          "role": "logic",
+          "symbol": "render_image_bytes",
+          "anchor": "e54efd14f3a2",
+          "first": "def render_image_bytes("
+        }
+      ]
+    },
+    {
+      "id": "image-canvas",
+      "level": "view",
+      "parent": null,
+      "title": "Image canvas",
+      "summary": "Shows the loaded micrograph large, with zoom and pan, and draws each detected circle, its diameter line and label, and the scale line on top.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/static_src_backup/index.html",
+          "start": 215,
+          "end": 215,
+          "role": "markup",
+          "symbol": "#imageCanvas",
+          "anchor": "671d4beb0f9d",
+          "first": "<canvas id=\"imageCanvas\" tabindex=\"0\" aria-label=\"Image editing canvas\" aria-describedby=\"canvasGestureHint\" data-i18n-a"
+        },
+        {
+          "file": "code/static_src_backup/index.html",
+          "start": 237,
+          "end": 241,
+          "role": "markup",
+          "symbol": "#emptyState",
+          "anchor": "4b463ee1386b",
+          "first": "<button id=\"emptyState\" class=\"empty-state\" type=\"button\">"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2360,
+          "end": 2411,
+          "role": "logic",
+          "symbol": "loadImageData",
+          "anchor": "a5c60c849fb2",
+          "first": "function loadImageData(imageUrl, imageName, imageBytes, revokeUrl = false) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2348,
+          "end": 2358,
+          "role": "logic",
+          "symbol": "handleDrop",
+          "anchor": "a7a39a5e75fd",
+          "first": "function handleDrop(event) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1504,
+          "end": 1504,
+          "role": "logic",
+          "symbol": "draw",
+          "anchor": "185e145fcccc",
+          "first": "function draw(targetCtx = ctx, options = {}) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1580,
+          "end": 1624,
+          "role": "logic",
+          "symbol": "drawParticle",
+          "anchor": "6cc724be6c9b",
+          "first": "function drawParticle(targetCtx, particle, transform, showLabel, ghost = false, showSelection = true) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1441,
+          "end": 1460,
+          "role": "logic",
+          "symbol": "zoomAt",
+          "anchor": "54a653edcff4",
+          "first": "function zoomAt(factor, center = null) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1433,
+          "end": 1439,
+          "role": "logic",
+          "symbol": "resetView",
+          "anchor": "e1ec37a6a08a",
+          "first": "function resetView() {"
+        }
+      ]
+    },
+    {
+      "id": "edit-toolbar",
+      "level": "component",
+      "parent": "image-canvas",
+      "title": "Annotation tool rail",
+      "summary": "Select, pan, draw-circle-by-diameter, redraw-scale, zoom, fit, hold-for-original and delete tools, with keyboard shortcuts and arrow-key nudging, for correcting detections by hand.",
+      "views": [],
+      "interactions": [
+        "select",
+        "multi-select",
+        "drag to arrange",
+        "keyboard shortcuts",
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/static_src_backup/index.html",
+          "start": 151,
+          "end": 213,
+          "role": "markup",
+          "symbol": "nav.quick-toolbar",
+          "anchor": "567bda3e17c0",
+          "first": "<nav class=\"quick-toolbar\" aria-label=\"Image editing tools\" data-i18n-aria=\"toolbar.aria\">"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2115,
+          "end": 2120,
+          "role": "logic",
+          "symbol": "setInteractionMode",
+          "anchor": "7f3c2924da20",
+          "first": "function setInteractionMode(mode) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 3089,
+          "end": 3178,
+          "role": "logic",
+          "symbol": "startPointerDrag",
+          "anchor": "fd34f731e9d0",
+          "first": "function startPointerDrag(event) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 3214,
+          "end": 3261,
+          "role": "logic",
+          "symbol": "finishPointerDrag",
+          "anchor": "2559e5bfb086",
+          "first": "function finishPointerDrag(cancelled = false) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1559,
+          "end": 1565,
+          "role": "logic",
+          "symbol": "circleFromDiameterDrag",
+          "anchor": "b9282c90ff61",
+          "first": "function circleFromDiameterDrag(drag) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2204,
+          "end": 2210,
+          "role": "logic",
+          "symbol": "setScaleFromLine",
+          "anchor": "49264b9c9411",
+          "first": "function setScaleFromLine(line) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2196,
+          "end": 2202,
+          "role": "logic",
+          "symbol": "deleteSelectedParticles",
+          "anchor": "26fb1d590d29",
+          "first": "function deleteSelectedParticles() {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 3332,
+          "end": 3386,
+          "role": "logic",
+          "anchor": "3897629f0b99",
+          "first": "window.addEventListener(\"keydown\", (event) => {"
+        }
+      ]
+    },
+    {
+      "id": "results-table",
+      "level": "component",
+      "parent": "results-panel",
+      "title": "Summary statistics and data table",
+      "summary": "Shows the count, mean, median and range of the included particles and a row for each particle; clicking a row selects that particle on the canvas.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "multi-select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/static_src_backup/index.html",
+          "start": 624,
+          "end": 636,
+          "role": "markup",
+          "symbol": "section.stats",
+          "anchor": "a0799bc898ed",
+          "first": "<section class=\"stats control-group first\">"
+        },
+        {
+          "file": "code/static_src_backup/index.html",
+          "start": 654,
+          "end": 675,
+          "role": "markup",
+          "symbol": "#rightPanelTable",
+          "anchor": "2b438e5d02dc",
+          "first": "<section id=\"rightPanelTable\" class=\"right-tab-panel active\" data-right-panel=\"table\" role=\"tabpanel\" aria-labelledby=\"r"
+        },
+        {
+          "file": "code/static_src_backup/styles.css",
+          "start": 929,
+          "end": 932,
+          "role": "style",
+          "symbol": "#rightPanelTable td",
+          "anchor": "8da587fdccd9",
+          "first": "#rightPanelTable td {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1718,
+          "end": 1751,
+          "role": "logic",
+          "symbol": "updateStats",
+          "anchor": "7977542b85fc",
+          "first": "function updateStats() {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2056,
+          "end": 2079,
+          "role": "logic",
+          "symbol": "renderTable",
+          "anchor": "9b1a97258ddc",
+          "first": "function renderTable() {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 3053,
+          "end": 3057,
+          "role": "logic",
+          "anchor": "f9b602d18ba1",
+          "first": "els.table.addEventListener(\"click\", (event) => {"
+        },
+        {
+          "file": "code/static_src_backup/particle-math.js",
+          "start": 36,
+          "end": 49,
+          "role": "logic",
+          "symbol": "summarizeDiameters",
+          "anchor": "6f9d2e79c972",
+          "first": "export function summarizeDiameters(inputValues) {"
+        },
+        {
+          "file": "code/static_src_backup/particle-math.js",
+          "start": 1,
+          "end": 34,
+          "role": "logic",
+          "symbol": "circleVisibleFraction",
+          "anchor": "8deb6eccf90a",
+          "first": "export function circleVisibleFraction(particle, width, height, samples = 240) {"
+        }
+      ]
+    },
+    {
+      "id": "distribution-chart",
+      "level": "component",
+      "parent": "results-panel",
+      "title": "Size distribution histogram",
+      "summary": "A diameter histogram with an adjustable bin count and a cumulative percentage line. It can also float over the image as a live overlay and can be downloaded as a PNG.",
+      "views": [
+        "bar chart",
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/static_src_backup/index.html",
+          "start": 677,
+          "end": 694,
+          "role": "markup",
+          "symbol": "#rightPanelPareto",
+          "anchor": "82ef600a4e67",
+          "first": "<section id=\"rightPanelPareto\" class=\"right-tab-panel\" data-right-panel=\"pareto\" role=\"tabpanel\" aria-labelledby=\"rightT"
+        },
+        {
+          "file": "code/static_src_backup/index.html",
+          "start": 258,
+          "end": 267,
+          "role": "markup",
+          "symbol": "#paretoOverlay",
+          "anchor": "161f331bfca2",
+          "first": "<section id=\"paretoOverlay\" class=\"pareto-overlay floating-overlay\" data-overlay-id=\"pareto\" aria-label=\"Live Pareto dis"
+        },
+        {
+          "file": "code/static_src_backup/styles.css",
+          "start": 999,
+          "end": 1003,
+          "role": "style",
+          "symbol": "#rightPanelPareto .pareto-plot",
+          "anchor": "85c0365239fe",
+          "first": "#rightPanelPareto .pareto-plot {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1815,
+          "end": 1837,
+          "role": "logic",
+          "symbol": "paretoSeries",
+          "anchor": "d6179c27d51f",
+          "first": "function paretoSeries(values) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1839,
+          "end": 1866,
+          "role": "logic",
+          "symbol": "paretoTraces",
+          "anchor": "5b77b479e252",
+          "first": "function paretoTraces(series) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2026,
+          "end": 2054,
+          "role": "logic",
+          "symbol": "renderPareto",
+          "anchor": "c1526e096f5e",
+          "first": "async function renderPareto(inputValues = null) {"
+        }
+      ]
+    },
+    {
+      "id": "export-panel",
+      "level": "component",
+      "parent": "results-panel",
+      "title": "Export options",
+      "summary": "Downloads the corrected measurements as CSV and an annotated PNG. Options set the label limit, whether to include the selection highlight, a scale bar and a legend, and the outer margin and its colour.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/static_src_backup/index.html",
+          "start": 696,
+          "end": 763,
+          "role": "markup",
+          "symbol": "#rightPanelExport",
+          "anchor": "ff2e9dedb558",
+          "first": "<section id=\"rightPanelExport\" class=\"right-tab-panel\" data-right-panel=\"export\" role=\"tabpanel\" aria-labelledby=\"rightT"
+        },
+        {
+          "file": "code/static_src_backup/styles.css",
+          "start": 1038,
+          "end": 1040,
+          "role": "style",
+          "symbol": "#rightPanelExport .export-options",
+          "anchor": "8934b0e74674",
+          "first": "#rightPanelExport .export-options {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2431,
+          "end": 2458,
+          "role": "logic",
+          "symbol": "exportCsv",
+          "anchor": "4cfe1492a52a",
+          "first": "function exportCsv() {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2460,
+          "end": 2496,
+          "role": "logic",
+          "symbol": "exportPng",
+          "anchor": "21b7ac422614",
+          "first": "async function exportPng() {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2498,
+          "end": 2501,
+          "role": "logic",
+          "symbol": "exportAll",
+          "anchor": "af9c0aa663be",
+          "first": "async function exportAll() {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 1657,
+          "end": 1716,
+          "role": "logic",
+          "symbol": "drawExportLegend",
+          "anchor": "33bf10335a8b",
+          "first": "function drawExportLegend(targetCtx) {"
+        }
+      ]
+    },
+    {
+      "id": "results-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis and export panel",
+      "summary": "A right-hand panel with tabs, opened from the top bar, that switches between the data table, the distribution chart and the export options.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/static_src_backup/index.html",
+          "start": 590,
+          "end": 765,
+          "role": "markup",
+          "symbol": "#rightPanel",
+          "anchor": "19907999dbc7",
+          "first": "<aside id=\"rightPanel\" class=\"right-panel\" aria-label=\"Analysis and export\" data-i18n-aria=\"nav.dataPanel\">"
+        },
+        {
+          "file": "code/static_src_backup/styles.css",
+          "start": 859,
+          "end": 865,
+          "role": "style",
+          "symbol": ".right-panel .tabs.icon-tabs .tab",
+          "anchor": "338c21f494be",
+          "first": ".right-panel .tabs.icon-tabs .tab {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2967,
+          "end": 2967,
+          "role": "logic",
+          "symbol": "setRightTab",
+          "anchor": "fe669586bdb1",
+          "first": "function setRightTab(nextTab, { focus = false } = {}) {"
+        },
+        {
+          "file": "code/static_src_backup/app.js",
+          "start": 2615,
+          "end": 2642,
+          "role": "logic",
+          "symbol": "syncPanels",
+          "anchor": "a44bd74559d0",
+          "first": "function syncPanels() {"
+        }
+      ]
+    }
+  ]
+}

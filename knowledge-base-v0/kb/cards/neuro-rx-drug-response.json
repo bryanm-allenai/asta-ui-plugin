@@ -1,0 +1,377 @@
+{
+  "schema": "astaui.card/1",
+  "id": "neuro-rx-drug-response",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:42:05Z"
+  },
+  "app": {
+    "title": "NEURO-RX Drug Response Prediction Engine",
+    "summary": "The person picks a compound from a sidebar. For that compound the interface matches drug-response values to gene expression across cell lines and splits the cell lines into training and held-out test sets. On the training set it correlates every gene with response and applies false-discovery correction. A volcano plot shows each gene's correlation and significance, with count cards beside it, and the gene table can be exported. Further tabs show the distribution of response values with the most sensitive cell lines, a random-forest model trained on the top genes with its cross-validated and held-out scores, and a predicted-vs-actual plot. A simulator lets the person pick one held-out cell line and compare its predicted response with the measured one.",
+    "task": {
+      "text": "Find genes whose expression correlates with sensitivity to a chosen drug, and test how well those genes predict response in held-out cell lines.",
+      "verbs": [
+        "derive",
+        "identify",
+        "explore",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "A gene-by-cell-line expression matrix joined to one log IC50 drug-response value per cell line and drug; from these the interface derives per-gene correlation statistics.",
+      "item": "a cancer cell line with its gene expression profile and its log IC50 for one drug",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "analysing public drug-screen and expression data to find candidate response biomarkers and test a predictive model",
+      "terms": [
+        "analyze",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "One compound chosen in the sidebar drives a gene-level pipeline that feeds four tabs: a volcano scatter with count cards and a CSV export, a response histogram with a top-sensitive table, a model tab with score metrics, a predicted-vs-actual scatter and a per-cell-line prediction picker, and a methods panel listing the significant genes.",
+      "views": [
+        "scatter plot",
+        "bar chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "biomarker discovery and drug-sensitivity prediction from cell-line pharmacogenomics in cancer biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "pharmacogenomics",
+        "precision oncology",
+        "biomarker discovery"
+      ]
+    },
+    "workflow": {
+      "name": "find features associated with an outcome and test a model built on them",
+      "steps": [
+        {
+          "step": "choose the condition to analyse",
+          "here": "A 'Target Compound' select box in the sidebar. It defaults to the drugs present from a preset list. Choosing one re-runs the matching of response to expression.",
+          "parts": [
+            "control-deck"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Cell lines are split 80/20 before any testing. On the training set each gene's Pearson r with log IC50 is computed, with Benjamini-Hochberg FDR applied. A gene counts as significant when FDR < 0.05 and |r| > 0.2.",
+          "parts": [
+            "volcano-scan"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A volcano plot of correlation against -log10 raw p, with dashed threshold lines, significant genes coloured, and gene names on hover. Cards beside it count the genes scanned, the significant biomarkers and the train/test cell lines.",
+          "parts": [
+            "volcano-scan",
+            "biomarker-cards"
+          ]
+        },
+        {
+          "step": "summarize the outcome across items",
+          "here": "A histogram of log IC50 across all matched cell lines, and a table of the ten most sensitive ones.",
+          "parts": [
+            "dose-response-tab"
+          ]
+        },
+        {
+          "step": "fit a model and check it on held-out items",
+          "here": "A random forest is trained on up to 20 of the top genes, ranked by FDR. Metric tiles show its 5-fold CV R² on the training set and its test R² and RMSE. A scatter of predicted vs actual on the test set has an OLS trendline.",
+          "parts": [
+            "ml-predictor"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The 'Cell Line ID' picker chooses a held-out cell line and shows its actual and predicted log IC50, with the error as a delta.",
+          "parts": [
+            "prediction-simulator"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'EXPORT BIOMARKERS' downloads the full gene statistics table as biomarkers.csv. The integrity tab lists the top FDR-significant genes.",
+          "parts": [
+            "biomarker-cards",
+            "integrity-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The train/test split happens before any statistical testing, and FDR, imputation medians and feature selection all use the training partition only, to avoid leakage.",
+        "Significance needs both FDR < 0.05 and an absolute correlation above 0.2, so the volcano plot uses correlation in place of fold change.",
+        "Model quality is reported twice: as cross-validated R² on the training set and as R² and RMSE on the held-out cell lines.",
+        "A per-item simulator sets one held-out cell line's predicted response against its measured one."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "control-deck",
+      "level": "view",
+      "parent": null,
+      "title": "Control Deck sidebar",
+      "summary": "Lets the person choose the compound to analyse, and states the leakage-prevention method.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/dashboard.py",
+          "start": 448,
+          "end": 463,
+          "role": "markup",
+          "anchor": "a6d77c8e6ee8",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app/dashboard.py",
+          "start": 255,
+          "end": 294,
+          "role": "style",
+          "anchor": "056b50a3ac9c",
+          "first": "/* ---------- SIDEBAR ---------- */"
+        },
+        {
+          "file": "code/app/dashboard.py",
+          "start": 430,
+          "end": 431,
+          "role": "logic",
+          "symbol": "cached_load_data",
+          "anchor": "a1610c2029b1",
+          "first": "def cached_load_data():"
+        },
+        {
+          "file": "code/src/data_loader.py",
+          "start": 22,
+          "end": 44,
+          "role": "logic",
+          "symbol": "load_gdsc_data",
+          "anchor": "cb94e6423633",
+          "first": "def load_gdsc_data():"
+        },
+        {
+          "file": "code/data/raw/GDSC2_response.csv",
+          "start": 1,
+          "end": 97,
+          "role": "data",
+          "anchor": "4cc0e6dbc600",
+          "first": "CELL_LINE_NAME,DRUG_NAME,LN_IC50"
+        },
+        {
+          "file": "code/data/raw/Expression_Data_seed.csv",
+          "start": 1,
+          "end": 26,
+          "role": "data",
+          "anchor": "dc26648475a4",
+          "first": "Gene,A549,H1975,PC9,HCC827,H3255,H820,H1650,Calu3,H23,H1299,H358,H441,H522,H2228,SW900,EKVX,H1703,H520,H596,SKMES1,H2170"
+        }
+      ]
+    },
+    {
+      "id": "volcano-scan",
+      "level": "view",
+      "parent": null,
+      "title": "Volcano scan",
+      "summary": "Plots each gene's correlation with drug response against its significance, so the person can spot candidate biomarkers.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/dashboard.py",
+          "start": 481,
+          "end": 541,
+          "role": "logic",
+          "anchor": "7d9063773605",
+          "first": "with st.spinner(\"⚡ Running biomarker computation pipeline...\"):"
+        },
+        {
+          "file": "code/src/data_loader.py",
+          "start": 46,
+          "end": 90,
+          "role": "logic",
+          "symbol": "process_biomarkers",
+          "anchor": "3675b155ae8d",
+          "first": "def process_biomarkers(df_resp, df_expr, drug_name, test_size=0.2):"
+        }
+      ]
+    },
+    {
+      "id": "biomarker-cards",
+      "level": "component",
+      "parent": "volcano-scan",
+      "title": "Biomarker counts and export",
+      "summary": "Shows the number of genes scanned, the significant genes and the train/test cell lines, and exports the gene statistics as CSV.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/dashboard.py",
+          "start": 544,
+          "end": 569,
+          "role": "markup",
+          "anchor": "abbd9084dd9a",
+          "first": "with col2:"
+        },
+        {
+          "file": "code/app/dashboard.py",
+          "start": 122,
+          "end": 191,
+          "role": "style",
+          "anchor": "b2225abe0c17",
+          "first": "/* ---------- METRIC CARDS (HOLOGRAPHIC) ---------- */"
+        }
+      ]
+    },
+    {
+      "id": "dose-response-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Dose-response distribution",
+      "summary": "Shows a histogram of log IC50 across the matched cell lines and lists the ten most sensitive ones.",
+      "views": [
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/dashboard.py",
+          "start": 575,
+          "end": 603,
+          "role": "logic",
+          "anchor": "2eb1639352ae",
+          "first": "with tab2:"
+        }
+      ]
+    },
+    {
+      "id": "ml-predictor",
+      "level": "view",
+      "parent": null,
+      "title": "ML predictor",
+      "summary": "Trains a random forest on the top genes and reports its cross-validated and held-out scores, with a predicted-vs-actual scatter.",
+      "views": [
+        "scatter plot",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/dashboard.py",
+          "start": 609,
+          "end": 658,
+          "role": "logic",
+          "anchor": "ad7e5dd49fcb",
+          "first": "with tab3:"
+        },
+        {
+          "file": "code/src/model.py",
+          "start": 7,
+          "end": 42,
+          "role": "logic",
+          "symbol": "train_drug_model",
+          "anchor": "ed5adec78b6d",
+          "first": "def train_drug_model(train_df, test_df, top_genes):"
+        }
+      ]
+    },
+    {
+      "id": "prediction-simulator",
+      "level": "component",
+      "parent": "ml-predictor",
+      "title": "Prediction simulator",
+      "summary": "Picks one held-out cell line and compares its predicted log IC50 with the measured value.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/dashboard.py",
+          "start": 661,
+          "end": 686,
+          "role": "logic",
+          "anchor": "997ef238621c",
+          "first": "with col_ml2:"
+        }
+      ]
+    },
+    {
+      "id": "integrity-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Pipeline integrity",
+      "summary": "Lists the method's safeguards and a table of the top genes that pass FDR < 0.05.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/dashboard.py",
+          "start": 692,
+          "end": 720,
+          "role": "markup",
+          "anchor": "9fbc02ed7f4f",
+          "first": "with tab4:"
+        }
+      ]
+    }
+  ]
+}

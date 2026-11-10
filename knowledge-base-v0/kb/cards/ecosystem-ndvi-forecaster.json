@@ -1,0 +1,381 @@
+{
+  "schema": "astaui.card/1",
+  "id": "ecosystem-ndvi-forecaster",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T18:09:47Z"
+  },
+  "app": {
+    "title": "Ecosystem State Forecaster",
+    "summary": "A person picks a data record and a site, then reads a bar chart that shows, for every site, how much each forecasting model improves on a seasonal-average baseline. They step through the held-out months on side-by-side maps of the observed value, the chosen model's forecast and the absolute error, with error numbers for that month. They pick one grid cell and follow it through time against both simple baselines and a prediction band. Finally they set a confidence level and check whether the band's observed coverage matches it.",
+    "task": {
+      "text": "Judge whether several forecasting models beat simple persistence and seasonal-average baselines on held-out data, by site and by data record, and whether their uncertainty intervals are calibrated.",
+      "verbs": [
+        "compare",
+        "derive",
+        "explore",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Monthly rasters of a vegetation index for several sites. Alongside them are each model's out-of-sample forecasts, a month-of-year climatology, a precomputed table of interval quantiles, and a headline error per predictor.",
+      "item": "one site's monthly raster on a grid, with each model's forecast for the same month",
+      "shapes": [
+        "field",
+        "time series",
+        "image collection",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "comparing trained models' out-of-sample forecasts against baselines, before reporting",
+      "terms": [
+        "compare",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls choose the record, site, models, map model, month, cell and confidence level, and every view redraws from them. The skill bar chart gives the overview across sites. The map row and the single-cell time series give the detail for one month and one cell, with a red circle marking the chosen cell on every map.",
+      "views": [
+        "bar chart",
+        "heatmap",
+        "side-by-side panes",
+        "line chart",
+        "summary stats",
+        "sidebar list"
+      ],
+      "interactions": [
+        "toggle view",
+        "select",
+        "multi-select",
+        "time slider",
+        "filter"
+      ],
+      "patterns": [
+        "overview and detail",
+        "side-by-side comparison",
+        "dashboard",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "forecast skill verification against persistence and climatology baselines, for satellite vegetation index in remote sensing",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "remote sensing",
+        "forecast verification",
+        "conformal prediction"
+      ]
+    },
+    "workflow": {
+      "name": "check whether forecasts beat simple baselines on held-out data",
+      "steps": [
+        {
+          "step": "choose the dataset and the subset to work on",
+          "here": "A radio button chooses the satellite record. Dropdowns choose the site, which models to show and which model to map.",
+          "parts": [
+            "controls"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Grouped bars show each model's skill against the climatology baseline for every site. The mapped model is highlighted, and above zero means the model beats the baseline.",
+          "parts": [
+            "skill-chart"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "A select slider steps through the test months. For each month the maps show observed, forecast and absolute error, with that month's RMSE, median absolute error and headline skill.",
+          "parts": [
+            "controls",
+            "forecast-maps",
+            "month-metrics"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Row and column sliders pick a grid cell. Its series is plotted against persistence, climatology and each chosen model, with the start of the test period marked.",
+          "parts": [
+            "controls",
+            "pixel-series"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A confidence slider looks up the conformal half-width and draws the band. The observed coverage over the test period is computed and compared with the nominal level.",
+          "parts": [
+            "controls",
+            "pixel-series",
+            "coverage-metrics"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Skill is always measured against two baselines, persistence and seasonal climatology, rather than reported as accuracy alone.",
+        "Switching between a short record and a long record is offered as the main control, because the headline conclusion changes between them.",
+        "Prediction intervals are conformal and redraw from a stored quantile table. Observed coverage on later folds is shown against the nominal level.",
+        "All forecasts shown are out of sample, from walk-forward folds with spatial hold-out blocks."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "controls",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar controls",
+      "summary": "Chooses the record, site, models, mapped model, confidence level, forecast month and grid cell that drive every view.",
+      "views": [
+        "sidebar list",
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "select",
+        "multi-select",
+        "time slider"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 23,
+          "end": 35,
+          "role": "data",
+          "anchor": "b17fe541cc58",
+          "first": "RECORDS = {"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 38,
+          "end": 40,
+          "role": "logic",
+          "symbol": "biomes_for",
+          "anchor": "e092db9f732c",
+          "first": "def biomes_for(tag: str) -> list[str]:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 44,
+          "end": 45,
+          "role": "logic",
+          "symbol": "load_biome",
+          "anchor": "f67c0e492f16",
+          "first": "def load_biome(tag: str, biome: str) -> xr.Dataset:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 58,
+          "end": 61,
+          "role": "logic",
+          "symbol": "models_in",
+          "anchor": "c3d5261c1576",
+          "first": "def models_in(ds: xr.Dataset) -> list[str]:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 153,
+          "end": 184,
+          "role": "markup",
+          "anchor": "e2cba279c1d7",
+          "first": "available = {label: tag for label, tag in RECORDS.items() if biomes_for(tag)}"
+        }
+      ]
+    },
+    {
+      "id": "skill-chart",
+      "level": "view",
+      "parent": null,
+      "title": "Do the models beat climatology?",
+      "summary": "Grouped bars of each model's skill against the climatology baseline for every site, with the mapped model highlighted.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 49,
+          "end": 55,
+          "role": "logic",
+          "symbol": "load_headlines",
+          "anchor": "67b079bcbc91",
+          "first": "def load_headlines(tag: str) -> dict[str, dict[str, float]]:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 116,
+          "end": 134,
+          "role": "logic",
+          "symbol": "skill_fig",
+          "anchor": "f4277c2f848d",
+          "first": "def skill_fig(headlines, biomes, models, highlight):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 185,
+          "end": 200,
+          "role": "markup",
+          "anchor": "6ae94e6c5b89",
+          "first": "headlines = load_headlines(tag)"
+        }
+      ]
+    },
+    {
+      "id": "forecast-maps",
+      "level": "view",
+      "parent": null,
+      "title": "Forecast for the chosen month",
+      "summary": "Three maps side by side, observed, forecast and absolute error, for one test month, with the chosen cell circled.",
+      "views": [
+        "heatmap",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "time slider",
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 71,
+          "end": 89,
+          "role": "logic",
+          "symbol": "map_row",
+          "anchor": "c55935aa1b3b",
+          "first": "def map_row(actual, pred, model, title, py, px):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 202,
+          "end": 205,
+          "role": "markup",
+          "anchor": "a3d56e53cd67",
+          "first": "st.subheader(f\"{BIOME_LABELS.get(biome, biome)}: forecast for {month_label}\")"
+        }
+      ]
+    },
+    {
+      "id": "month-metrics",
+      "level": "component",
+      "parent": "forecast-maps",
+      "title": "Month error metrics",
+      "summary": "Shows the chosen month's RMSE and median absolute error, and the headline skill against climatology over the whole test period.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 207,
+          "end": 215,
+          "role": "logic",
+          "anchor": "f920acd973a0",
+          "first": "resid = np.abs(actual - pred)"
+        }
+      ]
+    },
+    {
+      "id": "pixel-series",
+      "level": "view",
+      "parent": null,
+      "title": "One pixel through time",
+      "summary": "Plots one cell's observed series against persistence, climatology and the chosen models, with a conformal band around the mapped model.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "select",
+        "multi-select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 64,
+          "end": 67,
+          "role": "logic",
+          "symbol": "climatology_for",
+          "anchor": "8f304fcaefca",
+          "first": "def climatology_for(ds: xr.Dataset) -> xr.DataArray:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 92,
+          "end": 113,
+          "role": "logic",
+          "symbol": "series_fig",
+          "anchor": "6f0bcbf55e4f",
+          "first": "def series_fig(ds, chosen, primary, py, px, level, test_mask):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 217,
+          "end": 218,
+          "role": "markup",
+          "anchor": "e8e8fa4f8e90",
+          "first": "st.subheader(\"One pixel through time\")"
+        }
+      ]
+    },
+    {
+      "id": "coverage-metrics",
+      "level": "component",
+      "parent": "pixel-series",
+      "title": "Interval width and coverage",
+      "summary": "Reports the interval half-width at the chosen confidence level and the observed coverage over the test period against the nominal level.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "score"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 220,
+          "end": 228,
+          "role": "logic",
+          "anchor": "2feab704d671",
+          "first": "band = float(ds[\"conformal_q\"].sel(model=primary).interp(level=level))"
+        },
+        {
+          "file": "code/ecoforecast/app_data.py",
+          "start": 76,
+          "end": 89,
+          "role": "data",
+          "anchor": "0ae10cef2d18",
+          "first": "quantiles = {}"
+        }
+      ]
+    }
+  ]
+}

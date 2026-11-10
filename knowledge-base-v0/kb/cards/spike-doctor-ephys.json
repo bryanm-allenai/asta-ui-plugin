@@ -1,0 +1,506 @@
+{
+  "schema": "astaui.card/1",
+  "id": "spike-doctor-ephys",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T21:46:21Z"
+  },
+  "app": {
+    "title": "Spike Doctor",
+    "summary": "A person uploads a batch of current-clamp recording files and sets the channel, the stimulus epoch, and the voltage and dV/dt thresholds for spike detection. They pick which electrophysiological features to compute, either from a short list of common ones or by searching the full feature library. The interface recomputes every sweep of every file. It shows a status summary and, for each file, raw traces, a firing-versus-current curve and a phase-plane plot, plus a combined per-sweep table. A debug view with a sweep slider and a log let the person check the spike detection, and the results are exported as CSV, a multi-sheet Excel workbook with one sheet per feature, or a PDF of the summary plots.",
+    "task": {
+      "text": "Extract spike and passive membrane features from every sweep of a batch of current-clamp recordings, check the detection, and export the feature tables and summary plots.",
+      "verbs": [
+        "derive",
+        "summarize",
+        "compare",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Binary recording files from a patch-clamp amplifier, each holding many sweeps of membrane voltage over time with a stepped command current. The output is a table with one row per sweep (and per spike event) per file, holding the extracted features.",
+      "item": "a sweep of a recording: one voltage trace under one current step",
+      "shapes": [
+        "time series",
+        "table",
+        "events"
+      ]
+    },
+    "stage": {
+      "text": "extracting features from raw patch-clamp recordings, before statistics across cells",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Settings and feature checkboxes in a sidebar drive a reactive computation over every file. Its results feed tabs for a status summary with per-file plot rows, a combined data table, a per-sweep debug plot chosen with a slider, and a log. Download buttons appear in the sidebar once the results are valid.",
+      "views": [
+        "form",
+        "small multiples",
+        "line chart",
+        "table view",
+        "summary stats",
+        "sidebar list"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "filter",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "small multiples",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "feature extraction from whole-cell current-clamp recordings in electrophysiology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "electrophysiology",
+        "current clamp",
+        "intrinsic excitability"
+      ]
+    },
+    "workflow": {
+      "name": "compute per-item measures across a batch of recordings and export the tables",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Several recording files are uploaded at once with a progress bar. Files that fail to load are kept with their error, and the debug sweep slider is set to the largest sweep count.",
+          "parts": [
+            "sidebar-settings"
+          ]
+        },
+        {
+          "step": "set the parameters the computation uses",
+          "here": "Numeric fields set the recording channel, the protocol epoch that holds the current step, the voltage threshold for spikes, and the minimum dV/dt.",
+          "parts": [
+            "sidebar-settings"
+          ]
+        },
+        {
+          "step": "choose which measures to compute",
+          "here": "A Basic tab has checkboxes for common features, each with a tooltip saying what it measures. An Advanced tab filters the full feature library by typed text.",
+          "parts": [
+            "feature-picker"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Each sweep's stimulus window and current step are found, the features are extracted, and capacitance is derived from tau and input resistance. Features that make no sense for a sweep are blanked, and everything recomputes when a setting changes.",
+          "parts": [
+            "summary-plots",
+            "results-table"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A text summary gives load and analysis counts and the current settings. Each file then gets a row of raw traces, spike count against current step, and a phase plane at about twice rheobase.",
+          "parts": [
+            "summary-plots"
+          ]
+        },
+        {
+          "step": "open one item in detail to check the computation",
+          "here": "A slider picks one sweep for every file. Its plot marks detected spike peaks, the threshold line, the baseline voltage and the stimulus window above the command current, and a log lists warnings and errors by file and sweep.",
+          "parts": [
+            "debug-plots",
+            "analysis-logs"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Three downloads: a flat CSV with one row per sweep, an Excel workbook with one sheet per feature (current steps as rows, files as columns), and a PDF with two files' summary plots per A4 page.",
+          "parts": [
+            "export-buttons"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The stimulus window and current step are read from the protocol's epoch table, and the command current is rebuilt from it when the recorded one is missing.",
+        "Spike detection uses two thresholds, a voltage threshold and a dV/dt threshold, and the debug plot draws them over the trace so the person can tune them.",
+        "The phase-plane plot automatically picks the sweep nearest twice the rheobase, which is the lowest current step that fires.",
+        "Features that depend on the stimulus are dropped for files without a stimulus, and frequency or latency values are blanked for sweeps with too few spikes.",
+        "The Excel export pivots each feature into its own sheet, with current steps as rows and files as columns, ready to compare across cells."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar-settings",
+      "level": "view",
+      "parent": null,
+      "title": "File upload and analysis parameters",
+      "summary": "Loads a batch of recording files and holds the stimulus and spike-detection settings that every computation reads.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/ui/layout.py",
+          "start": 59,
+          "end": 121,
+          "role": "markup",
+          "anchor": "bb513fe1193a",
+          "first": "ui.layout_sidebar("
+        },
+        {
+          "file": "code/server/core.py",
+          "start": 46,
+          "end": 116,
+          "role": "logic",
+          "symbol": "_load_abf_files",
+          "anchor": "30d28b9422a5",
+          "first": "def _load_abf_files():"
+        }
+      ]
+    },
+    {
+      "id": "feature-picker",
+      "level": "component",
+      "parent": "sidebar-settings",
+      "title": "Feature selection",
+      "summary": "Lets the person tick common features with explanatory tooltips, or search the full feature library and add any of them.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "search",
+        "filter",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/ui/layout.py",
+          "start": 122,
+          "end": 146,
+          "role": "markup",
+          "anchor": "ddb459284a3c",
+          "first": "ui.h5(\"eFEL Features to Calculate:\"),"
+        },
+        {
+          "file": "code/ui/layout.py",
+          "start": 20,
+          "end": 38,
+          "role": "logic",
+          "symbol": "_create_basic_feature_checkboxes",
+          "anchor": "a8c277945f6f",
+          "first": "def _create_basic_feature_checkboxes():"
+        },
+        {
+          "file": "code/server/core.py",
+          "start": 168,
+          "end": 188,
+          "role": "logic",
+          "symbol": "advanced_features_filtered_ui",
+          "anchor": "c7e04d195fec",
+          "first": "def advanced_features_filtered_ui():"
+        },
+        {
+          "file": "code/server/core.py",
+          "start": 31,
+          "end": 42,
+          "role": "logic",
+          "symbol": "selected_efel_features",
+          "anchor": "a30ddf60b2fc",
+          "first": "def selected_efel_features() -> list:"
+        },
+        {
+          "file": "code/modules/constants.py",
+          "start": 1,
+          "end": 60,
+          "role": "data",
+          "anchor": "69ea3f2cb414",
+          "first": "from typing import List, Dict, Tuple"
+        }
+      ]
+    },
+    {
+      "id": "summary-plots",
+      "level": "view",
+      "parent": null,
+      "title": "Summary Plots",
+      "summary": "Shows load and analysis status, the current settings, and for each file a row of raw traces, the firing-versus-current curve and a phase-plane plot near twice rheobase.",
+      "views": [
+        "small multiples",
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "small multiples",
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/ui/layout.py",
+          "start": 150,
+          "end": 157,
+          "role": "markup",
+          "anchor": "2e68f0f0985d",
+          "first": "ui.nav_panel("
+        },
+        {
+          "file": "code/server/core.py",
+          "start": 119,
+          "end": 140,
+          "role": "logic",
+          "symbol": "analysis_results_list",
+          "anchor": "06e89bfa699a",
+          "first": "def analysis_results_list():"
+        },
+        {
+          "file": "code/modules/analysis.py",
+          "start": 165,
+          "end": 173,
+          "role": "logic",
+          "symbol": "run_analysis_on_abf",
+          "anchor": "eaa079232bc3",
+          "first": "def run_analysis_on_abf("
+        },
+        {
+          "file": "code/server/core.py",
+          "start": 192,
+          "end": 257,
+          "role": "logic",
+          "symbol": "analysis_summary_text",
+          "anchor": "3726785594df",
+          "first": "def analysis_summary_text():"
+        },
+        {
+          "file": "code/server/core.py",
+          "start": 261,
+          "end": 334,
+          "role": "logic",
+          "symbol": "dynamic_summary_plots_ui",
+          "anchor": "fbac097b9e35",
+          "first": "def dynamic_summary_plots_ui():"
+        },
+        {
+          "file": "code/modules/plotting.py",
+          "start": 338,
+          "end": 341,
+          "role": "logic",
+          "symbol": "_generate_summary_plots_for_file",
+          "anchor": "c2bfad9f3756",
+          "first": "def _generate_summary_plots_for_file("
+        }
+      ]
+    },
+    {
+      "id": "results-table",
+      "level": "view",
+      "parent": null,
+      "title": "Detailed Results Table",
+      "summary": "Combines every file's per-sweep feature rows into one table showing the current step, capacitance and the selected features.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/ui/layout.py",
+          "start": 158,
+          "end": 162,
+          "role": "markup",
+          "anchor": "bd230cdb3e91",
+          "first": "ui.nav_panel("
+        },
+        {
+          "file": "code/server/core.py",
+          "start": 143,
+          "end": 164,
+          "role": "logic",
+          "symbol": "combined_analysis_df",
+          "anchor": "b0057b97ad62",
+          "first": "def combined_analysis_df() -> pd.DataFrame:"
+        },
+        {
+          "file": "code/server/core.py",
+          "start": 442,
+          "end": 451,
+          "role": "logic",
+          "symbol": "analysis_data_table",
+          "anchor": "2f2052717e99",
+          "first": "def analysis_data_table():"
+        }
+      ]
+    },
+    {
+      "id": "debug-plots",
+      "level": "view",
+      "parent": null,
+      "title": "Debug Plots",
+      "summary": "For one sweep picked with a slider, draws each file's voltage trace with detected spike peaks, the threshold, the baseline and the stimulus window above the command current, so the person can check the detection.",
+      "views": [
+        "line chart",
+        "small multiples"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/ui/layout.py",
+          "start": 163,
+          "end": 179,
+          "role": "markup",
+          "anchor": "d64676bda847",
+          "first": "ui.nav_panel("
+        },
+        {
+          "file": "code/ui/layout.py",
+          "start": 46,
+          "end": 56,
+          "role": "style",
+          "anchor": "285296904062",
+          "first": "\"\"\""
+        },
+        {
+          "file": "code/server/core.py",
+          "start": 338,
+          "end": 438,
+          "role": "logic",
+          "symbol": "dynamic_debug_plots_ui",
+          "anchor": "e03df9dc4b13",
+          "first": "def dynamic_debug_plots_ui():"
+        },
+        {
+          "file": "code/modules/analysis.py",
+          "start": 314,
+          "end": 320,
+          "role": "logic",
+          "symbol": "generate_debug_plot",
+          "anchor": "8e67f85e287c",
+          "first": "def generate_debug_plot("
+        }
+      ]
+    },
+    {
+      "id": "analysis-logs",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis Logs",
+      "summary": "Lists info, warning and error messages tagged by file and sweep from loading and analysis, with a button to clear them.",
+      "views": [
+        "list"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/ui/layout.py",
+          "start": 180,
+          "end": 185,
+          "role": "markup",
+          "anchor": "92f4ecad2270",
+          "first": "ui.nav_panel("
+        },
+        {
+          "file": "code/server/core.py",
+          "start": 484,
+          "end": 494,
+          "role": "logic",
+          "symbol": "analysis_logs_text",
+          "anchor": "8feca7c4c16e",
+          "first": "def analysis_logs_text():"
+        },
+        {
+          "file": "code/server/core.py",
+          "start": 498,
+          "end": 499,
+          "role": "logic",
+          "symbol": "_clear_logs",
+          "anchor": "d73843a39c51",
+          "first": "def _clear_logs():"
+        },
+        {
+          "file": "code/modules/logger.py",
+          "start": 4,
+          "end": 36,
+          "role": "logic",
+          "symbol": "SessionLogger",
+          "anchor": "9f8be6b4a366",
+          "first": "class SessionLogger:"
+        }
+      ]
+    },
+    {
+      "id": "export-buttons",
+      "level": "component",
+      "parent": "sidebar-settings",
+      "title": "Downloads",
+      "summary": "Once there are valid results, offers a flat CSV, an Excel workbook with one sheet per feature (current steps by files), and a PDF of the summary plots with two files per page.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/ui/layout.py",
+          "start": 72,
+          "end": 72,
+          "role": "markup",
+          "anchor": "b093d6444f4a",
+          "first": "ui.output_ui(\"download_buttons\"),"
+        },
+        {
+          "file": "code/server/core.py",
+          "start": 455,
+          "end": 480,
+          "role": "logic",
+          "symbol": "download_buttons",
+          "anchor": "6beef5cd3c17",
+          "first": "def download_buttons():"
+        },
+        {
+          "file": "code/server/downloads.py",
+          "start": 123,
+          "end": 124,
+          "role": "logic",
+          "symbol": "register_download_handlers",
+          "anchor": "4f6a85957b23",
+          "first": "def register_download_handlers("
+        },
+        {
+          "file": "code/server/downloads.py",
+          "start": 12,
+          "end": 60,
+          "role": "logic",
+          "symbol": "_build_excel_bytes",
+          "anchor": "2ecb886a0559",
+          "first": "def _build_excel_bytes(df_before_pivot: pd.DataFrame) -> bytes:"
+        },
+        {
+          "file": "code/server/downloads.py",
+          "start": 63,
+          "end": 120,
+          "role": "logic",
+          "symbol": "_build_pdf_bytes",
+          "anchor": "d2d3cdc21fab",
+          "first": "def _build_pdf_bytes(results: list) -> bytes:"
+        }
+      ]
+    }
+  ]
+}

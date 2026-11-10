@@ -1,0 +1,445 @@
+{
+  "schema": "astaui.card/1",
+  "id": "msannot-ms-annotation",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T06:52:35Z"
+  },
+  "app": {
+    "title": "msannot — MS/MS spectral library search dashboard",
+    "summary": "A person loads a reference spectral library, or uses the bundled one, and brings in a query spectrum: a bundled example, an uploaded MGF/MSP file, or peaks pasted as m/z–intensity lines with a precursor mass. They choose whether to identify the compound or look for structural analogues, pick a similarity measure, and set the number of results, the precursor window and the largest mass shift allowed. The query is cleaned and searched, giving a ranked table of library candidates with scores, plus structural similarity when the query's structure is known. They pick a rank to see a mirror plot of the query against that candidate with the proposed structure drawn, and download the ranked hits as TSV. Other tabs let them browse and filter the library and read the benchmark of how reliable each measure is.",
+    "task": {
+      "text": "Propose the compound, or close structural analogues, behind an unknown tandem mass spectrum by ranking reference spectra in a library by spectral similarity.",
+      "verbs": [
+        "identify",
+        "compare",
+        "derive",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "A reference library of fragmentation spectra (peak lists of m/z and intensity with precursor mass, compound name, structure and contributor), and one or more query spectra to annotate.",
+      "item": "a tandem mass spectrum: a list of fragment peaks with a precursor mass",
+      "shapes": [
+        "spectrum",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "annotating unknown spectra by library matching after acquisition, before confirming with a standard",
+      "terms": [
+        "annotate"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls set the query source and the search parameters. These drive a ranked hits table, and the rank chosen there opens a mirror plot and a structure drawing for that candidate. Separate tabs give a filterable library table with composition charts, and a dashboard of benchmark tables and figures.",
+      "views": [
+        "form",
+        "table view",
+        "mirror plot",
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "filter",
+        "search",
+        "export",
+        "toggle view"
+      ],
+      "patterns": [
+        "master-detail",
+        "side-by-side comparison",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "MS/MS spectral library matching and analogue search in metabolomics",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "mass spectrometry",
+        "metabolomics",
+        "cheminformatics"
+      ]
+    },
+    "workflow": {
+      "name": "match an unknown item against a reference library and rank the candidates",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A library MSP is uploaded, or the bundled demo library is used, cleaned and indexed. The query comes from bundled examples, an uploaded MGF/MSP file, or pasted 'm/z intensity' lines with a precursor m/z, and one spectrum is picked from a dropdown.",
+          "parts": [
+            "sidebar",
+            "query-source"
+          ]
+        },
+        {
+          "step": "set how the match is made",
+          "here": "Pick Identification or Analogues mode and one of three similarity measures (cosine, modified cosine, entropy). Set the number of results, the precursor window in ppm and the largest mass shift in Da, and choose whether to exclude the query's own compound.",
+          "parts": [
+            "search-parameters"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The query is cleaned; with fewer than 5 peaks left it is refused. Otherwise it is scored against every library spectrum in the mass window, giving a ranked hits table with score, matched peaks and mass difference. A Tanimoto column is added when the query's structure is known.",
+          "parts": [
+            "search-results",
+            "hits-table"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Choosing a result rank draws a mirror plot of the query against that library spectrum, and the candidate's proposed structure is drawn below it.",
+          "parts": [
+            "mirror-viewer"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "A button downloads the ranked hits as hits.tsv.",
+          "parts": [
+            "hits-table"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "The Library tab shows the spectrum count and composition charts, and filters the library table by compound name.",
+          "parts": [
+            "library-browser"
+          ]
+        },
+        {
+          "step": "check how reliable the method is",
+          "here": "The Benchmark tab reads saved benchmark results and shows top-1 identification accuracy with confidence intervals against a random baseline, an analogue summary, and the evaluation figures.",
+          "parts": [
+            "benchmark-summary"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Two search modes: identification limits candidates to a precursor window in ppm, while analogue search allows a mass shift of up to a set number of Da and can exclude the query's own compound to simulate an unknown.",
+        "Three interchangeable spectral similarity measures, with the default changing by mode.",
+        "When the query's structure is known, Tanimoto similarity of molecular fingerprints is computed for each hit, so spectral rank can be checked against structural closeness.",
+        "Queries are cleaned the same way as the library, and too-poor spectra (fewer than 5 peaks) are refused before search.",
+        "A benchmark of each measure's accuracy sits next to the search, and the method notes say a library match is only a level-2 annotation to confirm with a standard."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar: library and query",
+      "summary": "Loads and indexes the reference library (uploaded or bundled) and holds the query and parameter controls that drive the search.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 74,
+          "end": 84,
+          "role": "markup",
+          "anchor": "5ac2bd1bb1fe",
+          "first": "st.sidebar.title(\"🧪 msannot\")"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 42,
+          "end": 45,
+          "role": "logic",
+          "symbol": "load_library",
+          "anchor": "00dcc22b4d95",
+          "first": "def load_library(path: str, modified: float) -> SpectralLibrary:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 66,
+          "end": 70,
+          "role": "logic",
+          "symbol": "uploaded_path",
+          "anchor": "e8b5dc2f42e0",
+          "first": "def uploaded_path(uploaded: Any) -> Path:"
+        }
+      ]
+    },
+    {
+      "id": "query-source",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Query source",
+      "summary": "Lets the person take a query spectrum from bundled examples, an uploaded MGF/MSP file, or pasted peak lines with a precursor m/z, then pick one spectrum.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 86,
+          "end": 113,
+          "role": "markup",
+          "anchor": "37d942fa4293",
+          "first": "st.sidebar.subheader(\"Requête\")"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 48,
+          "end": 63,
+          "role": "logic",
+          "symbol": "parse_pasted",
+          "anchor": "6ff27cef54d0",
+          "first": "def parse_pasted(text: str, precursor: float) -> Spectrum | None:"
+        },
+        {
+          "file": "code/src/msannot/io/mgf.py",
+          "start": 120,
+          "end": 133,
+          "role": "logic",
+          "symbol": "load_spectra",
+          "anchor": "5a5b569b5bad",
+          "first": "def load_spectra(path: Path) -> list[Spectrum]:"
+        }
+      ]
+    },
+    {
+      "id": "search-parameters",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Search parameters",
+      "summary": "Sets the search mode (identification or analogues), similarity measure, number of results, precursor ppm window, maximum mass shift, and whether to exclude the query's own compound.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 115,
+          "end": 130,
+          "role": "markup",
+          "anchor": "b2ee6f50be82",
+          "first": "st.sidebar.subheader(\"Paramètres\")"
+        }
+      ]
+    },
+    {
+      "id": "search-results",
+      "level": "view",
+      "parent": null,
+      "title": "Search tab",
+      "summary": "Cleans the chosen query, searches the library with the set parameters, and shows the ranked candidates and the selected match.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 133,
+          "end": 157,
+          "role": "logic",
+          "anchor": "09a60a693f19",
+          "first": "st.title(\"Annotation de petites molécules par spectres MS/MS\")"
+        },
+        {
+          "file": "code/src/msannot/search/library.py",
+          "start": 140,
+          "end": 149,
+          "role": "logic",
+          "symbol": "search",
+          "anchor": "92624a518af1",
+          "first": "def search("
+        },
+        {
+          "file": "code/src/msannot/processing/cleaning.py",
+          "start": 22,
+          "end": 38,
+          "role": "logic",
+          "symbol": "clean_spectrum",
+          "anchor": "d6f7c81b1d74",
+          "first": "def clean_spectrum(spectrum: Spectrum, config: CleaningConfig) -> Spectrum | None:"
+        }
+      ]
+    },
+    {
+      "id": "hits-table",
+      "level": "component",
+      "parent": "search-results",
+      "title": "Ranked hits table",
+      "summary": "Lists the top library candidates with score, matched peaks and mass difference, adds structural Tanimoto similarity when the query's structure is known, and downloads the hits as TSV.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 158,
+          "end": 179,
+          "role": "markup",
+          "anchor": "e6558cbef6f5",
+          "first": "if hits.empty:"
+        },
+        {
+          "file": "code/src/msannot/chem/structures.py",
+          "start": 74,
+          "end": 120,
+          "role": "logic",
+          "symbol": "FingerprintIndex",
+          "anchor": "b1cc1d4863f1",
+          "first": "class FingerprintIndex:"
+        }
+      ]
+    },
+    {
+      "id": "mirror-viewer",
+      "level": "component",
+      "parent": "search-results",
+      "title": "Mirror spectrum and proposed structure",
+      "summary": "For the chosen result rank, draws the query and the library spectrum as a mirror plot and shows the candidate's 2D structure.",
+      "views": [
+        "mirror plot",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 180,
+          "end": 201,
+          "role": "markup",
+          "anchor": "afe58cd5b3b2",
+          "first": "rank = st.selectbox(\"Spectre miroir du résultat n°\", list(hits[\"rank\"]))"
+        },
+        {
+          "file": "code/src/msannot/plotting/spectra.py",
+          "start": 45,
+          "end": 52,
+          "role": "logic",
+          "symbol": "mirror_figure",
+          "anchor": "e531e314b56f",
+          "first": "def mirror_figure("
+        },
+        {
+          "file": "code/src/msannot/chem/structures.py",
+          "start": 134,
+          "end": 142,
+          "role": "logic",
+          "symbol": "molecule_svg",
+          "anchor": "44d9f803efa4",
+          "first": "def molecule_svg(smiles: str, width: int = 300, height: int = 220) -> str | None:"
+        }
+      ]
+    },
+    {
+      "id": "library-browser",
+      "level": "view",
+      "parent": null,
+      "title": "Library tab",
+      "summary": "Shows how many spectra the library holds and its composition, and filters the library table by compound name.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "search",
+        "filter"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 203,
+          "end": 214,
+          "role": "markup",
+          "anchor": "b906b6f92785",
+          "first": "with tabs[1]:"
+        },
+        {
+          "file": "code/src/msannot/plotting/dataset.py",
+          "start": 24,
+          "end": 50,
+          "role": "logic",
+          "symbol": "dataset_figure",
+          "anchor": "e3a68c450e42",
+          "first": "def dataset_figure(table: pd.DataFrame) -> Figure:"
+        }
+      ]
+    },
+    {
+      "id": "benchmark-summary",
+      "level": "view",
+      "parent": null,
+      "title": "Benchmark tab",
+      "summary": "Reads the saved benchmark summary and shows identification accuracy with confidence intervals and a random baseline, analogue results, and the evaluation figures.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 216,
+          "end": 250,
+          "role": "markup",
+          "anchor": "90622f94cce8",
+          "first": "with tabs[2]:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "data",
+      "list": "shapes",
+      "term": "spectrum"
+    },
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "mirror plot"
+    }
+  ]
+}

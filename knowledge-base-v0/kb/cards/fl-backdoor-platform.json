@@ -1,0 +1,680 @@
+{
+  "schema": "astaui.card/1",
+  "id": "fl-backdoor-platform",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T16:20:49Z"
+  },
+  "app": {
+    "title": "联安智盾 (Lian'an Zhidun): federated learning backdoor attack and defense experiment platform",
+    "summary": "A person sets up a simulated federated training run in a grouped form: clients and rounds, data partitioning, which backdoor attack the malicious clients use, and which client-side filter, server-side detector and robust aggregator defend against it. Before running, they can see the trigger the attack would add to a chosen training image. They start the run, or queue many runs from a JSON file, and watch accuracy, attack success rate and loss rise round by round alongside the live log. Finished runs land in a searchable history with final metrics, curves, detection statistics and files to download. Several runs can then be gathered into a named comparison summary with overlaid curves, a metrics table, and CSV, LaTeX and ZIP downloads.",
+    "task": {
+      "text": "Configure and run simulated attack-versus-defense experiments, then compare runs by clean accuracy and attack success rate.",
+      "verbs": [
+        "compare",
+        "monitor",
+        "plan",
+        "derive",
+        "summarize",
+        "curate"
+      ]
+    },
+    "data": {
+      "text": "Experiment configurations and the per-round metric logs each simulated training run produces: global accuracy, attack success rate and loss, per-client anomaly scores and detection outcomes, plus sample images with triggers added.",
+      "item": "one simulated federated training run with its configuration snapshot and per-round metrics",
+      "shapes": [
+        "table",
+        "time series",
+        "image",
+        "events",
+        "judgements",
+        "versions"
+      ]
+    },
+    "stage": {
+      "text": "running and comparing simulated defense experiments, from configuration through to tables for a paper",
+      "terms": [
+        "analyze",
+        "compare",
+        "plan",
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "A grouped parameter form drives a trigger preview of a sample image and a launch panel that streams live round-by-round curves and logs over a websocket. A batch page queues many configurations with progress. Finished runs feed a searchable card grid with a detail modal and a summary builder, where the person picks runs to set side by side in overlaid curves and a table.",
+      "views": [
+        "form",
+        "line chart",
+        "image viewer",
+        "side-by-side panes",
+        "table view",
+        "thumbnail grid",
+        "detail panel",
+        "summary stats",
+        "text editor"
+      ],
+      "interactions": [
+        "inline edit",
+        "toggle view",
+        "import",
+        "export",
+        "search",
+        "filter",
+        "select",
+        "multi-select",
+        "undo"
+      ],
+      "patterns": [
+        "master-detail",
+        "side-by-side comparison",
+        "status pipeline",
+        "dashboard",
+        "version history"
+      ]
+    },
+    "field": {
+      "text": "backdoor attacks and robust aggregation defenses in federated learning",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "federated learning",
+        "backdoor defense",
+        "machine learning security"
+      ]
+    },
+    "workflow": {
+      "name": "configure, run and compare simulation experiments",
+      "steps": [
+        {
+          "step": "set the parameters of a run",
+          "here": "A form grouped into core, federated, attack, defense and management sections. Fields appear or hide depending on the chosen attack, detector or aggregator. A raw TOML editor and named backups support editing the configuration file directly and restoring an earlier version.",
+          "parts": [
+            "config-page",
+            "config-backups"
+          ]
+        },
+        {
+          "step": "preview the effect of the chosen treatment on one sample",
+          "here": "The original training image is shown next to the same image with the trigger added, along with its target label and the number of changed pixels. Distributed attacks also show one client's local trigger and the full trigger.",
+          "parts": [
+            "attack-preview"
+          ]
+        },
+        {
+          "step": "run it and watch progress live",
+          "here": "Start or stop a named run. A progress bar counts rounds, and ACC/ASR and loss curves plus an ANSI-coloured log stream in over a websocket.",
+          "parts": [
+            "run-monitor"
+          ]
+        },
+        {
+          "step": "queue many runs and track the queue",
+          "here": "Upload or edit a JSON list of experiments, re-parse it, then run it. Each item shows a status, progress across the whole batch and the current run's curves. The person can pause, resume, end only the current run or cancel the batch, and filter the list by status.",
+          "parts": [
+            "batch-queue"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Finished runs appear as cards with final ACC and ASR. They can be searched by name or UUID and paged, and opening one shows its curves, detection metrics, configuration snapshot, plots and files.",
+          "parts": [
+            "run-history"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Pick runs with a searchable checklist and name a summary. The summary overlays their ACC and ASR curves and lists their final metrics in a table.",
+          "parts": [
+            "summary-compare"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download a run's images or all its files as ZIP, or a summary's CSV, LaTeX table and ZIP.",
+          "parts": [
+            "run-history",
+            "summary-compare"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each run is judged on two opposing numbers: clean accuracy should stay high while attack success rate should fall to zero.",
+        "Defenses stack in three layers (client data filter, server-side update detection, robust aggregation), each with its own parameters.",
+        "Malicious clients are tracked as ground truth, so detection precision, recall, FPR and AUC can be computed every round.",
+        "The trigger preview uses the same image transforms as training without sampling poison, so the person sees the attack before spending a run on it.",
+        "The comparison exports a LaTeX table ready to paste into a paper."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "config-page",
+      "level": "view",
+      "parent": null,
+      "title": "Single experiment configuration",
+      "summary": "A grouped form for setting a run's federated, attack and defense parameters, where fields appear only when the chosen method needs them.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/src/pages/ConfigPage.tsx",
+          "start": 6,
+          "end": 26,
+          "role": "markup",
+          "anchor": "9e9220c28cec",
+          "first": "const ConfigPage: React.FC = () => {"
+        },
+        {
+          "file": "code/frontend/src/components/ConfigForm/index.tsx",
+          "start": 1005,
+          "end": 1108,
+          "role": "markup",
+          "anchor": "8e15b4eae2c5",
+          "first": "<Form"
+        },
+        {
+          "file": "code/frontend/src/components/ConfigForm/index.tsx",
+          "start": 414,
+          "end": 512,
+          "role": "logic",
+          "anchor": "9cec8fc6f4e4",
+          "first": "const handleValuesChange = (changedValues: any, allValues: any) => {"
+        },
+        {
+          "file": "code/frontend/src/components/ConfigForm/index.tsx",
+          "start": 176,
+          "end": 227,
+          "role": "logic",
+          "anchor": "82826441e3ca",
+          "first": "const loadConfig = async () => {"
+        },
+        {
+          "file": "code/frontend/src/components/ConfigForm/FieldRenderer.tsx",
+          "start": 12,
+          "end": 53,
+          "role": "logic",
+          "anchor": "871c92c79712",
+          "first": "const FieldRenderer: React.FC<FieldRendererProps> = ({"
+        },
+        {
+          "file": "code/backend/config_manager.py",
+          "start": 53,
+          "end": 232,
+          "role": "data",
+          "anchor": "20bea2239a20",
+          "first": "CONFIG_SCHEMA: dict[str, dict[str, Any]] = {"
+        },
+        {
+          "file": "code/backend/config_manager.py",
+          "start": 233,
+          "end": 551,
+          "role": "data",
+          "anchor": "eb3d74ab9e76",
+          "first": "\"group\": \"attack\","
+        }
+      ]
+    },
+    {
+      "id": "attack-preview",
+      "level": "component",
+      "parent": "config-page",
+      "title": "Backdoor sample preview",
+      "summary": "Shows a chosen training image before and after the configured trigger is added, with its target label and the number of changed pixels. Distributed attacks also show one client's local trigger.",
+      "views": [
+        "image viewer",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/AttackPreview/index.tsx",
+          "start": 91,
+          "end": 152,
+          "role": "markup",
+          "anchor": "d0609d1cac38",
+          "first": "return ("
+        },
+        {
+          "file": "code/frontend/src/components/AttackPreview/index.tsx",
+          "start": 31,
+          "end": 90,
+          "role": "logic",
+          "anchor": "8518a397a089",
+          "first": "export default function AttackPreview({ config, ready }: Props) {"
+        },
+        {
+          "file": "code/backend/attack_preview.py",
+          "start": 49,
+          "end": 164,
+          "role": "logic",
+          "symbol": "preview_attack",
+          "anchor": "e8d387882b52",
+          "first": "def preview_attack(request: dict) -> dict:"
+        },
+        {
+          "file": "code/backend/main.py",
+          "start": 467,
+          "end": 478,
+          "role": "logic",
+          "symbol": "get_attack_preview",
+          "anchor": "a738a398c2d1",
+          "first": "async def get_attack_preview(request: dict[str, Any]):"
+        }
+      ]
+    },
+    {
+      "id": "config-backups",
+      "level": "component",
+      "parent": "config-page",
+      "title": "Raw configuration editor and backups",
+      "summary": "Edit, import and download the TOML configuration directly, and save, view, edit, restore or delete named backups of it.",
+      "views": [
+        "text editor",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "undo"
+      ],
+      "patterns": [
+        "version history"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/ConfigForm/index.tsx",
+          "start": 1109,
+          "end": 1246,
+          "role": "markup",
+          "anchor": "82c5a370200a",
+          "first": "<Modal"
+        },
+        {
+          "file": "code/frontend/src/components/ConfigForm/index.tsx",
+          "start": 228,
+          "end": 412,
+          "role": "logic",
+          "anchor": "99687089012f",
+          "first": "const handleOpenAdvanced = () => {"
+        },
+        {
+          "file": "code/frontend/src/components/ConfigForm/index.tsx",
+          "start": 642,
+          "end": 840,
+          "role": "logic",
+          "anchor": "46d33231bb17",
+          "first": "const loadBackups = async () => {"
+        },
+        {
+          "file": "code/backend/config_manager.py",
+          "start": 849,
+          "end": 897,
+          "role": "logic",
+          "symbol": "list_backups",
+          "anchor": "933d1bea1503",
+          "first": "def list_backups() -> list[dict[str, Any]]:"
+        },
+        {
+          "file": "code/backend/config_manager.py",
+          "start": 935,
+          "end": 944,
+          "role": "logic",
+          "symbol": "restore_from_backup",
+          "anchor": "98143f699806",
+          "first": "def restore_from_backup(filename: str, backup_current: bool = True, backup_name: str | None = None) -> None:"
+        },
+        {
+          "file": "code/backend/config_manager.py",
+          "start": 1010,
+          "end": 1022,
+          "role": "logic",
+          "symbol": "create_backup",
+          "anchor": "146d7099ddd7",
+          "first": "def create_backup(custom_name: str | None = None, on_conflict: str = 'ask') -> Path | None:"
+        }
+      ]
+    },
+    {
+      "id": "run-monitor",
+      "level": "view",
+      "parent": null,
+      "title": "Experiment control",
+      "summary": "Starts or stops a named run and streams its round progress, ACC/ASR and loss curves, and log live.",
+      "views": [
+        "line chart",
+        "summary stats",
+        "list"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/ExperimentControl/index.tsx",
+          "start": 292,
+          "end": 338,
+          "role": "markup",
+          "anchor": "d9f007b9f2cb",
+          "first": "return ("
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentControl/index.tsx",
+          "start": 42,
+          "end": 130,
+          "role": "logic",
+          "anchor": "858ca2ca4895",
+          "first": "const renderCharts = useCallback(() => {"
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentControl/index.tsx",
+          "start": 132,
+          "end": 240,
+          "role": "logic",
+          "anchor": "0fb85c285e08",
+          "first": "const connectWS = useCallback((name: string, runId?: string | null) => {"
+        },
+        {
+          "file": "code/frontend/src/components/LogViewer/index.tsx",
+          "start": 4,
+          "end": 42,
+          "role": "logic",
+          "anchor": "589d779c0526",
+          "first": "const ansiToHtml = new AnsiToHtml({"
+        },
+        {
+          "file": "code/frontend/src/utils/experimentStream.ts",
+          "start": 31,
+          "end": 62,
+          "role": "logic",
+          "anchor": "03f6d5a0d4de",
+          "first": "export const parseMetricPoint = (value: unknown): MetricPoint | null => {"
+        },
+        {
+          "file": "code/backend/main.py",
+          "start": 482,
+          "end": 513,
+          "role": "logic",
+          "symbol": "start_experiment",
+          "anchor": "5cf223723ce1",
+          "first": "async def start_experiment(request: dict[str, Any]):"
+        },
+        {
+          "file": "code/backend/main.py",
+          "start": 517,
+          "end": 533,
+          "role": "logic",
+          "symbol": "stop_experiment",
+          "anchor": "9957d49d7f62",
+          "first": "async def stop_experiment():"
+        },
+        {
+          "file": "code/backend/main.py",
+          "start": 262,
+          "end": 299,
+          "role": "logic",
+          "symbol": "websocket_logs",
+          "anchor": "17cf12e62f7c",
+          "first": "async def websocket_logs(websocket: WebSocket, exp_name: str):"
+        }
+      ]
+    },
+    {
+      "id": "batch-queue",
+      "level": "view",
+      "parent": null,
+      "title": "Batch experiments",
+      "summary": "Loads a JSON list of experiments and runs them as a queue, with status for each item, overall and current-run progress, live curves, and pause, resume, stop-current and cancel controls.",
+      "views": [
+        "table view",
+        "text editor",
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "inline edit"
+      ],
+      "patterns": [
+        "status pipeline",
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/pages/BatchPage.tsx",
+          "start": 256,
+          "end": 384,
+          "role": "markup",
+          "anchor": "0336fcb17dbe",
+          "first": "</div>"
+        },
+        {
+          "file": "code/frontend/src/pages/BatchPage.tsx",
+          "start": 101,
+          "end": 218,
+          "role": "logic",
+          "anchor": "d75c33a7cb81",
+          "first": "const handleUpload = async () => {"
+        },
+        {
+          "file": "code/frontend/src/pages/BatchPage.tsx",
+          "start": 219,
+          "end": 255,
+          "role": "logic",
+          "anchor": "2f0bf47cd61d",
+          "first": "const visibleExperiments = experiments.filter((_item, index) => statusFilter === 'all' || (batchStatus?.results?.[index]"
+        },
+        {
+          "file": "code/frontend/src/components/BatchMonitor/index.tsx",
+          "start": 21,
+          "end": 162,
+          "role": "logic",
+          "anchor": "07381b632ba6",
+          "first": "const BatchMonitor: React.FC<Props> = ({ batchId, onComplete, onStatus, onProgress }) => {"
+        },
+        {
+          "file": "code/frontend/src/components/BatchMonitor/ExperimentMetrics.tsx",
+          "start": 18,
+          "end": 140,
+          "role": "logic",
+          "anchor": "c61a7c1444ae",
+          "first": "const ExperimentMetrics: React.FC<Props> = ({ name, runId, onProgress }) => {"
+        },
+        {
+          "file": "code/backend/main.py",
+          "start": 631,
+          "end": 666,
+          "role": "logic",
+          "symbol": "run_batch_experiments",
+          "anchor": "c927c138ecb7",
+          "first": "async def run_batch_experiments(request: dict[str, Any]):"
+        },
+        {
+          "file": "code/backend/main.py",
+          "start": 669,
+          "end": 772,
+          "role": "logic",
+          "symbol": "_run_batch_sequence",
+          "anchor": "784b02085d5f",
+          "first": "async def _run_batch_sequence(task: BatchTask) -> None:"
+        },
+        {
+          "file": "code/backend/batch_manager.py",
+          "start": 22,
+          "end": 92,
+          "role": "logic",
+          "symbol": "BatchTask",
+          "anchor": "9e43ecb443ad",
+          "first": "class BatchTask:"
+        }
+      ]
+    },
+    {
+      "id": "run-history",
+      "level": "view",
+      "parent": null,
+      "title": "Experiment history",
+      "summary": "A searchable, paged grid of finished runs showing final ACC and ASR. Opening a run shows its curves, detection metrics, configuration snapshot, plots and downloads.",
+      "views": [
+        "thumbnail grid",
+        "detail panel",
+        "line chart",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "search",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/ExperimentHistory/index.tsx",
+          "start": 401,
+          "end": 546,
+          "role": "markup",
+          "anchor": "beabc60ace0a",
+          "first": "<Card"
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentHistory/index.tsx",
+          "start": 547,
+          "end": 745,
+          "role": "markup",
+          "anchor": "c011a8eacc4c",
+          "first": "<Modal"
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentHistory/index.tsx",
+          "start": 120,
+          "end": 193,
+          "role": "logic",
+          "anchor": "a36b6fae200f",
+          "first": "const loadExperiments = async (query = searchTerm, nextPage = page, nextSize = pageSize) => {"
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentHistory/index.tsx",
+          "start": 194,
+          "end": 300,
+          "role": "logic",
+          "anchor": "028e48be9e46",
+          "first": "const handleGeneratePlots = async (expName: string) => {"
+        },
+        {
+          "file": "code/backend/catalog.py",
+          "start": 359,
+          "end": 385,
+          "role": "logic",
+          "symbol": "query",
+          "anchor": "d6a047f8b6ee",
+          "first": "def query(self, root: Path, *, search: str = \"\", status: str | None = None,"
+        },
+        {
+          "file": "code/backend/results_scanner.py",
+          "start": 157,
+          "end": 191,
+          "role": "logic",
+          "symbol": "get_experiment_detail",
+          "anchor": "e9fc7b70d0d8",
+          "first": "def get_experiment_detail(exp_dir: Path) -> Optional[dict[str, Any]]:"
+        }
+      ]
+    },
+    {
+      "id": "summary-compare",
+      "level": "view",
+      "parent": null,
+      "title": "Experiment comparison summaries",
+      "summary": "Pick several runs and name a summary. It overlays their ACC and ASR curves, tabulates their final metrics, and exports CSV, LaTeX and ZIP.",
+      "views": [
+        "line chart",
+        "table view",
+        "list",
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "search",
+        "multi-select",
+        "export",
+        "filter"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/pages/SummaryPage.tsx",
+          "start": 371,
+          "end": 451,
+          "role": "markup",
+          "anchor": "3cfaf4380066",
+          "first": "<Card>"
+        },
+        {
+          "file": "code/frontend/src/pages/SummaryPage.tsx",
+          "start": 452,
+          "end": 572,
+          "role": "markup",
+          "anchor": "9db87fb179e9",
+          "first": "<Modal"
+        },
+        {
+          "file": "code/frontend/src/pages/SummaryPage.tsx",
+          "start": 92,
+          "end": 169,
+          "role": "logic",
+          "anchor": "8f48ed23a6e5",
+          "first": "const filteredSummaries = summaryKeyword"
+        },
+        {
+          "file": "code/frontend/src/pages/SummaryPage.tsx",
+          "start": 170,
+          "end": 297,
+          "role": "logic",
+          "anchor": "d54f5c4456ac",
+          "first": "const handleDownloadZip = async (summaryName: string, response?: { data: Blob }) => {"
+        },
+        {
+          "file": "code/backend/main.py",
+          "start": 1031,
+          "end": 1071,
+          "role": "logic",
+          "symbol": "create_summary",
+          "anchor": "37cb2f6633b1",
+          "first": "async def create_summary(request: dict[str, Any]):"
+        },
+        {
+          "file": "code/backend/results_scanner.py",
+          "start": 224,
+          "end": 241,
+          "role": "logic",
+          "symbol": "get_summary_detail",
+          "anchor": "3ebee0e46b5f",
+          "first": "def get_summary_detail(summary_dir: Path) -> Optional[dict[str, Any]]:"
+        }
+      ]
+    }
+  ]
+}

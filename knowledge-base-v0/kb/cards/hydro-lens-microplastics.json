@@ -1,0 +1,461 @@
+{
+  "schema": "astaui.card/1",
+  "id": "hydro-lens-microplastics",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T09:06:17Z"
+  },
+  "app": {
+    "title": "Hydro Lens — calibrated optical screening of microscope images for microplastic particles",
+    "summary": "The person first sets the optical scale on a calibration page. They can compute microns per pixel from a stage micrometer image or enter a measured line distance by hand, then check the scale against reference beads and save it with an expiry date. On the analysis page they upload a microscope image or pick a demo reference, then run a pipeline that preprocesses the image, detects candidate particles, sizes them and scores confidence. The results show headline numbers, active flags, the annotated image next to the preprocessed one, a size histogram and a table with one row per particle. The person then enters the filtered volume and dilution to get particles per litre and downloads a JSON report. Sizes and concentration are blocked until a valid calibration exists.",
+    "task": {
+      "text": "Count, classify and size candidate particles in a calibrated microscope image, estimate their concentration in the sampled water, and flag samples that need lab confirmation.",
+      "verbs": [
+        "derive",
+        "identify",
+        "summarize",
+        "triage"
+      ]
+    },
+    "data": {
+      "text": "Microscope images of filtered samples, each turned into a table of detected objects with a class, a confidence score and physical sizes, plus a saved calibration record that converts pixels to microns.",
+      "item": "a candidate particle detected in one microscope image of a filter",
+      "shapes": [
+        "image",
+        "table",
+        "categories",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "screening calibrated microscope images of filtered samples to get counts, sizes and concentration, before lab confirmation",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar radio switches between the analysis page and a calibration wizard, and shows the calibration status on every page. That status unlocks or blocks the quantitative tabs. After a run, a row of metric cards and a flags expander sit above tabs: two images side by side, a size histogram, a sortable particle table, a concentration form and a JSON export.",
+      "views": [
+        "summary stats",
+        "side-by-side panes",
+        "image viewer",
+        "bar chart",
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "toggle view",
+        "sort",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "calibrated particle detection and sizing in optical microscopy for water-quality screening",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "particle sizing",
+        "microscopy image analysis",
+        "water quality monitoring"
+      ]
+    },
+    "workflow": {
+      "name": "count and size objects in an image against a calibrated scale, then estimate their concentration",
+      "steps": [
+        {
+          "step": "set and validate the measurement scale before measuring",
+          "here": "Microns per pixel are computed by FFT from a stage micrometer image, or from a measured pixel distance and a number of divisions. The scale is checked against 10, 50 and 100 µm reference beads and saved with magnification, camera and an expiry date.",
+          "parts": [
+            "calibration-portal"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "Upload a JPG, PNG or TIFF microscope image, or pick a demo reference (mixed sample, blank filter control or stage micrometer). A banner shows whether calibration is active, stale or missing.",
+          "parts": [
+            "analyze-page"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Run Screening Pipeline' applies median blur and CLAHE, runs YOLO detection, measures Feret diameters and ECD with OpenCV, and scores confidence. Particle count, sample confidence, the lab-confirmation flag, imaged area and inference time appear as cards, with the active flags listed below them.",
+          "parts": [
+            "analyze-page",
+            "result-metrics"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "The annotated image, with boxes coloured by confidence tier, sits next to the preprocessed input.",
+          "parts": [
+            "detection-images"
+          ]
+        },
+        {
+          "step": "summarize the items by category",
+          "here": "A bar chart counts particles in equivalent-circular-diameter bins, and a table lists each particle's class, confidence, Feret max and min, ECD, aspect ratio and lab-flag reasons.",
+          "parts": [
+            "size-histogram",
+            "particle-table"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Enter the filtered water volume in mL and a dilution factor to get the estimated particles per litre from the count and the imaged area.",
+          "parts": [
+            "concentration-calculator"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The full report is shown as JSON and can be downloaded as a file named by sample ID.",
+          "parts": [
+            "json-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "A calibration gate controls the output: without a valid, unexpired scale factor, sizes, the size histogram and concentration are blocked, and only the count is reported.",
+        "Calibration expires after a set number of days. A stale calibration halves the quality factor in the sample confidence score.",
+        "Sample confidence is mean detection confidence × calibration quality × coverage factor. A rule set sends the sample to lab confirmation on low confidence, large size, high aspect ratio or a poorly supported class.",
+        "Scale validation compares measured reference beads against their nominal sizes, with a percentage error for each bead.",
+        "Concentration is extrapolated from one field of view to the whole sample, using the filtered volume and the dilution factor."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "calibration-portal",
+      "level": "view",
+      "parent": null,
+      "title": "Calibration status and wizard",
+      "summary": "Shows the active scale factor and its validity in the sidebar, and walks the person through computing, validating and saving a new microns-per-pixel calibration.",
+      "views": [
+        "summary stats",
+        "form",
+        "image viewer"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 152,
+          "end": 183,
+          "role": "markup",
+          "anchor": "a082b83b95f2",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 101,
+          "end": 117,
+          "role": "style",
+          "anchor": "eb0eaeab0cc3",
+          "first": ".badge-pass {"
+        },
+        {
+          "file": "code/app.py",
+          "start": 506,
+          "end": 594,
+          "role": "logic",
+          "symbol": "page_calibration",
+          "anchor": "739409d2a619",
+          "first": "def page_calibration():"
+        },
+        {
+          "file": "code/src/calibrate.py",
+          "start": 13,
+          "end": 226,
+          "role": "logic",
+          "symbol": "CalibrationManager",
+          "anchor": "205ecb6e66e1",
+          "first": "class CalibrationManager:"
+        },
+        {
+          "file": "code/data/calibration/calibration.json",
+          "start": 1,
+          "end": 31,
+          "role": "data",
+          "anchor": "9939f0cd2faa",
+          "first": "{"
+        }
+      ]
+    },
+    {
+      "id": "analyze-page",
+      "level": "view",
+      "parent": null,
+      "title": "Sample analysis",
+      "summary": "Shows the calibration banner, takes an uploaded or demo microscope image, and runs the detection, sizing and confidence pipeline.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 189,
+          "end": 255,
+          "role": "markup",
+          "anchor": "e5fbdd640db4",
+          "first": "def page_analyze():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 74,
+          "end": 99,
+          "role": "style",
+          "anchor": "ad8f0ced14cd",
+          "first": ".banner-valid {"
+        },
+        {
+          "file": "code/app.py",
+          "start": 257,
+          "end": 333,
+          "role": "logic",
+          "anchor": "6c5ed12b545c",
+          "first": "if run_analysis or \"last_analysis\" in st.session_state:"
+        },
+        {
+          "file": "code/data/create_sample_assets.py",
+          "start": 5,
+          "end": 57,
+          "role": "data",
+          "symbol": "generate_sample_assets",
+          "anchor": "2459d1d81e29",
+          "first": "def generate_sample_assets():"
+        }
+      ]
+    },
+    {
+      "id": "result-metrics",
+      "level": "component",
+      "parent": "analyze-page",
+      "title": "Metric cards and screening flags",
+      "summary": "Shows the particle count, sample confidence, the lab-confirmation flag, imaged area and inference time, followed by the list of active screening flags.",
+      "views": [
+        "summary stats",
+        "list"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 340,
+          "end": 382,
+          "role": "markup",
+          "anchor": "bafacd6ef1e0",
+          "first": "# Key Metric Cards Header"
+        },
+        {
+          "file": "code/app.py",
+          "start": 52,
+          "end": 72,
+          "role": "style",
+          "anchor": "5110b81cc0a9",
+          "first": ".metric-card {"
+        },
+        {
+          "file": "code/src/confidence.py",
+          "start": 4,
+          "end": 8,
+          "role": "logic",
+          "symbol": "compute_sample_confidence",
+          "anchor": "c76e6b524e91",
+          "first": "def compute_sample_confidence("
+        }
+      ]
+    },
+    {
+      "id": "detection-images",
+      "level": "component",
+      "parent": "analyze-page",
+      "title": "Annotated and preprocessed images",
+      "summary": "Places the image with confidence-coloured detection boxes next to the contrast-enhanced input.",
+      "views": [
+        "side-by-side panes",
+        "image viewer"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 384,
+          "end": 401,
+          "role": "markup",
+          "anchor": "b748c9bdfc06",
+          "first": "# Results Tabs"
+        },
+        {
+          "file": "code/src/utils.py",
+          "start": 7,
+          "end": 11,
+          "role": "logic",
+          "symbol": "draw_annotations",
+          "anchor": "34247a0fffd2",
+          "first": "def draw_annotations("
+        }
+      ]
+    },
+    {
+      "id": "size-histogram",
+      "level": "component",
+      "parent": "analyze-page",
+      "title": "Size distribution",
+      "summary": "Counts particles in equivalent-circular-diameter bins and draws them as a bar chart, or shows a blocking notice when calibration is missing.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 403,
+          "end": 436,
+          "role": "markup",
+          "anchor": "7e5477965cec",
+          "first": "# TAB 2: Size Distribution & Bins"
+        },
+        {
+          "file": "code/src/utils.py",
+          "start": 85,
+          "end": 115,
+          "role": "logic",
+          "symbol": "compute_size_distribution",
+          "anchor": "f71695f22200",
+          "first": "def compute_size_distribution(detections: List[Dict[str, Any]]) -> Dict[str, int]:"
+        }
+      ]
+    },
+    {
+      "id": "particle-table",
+      "level": "component",
+      "parent": "analyze-page",
+      "title": "Particle inspection table",
+      "summary": "Lists every detected particle with its class, confidence, Feret diameters, ECD, aspect ratio and the reasons it needs lab confirmation.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 438,
+          "end": 459,
+          "role": "markup",
+          "anchor": "1808e81eb08c",
+          "first": "# TAB 3: Particle Inspection Table"
+        },
+        {
+          "file": "code/src/size.py",
+          "start": 6,
+          "end": 10,
+          "role": "logic",
+          "symbol": "compute_particle_sizes",
+          "anchor": "49c3a430345f",
+          "first": "def compute_particle_sizes("
+        }
+      ]
+    },
+    {
+      "id": "concentration-calculator",
+      "level": "component",
+      "parent": "analyze-page",
+      "title": "Concentration calculator",
+      "summary": "Turns the count and imaged area into particles per litre from the filtered volume and dilution factor the person enters.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 461,
+          "end": 487,
+          "role": "markup",
+          "anchor": "cbaab92a5d73",
+          "first": "# TAB 4: Concentration Calculator"
+        },
+        {
+          "file": "code/src/utils.py",
+          "start": 118,
+          "end": 122,
+          "role": "logic",
+          "symbol": "calculate_concentration",
+          "anchor": "6e0efdd52ccf",
+          "first": "def calculate_concentration("
+        }
+      ]
+    },
+    {
+      "id": "json-export",
+      "level": "component",
+      "parent": "analyze-page",
+      "title": "JSON report export",
+      "summary": "Shows the machine-readable report and downloads it as a file named by sample ID.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 489,
+          "end": 500,
+          "role": "markup",
+          "anchor": "f12e76c5ba9c",
+          "first": "# TAB 5: JSON Export"
+        },
+        {
+          "file": "code/src/utils.py",
+          "start": 134,
+          "end": 140,
+          "role": "logic",
+          "symbol": "generate_report_json",
+          "anchor": "73d06adfd84d",
+          "first": "def generate_report_json("
+        }
+      ]
+    }
+  ]
+}

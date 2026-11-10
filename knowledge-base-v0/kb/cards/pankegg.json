@@ -1,0 +1,767 @@
+{
+  "schema": "astaui.card/1",
+  "id": "pankegg",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T05:14:03Z"
+  },
+  "app": {
+    "title": "PanKEGG: browse and compare metagenome bins by quality, taxonomy and KEGG pathway completeness",
+    "summary": "A person builds a database from their per-sample annotation, classification and quality outputs, then opens it in the browser. They browse the bins of each sample, sort and filter them by completeness, contamination, a quality threshold or a taxonomic rank, and plot bin quality. They browse the pathways found, with a completion percentage that is recalculated for the samples or bins they pick, open the orthologs behind each pathway, and copy them out to colour the pathway in KEGG. They compare two samples or two bins through pathway heatmaps, quality scatter plots, PCA and tables of shared pathways, compare taxonomic make-up across samples, and export the filtered bin and pathway tables as files.",
+    "task": {
+      "text": "Explore and compare metagenome bins across samples by their quality, taxonomy and how complete their metabolic pathways are.",
+      "verbs": [
+        "explore",
+        "compare",
+        "derive",
+        "summarize",
+        "identify",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "A relational database of genome bins grouped by sample. Each bin has quality estimates, a taxonomic classification down to species and annotated orthologs, and the orthologs are linked to reference pathways that have a known total number of orthologs.",
+      "item": "a genome bin from one sample, with its quality, taxonomy and annotated orthologs",
+      "shapes": [
+        "table",
+        "hierarchy",
+        "categories",
+        "network"
+      ]
+    },
+    "stage": {
+      "text": "exploring and comparing annotated genome bins after binning, classification and annotation, before downstream analysis",
+      "terms": [
+        "explore",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Server-rendered tables of bins, pathways and orthologs are linked to each other: a bin opens its pathways or orthologs, and a pathway opens the bins that carry it. Filters recompute pathway completion for the chosen subset. Separate comparison pages fetch JSON for two chosen samples or bins and draw heatmaps, scatter plots, PCA and bar charts of shared pathways next to each other.",
+      "views": [
+        "table view",
+        "heatmap",
+        "scatter plot",
+        "bar chart",
+        "side-by-side panes",
+        "detail panel",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "search",
+        "sort",
+        "select",
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "side-by-side comparison",
+        "linked views",
+        "master-detail"
+      ]
+    },
+    "field": {
+      "text": "metagenome bin quality, taxonomy and KEGG pathway completeness in metagenomics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "metagenomics",
+        "bioinformatics",
+        "metabolic pathways"
+      ]
+    },
+    "workflow": {
+      "name": "browse annotated items by group, filter by quality, and compare their feature content",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A command-line step builds an SQLite database from a CSV that lists, for each sample, its annotation, classification and quality files. The app is then started on that database.",
+          "parts": [
+            "bins-browser"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Bins are listed under their sample. The person can sort by name, completeness or contamination, switch on a quality filter (completeness − 5×contamination > 50), and search by sample, bin or any taxonomic rank, including 'unclassified'.",
+          "parts": [
+            "bins-browser",
+            "bin-quality-plot"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Each pathway gets a completion percentage (orthologs detected ÷ orthologs the pathway has in total), recalculated for the sample or bin chips chosen in the filter. The person can also search by map name or ortholog ID.",
+          "parts": [
+            "maps-browser"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "'Toggle ko_ids' lists a pathway's orthologs, coloured by whether they officially belong to it. 'Highlight pathways' opens a side panel that copies the IDs, ready to paste into KEGG's map colouring.",
+          "parts": [
+            "maps-browser",
+            "ko-highlight-panel"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Two samples or two bins are picked from dropdowns. Their pathway-completion heatmaps (by pathway group), quality scatter plots and bin PCA appear next to each other, along with a searchable table and bar chart of the pathways they share or don't share.",
+          "parts": [
+            "sample-vs-sample",
+            "bin-vs-bin"
+          ]
+        },
+        {
+          "step": "summarize the collection by category",
+          "here": "For a chosen rank, a bar chart shows each sample's taxonomic composition as a share of its bins, and a clustered heatmap shows pathways against taxa. A PCA of samples is based on maps, orthologs or taxonomy.",
+          "parts": [
+            "taxonomy-comparison",
+            "sample-pca"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Export Current State' saves the filtered pathway table, and the bin list exports too, as files for further analysis.",
+          "parts": [
+            "maps-browser"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Pathway completion is the share of a reference pathway's orthologs that were detected, and it is recomputed for whichever samples or bins are selected.",
+        "A fixed field threshold on quality (completeness − 5×contamination > 50) acts both as a filter on the bin list and as the dividing line in the quality scatter plots.",
+        "Orthologs are coloured by whether they officially belong to the pathway, and they can be copied out to colour the pathway diagram in an external reference database.",
+        "Pathway heatmaps are split by a fixed grouping of pathways into reference sub-categories, and the person picks which groups to draw.",
+        "Taxa can be compared at any of seven ranks, and placeholder rank labels count as 'unclassified'."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "bins-browser",
+      "level": "view",
+      "parent": null,
+      "title": "Bins by sample",
+      "summary": "Lists every bin under its sample, with taxonomy, completeness and contamination. The person can sort, search by taxonomic rank, apply the quality filter, and jump to a bin's pathways or orthologs.",
+      "views": [
+        "table view",
+        "tree view"
+      ],
+      "interactions": [
+        "sort",
+        "filter",
+        "search",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/templates/bin.html",
+          "start": 13,
+          "end": 101,
+          "role": "markup",
+          "anchor": "1dbb2bf2d72f",
+          "first": "<div class=\"container mt-5\">"
+        },
+        {
+          "file": "code/templates/bin.html",
+          "start": 103,
+          "end": 194,
+          "role": "markup",
+          "symbol": "table.table:1",
+          "anchor": "e297f9f30741",
+          "first": "<table class=\"table table-bordered table-striped table-responsive text-center\">"
+        },
+        {
+          "file": "code/templates/bin.html",
+          "start": 227,
+          "end": 234,
+          "role": "style",
+          "symbol": ".taxonomy-entry",
+          "anchor": "263d9eb33dcf",
+          "first": ".taxonomy-entry {"
+        },
+        {
+          "file": "code/templates/bin.html",
+          "start": 256,
+          "end": 265,
+          "role": "logic",
+          "symbol": "toggleAllBins",
+          "anchor": "af1d5c2c8539",
+          "first": "function toggleAllBins() {"
+        },
+        {
+          "file": "code/templates/bin.html",
+          "start": 336,
+          "end": 344,
+          "role": "logic",
+          "symbol": "toggleClassification",
+          "anchor": "dc8ccb903930",
+          "first": "function toggleClassification(sampleName) {"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 1437,
+          "end": 1614,
+          "role": "logic",
+          "symbol": "show_bins",
+          "anchor": "b2b955c00bd4",
+          "first": "def show_bins():"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 1621,
+          "end": 1639,
+          "role": "logic",
+          "symbol": "toggle_gtdb_filter",
+          "anchor": "02143acb8e2d",
+          "first": "def toggle_gtdb_filter():"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 1642,
+          "end": 1648,
+          "role": "logic",
+          "symbol": "set_sort_option",
+          "anchor": "d28951b578a3",
+          "first": "def set_sort_option():"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 757,
+          "end": 878,
+          "role": "logic",
+          "symbol": "export_bins",
+          "anchor": "b6e735aec1b0",
+          "first": "def export_bins():"
+        }
+      ]
+    },
+    {
+      "id": "bin-quality-plot",
+      "level": "component",
+      "parent": "bins-browser",
+      "title": "Bin quality plot",
+      "summary": "Plots completeness against contamination for one sample's bins in a modal, separating the bins that pass the quality threshold from those that don't.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/bin.html",
+          "start": 196,
+          "end": 208,
+          "role": "markup",
+          "symbol": "#plotModal",
+          "anchor": "a6a9070d4aba",
+          "first": "<div class=\"modal fade\" id=\"plotModal\" tabindex=\"-1\" aria-labelledby=\"plotModalLabel\" aria-hidden=\"true\">"
+        },
+        {
+          "file": "code/templates/bin.html",
+          "start": 292,
+          "end": 333,
+          "role": "logic",
+          "symbol": "generatePlot",
+          "anchor": "c0abcadc0b3d",
+          "first": "function generatePlot(sampleName) {"
+        }
+      ]
+    },
+    {
+      "id": "maps-browser",
+      "level": "view",
+      "parent": null,
+      "title": "Pathway maps with completion",
+      "summary": "Lists every pathway with a completion ring. The person can filter by sample or bin chips, by pathway name or by ortholog ID, expand the orthologs behind each pathway, and export the current view.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "search",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/templates/maps.html",
+          "start": 37,
+          "end": 82,
+          "role": "markup",
+          "symbol": "#filterForm",
+          "anchor": "7f1e40c8ea77",
+          "first": "<form id=\"filterForm\" method=\"POST\" action=\"{{ url_for('show_maps') }}\" class=\"mb-4\">"
+        },
+        {
+          "file": "code/templates/maps.html",
+          "start": 85,
+          "end": 175,
+          "role": "markup",
+          "symbol": "table.table",
+          "anchor": "c4f72c573047",
+          "first": "<table class=\"table table-bordered table-striped\">"
+        },
+        {
+          "file": "code/templates/maps.html",
+          "start": 5,
+          "end": 34,
+          "role": "markup",
+          "anchor": "ac127a6b1f8b",
+          "first": "<div class=\"container mt-5\">"
+        },
+        {
+          "file": "code/templates/maps.html",
+          "start": 336,
+          "end": 342,
+          "role": "style",
+          "symbol": ".progress-circle",
+          "anchor": "4b11b9b1f705",
+          "first": ".progress-circle {"
+        },
+        {
+          "file": "code/templates/maps.html",
+          "start": 333,
+          "end": 333,
+          "role": "style",
+          "symbol": ".tag-chip",
+          "anchor": "133e7b2734a1",
+          "first": ".tag-chip { display:inline-block; background:#eee; border-radius:2px; padding:2px 8px; margin:2px; }"
+        },
+        {
+          "file": "code/templates/maps.html",
+          "start": 191,
+          "end": 210,
+          "role": "logic",
+          "symbol": "updateTagUI",
+          "anchor": "e9c3a01115e9",
+          "first": "function updateTagUI() {"
+        },
+        {
+          "file": "code/templates/maps.html",
+          "start": 225,
+          "end": 295,
+          "role": "logic",
+          "symbol": "attachTagInputHandlers",
+          "anchor": "21f577a25c83",
+          "first": "function attachTagInputHandlers(input) {"
+        },
+        {
+          "file": "code/templates/maps.html",
+          "start": 320,
+          "end": 329,
+          "role": "logic",
+          "symbol": "toggleAllCollapses",
+          "anchor": "1237f25b9ce6",
+          "first": "function toggleAllCollapses() {"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 1269,
+          "end": 1430,
+          "role": "logic",
+          "symbol": "show_maps",
+          "anchor": "302b2f66b486",
+          "first": "def show_maps():"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 368,
+          "end": 387,
+          "role": "logic",
+          "symbol": "get_bins_list",
+          "anchor": "489f5bc36f05",
+          "first": "def get_bins_list():"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 882,
+          "end": 988,
+          "role": "logic",
+          "symbol": "export_maps",
+          "anchor": "1299f3dcf867",
+          "first": "def export_maps():"
+        }
+      ]
+    },
+    {
+      "id": "ko-highlight-panel",
+      "level": "component",
+      "parent": "maps-browser",
+      "title": "Highlight pathway panel",
+      "summary": "A side panel that lists a pathway's detected orthologs and copies them to the clipboard, so they can be pasted into the reference pathway map for colouring.",
+      "views": [
+        "detail panel",
+        "list"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/maps.html",
+          "start": 148,
+          "end": 172,
+          "role": "markup",
+          "anchor": "5e8d08ec5865",
+          "first": "<!-- Offcanvas for Highlight Pathways -->"
+        },
+        {
+          "file": "code/templates/maps.html",
+          "start": 309,
+          "end": 318,
+          "role": "logic",
+          "symbol": "copyOffcanvasToClipboard",
+          "anchor": "451d7d0137e6",
+          "first": "function copyOffcanvasToClipboard(index) {"
+        }
+      ]
+    },
+    {
+      "id": "sample-vs-sample",
+      "level": "view",
+      "parent": null,
+      "title": "Sample vs sample",
+      "summary": "Sets two samples side by side: pathway-completion heatmaps per chosen pathway group, quality scatter plots, PCA of bins with clusters, and a searchable table and bar chart of shared pathways.",
+      "views": [
+        "heatmap",
+        "scatter plot",
+        "bar chart",
+        "table view",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select",
+        "filter",
+        "search",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/templates/sample_vs_sample.html",
+          "start": 1,
+          "end": 190,
+          "role": "markup",
+          "anchor": "92e76a3d1a48",
+          "first": "{% extends \"base.html\" %}"
+        },
+        {
+          "file": "code/templates/sample_vs_sample.html",
+          "start": 244,
+          "end": 326,
+          "role": "logic",
+          "symbol": "fetchHeatmapData",
+          "anchor": "a82b5b89b32c",
+          "first": "function fetchHeatmapData(sample, container, sampleNumber, selectedGroups) {"
+        },
+        {
+          "file": "code/templates/sample_vs_sample.html",
+          "start": 355,
+          "end": 407,
+          "role": "logic",
+          "symbol": "fetchScatterplotData",
+          "anchor": "a4c6a516c18e",
+          "first": "function fetchScatterplotData(sample, container) {"
+        },
+        {
+          "file": "code/templates/sample_vs_sample.html",
+          "start": 410,
+          "end": 481,
+          "role": "logic",
+          "symbol": "fetchCommonPathwaysData",
+          "anchor": "b081b4e4440a",
+          "first": "function fetchCommonPathwaysData(sample1, sample2, sample1Name, sample2Name) {"
+        },
+        {
+          "file": "code/templates/sample_vs_sample.html",
+          "start": 484,
+          "end": 520,
+          "role": "logic",
+          "symbol": "fetchPCAData",
+          "anchor": "8f005394fd82",
+          "first": "function fetchPCAData(sample, container, sampleName) {"
+        },
+        {
+          "file": "code/templates/sample_vs_sample.html",
+          "start": 621,
+          "end": 634,
+          "role": "logic",
+          "symbol": "filterPathwayTable",
+          "anchor": "5acaf9d67d0c",
+          "first": "function filterPathwayTable() {"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 392,
+          "end": 436,
+          "role": "logic",
+          "symbol": "get_heatmap_data",
+          "anchor": "e073aabdd968",
+          "first": "def get_heatmap_data():"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 470,
+          "end": 510,
+          "role": "logic",
+          "symbol": "get_scatterplot_data",
+          "anchor": "58f020287125",
+          "first": "def get_scatterplot_data():"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 514,
+          "end": 550,
+          "role": "logic",
+          "symbol": "get_common_pathways_data",
+          "anchor": "114e2d83997a",
+          "first": "def get_common_pathways_data():"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 554,
+          "end": 608,
+          "role": "logic",
+          "symbol": "get_pca_data",
+          "anchor": "978ad11fd916",
+          "first": "def get_pca_data():"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 315,
+          "end": 338,
+          "role": "data",
+          "symbol": "parse_pathway_groups",
+          "anchor": "a5a381644717",
+          "first": "def parse_pathway_groups(file_path):"
+        }
+      ]
+    },
+    {
+      "id": "bin-vs-bin",
+      "level": "view",
+      "parent": null,
+      "title": "Bin vs bin",
+      "summary": "The person picks a sample and then a bin on each side, and gets a searchable table and bar chart of the pathways shared by, or unique to, the two bins.",
+      "views": [
+        "table view",
+        "bar chart"
+      ],
+      "interactions": [
+        "select",
+        "search"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/templates/bin_vs_bin.html",
+          "start": 10,
+          "end": 75,
+          "role": "markup",
+          "anchor": "e8466288b8b5",
+          "first": "<div class=\"row mt-3\">"
+        },
+        {
+          "file": "code/templates/bin_vs_bin.html",
+          "start": 109,
+          "end": 130,
+          "role": "logic",
+          "symbol": "fetchBins",
+          "anchor": "5080afee7910",
+          "first": "function fetchBins(sampleSelect, binSelect) {"
+        },
+        {
+          "file": "code/templates/bin_vs_bin.html",
+          "start": 139,
+          "end": 158,
+          "role": "logic",
+          "symbol": "fetchCommonPathwaysForBins",
+          "anchor": "5e8fe05b746a",
+          "first": "function fetchCommonPathwaysForBins(bin1, bin2, bin1Name, bin2Name) {"
+        },
+        {
+          "file": "code/templates/bin_vs_bin.html",
+          "start": 170,
+          "end": 201,
+          "role": "logic",
+          "symbol": "renderCommonPathwaysTable",
+          "anchor": "57122cf45650",
+          "first": "function renderCommonPathwaysTable(data) {"
+        },
+        {
+          "file": "code/templates/bin_vs_bin.html",
+          "start": 230,
+          "end": 273,
+          "role": "logic",
+          "symbol": "fetchAndRenderCommonPathwaysBarplot",
+          "anchor": "9d44c7acb164",
+          "first": "function fetchAndRenderCommonPathwaysBarplot(bin1, bin2, bin1Name, bin2Name) {"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 256,
+          "end": 270,
+          "role": "logic",
+          "symbol": "get_bins",
+          "anchor": "41773c18c177",
+          "first": "def get_bins():"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 274,
+          "end": 309,
+          "role": "logic",
+          "symbol": "get_common_pathways_for_bins",
+          "anchor": "2b80c315f314",
+          "first": "def get_common_pathways_for_bins():"
+        }
+      ]
+    },
+    {
+      "id": "taxonomy-comparison",
+      "level": "view",
+      "parent": null,
+      "title": "Taxonomy comparison",
+      "summary": "For a chosen rank, shows each sample's composition as a share of its bins in a bar chart, and a hierarchically clustered heatmap of pathways against taxa for one sample.",
+      "views": [
+        "bar chart",
+        "heatmap"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/templates/taxonomy_comparison.html",
+          "start": 10,
+          "end": 60,
+          "role": "markup",
+          "anchor": "dbc87198ef31",
+          "first": "<div class=\"row mt-3\">"
+        },
+        {
+          "file": "code/templates/taxonomy_comparison.html",
+          "start": 87,
+          "end": 138,
+          "role": "logic",
+          "symbol": "fetchTaxonomyData",
+          "anchor": "6c4e9f9ce2d5",
+          "first": "function fetchTaxonomyData(rank) {"
+        },
+        {
+          "file": "code/templates/taxonomy_comparison.html",
+          "start": 141,
+          "end": 199,
+          "role": "logic",
+          "symbol": "fetchHeatmapData",
+          "anchor": "33a4deae9605",
+          "first": "function fetchHeatmapData(sample, rank) {"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 75,
+          "end": 136,
+          "role": "logic",
+          "symbol": "get_taxonomy_data",
+          "anchor": "19ffeec3d59a",
+          "first": "def get_taxonomy_data():"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 140,
+          "end": 200,
+          "role": "logic",
+          "symbol": "get_heatmap_data_for_taxonomy",
+          "anchor": "a211b580179b",
+          "first": "def get_heatmap_data_for_taxonomy():"
+        }
+      ]
+    },
+    {
+      "id": "sample-pca",
+      "level": "view",
+      "parent": null,
+      "title": "Sample PCA",
+      "summary": "Projects all samples onto two principal components, based on pathway maps, orthologs or taxonomy at a chosen rank, and reports the variance each component explains.",
+      "views": [
+        "scatter plot",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/compar_full.html",
+          "start": 6,
+          "end": 27,
+          "role": "markup",
+          "symbol": "#pcaForm",
+          "anchor": "813b181dc06b",
+          "first": "<form id=\"pcaForm\">"
+        },
+        {
+          "file": "code/templates/compar_full.html",
+          "start": 28,
+          "end": 28,
+          "role": "markup",
+          "symbol": "#pcaPlot",
+          "anchor": "02b2d2002a52",
+          "first": "<div id=\"pcaPlot\" class=\"mt-4\"></div>"
+        },
+        {
+          "file": "code/templates/compar_full.html",
+          "start": 54,
+          "end": 102,
+          "role": "logic",
+          "symbol": "fetchPcaData",
+          "anchor": "65dc69fc977d",
+          "first": "function fetchPcaData() {"
+        },
+        {
+          "file": "code/pankegg_app.py",
+          "start": 620,
+          "end": 745,
+          "role": "logic",
+          "symbol": "compar_full",
+          "anchor": "975100219a9d",
+          "first": "def compar_full():"
+        }
+      ]
+    }
+  ]
+}

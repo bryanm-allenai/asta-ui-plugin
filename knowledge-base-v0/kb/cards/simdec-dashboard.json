@@ -1,0 +1,685 @@
+{
+  "schema": "astaui.card/1",
+  "id": "simdec-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:15:16Z"
+  },
+  "app": {
+    "title": "Simulation Decomposition Dashboard (SimDec)",
+    "summary": "A person loads a table of simulation runs, or keeps the bundled example, picks the output column and the input columns, and gets a ranked table of sensitivity indices for the inputs. The app suggests the inputs needed to explain most of the output variance, and the person can change that choice. The output's distribution is split into scenarios built from combinations of the chosen inputs' states and drawn colour-coded as a stacked histogram, a boxplot, or a scatter of two outputs. The person adjusts the bins, axis limits and state colours, reads the scenario and state tables, and downloads the indices and tables as a single CSV. A companion app can generate the input sample first.",
+    "task": {
+      "text": "Find out which uncertain inputs of a computational model drive its output, and show how their combined states shape the output distribution.",
+      "verbs": [
+        "derive",
+        "explore",
+        "summarize",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "A table of Monte Carlo simulation runs, with one or more output columns and several input-parameter columns, plus the sensitivity indices, scenarios and state bins computed from it.",
+      "item": "one simulation run: a row of input values and the output values they produced",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "analysing a model's uncertainty after running Monte Carlo simulations, before deciding which factors matter",
+      "terms": [
+        "analyze",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls drive a chain of reactive computations: the chosen columns produce sensitivity indices, the indices pre-select inputs for the decomposition, and the decomposition feeds a colour-coded distribution chart and two scenario tables that all update together. Choosing a chart type shows or hides its own controls (bins, second output, Y-limit, share of points shown), and per-state colour pickers recolour both the chart and the scenario table.",
+      "views": [
+        "bar chart",
+        "scatter plot",
+        "table view",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "multi-select",
+        "select",
+        "toggle view",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "variance-based global sensitivity analysis of simulation models, using Monte Carlo sampling",
+      "disciplines": [
+        "mathematics"
+      ],
+      "terms": [
+        "sensitivity analysis",
+        "uncertainty quantification",
+        "monte carlo simulation"
+      ]
+    },
+    "workflow": {
+      "name": "break an output's distribution down by the inputs that drive it",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "upload a comma-delimited CSV (column names are checked, and a bundled example is used if the file fails), then choose the output column and the input columns",
+          "parts": [
+            "data-loader",
+            "controls-sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "compute a sensitivity index for each input and show the inputs ranked in a table, with progress bars and a 'Sum of Indices' row at the top",
+          "parts": [
+            "sensitivity-table"
+          ]
+        },
+        {
+          "step": "choose which items to carry forward",
+          "here": "the decomposition inputs are pre-filled with the top-ranked inputs that together reach 80% of explained variance (at most four); the person can change them, and a number shows the explained variance ratio of the selection",
+          "parts": [
+            "decomposition-selector"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "show the output distribution colour-coded by scenario as a stacked histogram, a boxplot, or a scatter of two outputs; adjust the number of bins, the X and Y limits, the share of points shown, and a main colour for each state of the top input",
+          "parts": [
+            "decomposition-figure",
+            "color-pickers"
+          ]
+        },
+        {
+          "step": "summarize results by group",
+          "here": "a Scenarios table gives a statistic per combination of states, coloured to match the chart, and a states table gives the min and max of each state",
+          "parts": [
+            "scenario-tables"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download writes simdec.csv, containing the overall, first-order and second-order indices and the scenario and state tables",
+          "parts": [
+            "download-header"
+          ]
+        }
+      ],
+      "distinctive": [
+        "scenarios are formed automatically by cutting each chosen input's range into states (such as low, medium and high) and taking every combination of them",
+        "inputs are pre-selected by a rule: the fewest top-ranked inputs whose indices reach 80% of the total, capped at four",
+        "colour encodes the scenario hierarchy: the most influential input sets the hue and the next input subdivides it into shades",
+        "a '2 outputs' mode decomposes two outputs with the same scenarios and plots them against each other",
+        "a companion page generates the input sample (Sobol', Halton or Latin Hypercube, with a distribution and bounds per variable) and reports its discrepancy"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "controls-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Data / Decomposition / Visualization sidebar",
+      "summary": "Holds every control in the order they are used: data, then decomposition inputs, then chart settings.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "multi-select"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 569,
+          "end": 592,
+          "role": "markup",
+          "anchor": "ac05e95ac093",
+          "first": "# App layout"
+        }
+      ]
+    },
+    {
+      "id": "data-loader",
+      "level": "component",
+      "parent": "controls-sidebar",
+      "title": "CSV upload and output/input selectors",
+      "summary": "Loads and checks a CSV of simulation runs, then lets the person choose the output column and the input columns.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 59,
+          "end": 73,
+          "role": "logic",
+          "symbol": "load_data",
+          "anchor": "087f57f8b817",
+          "first": "def load_data(text_fname):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 77,
+          "end": 83,
+          "role": "logic",
+          "symbol": "column_inputs",
+          "anchor": "2293cc807368",
+          "first": "def column_inputs(data, output):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 87,
+          "end": 90,
+          "role": "logic",
+          "symbol": "column_output",
+          "anchor": "c538cade9a7f",
+          "first": "def column_output(data):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 94,
+          "end": 102,
+          "role": "logic",
+          "symbol": "filtered_data",
+          "anchor": "fc9e605fc61b",
+          "first": "def filtered_data(data, output_name):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 44,
+          "end": 55,
+          "role": "data",
+          "anchor": "c44cc979b5f8",
+          "first": "VALID_CHARACTERS = re.compile(r\"[^A-Za-z0-9_ \\-.]\")"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 354,
+          "end": 373,
+          "role": "markup",
+          "anchor": "ab42ff65f014",
+          "first": "# Bindings"
+        }
+      ]
+    },
+    {
+      "id": "sensitivity-table",
+      "level": "view",
+      "parent": null,
+      "title": "Sensitivity Indices",
+      "summary": "Ranks the inputs by sensitivity index, with progress bars and a sum row at the top.",
+      "views": [
+        "table view",
+        "bar chart"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 106,
+          "end": 108,
+          "role": "logic",
+          "symbol": "sensitivity_indices_full",
+          "anchor": "b18148f6e951",
+          "first": "def sensitivity_indices_full(inputs, output):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 112,
+          "end": 117,
+          "role": "logic",
+          "symbol": "sensitivity_indices",
+          "anchor": "c42397d17070",
+          "first": "def sensitivity_indices(sensitivity_indices_):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 121,
+          "end": 163,
+          "role": "logic",
+          "symbol": "sensitivity_indices_table",
+          "anchor": "228a116d068c",
+          "first": "def sensitivity_indices_table(si, inputs):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 375,
+          "end": 387,
+          "role": "logic",
+          "anchor": "d0b390da217c",
+          "first": "interactive_sensitivity_indices_full = pn.bind("
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 607,
+          "end": 612,
+          "role": "markup",
+          "anchor": "9417ffb45bf8",
+          "first": "template.main[4:7, 0:4] = pn.Column("
+        },
+        {
+          "file": "code/src/simdec/sensitivity_indices.py",
+          "start": 80,
+          "end": 83,
+          "role": "logic",
+          "symbol": "sensitivity_indices",
+          "anchor": "46b6de538c5d",
+          "first": "def sensitivity_indices("
+        }
+      ]
+    },
+    {
+      "id": "decomposition-selector",
+      "level": "component",
+      "parent": "controls-sidebar",
+      "title": "Select inputs for decomposition",
+      "summary": "Pre-selects the inputs that reach 80% of explained variance, lets the person change them, and shows the explained variance ratio of the selection.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 180,
+          "end": 191,
+          "role": "logic",
+          "symbol": "explained_variance_80",
+          "anchor": "2c77e10fdc2c",
+          "first": "def explained_variance_80(sensitivity_indices_table):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 171,
+          "end": 177,
+          "role": "logic",
+          "symbol": "filtered_si",
+          "anchor": "37317394833b",
+          "first": "def filtered_si(sensitivity_indices_table, input_names):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 167,
+          "end": 168,
+          "role": "logic",
+          "symbol": "explained_variance",
+          "anchor": "9524b210abbf",
+          "first": "def explained_variance(si):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 195,
+          "end": 202,
+          "role": "logic",
+          "symbol": "decomposition_",
+          "anchor": "923463a8a8fa",
+          "first": "def decomposition_(dec_limit, si, inputs, output):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 389,
+          "end": 423,
+          "role": "markup",
+          "anchor": "87e82ccf5ef4",
+          "first": "interactive_explained_variance_80 = pn.bind("
+        },
+        {
+          "file": "code/src/simdec/decomposition.py",
+          "start": 66,
+          "end": 74,
+          "role": "logic",
+          "symbol": "decomposition",
+          "anchor": "e8b27ee9d9cc",
+          "first": "def decomposition("
+        }
+      ]
+    },
+    {
+      "id": "decomposition-figure",
+      "level": "view",
+      "parent": null,
+      "title": "Colour-coded output distribution",
+      "summary": "Draws the output distribution split into coloured scenario segments, as a stacked histogram, a boxplot, or a scatter of two outputs, with adjustable bins and axis limits.",
+      "views": [
+        "bar chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "toggle view",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 262,
+          "end": 263,
+          "role": "logic",
+          "symbol": "figure_pn",
+          "anchor": "19c70f9eac4b",
+          "first": "def figure_pn("
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 242,
+          "end": 245,
+          "role": "logic",
+          "symbol": "n_bins_auto",
+          "anchor": "3bb0c74920fe",
+          "first": "def n_bins_auto(res):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 257,
+          "end": 258,
+          "role": "logic",
+          "symbol": "xlim_auto",
+          "anchor": "16df1ca6cdfe",
+          "first": "def xlim_auto(output):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 248,
+          "end": 249,
+          "role": "logic",
+          "symbol": "display_n_bins",
+          "anchor": "113569c3b227",
+          "first": "def display_n_bins(kind):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 252,
+          "end": 253,
+          "role": "logic",
+          "symbol": "display_2_output",
+          "anchor": "5e221f403007",
+          "first": "def display_2_output(kind):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 510,
+          "end": 511,
+          "role": "logic",
+          "symbol": "callback_xlim",
+          "anchor": "79c5c8fed8b5",
+          "first": "def callback_xlim(start, end):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 517,
+          "end": 518,
+          "role": "logic",
+          "symbol": "callback_ylim",
+          "anchor": "e71427b39010",
+          "first": "def callback_ylim(start, end):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 425,
+          "end": 521,
+          "role": "markup",
+          "anchor": "45d18d27f0c3",
+          "first": "switch_type_visualization = pn.widgets.RadioButtonGroup("
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 548,
+          "end": 560,
+          "role": "logic",
+          "anchor": "43a9bed37653",
+          "first": "interactive_figure = pn.bind("
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 594,
+          "end": 595,
+          "role": "markup",
+          "anchor": "be8f47e8553c",
+          "first": "# Main window"
+        },
+        {
+          "file": "code/src/simdec/visualization.py",
+          "start": 145,
+          "end": 153,
+          "role": "logic",
+          "symbol": "visualization",
+          "anchor": "c32a047eaf94",
+          "first": "def visualization("
+        },
+        {
+          "file": "code/src/simdec/visualization.py",
+          "start": 233,
+          "end": 245,
+          "role": "logic",
+          "symbol": "two_output_visualization",
+          "anchor": "bb5a86be8c59",
+          "first": "def two_output_visualization("
+        }
+      ]
+    },
+    {
+      "id": "color-pickers",
+      "level": "component",
+      "parent": "controls-sidebar",
+      "title": "Main color for states",
+      "summary": "Gives one colour picker per state of the top input, from which shade palettes are built for the chart and the scenario table.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 206,
+          "end": 214,
+          "role": "logic",
+          "symbol": "base_colors",
+          "anchor": "973ca5ebb1e4",
+          "first": "def base_colors(res):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 217,
+          "end": 222,
+          "role": "logic",
+          "symbol": "update_colors_select",
+          "anchor": "f78dccf0d370",
+          "first": "def update_colors_select(event):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 225,
+          "end": 231,
+          "role": "logic",
+          "symbol": "create_color_pickers",
+          "anchor": "7feed6804d52",
+          "first": "def create_color_pickers(states, colors):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 235,
+          "end": 238,
+          "role": "logic",
+          "symbol": "palette_",
+          "anchor": "14243c3021ca",
+          "first": "def palette_(states: list[list[str]], colors_picked: list[list[float]]):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 529,
+          "end": 546,
+          "role": "markup",
+          "anchor": "bcb6d26a6e89",
+          "first": "interactive_base_colors = pn.bind(base_colors, interactive_decomposition)"
+        },
+        {
+          "file": "code/src/simdec/visualization.py",
+          "start": 102,
+          "end": 103,
+          "role": "logic",
+          "symbol": "palette",
+          "anchor": "4a47c1c1ad0e",
+          "first": "def palette("
+        },
+        {
+          "file": "code/src/simdec/visualization.py",
+          "start": 54,
+          "end": 63,
+          "role": "logic",
+          "symbol": "sequential_cmaps",
+          "anchor": "1b5e941a5080",
+          "first": "def sequential_cmaps():"
+        }
+      ]
+    },
+    {
+      "id": "scenario-tables",
+      "level": "view",
+      "parent": null,
+      "title": "Scenarios and Details on inputs' states",
+      "summary": "Lists each scenario, a combination of input states, with its output statistic in the chart's colours, plus the min–max range of each state.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 294,
+          "end": 295,
+          "role": "logic",
+          "symbol": "states_from_data",
+          "anchor": "d0fa37b5c084",
+          "first": "def states_from_data(res, inputs):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 299,
+          "end": 308,
+          "role": "logic",
+          "symbol": "tableau_pn",
+          "anchor": "035bddf42ac2",
+          "first": "def tableau_pn(res, states, palette):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 312,
+          "end": 324,
+          "role": "logic",
+          "symbol": "tableau_states",
+          "anchor": "1c31c64ee218",
+          "first": "def tableau_states(res, states):"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 562,
+          "end": 567,
+          "role": "logic",
+          "anchor": "c647a02d8bba",
+          "first": "interactive_tableau = pn.bind("
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 597,
+          "end": 605,
+          "role": "markup",
+          "anchor": "1e822a6d3ef9",
+          "first": "template.main[0:4, 6:12] = pn.Column("
+        },
+        {
+          "file": "code/src/simdec/visualization.py",
+          "start": 373,
+          "end": 379,
+          "role": "logic",
+          "symbol": "tableau",
+          "anchor": "d1ff70eadbf6",
+          "first": "def tableau("
+        },
+        {
+          "file": "code/src/simdec/decomposition.py",
+          "start": 15,
+          "end": 43,
+          "role": "logic",
+          "symbol": "states_expansion",
+          "anchor": "e90c0bfb0d69",
+          "first": "def states_expansion(states: list[int], inputs: pd.DataFrame) -> list[list[str]]:"
+        }
+      ]
+    },
+    {
+      "id": "download-header",
+      "level": "view",
+      "parent": null,
+      "title": "Download header",
+      "summary": "Writes the sensitivity indices, the scenario table and the states table into one CSV file.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 327,
+          "end": 331,
+          "role": "logic",
+          "symbol": "csv_data",
+          "anchor": "60c23ddf02d9",
+          "first": "def csv_data("
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 614,
+          "end": 632,
+          "role": "markup",
+          "anchor": "6b03dd54cbeb",
+          "first": "# Header"
+        },
+        {
+          "file": "code/panel/simdec_app.py",
+          "start": 685,
+          "end": 695,
+          "role": "markup",
+          "anchor": "6f88c6227318",
+          "first": "header_area = pn.Row("
+        }
+      ]
+    }
+  ]
+}

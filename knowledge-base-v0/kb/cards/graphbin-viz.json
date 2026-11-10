@@ -1,0 +1,858 @@
+{
+  "schema": "astaui.card/1",
+  "id": "graphbin-viz",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:04:46Z"
+  },
+  "app": {
+    "title": "GraphBin-Viz: Interactive Visual Analytics for Exploring Graph-based Metagenomic Binning",
+    "summary": "A person loads an assembly graph, its contigs, an initial binning result and optionally other tools' binning results, sets the refinement parameters, and runs graph-based bin refinement in the browser. They then explore the result in a coordinated workspace: the assembly graph coloured by bin, confidence, disagreement or decision stage; a run summary with a list of contigs needing attention; a per-contig record explaining how each bin was decided; a brushable composition scatter; and a flow diagram between results. They can replay label propagation iteration by iteration, lock selected contigs to a bin and re-run refinement with those as fixed seeds, and finally export the curated binning as a CSV.",
+    "task": {
+      "text": "Check how graph-based refinement reassigned contigs to bins, find the assignments that are disputed or weakly supported, and correct them by re-running refinement under locked assignments.",
+      "verbs": [
+        "compare",
+        "identify",
+        "clean",
+        "explore",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "An assembly graph of contigs with their sequences, length, GC and coverage, plus several binning results that each assign contigs to bins, and a per-contig decision record from refinement.",
+      "item": "a contig: a node in the assembly graph with its bin under each result",
+      "shapes": [
+        "network",
+        "table",
+        "sequence",
+        "versions"
+      ]
+    },
+    "stage": {
+      "text": "comparing and correcting metagenomic bins after assembly and initial binning, before downstream genome analysis",
+      "terms": [
+        "compare",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A canvas network diagram of the assembly graph, a brushable scatter of contig features and a Sankey-style flow between binning results all share one selection, so brushing, clicking a flow or clicking a node highlights the same contigs everywhere; an inspector beside them summarises the run when nothing is selected and opens one contig's decision record when one is. A curation panel locks selected contigs to a bin and re-runs refinement, and a replay slider steps the graph through propagation iterations.",
+      "views": [
+        "network diagram",
+        "scatter plot",
+        "summary stats",
+        "detail panel",
+        "form",
+        "bar chart",
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "brush",
+        "hover for detail",
+        "zoom and pan",
+        "filter",
+        "toggle view",
+        "time slider",
+        "apply label",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail",
+        "master-detail",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "graph-based contig binning of metagenomic assemblies in bioinformatics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "metagenomics",
+        "metagenomic binning",
+        "assembly graphs"
+      ]
+    },
+    "workflow": {
+      "name": "check and correct group assignments of items in a network, then export the curated assignment",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pick the assembler, then upload the GFA graph, contigs FASTA, a paths file (SPAdes only), the initial binning CSV/TSV and any other tools' binning results; each file is validated on pick.",
+          "parts": [
+            "config-panel"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Set max iterations, difference threshold and minimum bin size and run refinement in the browser; it records for every contig its decision stage, supporting neighbours, competing bin scores, hop distance to seeds and a confidence.",
+          "parts": [
+            "config-panel"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The assembly graph is drawn with contigs coloured by bin under any chosen result, or by confidence, disagreement, decision stage or a sequence feature; the summary shows counts per decision stage, a confidence histogram and a needs-attention list.",
+          "parts": [
+            "graph-view",
+            "workspace-toolbar",
+            "inspector"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Chips show only disputed or low-confidence contigs, a select narrows to one bin, and brushing the GC-by-coverage scatter or clicking a flow between results selects that group in every view.",
+          "parts": [
+            "workspace-toolbar",
+            "feature-scatter",
+            "contig-flow"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Clicking a contig opens its record: its bin under every result, the stage and reason its label was kept, stripped or inferred, its supporting neighbours with weights, and the competing scores; the replay slider steps the graph through propagation iterations.",
+          "parts": [
+            "inspector",
+            "replay-bar"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Select contigs, choose a bin and Lock assignment, then Re-run refinement so the locked contigs act as fixed seeds and the correction propagates through the graph.",
+          "parts": [
+            "curation-panel"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Export binning downloads the curated contig-to-bin assignment as a CSV; the propagation replay can also be saved as a GIF.",
+          "parts": [
+            "curation-panel",
+            "replay-bar"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every assignment carries a decision provenance: whether its initial label was kept as a seed, stripped because graph neighbours contradicted it, inferred by propagation, or unresolved, with the reason.",
+        "Confidence combines the vote margin with a decay by hop distance from the nearest seed, so a label carried far through the graph is trusted less.",
+        "Disagreement across any number of binning results is measured only over the results that placed the contig in a bin, so leaving a contig unbinned is not counted as a conflict.",
+        "Corrections are not relabels: locked contigs are fed back as immovable seeds and the whole refinement is re-run under them.",
+        "A replay slider steps through label propagation iteration by iteration, hiding final-result markers so only the spreading labels move."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "config-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Input files and GraphBin settings",
+      "summary": "Takes the assembly graph, contigs, initial and other binning results and refinement parameters, validates them and runs refinement in the browser.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/components/inputs/ConfigPanel.jsx",
+          "start": 13,
+          "end": 13,
+          "role": "markup",
+          "symbol": "ConfigPanel",
+          "anchor": "6f2bf7087963",
+          "first": "export function ConfigPanel({ onRun, onOpenSessions }) {"
+        },
+        {
+          "file": "code/src/components/inputs/InputFilesForm.jsx",
+          "start": 13,
+          "end": 113,
+          "role": "markup",
+          "symbol": "InputFilesForm",
+          "anchor": "b6dd76b3806b",
+          "first": "export function InputFilesForm() {"
+        },
+        {
+          "file": "code/src/components/inputs/FileField.jsx",
+          "start": 12,
+          "end": 21,
+          "role": "markup",
+          "symbol": "FileField",
+          "anchor": "5d3c81a5df4e",
+          "first": "export function FileField({"
+        },
+        {
+          "file": "code/src/components/inputs/SettingsForms.jsx",
+          "start": 60,
+          "end": 119,
+          "role": "markup",
+          "symbol": "GraphBinSettingsForm",
+          "anchor": "d05871809c64",
+          "first": "export function GraphBinSettingsForm() {"
+        },
+        {
+          "file": "code/src/components/inputs/RunButtons.jsx",
+          "start": 9,
+          "end": 9,
+          "role": "markup",
+          "symbol": "RunButtons",
+          "anchor": "c813abdb6932",
+          "first": "export function RunButtons({ onRun, onOpenSessions }) {"
+        },
+        {
+          "file": "code/src/style.css",
+          "start": 429,
+          "end": 434,
+          "role": "style",
+          "symbol": "#config-two-col",
+          "anchor": "dbcf54f98d4b",
+          "first": "#config-two-col {"
+        },
+        {
+          "file": "code/src/style.css",
+          "start": 477,
+          "end": 482,
+          "role": "style",
+          "symbol": ".form-row",
+          "anchor": "00fda6f84873",
+          "first": ".form-row{"
+        },
+        {
+          "file": "code/src/lib/fileValidation.js",
+          "start": 36,
+          "end": 55,
+          "role": "logic",
+          "symbol": "validateContigsFile",
+          "anchor": "e139f38f0dcd",
+          "first": "export async function validateContigsFile(file) {"
+        },
+        {
+          "file": "code/src/lib/fileValidation.js",
+          "start": 57,
+          "end": 63,
+          "role": "logic",
+          "symbol": "validateInitialFile",
+          "anchor": "f93d855c331f",
+          "first": "export function validateInitialFile(file) {"
+        },
+        {
+          "file": "code/src/lib/fileValidation.js",
+          "start": 25,
+          "end": 34,
+          "role": "logic",
+          "symbol": "validateGraphFile",
+          "anchor": "e42aca2c1297",
+          "first": "export function validateGraphFile(file) {"
+        },
+        {
+          "file": "code/src/hooks/useGraphBinRun.js",
+          "start": 20,
+          "end": 167,
+          "role": "logic",
+          "symbol": "useGraphBinRun",
+          "anchor": "d0707e19f68e",
+          "first": "export function useGraphBinRun() {"
+        },
+        {
+          "file": "code/src/lib/pyodide/pipeline.js",
+          "start": 139,
+          "end": 139,
+          "role": "logic",
+          "symbol": "runPipeline",
+          "anchor": "e2757883118f",
+          "first": "export async function runPipeline({ source, settings, files = {}, log, status }) {"
+        },
+        {
+          "file": "code/public/py/graphbin/graphbin_Func.py",
+          "start": 167,
+          "end": 178,
+          "role": "logic",
+          "symbol": "graphbin_main",
+          "anchor": "df946b1fecc9",
+          "first": "def graphbin_main("
+        },
+        {
+          "file": "code/public/py/graphbin/graphbin_Func.py",
+          "start": 533,
+          "end": 546,
+          "role": "logic",
+          "symbol": "_assemble_provenance",
+          "anchor": "0156966b8fed",
+          "first": "def _assemble_provenance("
+        },
+        {
+          "file": "code/public/py/export_common.py",
+          "start": 101,
+          "end": 154,
+          "role": "logic",
+          "symbol": "compare_assignments",
+          "anchor": "095b1c1ab9ac",
+          "first": "def compare_assignments(bins_by_key, keys):"
+        },
+        {
+          "file": "code/src/state/settingsStore.jsx",
+          "start": 13,
+          "end": 26,
+          "role": "data",
+          "symbol": "defaultSettings",
+          "anchor": "5d871aad953c",
+          "first": "const defaultSettings = {"
+        }
+      ]
+    },
+    {
+      "id": "graph-view",
+      "level": "view",
+      "parent": null,
+      "title": "Assembly graph",
+      "summary": "Draws the assembly graph with contigs coloured and sized by the chosen encoding, with hover tooltips, click to open a contig, zoom and pan, and a legend.",
+      "views": [
+        "network diagram"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/components/workspace/Workspace.jsx",
+          "start": 24,
+          "end": 122,
+          "role": "markup",
+          "symbol": "Workspace",
+          "anchor": "10b73de6b801",
+          "first": "export function Workspace() {"
+        },
+        {
+          "file": "code/src/components/workspace/GraphView.jsx",
+          "start": 24,
+          "end": 317,
+          "role": "logic",
+          "anchor": "e9b0379a6c16",
+          "first": "export const GraphView = forwardRef(function GraphView({ derived }, ref) {"
+        },
+        {
+          "file": "code/src/components/workspace/GraphLegend.jsx",
+          "start": 161,
+          "end": 161,
+          "role": "markup",
+          "symbol": "GraphLegend",
+          "anchor": "009b52800e78",
+          "first": "export function GraphLegend({ binColors, extents, sizeMode, baseRadius }) {"
+        },
+        {
+          "file": "code/src/components/workspace/ContigTooltip.jsx",
+          "start": 8,
+          "end": 8,
+          "role": "markup",
+          "symbol": "ContigTooltip",
+          "anchor": "f3727aa1adc2",
+          "first": "export function ContigTooltip({ model, node, results, binOf, mode }) {"
+        },
+        {
+          "file": "code/src/style.css",
+          "start": 992,
+          "end": 997,
+          "role": "style",
+          "symbol": ".workspace",
+          "anchor": "519c8a82a382",
+          "first": ".workspace{"
+        },
+        {
+          "file": "code/src/style.css",
+          "start": 746,
+          "end": 753,
+          "role": "style",
+          "symbol": "#graph-canvas",
+          "anchor": "54aaeaa850e0",
+          "first": "#graph-canvas{"
+        },
+        {
+          "file": "code/src/style.css",
+          "start": 775,
+          "end": 787,
+          "role": "style",
+          "symbol": ".tooltip",
+          "anchor": "9b8dbe346ded",
+          "first": ".tooltip{"
+        },
+        {
+          "file": "code/src/lib/drawGraph.js",
+          "start": 12,
+          "end": 174,
+          "role": "logic",
+          "symbol": "drawGraph",
+          "anchor": "dc86d0620f86",
+          "first": "export function drawGraph(ctx, options) {"
+        },
+        {
+          "file": "code/src/lib/palette.js",
+          "start": 126,
+          "end": 126,
+          "role": "logic",
+          "symbol": "createColorForNode",
+          "anchor": "3b049aff8138",
+          "first": "export function createColorForNode({ colorMode, mode, binOf, binColors, extents, unbinnedColor }) {"
+        },
+        {
+          "file": "code/src/lib/spatial.js",
+          "start": 22,
+          "end": 22,
+          "role": "logic",
+          "symbol": "pickNode",
+          "anchor": "4e9a845fa23d",
+          "first": "export function pickNode({ index, model, world, radiusWorld, isVisible }) {"
+        },
+        {
+          "file": "code/src/state/viewStore.jsx",
+          "start": 78,
+          "end": 249,
+          "role": "logic",
+          "symbol": "reducer",
+          "anchor": "0632fcfdd2d1",
+          "first": "function reducer(state, action) {"
+        }
+      ]
+    },
+    {
+      "id": "workspace-toolbar",
+      "level": "component",
+      "parent": "graph-view",
+      "title": "Encoding and filter toolbar",
+      "summary": "Chooses which result to show, what colours and sizes the nodes, narrows to one bin, and toggles disputed, low-confidence and change markers.",
+      "views": [],
+      "interactions": [
+        "toggle view",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/components/workspace/WorkspaceToolbar.jsx",
+          "start": 26,
+          "end": 26,
+          "role": "markup",
+          "symbol": "WorkspaceToolbar",
+          "anchor": "fd76fd14e885",
+          "first": "export function WorkspaceToolbar({ results }) {"
+        },
+        {
+          "file": "code/src/components/workspace/FilterChips.jsx",
+          "start": 31,
+          "end": 66,
+          "role": "markup",
+          "symbol": "FilterChips",
+          "anchor": "e8ebc35cb82f",
+          "first": "export function FilterChips() {"
+        },
+        {
+          "file": "code/src/style.css",
+          "start": 1008,
+          "end": 1016,
+          "role": "style",
+          "symbol": ".ws-toolbar",
+          "anchor": "bbd85b836f4d",
+          "first": ".ws-toolbar{"
+        },
+        {
+          "file": "code/src/style.css",
+          "start": 1054,
+          "end": 1059,
+          "role": "style",
+          "symbol": ".tb-row-chips",
+          "anchor": "1d0bb266662a",
+          "first": ".tb-row-chips{"
+        },
+        {
+          "file": "code/src/lib/visibility.js",
+          "start": 9,
+          "end": 9,
+          "role": "logic",
+          "symbol": "createVisibilityTest",
+          "anchor": "ab3493a9cad0",
+          "first": "export function createVisibilityTest({ model, filters, binOf }) {"
+        },
+        {
+          "file": "code/src/constants/encodings.js",
+          "start": 3,
+          "end": 11,
+          "role": "data",
+          "symbol": "COLOR_MODES",
+          "anchor": "65c3c68f5a96",
+          "first": "export const COLOR_MODES = ["
+        },
+        {
+          "file": "code/src/constants/encodings.js",
+          "start": 13,
+          "end": 18,
+          "role": "data",
+          "symbol": "SIZE_MODES",
+          "anchor": "8706ebe96d11",
+          "first": "export const SIZE_MODES = ["
+        },
+        {
+          "file": "code/src/constants/encodings.js",
+          "start": 37,
+          "end": 42,
+          "role": "data",
+          "symbol": "FILTER_CHIPS",
+          "anchor": "04553db75dfb",
+          "first": "export const FILTER_CHIPS = ["
+        },
+        {
+          "file": "code/src/constants/encodings.js",
+          "start": 49,
+          "end": 53,
+          "role": "data",
+          "symbol": "MARKER_CHIPS",
+          "anchor": "0b4dbb10a4a8",
+          "first": "export const MARKER_CHIPS = ["
+        }
+      ]
+    },
+    {
+      "id": "replay-bar",
+      "level": "component",
+      "parent": "graph-view",
+      "title": "Propagation replay",
+      "summary": "A slider and play control that step the graph through label propagation iteration by iteration, with a speed setting and GIF export.",
+      "views": [],
+      "interactions": [
+        "time slider",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/components/workspace/ReplayBar.jsx",
+          "start": 18,
+          "end": 18,
+          "role": "markup",
+          "symbol": "ReplayBar",
+          "anchor": "d359fdcaf11e",
+          "first": "export function ReplayBar({ available, active, onSaveGif, gifExport }) {"
+        },
+        {
+          "file": "code/src/lib/model.js",
+          "start": 88,
+          "end": 103,
+          "role": "logic",
+          "symbol": "replayBinFor",
+          "anchor": "b1b7bb715869",
+          "first": "export function replayBinFor(model, n, iter) {"
+        },
+        {
+          "file": "code/src/lib/exportGif.js",
+          "start": 31,
+          "end": 43,
+          "role": "logic",
+          "symbol": "exportReplayGif",
+          "anchor": "c8001f286789",
+          "first": "export async function exportReplayGif({"
+        },
+        {
+          "file": "code/src/constants/encodings.js",
+          "start": 59,
+          "end": 64,
+          "role": "data",
+          "symbol": "REPLAY_SPEEDS",
+          "anchor": "e0f5c1dbfe3d",
+          "first": "export const REPLAY_SPEEDS = ["
+        }
+      ]
+    },
+    {
+      "id": "inspector",
+      "level": "view",
+      "parent": null,
+      "title": "Inspector: run summary and contig record",
+      "summary": "With nothing open it summarises decision stages, confidence and a needs-attention list that select contigs; with a contig open it shows its bins across results and how its bin was decided.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "list",
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/src/components/workspace/Inspector.jsx",
+          "start": 13,
+          "end": 13,
+          "role": "markup",
+          "symbol": "Inspector",
+          "anchor": "8bc3cc76e0b3",
+          "first": "export function Inspector({ derived, onOpenContig }) {"
+        },
+        {
+          "file": "code/src/components/workspace/SummaryPanel.jsx",
+          "start": 23,
+          "end": 23,
+          "role": "markup",
+          "symbol": "SummaryPanel",
+          "anchor": "e36bf6835823",
+          "first": "export function SummaryPanel({ model, results, onOpenContig }) {"
+        },
+        {
+          "file": "code/src/components/workspace/ContigRecord.jsx",
+          "start": 18,
+          "end": 18,
+          "role": "markup",
+          "symbol": "ContigRecord",
+          "anchor": "534418270a6c",
+          "first": "export function ContigRecord({ model, node, results, binOf, binColors, unbinnedColor, onOpenContig }) {"
+        },
+        {
+          "file": "code/src/lib/summary.js",
+          "start": 11,
+          "end": 39,
+          "role": "logic",
+          "symbol": "summariseModel",
+          "anchor": "ed5219d58e9e",
+          "first": "export function summariseModel(model) {"
+        },
+        {
+          "file": "code/src/lib/summary.js",
+          "start": 45,
+          "end": 98,
+          "role": "logic",
+          "symbol": "contigsNeedingAttention",
+          "anchor": "c35625418ff9",
+          "first": "export function contigsNeedingAttention(model, limit = 10) {"
+        },
+        {
+          "file": "code/src/constants/stages.js",
+          "start": 39,
+          "end": 49,
+          "role": "data",
+          "symbol": "STAGE_EXPLANATIONS",
+          "anchor": "d0b45588ca50",
+          "first": "export const STAGE_EXPLANATIONS = {"
+        },
+        {
+          "file": "code/src/constants/stages.js",
+          "start": 60,
+          "end": 66,
+          "role": "data",
+          "symbol": "CONFIDENCE_BUCKETS",
+          "anchor": "cd4561529106",
+          "first": "export const CONFIDENCE_BUCKETS = ["
+        }
+      ]
+    },
+    {
+      "id": "curation-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Curate",
+      "summary": "Locks the selected contigs to a chosen bin, re-runs refinement with them as fixed seeds, and exports the curated binning as CSV.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "apply label",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/components/workspace/CurationPanel.jsx",
+          "start": 21,
+          "end": 21,
+          "role": "markup",
+          "symbol": "CurationPanel",
+          "anchor": "7184182a1123",
+          "first": "export function CurationPanel({ derived }) {"
+        },
+        {
+          "file": "code/src/style.css",
+          "start": 587,
+          "end": 589,
+          "role": "style",
+          "symbol": ".curation-panel .fui-Select",
+          "anchor": "f6b182bee62c",
+          "first": ".curation-panel .fui-Select{"
+        },
+        {
+          "file": "code/src/lib/curation.js",
+          "start": 6,
+          "end": 15,
+          "role": "logic",
+          "symbol": "curatedAssignments",
+          "anchor": "4f36b8028dd9",
+          "first": "export function curatedAssignments(model, overrides) {"
+        },
+        {
+          "file": "code/src/lib/curation.js",
+          "start": 17,
+          "end": 19,
+          "role": "logic",
+          "symbol": "assignmentsToCsv",
+          "anchor": "b6ecdc3a4940",
+          "first": "export function assignmentsToCsv(rows) {"
+        },
+        {
+          "file": "code/src/lib/pyodide/pipeline.js",
+          "start": 330,
+          "end": 330,
+          "role": "logic",
+          "symbol": "rerunRefinement",
+          "anchor": "e510db2a4bbb",
+          "first": "export async function rerunRefinement({ runContext, locked, log, status }) {"
+        }
+      ]
+    },
+    {
+      "id": "feature-scatter",
+      "level": "view",
+      "parent": null,
+      "title": "Contig feature space",
+      "summary": "A brushable scatter of contigs by GC, coverage, length or confidence, linked to the graph so composition and graph structure can be compared.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "brush",
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/components/workspace/FeatureScatter.jsx",
+          "start": 48,
+          "end": 48,
+          "role": "markup",
+          "symbol": "FeatureScatter",
+          "anchor": "900a75200ff5",
+          "first": "export function FeatureScatter({ derived }) {"
+        },
+        {
+          "file": "code/src/components/workspace/FeatureScatter.jsx",
+          "start": 198,
+          "end": 212,
+          "role": "logic",
+          "symbol": "handleSelected",
+          "anchor": "2ad8f8f40d70",
+          "first": "const handleSelected = (event) => {"
+        },
+        {
+          "file": "code/src/lib/features.js",
+          "start": 5,
+          "end": 17,
+          "role": "data",
+          "symbol": "SCATTER_FIELDS",
+          "anchor": "7897bbfe09f6",
+          "first": "export const SCATTER_FIELDS = {"
+        },
+        {
+          "file": "code/src/constants/encodings.js",
+          "start": 66,
+          "end": 71,
+          "role": "data",
+          "symbol": "SCATTER_AXIS_OPTIONS",
+          "anchor": "269234c2fe17",
+          "first": "export const SCATTER_AXIS_OPTIONS = ["
+        }
+      ]
+    },
+    {
+      "id": "contig-flow",
+      "level": "view",
+      "parent": null,
+      "title": "Flow between binning results",
+      "summary": "A multi-stage flow diagram showing how contigs move between bins from one result to the next, with flow statistics; clicking a flow selects its contigs.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "linked views",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/src/components/workspace/ContigFlow.jsx",
+          "start": 25,
+          "end": 25,
+          "role": "markup",
+          "symbol": "ContigFlow",
+          "anchor": "1683e48c5eaa",
+          "first": "export function ContigFlow({ derived }) {"
+        },
+        {
+          "file": "code/src/components/workspace/FlowStats.jsx",
+          "start": 11,
+          "end": 11,
+          "role": "markup",
+          "symbol": "FlowStats",
+          "anchor": "65c03280f523",
+          "first": "export function FlowStats({ stats }) {"
+        },
+        {
+          "file": "code/src/style.css",
+          "start": 860,
+          "end": 869,
+          "role": "style",
+          "symbol": ".sankey-wrap",
+          "anchor": "fa4041fa982a",
+          "first": ".sankey-wrap{"
+        },
+        {
+          "file": "code/src/style.css",
+          "start": 820,
+          "end": 825,
+          "role": "style",
+          "symbol": ".flow-stats",
+          "anchor": "2850d4577b80",
+          "first": ".flow-stats{"
+        },
+        {
+          "file": "code/src/lib/sankeyData.js",
+          "start": 11,
+          "end": 11,
+          "role": "logic",
+          "symbol": "buildSankeyData",
+          "anchor": "d697dcf32aca",
+          "first": "export function buildSankeyData({ model, binOf, onlyChanged, hideUnbinned }) {"
+        },
+        {
+          "file": "code/src/lib/sankeyData.js",
+          "start": 81,
+          "end": 81,
+          "role": "logic",
+          "symbol": "computeFlowStats",
+          "anchor": "3641ccecda6c",
+          "first": "export function computeFlowStats({ model, binOf }) {"
+        }
+      ]
+    }
+  ]
+}

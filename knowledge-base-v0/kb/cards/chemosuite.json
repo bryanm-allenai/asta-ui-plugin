@@ -1,0 +1,590 @@
+{
+  "schema": "astaui.card/1",
+  "id": "chemosuite",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T10:38:44Z"
+  },
+  "app": {
+    "title": "ChemoSuite: multi-instrument spectra to fused descriptors and a sample-class model",
+    "summary": "A person picks one analytical module at a time from a sidebar. Each module brings in that instrument's files (peak lists, fluorescence matrices, IR, NMR, thermal, chromatography or elemental tables), or a folder, a ZIP batch or a synthetic benchmark. In each module they clean and calibrate the signals, compute descriptors per sample (for example molecular formulas or decomposition components) and send the descriptor table to a shared session. In the fusion module they join every block by sample ID, type a class label for each sample and fit a discriminant model. They then judge it from its fit metrics, its scores plot with a confidence ellipse, a permutation test and the variable-importance ranking, and export a multi-sheet report, the fused matrix and the ranked markers, or save the whole session as a project file.",
+    "task": {
+      "text": "Turn raw instrument outputs from several analytical techniques into per-sample descriptors, fuse them, and fit and validate a model that separates sample classes and ranks the descriptors that drive the separation.",
+      "verbs": [
+        "derive",
+        "compare",
+        "identify",
+        "clean",
+        "summarize",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "Instrument signals for a set of samples, one file per sample and technique (mass peak lists, excitation-emission matrices, IR/NMR spectra, thermal curves, chromatograms, elemental tables). These become descriptor tables with one row per sample, joined by sample ID into a single feature matrix with a class column.",
+      "item": "a sample measured by one or more analytical techniques, carried as one row of descriptors",
+      "shapes": [
+        "spectrum",
+        "table",
+        "network"
+      ]
+    },
+    "stage": {
+      "text": "processing instrument spectra into descriptors and classifying samples, after measurement and before reporting",
+      "terms": [
+        "analyze",
+        "clean",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar module picker switches between per-technique studios. Each studio has a sidebar file manager driving tabbed plots and tables for the active sample and pushes its descriptor table into shared session state. The fusion studio assembles those tables into an editable matrix, fits the chosen model, and shows metrics, scores, importance and validation in tabs with download buttons.",
+      "views": [
+        "sidebar list",
+        "line chart",
+        "scatter plot",
+        "heatmap",
+        "bar chart",
+        "table view",
+        "summary stats",
+        "network diagram",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "search",
+        "filter",
+        "inline edit",
+        "toggle view",
+        "zoom and pan",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "master-detail",
+        "side-by-side comparison",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "multi-technique spectroscopy with chemometric data fusion and PLS-DA classification in analytical chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "chemometrics",
+        "data fusion",
+        "pls da"
+      ]
+    },
+    "workflow": {
+      "name": "turn several measurement types per sample into one feature table and fit a class model",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "choose a technique module in the sidebar, then upload files, scan a local folder, upload a ZIP batch or load a synthetic benchmark; a saved .chemo project can restore everything",
+          "parts": [
+            "module-nav",
+            "fticr-studio",
+            "project-dialog"
+          ]
+        },
+        {
+          "step": "clean and calibrate each signal",
+          "here": "pick m/z and intensity columns, crop the m/z range, set a noise cutoff and normalisation; correct mass drift with a polynomial fitted to matched calibrant peaks (order dropped to linear when calibrants span too little of the range)",
+          "parts": [
+            "fticr-studio",
+            "mass-recalibration"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "assign molecular formulas within ppm tolerance and element bounds with an optional 13C isotope check; fit PARAFAC to fluorescence matrices; compute indices per sample and send the descriptor table to the fusion module",
+          "parts": [
+            "formula-assignment",
+            "eem-studio"
+          ]
+        },
+        {
+          "step": "join the tables by sample and label each sample's class",
+          "here": "assemble every session block (or uploaded descriptor CSVs, or a batch screen) by Sample_ID into one matrix; only the Class_Target column is editable, pre-filled from sample names",
+          "parts": [
+            "fusion-assembler"
+          ]
+        },
+        {
+          "step": "fit a model and check that it holds",
+          "here": "choose PLS-DA, OPLS-DA, sparse PLS-DA or multiblock variants, low- or mid-level fusion, latent variables, block scaling and permutation count; read R2X/R2Y/Q2/accuracy, a 2D/3D scores plot with a Hotelling ellipse, VIP ranking, S-plot and permutation p-value",
+          "parts": [
+            "model-results"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "download a multi-sheet Excel or HTML passport, the fused matrix CSV and the ranked biomarker CSV, or save the session as a .chemo project",
+          "parts": [
+            "model-results",
+            "project-dialog"
+          ]
+        }
+      ],
+      "distinctive": [
+        "each technique is its own studio that publishes a per-sample descriptor block into a shared session, so fusion depends on samples sharing an ID across instruments",
+        "blocks are scaled by 1/sqrt(number of variables) so a technique with many descriptors does not swamp one with few",
+        "a warning appears when descriptors outnumber samples and there are fewer than 20 samples, because the class separation may be over-optimistic",
+        "mass-scale recalibration falls back to a linear fit when the matched calibrants cover less than 60% of the mass range",
+        "variable importance is coloured by the technique each descriptor came from, so the person sees which instrument drives the separation"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "module-nav",
+      "level": "view",
+      "parent": null,
+      "title": "Module picker sidebar",
+      "summary": "Lets the person switch between the analytical-technique studios and the fusion studio, grouped by category, and change the interface language.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1895,
+          "end": 1991,
+          "role": "markup",
+          "anchor": "a2ce16056421",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1978,
+          "end": 1981,
+          "role": "logic",
+          "symbol": "_on_module_select_changed",
+          "anchor": "4db702615108",
+          "first": "def _on_module_select_changed():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2176,
+          "end": 2199,
+          "role": "logic",
+          "anchor": "e86a3072c5d4",
+          "first": "import views"
+        },
+        {
+          "file": "code/assets/style.css",
+          "start": 157,
+          "end": 161,
+          "role": "style",
+          "symbol": "[data-testid=\"stSidebar\"]",
+          "anchor": "f8b994baa76d",
+          "first": "[data-testid=\"stSidebar\"] {"
+        }
+      ]
+    },
+    {
+      "id": "project-dialog",
+      "level": "component",
+      "parent": "module-nav",
+      "title": "Project save and restore dialog",
+      "summary": "Shows which techniques and models are in the session, saves the whole workspace as a .chemo archive and restores one from upload.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "export",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1811,
+          "end": 1890,
+          "role": "logic",
+          "symbol": "show_project_manager_dialog",
+          "anchor": "ff4b5a69a4bc",
+          "first": "def show_project_manager_dialog():"
+        },
+        {
+          "file": "code/modules/project_io.py",
+          "start": 112,
+          "end": 115,
+          "role": "logic",
+          "symbol": "save_chemo_project",
+          "anchor": "b9dbaa719ffd",
+          "first": "def save_chemo_project("
+        },
+        {
+          "file": "code/modules/project_io.py",
+          "start": 338,
+          "end": 518,
+          "role": "logic",
+          "symbol": "load_chemo_project",
+          "anchor": "a49ccf683d46",
+          "first": "def load_chemo_project(source: Union[bytes, io.BytesIO, str]) -> Dict[str, Any]:"
+        },
+        {
+          "file": "code/modules/project_io.py",
+          "start": 305,
+          "end": 335,
+          "role": "logic",
+          "symbol": "get_chemo_project_summary",
+          "anchor": "ef71ff9460bd",
+          "first": "def get_chemo_project_summary(source: Union[bytes, io.BytesIO, str]) -> Dict[str, Any]:"
+        }
+      ]
+    },
+    {
+      "id": "fticr-studio",
+      "level": "view",
+      "parent": null,
+      "title": "Mass spectrum manager and stick plot",
+      "summary": "Loads peak lists by upload, folder or ZIP batch, finds a spectrum by name search, parses and filters its peaks by m/z range and noise cutoff, and draws the stick plot with the top peaks labelled.",
+      "views": [
+        "sidebar list",
+        "line chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "select",
+        "filter",
+        "zoom and pan",
+        "hover for detail"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/views/fticr_view.py",
+          "start": 97,
+          "end": 437,
+          "role": "markup",
+          "anchor": "fce2990b88ad",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/modules/fticr_core.py",
+          "start": 214,
+          "end": 259,
+          "role": "logic",
+          "symbol": "parse_uploaded_file",
+          "anchor": "3f97356df0b7",
+          "first": "def parse_uploaded_file(file_bytes: bytes, delimiter: str = \"Auto\", decimal_sep: str = \".\", has_header: bool = True) -> "
+        },
+        {
+          "file": "code/assets/style.css",
+          "start": 773,
+          "end": 785,
+          "role": "style",
+          "symbol": ".sample-toolbar",
+          "anchor": "52e441c48fc7",
+          "first": ".sample-toolbar {"
+        },
+        {
+          "file": "code/assets/style.css",
+          "start": 787,
+          "end": 798,
+          "role": "style",
+          "symbol": ".sample-chip",
+          "anchor": "b849107b1a71",
+          "first": ".sample-chip {"
+        }
+      ]
+    },
+    {
+      "id": "mass-recalibration",
+      "level": "component",
+      "parent": "fticr-studio",
+      "title": "m/z recalibration",
+      "summary": "Matches calibrant masses within a ppm window, fits a polynomial drift correction, plots the error before and after, and applies or resets it.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/views/fticr_view.py",
+          "start": 439,
+          "end": 503,
+          "role": "logic",
+          "anchor": "1e576793d9a7",
+          "first": "with st_sub2:"
+        },
+        {
+          "file": "code/modules/fticr_core.py",
+          "start": 970,
+          "end": 982,
+          "role": "data",
+          "symbol": "get_calibrant_library",
+          "anchor": "cf488e514e67",
+          "first": "def get_calibrant_library(series_name: str, ion_mode: str) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "formula-assignment",
+      "level": "component",
+      "parent": "fticr-studio",
+      "title": "Formula assignment",
+      "summary": "Assigns elemental formulas to peaks within element bounds, ppm tolerance and ratio limits with an optional isotope check, and reports the assignment rate and mean error with a downloadable table.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/fticr_view.py",
+          "start": 513,
+          "end": 630,
+          "role": "logic",
+          "anchor": "d7c6bfd709be",
+          "first": "with st_sub_assign:"
+        },
+        {
+          "file": "code/modules/fticr_core.py",
+          "start": 401,
+          "end": 405,
+          "role": "logic",
+          "symbol": "run_formula_assignment",
+          "anchor": "d480147a02ac",
+          "first": "def run_formula_assignment("
+        },
+        {
+          "file": "code/modules/fticr_core.py",
+          "start": 121,
+          "end": 203,
+          "role": "logic",
+          "symbol": "calculate_descriptors",
+          "anchor": "dc8e46a6f2c9",
+          "first": "def calculate_descriptors(df: pd.DataFrame, lang: str = \"ru\") -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "eem-studio",
+      "level": "view",
+      "parent": null,
+      "title": "Fluorescence EEM-PARAFAC studio",
+      "summary": "Shows each excitation-emission matrix as a contour map after scatter removal, computes optical indices, fits a PARAFAC model with diagnostics and split-half validation, and exports component scores as descriptors for fusion.",
+      "views": [
+        "heatmap",
+        "line chart",
+        "bar chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/views/eem_view.py",
+          "start": 20,
+          "end": 470,
+          "role": "markup",
+          "symbol": "render_eem_studio",
+          "anchor": "b1b487209cb7",
+          "first": "def render_eem_studio(T: dict, lang: str):"
+        },
+        {
+          "file": "code/modules/eem_core.py",
+          "start": 316,
+          "end": 317,
+          "role": "logic",
+          "symbol": "fit_parafac",
+          "anchor": "db4341761624",
+          "first": "def fit_parafac("
+        },
+        {
+          "file": "code/modules/eem_core.py",
+          "start": 192,
+          "end": 197,
+          "role": "logic",
+          "symbol": "remove_scatter_bands",
+          "anchor": "7ba4206b0fd6",
+          "first": "def remove_scatter_bands("
+        },
+        {
+          "file": "code/modules/eem_core.py",
+          "start": 346,
+          "end": 349,
+          "role": "logic",
+          "symbol": "split_half_analysis",
+          "anchor": "82884c3147d5",
+          "first": "def split_half_analysis("
+        }
+      ]
+    },
+    {
+      "id": "fusion-assembler",
+      "level": "view",
+      "parent": null,
+      "title": "Multimodal dataset assembler",
+      "summary": "Builds one feature matrix from session blocks, uploaded descriptor tables, a batch directory screen or a benchmark, joins them by sample ID, and lets the person edit only the class label of each sample.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/views/chemo_ml_view.py",
+          "start": 127,
+          "end": 489,
+          "role": "logic",
+          "anchor": "8ade30da2cd7",
+          "first": "st.subheader(T[lang][\"ml_sec1_title\"])"
+        },
+        {
+          "file": "code/modules/chemo_ml.py",
+          "start": 134,
+          "end": 143,
+          "role": "logic",
+          "symbol": "merge_feature_blocks",
+          "anchor": "3380ab2f81a8",
+          "first": "def merge_feature_blocks("
+        },
+        {
+          "file": "code/modules/chemo_ml.py",
+          "start": 48,
+          "end": 131,
+          "role": "logic",
+          "symbol": "extract_fticr_descriptors",
+          "anchor": "f8c212f9e416",
+          "first": "def extract_fticr_descriptors(assigned_df: pd.DataFrame, sample_id: str, basis: str = \"count\") -> Dict[str, float]:"
+        },
+        {
+          "file": "code/modules/batch_screener.py",
+          "start": 459,
+          "end": 463,
+          "role": "logic",
+          "symbol": "batch_screen_directory",
+          "anchor": "faf0b5ed722b",
+          "first": "def batch_screen_directory("
+        }
+      ]
+    },
+    {
+      "id": "model-results",
+      "level": "component",
+      "parent": "fusion-assembler",
+      "title": "Discriminant model fit, diagnostics and export",
+      "summary": "Fits the chosen PLS-DA-family model and shows fit metrics, a 2D/3D scores plot with a Hotelling confidence region, VIP ranking by block, S-plot, permutation validation and cross-block correlation, with report and CSV downloads.",
+      "views": [
+        "scatter plot",
+        "bar chart",
+        "heatmap",
+        "network diagram",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/views/chemo_ml_view.py",
+          "start": 491,
+          "end": 1204,
+          "role": "logic",
+          "anchor": "07cf9acdc665",
+          "first": "st.subheader(T[lang][\"ml_sec2_title\"])"
+        },
+        {
+          "file": "code/modules/chemo_ml.py",
+          "start": 324,
+          "end": 330,
+          "role": "logic",
+          "symbol": "train_plsda_model",
+          "anchor": "ab3eed10c898",
+          "first": "def train_plsda_model("
+        },
+        {
+          "file": "code/modules/chemo_ml.py",
+          "start": 479,
+          "end": 485,
+          "role": "logic",
+          "symbol": "train_oplsda_model",
+          "anchor": "f68858c0222d",
+          "first": "def train_oplsda_model("
+        },
+        {
+          "file": "code/modules/chemo_ml.py",
+          "start": 652,
+          "end": 659,
+          "role": "logic",
+          "symbol": "train_splsda_model",
+          "anchor": "d5d128a00fe5",
+          "first": "def train_splsda_model("
+        },
+        {
+          "file": "code/modules/chemo_ml.py",
+          "start": 904,
+          "end": 912,
+          "role": "logic",
+          "symbol": "run_permutation_test",
+          "anchor": "abf66a565086",
+          "first": "def run_permutation_test("
+        },
+        {
+          "file": "code/modules/report_generator.py",
+          "start": 76,
+          "end": 81,
+          "role": "logic",
+          "symbol": "generate_excel_passport",
+          "anchor": "718dd83adb54",
+          "first": "def generate_excel_passport("
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "data",
+      "list": "shapes",
+      "term": "spectrum"
+    }
+  ]
+}

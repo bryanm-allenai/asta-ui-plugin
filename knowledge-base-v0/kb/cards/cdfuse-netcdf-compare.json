@@ -1,0 +1,678 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cdfuse-netcdf-compare",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T17:32:22Z"
+  },
+  "app": {
+    "title": "CDFuse — NetCDF comparison",
+    "summary": "A person uploads a candidate gridded dataset and a reference dataset, or loads a demonstration pair, and can add a study-area boundary. They then choose the variable in each file and confirm which coordinates hold time, latitude and longitude. They can also set time shifts, keep one hour per day, and pick a temporal aggregation, a grid-alignment method and a set of skill metrics. Running the comparison aligns both datasets in time and on a common grid, then scores every grid cell. The person reads a summary table and one map per metric, and downloads each metric field (PNG, NetCDF, GeoTIFF, CSV), a run report that records every setting, or everything as one ZIP.",
+    "task": {
+      "text": "Score how well a gridded dataset reproduces a reference dataset at every grid cell, and export the metric maps with a record of the settings used.",
+      "verbs": [
+        "compare",
+        "derive",
+        "summarize",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Two gridded time series of the same variable, stored as NetCDF with time, latitude and longitude dimensions, plus an optional vector boundary polygon.",
+      "item": "a grid cell's time series in the candidate dataset, paired with the same cell in the reference dataset",
+      "shapes": [
+        "field",
+        "time series",
+        "geospatial"
+      ]
+    },
+    "stage": {
+      "text": "evaluating a gridded product against a benchmark dataset, before reporting on its skill",
+      "terms": [
+        "compare",
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "Numbered tabs take the person from loading data, to configuring coordinates, time handling, alignment and metrics, to results. A sidebar ticks off each stage as it is done. The results tab shows overview counts, a summary-statistics table and one colour-mapped grid map per metric. Each map has its own statistics and download buttons beside it.",
+      "views": [
+        "form",
+        "map",
+        "heatmap",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline",
+        "small multiples",
+        "side-by-side comparison",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "cell-wise skill scoring of gridded datasets against a reference in the earth sciences",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "gridded dataset evaluation",
+        "model validation",
+        "netcdf"
+      ]
+    },
+    "workflow": {
+      "name": "score a candidate dataset against a reference and export the results",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Separate uploaders for the candidate and reference NetCDF files, or a button that loads a synthetic demonstration pair. Optionally, a shapefile, GeoJSON or GeoPackage boundary.",
+          "parts": [
+            "data-tab",
+            "boundary-upload"
+          ]
+        },
+        {
+          "step": "map each input's fields onto a common structure",
+          "here": "For each dataset, pick the variable and confirm the auto-detected time, latitude and longitude coordinates. Pick a slice for any extra dimension, and set an optional time shift in hours.",
+          "parts": [
+            "coordinate-config"
+          ]
+        },
+        {
+          "step": "set how the inputs are matched before computing",
+          "here": "Optionally keep one hour per day for each dataset and match on calendar date. Choose a temporal aggregation (daily, monthly, seasonal, annual) and its statistic, and choose whether to interpolate one grid onto the other or use only exactly shared cells.",
+          "parts": [
+            "time-alignment-settings"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Pick metrics (Correlation, NSE, KGE, PBIAS, RMSE, MAE, Bias), optionally clip to the boundary, and run. The inputs are checked first. Each metric is computed per cell over the shared time steps, and cells with too few pairs or an undefined denominator are masked.",
+          "parts": [
+            "metric-run"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Counts of matched time steps and grid cells, an expandable list of the processing notes, and a table of the mean, median, min, max and coverage of each metric.",
+          "parts": [
+            "results-summary"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "One map per metric, with a fixed or robust diverging colour scale, the boundary outline, guidance on interpreting the metric, and its statistics beside it.",
+          "parts": [
+            "metric-maps"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Per-metric PNG, CF-attributed NetCDF, GeoTIFF and long-format CSV files, plus a summary CSV, a plain-text run report recording every setting, and a ZIP with all of them.",
+          "parts": [
+            "results-summary",
+            "metric-maps"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The comparison is asymmetric: one dataset is the reference treated as truth and the other is the candidate being scored, so which one goes where changes the answer.",
+        "Metrics are computed independently at every grid cell through time. A value missing on either side drops that time step from both, and undefined cells are stored as missing, never as zero.",
+        "No product's conventions are assumed: time shifts and the choice of hour of day are explicit settings for each dataset, and longitudes and latitude order are normalised automatically.",
+        "A run report records every setting and processing note, so the comparison can be reproduced.",
+        "An optional vector boundary is drawn on every map and can mask the metric fields to the study area."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "workflow-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Workflow progress sidebar",
+      "summary": "Ticks off the stages (load, configure, run, download), lists the loaded files and clears the session.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 81,
+          "end": 93,
+          "role": "data",
+          "anchor": "55c2c6c07805",
+          "first": "DEFAULTS: dict[str, object] = {"
+        },
+        {
+          "file": "code/app.py",
+          "start": 188,
+          "end": 232,
+          "role": "markup",
+          "anchor": "11942d6a23a5",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 44,
+          "end": 74,
+          "role": "style",
+          "anchor": "f3ba46792f1f",
+          "first": "STYLES = \"\"\""
+        }
+      ]
+    },
+    {
+      "id": "data-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Load the two datasets",
+      "summary": "Separate uploaders for the candidate and reference NetCDF files, plus a built-in synthetic demonstration pair that can also be downloaded.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 239,
+          "end": 326,
+          "role": "markup",
+          "anchor": "fc35d00660c5",
+          "first": "with tab_data:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 366,
+          "end": 369,
+          "role": "markup",
+          "anchor": "fcf407bf5a67",
+          "first": "if st.session_state[\"candidate_ds\"] is not None and st.session_state[\"reference_ds\"] is not None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 97,
+          "end": 98,
+          "role": "logic",
+          "symbol": "cached_open_netcdf",
+          "anchor": "bf397ab7ca66",
+          "first": "def cached_open_netcdf(file_bytes: bytes, filename: str) -> xr.Dataset:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 102,
+          "end": 103,
+          "role": "logic",
+          "symbol": "cached_demo_pair",
+          "anchor": "9b3da76971a8",
+          "first": "def cached_demo_pair() -> tuple[xr.Dataset, xr.Dataset]:"
+        },
+        {
+          "file": "code/cdfuse/io.py",
+          "start": 19,
+          "end": 54,
+          "role": "logic",
+          "symbol": "open_netcdf",
+          "anchor": "3979ae8ff84e",
+          "first": "def open_netcdf(file_bytes: bytes, filename: str) -> xr.Dataset:"
+        },
+        {
+          "file": "code/cdfuse/sample.py",
+          "start": 19,
+          "end": 24,
+          "role": "data",
+          "symbol": "make_demo_pair",
+          "anchor": "a87229093f69",
+          "first": "def make_demo_pair("
+        },
+        {
+          "file": "code/cdfuse/sample.py",
+          "start": 106,
+          "end": 108,
+          "role": "logic",
+          "symbol": "demo_bytes",
+          "anchor": "a71a5f3994c1",
+          "first": "def demo_bytes(dataset: xr.Dataset) -> bytes:"
+        }
+      ]
+    },
+    {
+      "id": "boundary-upload",
+      "level": "component",
+      "parent": "data-tab",
+      "title": "Optional study-area boundary",
+      "summary": "Reads a zipped shapefile, GeoJSON or GeoPackage, reprojects it to latitude and longitude, and reports its extent so it can be drawn on the maps and used to clip them.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 327,
+          "end": 365,
+          "role": "markup",
+          "anchor": "27e42c0028a3",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/cdfuse/io.py",
+          "start": 70,
+          "end": 134,
+          "role": "logic",
+          "symbol": "load_boundary",
+          "anchor": "bb6cdd55b889",
+          "first": "def load_boundary(uploaded_files: list) -> gpd.GeoDataFrame | None:"
+        },
+        {
+          "file": "code/cdfuse/io.py",
+          "start": 137,
+          "end": 174,
+          "role": "logic",
+          "symbol": "clip_to_boundary",
+          "anchor": "60b612859866",
+          "first": "def clip_to_boundary(data: xr.DataArray, boundary: gpd.GeoDataFrame) -> xr.DataArray:"
+        }
+      ]
+    },
+    {
+      "id": "coordinate-config",
+      "level": "component",
+      "parent": "configure-tab",
+      "title": "Variables and coordinates",
+      "summary": "Two columns, one per dataset: pick the variable, see its units and dimensions, confirm the auto-detected time, latitude and longitude coordinates, set a time shift, and choose a slice for each extra dimension.",
+      "views": [
+        "form",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 376,
+          "end": 446,
+          "role": "markup",
+          "anchor": "8b95164e4c6f",
+          "first": "with tab_configure:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 106,
+          "end": 112,
+          "role": "logic",
+          "symbol": "detect_index",
+          "anchor": "2021e736f79c",
+          "first": "def detect_index(options: list[str], candidates: tuple[str, ...]) -> int:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 115,
+          "end": 119,
+          "role": "logic",
+          "symbol": "coordinate_options",
+          "anchor": "0a38c0ee6f2a",
+          "first": "def coordinate_options(dataset: xr.Dataset, variable: str) -> list[str]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 122,
+          "end": 139,
+          "role": "logic",
+          "symbol": "dataset_overview",
+          "anchor": "b0cfb782ca2f",
+          "first": "def dataset_overview(dataset: xr.Dataset, variable: str) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 142,
+          "end": 143,
+          "role": "logic",
+          "symbol": "extra_dimension_selection",
+          "anchor": "5c4961125720",
+          "first": "def extra_dimension_selection("
+        },
+        {
+          "file": "code/cdfuse/config.py",
+          "start": 19,
+          "end": 23,
+          "role": "data",
+          "anchor": "610efda56386",
+          "first": "# Coordinate names tried when guessing which coordinate is which. The first"
+        },
+        {
+          "file": "code/cdfuse/preprocess.py",
+          "start": 92,
+          "end": 97,
+          "role": "logic",
+          "symbol": "standardise",
+          "anchor": "774a71ccfc9f",
+          "first": "def standardise("
+        },
+        {
+          "file": "code/cdfuse/preprocess.py",
+          "start": 34,
+          "end": 35,
+          "role": "logic",
+          "symbol": "squeeze_extra_dimensions",
+          "anchor": "1d1d45bde65e",
+          "first": "def squeeze_extra_dimensions("
+        }
+      ]
+    },
+    {
+      "id": "time-alignment-settings",
+      "level": "component",
+      "parent": "configure-tab",
+      "title": "Time handling, aggregation and alignment",
+      "summary": "Sets how the two datasets are matched in time and space: keep one hour per day for each dataset, match on calendar date, resample to a coarser period with a chosen statistic, and interpolate onto one grid or keep only the cells both share.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 447,
+          "end": 513,
+          "role": "markup",
+          "anchor": "9f7888f24daf",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/cdfuse/config.py",
+          "start": 98,
+          "end": 112,
+          "role": "data",
+          "anchor": "ab86994ef94b",
+          "first": "AGGREGATION_FREQUENCIES = {"
+        },
+        {
+          "file": "code/cdfuse/preprocess.py",
+          "start": 166,
+          "end": 167,
+          "role": "logic",
+          "symbol": "select_hour_of_day",
+          "anchor": "198cc8cc13b7",
+          "first": "def select_hour_of_day("
+        },
+        {
+          "file": "code/cdfuse/preprocess.py",
+          "start": 203,
+          "end": 221,
+          "role": "logic",
+          "symbol": "aggregate",
+          "anchor": "f20431fbef5f",
+          "first": "def aggregate(data: xr.DataArray, frequency: str | None, method: str) -> xr.DataArray:"
+        },
+        {
+          "file": "code/cdfuse/preprocess.py",
+          "start": 224,
+          "end": 225,
+          "role": "logic",
+          "symbol": "align",
+          "anchor": "3542ee50c179",
+          "first": "def align("
+        }
+      ]
+    },
+    {
+      "id": "metric-run",
+      "level": "component",
+      "parent": "configure-tab",
+      "title": "Metrics and run comparison",
+      "summary": "Pick metrics from a list (with their definitions), optionally clip to the boundary, and run. Settings are validated, the comparison pipeline runs, and maps and output files are prepared.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 515,
+          "end": 646,
+          "role": "logic",
+          "anchor": "8cf8403b8317",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/cdfuse/config.py",
+          "start": 28,
+          "end": 96,
+          "role": "data",
+          "anchor": "a917f6fab6e2",
+          "first": "# Plot defaults per metric. ``vmin``/``vmax`` of None means \"scale to the data\","
+        },
+        {
+          "file": "code/cdfuse/pipeline.py",
+          "start": 23,
+          "end": 43,
+          "role": "data",
+          "symbol": "ComparisonSettings",
+          "anchor": "41fd1a832da1",
+          "first": "class ComparisonSettings:"
+        },
+        {
+          "file": "code/cdfuse/pipeline.py",
+          "start": 59,
+          "end": 63,
+          "role": "logic",
+          "symbol": "run_comparison",
+          "anchor": "57dc5b04f09a",
+          "first": "def run_comparison("
+        },
+        {
+          "file": "code/cdfuse/metrics.py",
+          "start": 21,
+          "end": 105,
+          "role": "logic",
+          "anchor": "1ac239dd407c",
+          "first": "TIME = \"time\""
+        }
+      ]
+    },
+    {
+      "id": "results-summary",
+      "level": "view",
+      "parent": null,
+      "title": "Results overview and summary statistics",
+      "summary": "Shows the matched time steps and grid size, the processing notes, and a table of statistics for each metric with coverage, plus downloads for the summary CSV, the run report and the full ZIP.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 652,
+          "end": 704,
+          "role": "markup",
+          "anchor": "11da958ea451",
+          "first": "with tab_results:"
+        },
+        {
+          "file": "code/cdfuse/metrics.py",
+          "start": 108,
+          "end": 134,
+          "role": "logic",
+          "symbol": "summarise",
+          "anchor": "cfae9db28230",
+          "first": "def summarise(result: xr.DataArray, metric_name: str) -> dict[str, float | int | str]:"
+        },
+        {
+          "file": "code/cdfuse/export.py",
+          "start": 83,
+          "end": 84,
+          "role": "logic",
+          "symbol": "summary_to_csv",
+          "anchor": "4b89676905aa",
+          "first": "def summary_to_csv(summary: pd.DataFrame) -> bytes:"
+        },
+        {
+          "file": "code/cdfuse/export.py",
+          "start": 94,
+          "end": 118,
+          "role": "logic",
+          "symbol": "build_run_report",
+          "anchor": "53e1a086c7c9",
+          "first": "def build_run_report(provenance: dict[str, object], notes: list[str]) -> bytes:"
+        },
+        {
+          "file": "code/cdfuse/export.py",
+          "start": 121,
+          "end": 124,
+          "role": "logic",
+          "symbol": "build_archive",
+          "anchor": "e789218259ac",
+          "first": "def build_archive("
+        }
+      ]
+    },
+    {
+      "id": "metric-maps",
+      "level": "component",
+      "parent": "results-summary",
+      "title": "Metric maps",
+      "summary": "One colour-mapped grid map per metric, with the boundary outline, guidance on interpreting it, its statistics, and buttons to download it as PNG, NetCDF, GeoTIFF and CSV.",
+      "views": [
+        "map",
+        "heatmap",
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 706,
+          "end": 755,
+          "role": "markup",
+          "anchor": "e2a7dfc8e63c",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/cdfuse/plotting.py",
+          "start": 76,
+          "end": 85,
+          "role": "logic",
+          "symbol": "make_map",
+          "anchor": "7275718efe43",
+          "first": "def make_map("
+        },
+        {
+          "file": "code/cdfuse/plotting.py",
+          "start": 34,
+          "end": 38,
+          "role": "logic",
+          "symbol": "resolve_limits",
+          "anchor": "94d563705ecc",
+          "first": "def resolve_limits("
+        },
+        {
+          "file": "code/cdfuse/plotting.py",
+          "start": 138,
+          "end": 143,
+          "role": "logic",
+          "symbol": "figure_to_png",
+          "anchor": "b2a262459dc3",
+          "first": "def figure_to_png(fig: plt.Figure, dpi: int = 300) -> bytes:"
+        },
+        {
+          "file": "code/cdfuse/export.py",
+          "start": 27,
+          "end": 28,
+          "role": "logic",
+          "symbol": "metric_to_netcdf",
+          "anchor": "bc7c10f4d0e3",
+          "first": "def metric_to_netcdf("
+        },
+        {
+          "file": "code/cdfuse/export.py",
+          "start": 60,
+          "end": 80,
+          "role": "logic",
+          "symbol": "metric_to_geotiff",
+          "anchor": "310ee258b607",
+          "first": "def metric_to_geotiff(data: xr.DataArray, metric_name: str) -> bytes | None:"
+        },
+        {
+          "file": "code/cdfuse/export.py",
+          "start": 87,
+          "end": 91,
+          "role": "logic",
+          "symbol": "metric_to_csv",
+          "anchor": "49d47bd0ce64",
+          "first": "def metric_to_csv(data: xr.DataArray, metric_name: str) -> bytes:"
+        }
+      ]
+    },
+    {
+      "id": "configure-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Configure tab",
+      "summary": "The settings step, available once both datasets are loaded, that holds the coordinate, time, alignment and metric controls.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 376,
+          "end": 383,
+          "role": "markup",
+          "anchor": "c8c9de60c55a",
+          "first": "with tab_configure:"
+        }
+      ]
+    }
+  ]
+}

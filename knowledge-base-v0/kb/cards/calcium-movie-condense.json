@@ -1,0 +1,463 @@
+{
+  "schema": "astaui.card/1",
+  "id": "calcium-movie-condense",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:20:11Z"
+  },
+  "app": {
+    "title": "Time-lapse movie condenser",
+    "summary": "A person loads a time-lapse fluorescence movie (or a synthetic demo), enters the frame interval and pixel size, and sets each method choice in a sidebar: photobleach correction, baseline percentile, how peak time is encoded, colormap, a coherence gate for reporting a wave, spatial denoising and brightness gamma. The tool condenses the movie into a temporal color code, estimates wave direction and speed from the activation-time map, and detects active regions. A verification panel draws the chosen wave axis and the region outlines over the std projection beside the recovered numbers, so the person can check them and, if needed, set the axis by hand and re-run. They download the one-image summary and a full multi-panel publication figure as 300 dpi PNGs.",
+    "task": {
+      "text": "Turn a time-lapse movie into one static, print-ready summary figure and a wave-speed estimate that only gets reported when it holds up.",
+      "verbs": [
+        "derive",
+        "summarize",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "A time-lapse fluorescence movie loaded as a stack of frames, from which per-pixel activation times, projections, a kymograph and per-region dF/F traces are derived.",
+      "item": "one time-lapse movie, a stack of grayscale frames",
+      "shapes": [
+        "image collection",
+        "image",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "analyzing a recorded imaging movie and turning it into a figure for publication",
+      "terms": [
+        "analyze",
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls each set one method parameter, and the whole pipeline re-runs on every change. Below it, the one-image summary, a verification overlay beside the recovered numbers, and the composite figure are redrawn, each with its own download button.",
+      "views": [
+        "form",
+        "image viewer",
+        "summary stats",
+        "side-by-side panes",
+        "heatmap",
+        "line chart"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "calcium imaging analysis of propagating waves in fluorescence microscopy",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "calcium imaging",
+        "optical mapping",
+        "fluorescence microscopy"
+      ]
+    },
+    "workflow": {
+      "name": "condense a time-lapse recording into one summary figure with a measured rate",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "pick the synthetic demo or upload a TIFF stack or mp4/avi/mov video; the frame interval is read from ImageJ metadata if present",
+          "parts": [
+            "data-input"
+          ]
+        },
+        {
+          "step": "set the units and method choices the computation depends on",
+          "here": "frame interval (s/frame) and pixel size (um/px); photobleach correction, F0 baseline percentile, peak or centre-of-mass time encoding, colormap, coherence gate, spatial denoise and brightness gamma",
+          "parts": [
+            "data-input",
+            "method-controls"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "dF/F0 per pixel, a sub-frame activation-time map, a planar or local conduction-velocity speed estimate with a kymograph-ridge cross-check, and watershed-split active regions ordered by onset",
+          "parts": [
+            "verification"
+          ]
+        },
+        {
+          "step": "check the automatic choices against the data and override them",
+          "here": "the dashed wave axis and white ROI outlines are drawn over the std projection next to speed, planarity R2 and coherence; if wrong, switch off auto axis and type endpoints, or change the baseline percentile, then re-run",
+          "parts": [
+            "verification",
+            "axis-override"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "a temporal color code (hue = time of peak, brightness = amplitude) and a composite with montage, kymograph, per-ROI dF/F heatmap and traces, std and max projections",
+          "parts": [
+            "tcc-summary",
+            "full-figure"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "download the one-image summary and the full figure as 300 dpi PNGs",
+          "parts": [
+            "tcc-summary",
+            "full-figure"
+          ]
+        }
+      ],
+      "distinctive": [
+        "a coherence gate on the activation-time map means no speed is reported at all when the movie shows no oriented flow, rather than a guessed number",
+        "two speed estimators run (robust plane fit and local conduction-velocity field) and the plane fit's R2 picks which is reported, with an independent kymograph-ridge cross-check",
+        "photobleaching is fitted and divided out before any timing is measured, so peak times are not biased toward early frames",
+        "the whole movie collapses into one image where colour encodes when each pixel peaked and brightness how strongly, with colourblind-safe, print-safe colormaps",
+        "speed is converted to physical units only when both frame interval and pixel size are given"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar: data and methodological controls",
+      "summary": "Holds the numbered sections where the person picks the data and sets every method choice the pipeline uses.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 96,
+          "end": 143,
+          "role": "markup",
+          "anchor": "3d7c7cf3666d",
+          "first": "# --------------------------------------------------------------------------- #"
+        }
+      ]
+    },
+    {
+      "id": "data-input",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Data source and calibration",
+      "summary": "Chooses the synthetic demo or an uploaded TIFF/video and takes the frame interval and pixel size for physical units.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 100,
+          "end": 115,
+          "role": "markup",
+          "anchor": "ca0406c5bef3",
+          "first": "st.sidebar.header(\"1. Data\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 154,
+          "end": 168,
+          "role": "logic",
+          "anchor": "0380bb22bd41",
+          "first": "# resolve the stack"
+        },
+        {
+          "file": "code/app.py",
+          "start": 37,
+          "end": 46,
+          "role": "logic",
+          "symbol": "_load_from_bytes",
+          "anchor": "03f7ceeafc42",
+          "first": "def _load_from_bytes(data: bytes, suffix: str):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 50,
+          "end": 69,
+          "role": "data",
+          "symbol": "_demo_stack",
+          "anchor": "7f7786194b1a",
+          "first": "def _demo_stack():"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 43,
+          "end": 81,
+          "role": "logic",
+          "symbol": "load_stack",
+          "anchor": "868b93db83e2",
+          "first": "def load_stack(path: str) -> tuple[np.ndarray, dict]:"
+        }
+      ]
+    },
+    {
+      "id": "method-controls",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Accuracy controls",
+      "summary": "Sets photobleach correction, baseline percentile, time encoding, colormap, coherence gate, spatial denoise and gamma, each with a help note on why it matters.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 117,
+          "end": 132,
+          "role": "markup",
+          "anchor": "9d57aa27dac9",
+          "first": "st.sidebar.header(\"3. Accuracy controls\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 170,
+          "end": 174,
+          "role": "logic",
+          "anchor": "74f654094a49",
+          "first": "with st.spinner(\"Condensing...\"):"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 606,
+          "end": 670,
+          "role": "logic",
+          "symbol": "condense",
+          "anchor": "5c6b6a0ca175",
+          "first": "def condense(path_or_stack,"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 93,
+          "end": 114,
+          "role": "logic",
+          "symbol": "correct_photobleach",
+          "anchor": "12a9b30fe1d9",
+          "first": "def correct_photobleach(stack: np.ndarray) -> np.ndarray:"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 117,
+          "end": 136,
+          "role": "logic",
+          "symbol": "compute_dff",
+          "anchor": "3aa69c620227",
+          "first": "def compute_dff(stack: np.ndarray, baseline_percentile: float = 10.0,"
+        }
+      ]
+    },
+    {
+      "id": "axis-override",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Kymograph axis",
+      "summary": "Lets the person switch off the automatic PCA axis and type the kymograph line endpoints by hand.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 134,
+          "end": 143,
+          "role": "markup",
+          "anchor": "23beae93a387",
+          "first": "st.sidebar.header(\"4. Kymograph axis\")"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 226,
+          "end": 269,
+          "role": "logic",
+          "symbol": "kymograph",
+          "anchor": "0dd603df0079",
+          "first": "def kymograph(stack: np.ndarray,"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 205,
+          "end": 223,
+          "role": "logic",
+          "symbol": "_activity_principal_axis",
+          "anchor": "423011a32545",
+          "first": "def _activity_principal_axis(std_img: np.ndarray) -> tuple[np.ndarray, np.ndarray]:"
+        }
+      ]
+    },
+    {
+      "id": "tcc-summary",
+      "level": "view",
+      "parent": null,
+      "title": "One-image summary (temporal color code)",
+      "summary": "Shows the movie collapsed to one image coloured by time of peak and brightened by amplitude, with a colorbar, and offers it as a 300 dpi download.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 176,
+          "end": 187,
+          "role": "markup",
+          "anchor": "7fed4637d2c8",
+          "first": "# ---- the single image ----------------------------------------------------- #"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 143,
+          "end": 186,
+          "role": "logic",
+          "symbol": "temporal_color_code",
+          "anchor": "d12e4f0f959f",
+          "first": "def temporal_color_code(dff: np.ndarray,"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 673,
+          "end": 704,
+          "role": "logic",
+          "symbol": "save_single_image",
+          "anchor": "9ed0d14441cb",
+          "first": "def save_single_image(res: CondenseResult, out_path: str,"
+        }
+      ]
+    },
+    {
+      "id": "verification",
+      "level": "view",
+      "parent": null,
+      "title": "Verification",
+      "summary": "Draws the wave axis and detected ROI outlines over the std projection beside the recovered speed, estimator, R2, coherence and ROI count, so the person can confirm the automatic choices before trusting the numbers.",
+      "views": [
+        "image viewer",
+        "summary stats",
+        "side-by-side panes"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 189,
+          "end": 218,
+          "role": "markup",
+          "anchor": "31d1a1d6eb40",
+          "first": "# ---- verification --------------------------------------------------------- #"
+        },
+        {
+          "file": "code/app.py",
+          "start": 81,
+          "end": 93,
+          "role": "logic",
+          "symbol": "_verification_overlay",
+          "anchor": "3a4780dbf649",
+          "first": "def _verification_overlay(res):"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 441,
+          "end": 555,
+          "role": "logic",
+          "symbol": "estimate_wave",
+          "anchor": "d951145713e3",
+          "first": "def estimate_wave(dff: np.ndarray,"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 558,
+          "end": 576,
+          "role": "logic",
+          "symbol": "estimate_wave_speed",
+          "anchor": "2ba81e8b441f",
+          "first": "def estimate_wave_speed(kymo: np.ndarray) -> Optional[float]:"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 283,
+          "end": 353,
+          "role": "logic",
+          "symbol": "detect_rois",
+          "anchor": "04619c5a6e09",
+          "first": "def detect_rois(stack: np.ndarray, dff: np.ndarray,"
+        }
+      ]
+    },
+    {
+      "id": "full-figure",
+      "level": "view",
+      "parent": null,
+      "title": "Full publication figure",
+      "summary": "Assembles a multi-panel figure (montage, temporal color code, kymograph with speed, per-ROI dF/F heatmap and traces, std and max projections) and offers it as a 300 dpi download.",
+      "views": [
+        "image viewer",
+        "heatmap",
+        "line chart"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 220,
+          "end": 229,
+          "role": "markup",
+          "anchor": "626c0aa8c220",
+          "first": "# ---- full composite ------------------------------------------------------- #"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 707,
+          "end": 828,
+          "role": "logic",
+          "symbol": "make_figure",
+          "anchor": "49f2e85e7324",
+          "first": "def make_figure(res: CondenseResult, out_path: str,"
+        },
+        {
+          "file": "code/moviecondense.py",
+          "start": 193,
+          "end": 198,
+          "role": "logic",
+          "symbol": "projections",
+          "anchor": "29fa7d369f99",
+          "first": "def projections(stack: np.ndarray) -> dict[str, np.ndarray]:"
+        }
+      ]
+    }
+  ]
+}

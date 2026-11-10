@@ -1,0 +1,652 @@
+{
+  "schema": "astaui.card/1",
+  "id": "bacterial-growth-od-analyzer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T06:23:53Z"
+  },
+  "app": {
+    "title": "Bacterial Growth Analyzer",
+    "summary": "The person loads a plate-reader export, picks the plate format and clicks the replicate sample wells on a plate grid. They can also pick blank wells, fit a background model to them and subtract it, then check raw against corrected curves well by well. In advanced mode, two groups of wells can be added, subtracted, multiplied or divided. They then set time intervals on the averaged curve, pick a growth model or let AIC choose one, and fit it. Each fit gives parameter estimates with errors, a lag time and confidence bands. Change-point detection can propose the phase boundaries, and a custom ODE can be fitted instead. The fitted parameters download as a CSV, and the fit settings save as JSON so they can be applied again.",
+    "task": {
+      "text": "Turn raw optical-density time courses from a well plate into fitted growth parameters with uncertainty, after correcting for blank wells.",
+      "verbs": [
+        "derive",
+        "clean",
+        "identify",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "A plate-reader export: one time column and one column of readings per well, laid out on a plate of known rows and columns.",
+      "item": "a well on a multi-well plate, with its reading over time",
+      "shapes": [
+        "grid of series",
+        "time series",
+        "per element",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "fitting growth curves from raw plate-reader runs after an experiment, before reporting",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "Each step is a separate tab reached from a sidebar with a progress tracker, and each tab passes its prepared table to the next. A clickable plate grid picks the sample and blank wells. Line charts show the raw, corrected and averaged curves. Each fit sits in an expandable form for its time interval, model, initial guesses and bounds, and draws the fitted curve with a confidence band and a parameter table. A summary chart and a results table collect all the fits for export.",
+      "views": [
+        "fixed-layout grid",
+        "line chart",
+        "table view",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "multi-select",
+        "select",
+        "toggle view",
+        "time slider",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "status pipeline"
+      ]
+    },
+    "field": {
+      "text": "growth-curve model fitting of optical-density plate-reader data in microbiology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "microbiology",
+        "growth curves",
+        "plate reader"
+      ]
+    },
+    "workflow": {
+      "name": "pick replicates on a layout, correct against blanks, fit models over chosen intervals and export the parameters",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Choose a plate format (24, 84, 96, 1536 wells or custom rows × columns) and upload a headerless CSV or XLSX with time followed by one column per well.",
+          "parts": [
+            "upload-view"
+          ]
+        },
+        {
+          "step": "select the replicate items on their fixed layout",
+          "here": "Click wells on a lettered plate grid, or tick rows and columns and apply them, to choose the sample wells. Then plot them, with their mean and standard deviation.",
+          "parts": [
+            "plate-picker",
+            "upload-view",
+            "background-view"
+          ]
+        },
+        {
+          "step": "correct against control items",
+          "here": "Turn on background subtraction and pick blank wells. Fit a power law or quadratic to them, or use their average, and subtract it from the samples. Negative values are clipped to zero, and a raw vs corrected chart checks one well at a time.",
+          "parts": [
+            "background-view",
+            "plate-picker"
+          ]
+        },
+        {
+          "step": "combine groups arithmetically",
+          "here": "In advanced mode, Group 1 and Group 2 are added, subtracted, multiplied or divided in a chosen order, and the result becomes the data to fit.",
+          "parts": [
+            "group-operations"
+          ]
+        },
+        {
+          "step": "find where the curve changes phase",
+          "here": "Thresholded-derivative (Savitzky–Golay smoothing) or slope-based change-point detection on the averaged curve gives a table of phase start, end and duration.",
+          "parts": [
+            "phase-detection"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Add a fit for a start–end time window, choose exponential, logistic, Baranyi, lag-exponential-saturation, Gompertz, a custom expression, or Automatic Fit (lowest AIC), and set guesses and bounds. Fitting gives estimates, standard errors, p-values, R², lag time and a confidence band. A custom ODE system can be fitted instead.",
+          "parts": [
+            "fitting-view",
+            "ode-fit"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "A summary chart overlays every fit. 'Download Results CSV' saves the parameter table, and an editable fit configuration JSON can be downloaded and uploaded later to rerun the same fits automatically.",
+          "parts": [
+            "fit-results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Wells are picked on a plate grid of the chosen format, with row and column tick boxes for bulk selection.",
+        "The background can be modelled over time (power law or quadratic fitted to the blank wells) rather than only averaged, before it is subtracted.",
+        "Fits are made per time interval on the replicate mean. Lag time is derived from the fitted parameters, and each fit is marked POOR when R² is below 0.90 or the variance ratio is above 0.20.",
+        "Automatic Fit compares the candidate growth models by AIC and keeps the best one.",
+        "Fit settings round-trip as JSON, so the same intervals and models can be applied to a new run."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "upload-view",
+      "level": "view",
+      "parent": null,
+      "title": "Upload Data",
+      "summary": "Picks the plate format, loads the plate-reader file, shows an example layout and plots any selected wells' raw curves.",
+      "views": [
+        "table view",
+        "line chart"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/tabs/tab_upload.py",
+          "start": 15,
+          "end": 159,
+          "role": "logic",
+          "symbol": "display_tab_upload",
+          "anchor": "6ae555886c4f",
+          "first": "def display_tab_upload():"
+        },
+        {
+          "file": "code/tabs/tab_upload.py",
+          "start": 162,
+          "end": 189,
+          "role": "logic",
+          "symbol": "_select_layout",
+          "anchor": "aa5e1becf3ff",
+          "first": "def _select_layout():"
+        },
+        {
+          "file": "code/tabs/tab_upload.py",
+          "start": 191,
+          "end": 231,
+          "role": "logic",
+          "symbol": "_display_example_and_images",
+          "anchor": "8e87b7c98c1a",
+          "first": "def _display_example_and_images():"
+        },
+        {
+          "file": "code/utils/file_io.py",
+          "start": 13,
+          "end": 42,
+          "role": "logic",
+          "symbol": "read_data",
+          "anchor": "79b67d740e8e",
+          "first": "def read_data(uploaded_file, rows, columns):"
+        },
+        {
+          "file": "code/utils/file_io.py",
+          "start": 44,
+          "end": 54,
+          "role": "data",
+          "symbol": "create_example_data",
+          "anchor": "86c94b765df9",
+          "first": "def create_example_data():"
+        },
+        {
+          "file": "code/utils/plotting.py",
+          "start": 229,
+          "end": 260,
+          "role": "logic",
+          "symbol": "plot_selected_wells",
+          "anchor": "8ce46275fc1c",
+          "first": "def plot_selected_wells(df, wells, context=\"raw\"):"
+        }
+      ]
+    },
+    {
+      "id": "plate-picker",
+      "level": "component",
+      "parent": "background-view",
+      "title": "Plate well selector",
+      "summary": "A grid of well buttons in plate layout, toggled one by one or filled by ticked rows and columns, that returns the chosen wells and a plot request.",
+      "views": [
+        "fixed-layout grid"
+      ],
+      "interactions": [
+        "multi-select",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/utils/file_io.py",
+          "start": 91,
+          "end": 230,
+          "role": "logic",
+          "symbol": "create_button_layout",
+          "anchor": "e04176a2f33d",
+          "first": "def create_button_layout(rows, columns, labels, key_prefix, df=None):"
+        },
+        {
+          "file": "code/utils/file_io.py",
+          "start": 81,
+          "end": 88,
+          "role": "logic",
+          "symbol": "generate_labels",
+          "anchor": "bdd87a0490c8",
+          "first": "def generate_labels(rows, cols):"
+        },
+        {
+          "file": "code/utils/file_io.py",
+          "start": 95,
+          "end": 108,
+          "role": "style",
+          "anchor": "3f5b7262b4ee",
+          "first": "st.markdown(\"\"\""
+        }
+      ]
+    },
+    {
+      "id": "background-view",
+      "level": "view",
+      "parent": null,
+      "title": "Sample selection and background subtraction",
+      "summary": "Chooses sample and blank wells per group, fits or averages the blank signal, subtracts it and compares raw with corrected curves for a chosen well.",
+      "views": [
+        "line chart",
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "multi-select",
+        "toggle view",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/tabs/tab_background.py",
+          "start": 42,
+          "end": 459,
+          "role": "logic",
+          "symbol": "display_tab_background",
+          "anchor": "3d5ac3a8fd52",
+          "first": "def display_tab_background():"
+        },
+        {
+          "file": "code/tabs/tab_background.py",
+          "start": 520,
+          "end": 567,
+          "role": "logic",
+          "symbol": "_fit_power_law",
+          "anchor": "43abd13afea5",
+          "first": "def _fit_power_law(df, blank_wells, group_num):"
+        },
+        {
+          "file": "code/tabs/tab_background.py",
+          "start": 569,
+          "end": 626,
+          "role": "logic",
+          "symbol": "_fit_polynomial",
+          "anchor": "42f9f145ef0f",
+          "first": "def _fit_polynomial(df, blank_wells, group_num):"
+        },
+        {
+          "file": "code/tabs/tab_background.py",
+          "start": 628,
+          "end": 658,
+          "role": "logic",
+          "symbol": "_use_average_blank",
+          "anchor": "d292f0d7c8f7",
+          "first": "def _use_average_blank(df, blank_wells, group_num):"
+        },
+        {
+          "file": "code/tabs/tab_background.py",
+          "start": 461,
+          "end": 518,
+          "role": "logic",
+          "symbol": "_display_group_tracker",
+          "anchor": "bb80d0ebd435",
+          "first": "def _display_group_tracker(num_groups):"
+        },
+        {
+          "file": "code/tabs/tab_background.py",
+          "start": 660,
+          "end": 698,
+          "role": "logic",
+          "symbol": "_generate_bg_config_json",
+          "anchor": "093bdc76d2f1",
+          "first": "def _generate_bg_config_json(rows, columns, num_groups):"
+        },
+        {
+          "file": "code/utils/background.py",
+          "start": 5,
+          "end": 74,
+          "role": "logic",
+          "symbol": "perform_background_subtraction",
+          "anchor": "dc744b29a58f",
+          "first": "def perform_background_subtraction(groups_data, df, group_num, selected_blank_wells, selected_sample_wells):"
+        },
+        {
+          "file": "code/utils/plotting.py",
+          "start": 488,
+          "end": 513,
+          "role": "logic",
+          "symbol": "plot_raw_vs_corrected",
+          "anchor": "62b5437f8a9d",
+          "first": "def plot_raw_vs_corrected(df, group_df, well_name, group_num):"
+        },
+        {
+          "file": "code/utils/plotting.py",
+          "start": 434,
+          "end": 486,
+          "role": "logic",
+          "symbol": "plot_avg_sd_bg_subtracted",
+          "anchor": "023f71ad6449",
+          "first": "def plot_avg_sd_bg_subtracted(data, wells, group_num, context=\"default\"):"
+        }
+      ]
+    },
+    {
+      "id": "group-operations",
+      "level": "view",
+      "parent": null,
+      "title": "Group operations",
+      "summary": "Combines two groups of corrected wells by add, subtract, multiply or divide in a chosen order, and hands the result on for fitting.",
+      "views": [
+        "table view",
+        "line chart"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/tabs/tab_operations.py",
+          "start": 7,
+          "end": 173,
+          "role": "logic",
+          "symbol": "display_tab_operations",
+          "anchor": "12835c23d68e",
+          "first": "def display_tab_operations():"
+        },
+        {
+          "file": "code/utils/operations.py",
+          "start": 4,
+          "end": 31,
+          "role": "logic",
+          "symbol": "perform_group_operations",
+          "anchor": "20e6d34f119d",
+          "first": "def perform_group_operations(group1_data, group2_data, operation):"
+        }
+      ]
+    },
+    {
+      "id": "phase-detection",
+      "level": "view",
+      "parent": null,
+      "title": "Automatic phase detection",
+      "summary": "Finds growth-phase boundaries on the averaged curve by thresholded derivative or slope, with tunable smoothing and thresholds, and lists each phase's start, end and duration.",
+      "views": [
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/tabs/tab_phase_detection.py",
+          "start": 6,
+          "end": 99,
+          "role": "logic",
+          "symbol": "display_tab_phase_detection",
+          "anchor": "0a1e8c521e73",
+          "first": "def display_tab_phase_detection():"
+        },
+        {
+          "file": "code/utils/phase_detection.py",
+          "start": 8,
+          "end": 17,
+          "role": "logic",
+          "symbol": "detect_phases",
+          "anchor": "e898e3d4daa9",
+          "first": "def detect_phases("
+        },
+        {
+          "file": "code/utils/phase_detection.py",
+          "start": 99,
+          "end": 161,
+          "role": "logic",
+          "symbol": "plot_detected_phases",
+          "anchor": "0b8f53591a9a",
+          "first": "def plot_detected_phases(time, od_values, phases, derivative=None, slopes=None, change_points=None):"
+        }
+      ]
+    },
+    {
+      "id": "fitting-view",
+      "level": "view",
+      "parent": null,
+      "title": "Growth model fitting",
+      "summary": "Adds fits over chosen time intervals of the replicate mean, each with a model, initial guesses and bounds. Each fit shows its curve, confidence band and a parameter table with lag time and fit quality.",
+      "views": [
+        "form",
+        "line chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "time slider",
+        "select",
+        "inline edit",
+        "exclude and refit",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/tabs/tab_fitting.py",
+          "start": 26,
+          "end": 135,
+          "role": "logic",
+          "anchor": "66ec333cebe9",
+          "first": "def display_tab_fitting():"
+        },
+        {
+          "file": "code/tabs/tab_fitting.py",
+          "start": 340,
+          "end": 717,
+          "role": "logic",
+          "symbol": "_display_existing_phases",
+          "anchor": "ed4b8dacd2d2",
+          "first": "def _display_existing_phases(operated_data, selected_operated_wells):"
+        },
+        {
+          "file": "code/tabs/tab_fitting.py",
+          "start": 192,
+          "end": 337,
+          "role": "logic",
+          "symbol": "_handle_automatic_fits",
+          "anchor": "26e77b4b6b06",
+          "first": "def _handle_automatic_fits(uploaded_json_fit, operated_data, selected_wells):"
+        },
+        {
+          "file": "code/utils/fitting.py",
+          "start": 27,
+          "end": 98,
+          "role": "logic",
+          "symbol": "compute_fit_statistics",
+          "anchor": "94306bc2823c",
+          "first": "def compute_fit_statistics(time_vals, y_data, popt, pcov, model_func, param_names, alpha=0.05):"
+        },
+        {
+          "file": "code/utils/fitting.py",
+          "start": 101,
+          "end": 124,
+          "role": "logic",
+          "symbol": "compute_lag_time",
+          "anchor": "51c711eb6098",
+          "first": "def compute_lag_time(q0, mu, q0_std_err=None, mu_std_err=None):"
+        },
+        {
+          "file": "code/utils/models.py",
+          "start": 20,
+          "end": 21,
+          "role": "logic",
+          "symbol": "logistic_growth",
+          "anchor": "6ffb7b3dcb7b",
+          "first": "def logistic_growth(t, mu, X0, K):"
+        },
+        {
+          "file": "code/utils/models.py",
+          "start": 23,
+          "end": 25,
+          "role": "logic",
+          "symbol": "baranyi_growth",
+          "anchor": "8b90102b58e5",
+          "first": "def baranyi_growth(t, X0, mu, q0):"
+        },
+        {
+          "file": "code/utils/models.py",
+          "start": 30,
+          "end": 40,
+          "role": "logic",
+          "symbol": "gompertz_growth",
+          "anchor": "e3a21895f526",
+          "first": "def gompertz_growth(t, A, B, C):"
+        },
+        {
+          "file": "code/utils/file_io.py",
+          "start": 232,
+          "end": 258,
+          "role": "logic",
+          "symbol": "create_custom_model",
+          "anchor": "d8f4ad9c7206",
+          "first": "def create_custom_model(custom_expr, param_names):"
+        }
+      ]
+    },
+    {
+      "id": "fit-results",
+      "level": "component",
+      "parent": "fitting-view",
+      "title": "Fit summary and export",
+      "summary": "Overlays all fitted intervals on one chart, tabulates every fit's parameters, and downloads them as a CSV along with an editable fit configuration JSON.",
+      "views": [
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "export",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/tabs/tab_fitting.py",
+          "start": 136,
+          "end": 189,
+          "role": "logic",
+          "anchor": "46bafbf50fed",
+          "first": "# Summary Plot"
+        },
+        {
+          "file": "code/tabs/tab_fitting.py",
+          "start": 719,
+          "end": 766,
+          "role": "logic",
+          "symbol": "build_results_table",
+          "anchor": "25baa4a07f3e",
+          "first": "def build_results_table(fitted_phases):"
+        },
+        {
+          "file": "code/tabs/tab_fitting.py",
+          "start": 769,
+          "end": 781,
+          "role": "logic",
+          "symbol": "format_scientific",
+          "anchor": "ecae2cbcef45",
+          "first": "def format_scientific(value, precision=6):"
+        },
+        {
+          "file": "code/utils/plotting.py",
+          "start": 333,
+          "end": 406,
+          "role": "logic",
+          "symbol": "plot_phase_fit_with_ci",
+          "anchor": "5c21fbf6c2fa",
+          "first": "def plot_phase_fit_with_ci(phase_fits, operated_data, selected_operated_wells):"
+        }
+      ]
+    },
+    {
+      "id": "ode-fit",
+      "level": "view",
+      "parent": null,
+      "title": "Custom ODE fit",
+      "summary": "Lets the person write an ODE system with variables, parameters and initial conditions for a time interval, fits it to the averaged curve, and reports estimates, AIC/BIC and a 95% band.",
+      "views": [
+        "form",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "time slider"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/tabs/tab_ode_analysis.py",
+          "start": 13,
+          "end": 415,
+          "role": "logic",
+          "symbol": "display_tab_ode_analysis",
+          "anchor": "f0c5e3421c92",
+          "first": "def display_tab_ode_analysis():"
+        },
+        {
+          "file": "code/utils/ode_analysis.py",
+          "start": 7,
+          "end": 24,
+          "role": "logic",
+          "symbol": "parse_ode",
+          "anchor": "1ee2814904ac",
+          "first": "def parse_ode(ode_expr, variables, parameters):"
+        },
+        {
+          "file": "code/utils/ode_analysis.py",
+          "start": 39,
+          "end": 91,
+          "role": "logic",
+          "symbol": "compute_ode_ci_for_X",
+          "anchor": "f0866622a29f",
+          "first": "def compute_ode_ci_for_X(ode_system_func, param_values, param_cov, y0, t_eval, alpha=0.05, solver_method=\"RK45\", eps=1e-"
+        },
+        {
+          "file": "code/utils/plotting.py",
+          "start": 116,
+          "end": 179,
+          "role": "logic",
+          "symbol": "plot_all_ode_fits_summary",
+          "anchor": "f397872e8859",
+          "first": "def plot_all_ode_fits_summary(ode_fits, operated_data, selected_operated_wells):"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,507 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cave-frf-postural-sway",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T14:57:48Z"
+  },
+  "app": {
+    "title": "CAVE FRF — gain / phase analysis of sway against a sum-of-sines stimulus",
+    "summary": "The person picks the stimulus configuration, loads a trial-order file that gives each trial's stimulus amplitude, and points the app at a folder of recordings, which it walks and counts by condition, group and timepoint. They choose which condition to analyze, whether to include zero-amplitude baseline trials and whether to reuse cached results, then run the batch with a progress bar. They get the frequency response (gain, phase, coherence) at each stimulus frequency for every trial, plus per-trial sway metrics. They can view these as per-trial bars, recovery lines across timepoints, coherence, Nyquist, spectra, summary-metric plots and a table of group means, and download both result tables as CSV.",
+    "task": {
+      "text": "Compute the frequency response of body sway to a known sum-of-sines visual stimulus for every trial in a study folder, compare groups across timepoints, and export the per-trial tables.",
+      "verbs": [
+        "derive",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Folders of raw motion recordings (centre of pressure or centre of mass over time, some with a logged stimulus channel), sorted by condition, group and timepoint, plus a text file giving each trial's stimulus amplitude and a YAML stimulus model.",
+      "item": "one recorded trial: a fixed-length time series of sway from one subject at one timepoint and stimulus amplitude",
+      "shapes": [
+        "time series",
+        "table",
+        "hierarchy"
+      ]
+    },
+    "stage": {
+      "text": "computing frequency-response measures from raw balance recordings, before statistical comparison of groups",
+      "terms": [
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A numbered form (trial-order file, data folder, analysis filters) unlocks a run button that runs a batch pipeline with progress and caching. The results go into a tabbed dashboard of rendered plots and a group-means table. Radio controls switch the axis, the plot style and the condition shown, and download buttons export the two result tables.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view",
+        "bar chart",
+        "line chart",
+        "scatter plot",
+        "small multiples"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "small multiples"
+      ]
+    },
+    "field": {
+      "text": "frequency response analysis of postural sway under sensory perturbation, in balance and motor-control research",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "postural control",
+        "sensory reweighting",
+        "frequency response function"
+      ]
+    },
+    "workflow": {
+      "name": "batch-compute per-trial response measures from a folder of recordings and export the tables",
+      "steps": [
+        {
+          "step": "set the model the computation uses",
+          "here": "A collapsible sidebar panel shows the active sum-of-sines stimulus (formula, frequencies, weights, duration, condition-to-axis mapping). A YAML path and 'Load config' swap in another protocol.",
+          "parts": [
+            "stimulus-config"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "Upload a trial-order text file or tick 'Use bundled file', then type the top-level data folder path. Files are found recursively by filename pattern and counted by condition, file type, group and timepoint.",
+          "parts": [
+            "data-inputs"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Choose the standing, walking or both condition, choose whether to include amp=0 baseline trials, and choose whether to skip already-processed trials. Run stays disabled until both inputs are present.",
+          "parts": [
+            "run-controls"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Run analysis' gets the gain, phase and coherence at each stimulus frequency on both axes, plus RMS, path length and mean velocity, for every trial. A progress bar names each file as it goes.",
+          "parts": [
+            "run-controls"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Tabs show gain and phase as per-trial bars or as recovery lines across timepoints (or both), plus coherence, Nyquist, spectra of the first trials and summary metrics by group and timepoint. Radios set the axis and the condition shown.",
+          "parts": [
+            "plot-options",
+            "plot-tabs"
+          ]
+        },
+        {
+          "step": "summarize by group",
+          "here": "A group-means table averages gain, phase and coherence per group, condition, timepoint, amplitude, frequency and axis, with trial counts.",
+          "parts": [
+            "group-means-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download buttons save frf_results.csv (trial × frequency × axis) and summary_metrics.csv (one row per trial).",
+          "parts": [
+            "downloads"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The stimulus is a configurable sum of sinusoids. When a recording does not log it, it is rebuilt from the per-trial amplitude, and the response is read at the FFT bin where the stimulus peaks near each target frequency.",
+        "A separate trial-order file maps each subject, timepoint and trial number to its stimulus amplitude. Zero-amplitude trials are baselines with no gain or phase.",
+        "Each condition has a stimulus-matched axis (anteroposterior for standing, mediolateral for walking), and the cross axis is computed too.",
+        "Metadata comes entirely from a strict filename and folder convention, and files that do not match are skipped.",
+        "Results are cached, so re-runs after adding new subjects process only the new trials. Everything runs locally because the data are clinical."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "stimulus-config",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar: stimulus configuration and folder layout",
+      "summary": "Shows the active sum-of-sines stimulus model and the expected folder layout, and loads a different YAML config.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 49,
+          "end": 125,
+          "role": "markup",
+          "anchor": "ea04e22eea27",
+          "first": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "file": "code/cave_frf/analysis.py",
+          "start": 52,
+          "end": 89,
+          "role": "logic",
+          "symbol": "load_config",
+          "anchor": "28fdfb52698b",
+          "first": "def load_config(path=None):"
+        },
+        {
+          "file": "code/cave_frf/analysis.py",
+          "start": 92,
+          "end": 94,
+          "role": "logic",
+          "symbol": "get_active_config",
+          "anchor": "a2f3b79eb8d5",
+          "first": "def get_active_config():"
+        },
+        {
+          "file": "code/configs/cave.yaml",
+          "start": 1,
+          "end": 40,
+          "role": "data",
+          "anchor": "b5bbe42c4f2e",
+          "first": "# CAVE Adult Stimulus Factor study — default experiment configuration."
+        }
+      ]
+    },
+    {
+      "id": "data-inputs",
+      "level": "view",
+      "parent": null,
+      "title": "Steps 1–2: trial-order file and data folder",
+      "summary": "Takes the trial-order file and the data folder path, then reports how many recordings were found in each condition, group and timepoint.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 138,
+          "end": 210,
+          "role": "markup",
+          "anchor": "08eb40935ae9",
+          "first": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "file": "code/cave_frf/analysis.py",
+          "start": 582,
+          "end": 633,
+          "role": "logic",
+          "symbol": "discover_files",
+          "anchor": "9c10c8084340",
+          "first": "def discover_files(root_dir, recursive=True):"
+        },
+        {
+          "file": "code/cave_frf/analysis.py",
+          "start": 130,
+          "end": 152,
+          "role": "logic",
+          "symbol": "parse_filename",
+          "anchor": "dfaf88b2f895",
+          "first": "def parse_filename(name):"
+        },
+        {
+          "file": "code/cave_frf/analysis.py",
+          "start": 231,
+          "end": 282,
+          "role": "logic",
+          "symbol": "parse_trial_order",
+          "anchor": "df62cf88e204",
+          "first": "def parse_trial_order(path):"
+        },
+        {
+          "file": "code/Updated-_CAVE_Adult_Stimulus_Factor_Trial.txt",
+          "start": 1,
+          "end": 60,
+          "role": "data",
+          "anchor": "e80fdc94fc66",
+          "first": "CAVE Adult Stimulus Factor Trial Order"
+        }
+      ]
+    },
+    {
+      "id": "run-controls",
+      "level": "component",
+      "parent": "data-inputs",
+      "title": "Step 3: analysis filters and Run",
+      "summary": "Sets the condition, the baseline inclusion and the cache reuse, then runs the batch frequency-response pipeline with a progress bar once both inputs are ready.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 212,
+          "end": 280,
+          "role": "markup",
+          "anchor": "d2bbea918f67",
+          "first": "# ---------------------------------------------------------------------------"
+        },
+        {
+          "file": "code/app.py",
+          "start": 262,
+          "end": 264,
+          "role": "logic",
+          "symbol": "cb",
+          "anchor": "6cd447e7efa9",
+          "first": "def cb(i, n, name):"
+        },
+        {
+          "file": "code/cave_frf/analysis.py",
+          "start": 636,
+          "end": 903,
+          "role": "logic",
+          "symbol": "run_pipeline",
+          "anchor": "878ca862cdf2",
+          "first": "def run_pipeline(data_dir, trial_order_path,"
+        },
+        {
+          "file": "code/cave_frf/analysis.py",
+          "start": 493,
+          "end": 579,
+          "role": "logic",
+          "symbol": "analyze_trial",
+          "anchor": "f6851d04da4b",
+          "first": "def analyze_trial(file_path, entry):"
+        },
+        {
+          "file": "code/cave_frf/analysis.py",
+          "start": 393,
+          "end": 459,
+          "role": "logic",
+          "symbol": "compute_frf",
+          "anchor": "6da137bef971",
+          "first": "def compute_frf(stim, response, fs, stim_freqs_hz):"
+        },
+        {
+          "file": "code/cave_frf/analysis.py",
+          "start": 465,
+          "end": 487,
+          "role": "logic",
+          "symbol": "compute_summary_metrics",
+          "anchor": "a9d33d9d630f",
+          "first": "def compute_summary_metrics(cop_x, cop_y, fs):"
+        }
+      ]
+    },
+    {
+      "id": "downloads",
+      "level": "component",
+      "parent": "results",
+      "title": "Result counts and CSV downloads",
+      "summary": "Reports how many trials and subjects were analyzed and downloads the per-frequency results and the per-trial summary tables as CSV.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 288,
+          "end": 318,
+          "role": "markup",
+          "anchor": "9523b8b9579b",
+          "first": "if frf_df is not None and len(frf_df) > 0:"
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "level": "view",
+      "parent": null,
+      "title": "Results dashboard",
+      "summary": "Holds the result counts, downloads, plot options and the tabs of result plots and tables after a run.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 282,
+          "end": 365,
+          "role": "markup",
+          "anchor": "29f8f447f912",
+          "first": "# ---------------------------------------------------------------------------"
+        }
+      ]
+    },
+    {
+      "id": "plot-options",
+      "level": "component",
+      "parent": "results",
+      "title": "Plot options",
+      "summary": "Radios choose the analysis axis (stimulus-matched, AP or ML), the plot style (per-trial bars, recovery lines or both) and the condition for the summary metrics.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 320,
+          "end": 355,
+          "role": "markup",
+          "anchor": "224097f78732",
+          "first": "# ========================================================="
+        },
+        {
+          "file": "code/cave_frf/plots.py",
+          "start": 33,
+          "end": 39,
+          "role": "logic",
+          "symbol": "_filter_axis",
+          "anchor": "6dff7602e9dc",
+          "first": "def _filter_axis(df, axis):"
+        }
+      ]
+    },
+    {
+      "id": "plot-tabs",
+      "level": "component",
+      "parent": "results",
+      "title": "Gain & phase, coherence, Nyquist, spectra and summary-metric tabs",
+      "summary": "Draws the frequency-response results by group, amplitude and timepoint as bar panels, recovery lines with SEM bars, a Nyquist plot, response spectra and summary-metric comparisons.",
+      "views": [
+        "bar chart",
+        "line chart",
+        "scatter plot",
+        "small multiples"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 357,
+          "end": 416,
+          "role": "markup",
+          "anchor": "da2e27976613",
+          "first": "tabs = st.tabs(["
+        },
+        {
+          "file": "code/cave_frf/plots.py",
+          "start": 61,
+          "end": 106,
+          "role": "logic",
+          "symbol": "plot_gain_phase",
+          "anchor": "41a6344bac1a",
+          "first": "def plot_gain_phase(df, output_path, axis='stim_matched'):"
+        },
+        {
+          "file": "code/cave_frf/plots.py",
+          "start": 221,
+          "end": 296,
+          "role": "logic",
+          "symbol": "plot_hwang_recovery",
+          "anchor": "1f21b118515a",
+          "first": "def plot_hwang_recovery(df, output_path, axis='stim_matched'):"
+        },
+        {
+          "file": "code/cave_frf/plots.py",
+          "start": 109,
+          "end": 138,
+          "role": "logic",
+          "symbol": "plot_coherence",
+          "anchor": "a2ffb1abb6a5",
+          "first": "def plot_coherence(df, output_path, axis='stim_matched'):"
+        },
+        {
+          "file": "code/cave_frf/plots.py",
+          "start": 141,
+          "end": 172,
+          "role": "logic",
+          "symbol": "plot_nyquist",
+          "anchor": "2f57f9629bad",
+          "first": "def plot_nyquist(df, output_path, axis='stim_matched'):"
+        },
+        {
+          "file": "code/cave_frf/plots.py",
+          "start": 175,
+          "end": 215,
+          "role": "logic",
+          "symbol": "plot_spectra",
+          "anchor": "e252f07cd6b4",
+          "first": "def plot_spectra(cop_files_with_meta, trial_order_path, output_path,"
+        },
+        {
+          "file": "code/cave_frf/plots.py",
+          "start": 309,
+          "end": 365,
+          "role": "logic",
+          "symbol": "plot_summary_metrics",
+          "anchor": "af6ad91e6715",
+          "first": "def plot_summary_metrics(summary_df, output_path,"
+        }
+      ]
+    },
+    {
+      "id": "group-means-table",
+      "level": "component",
+      "parent": "results",
+      "title": "Group means table",
+      "summary": "Averages gain, phase and coherence over the non-baseline trials in each group × condition × timepoint × amplitude × frequency × axis cell, with trial counts.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 418,
+          "end": 435,
+          "role": "logic",
+          "anchor": "7dfb1f29b46e",
+          "first": "# --- Group means table ---"
+        }
+      ]
+    }
+  ]
+}

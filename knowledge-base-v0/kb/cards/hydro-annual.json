@@ -1,0 +1,277 @@
+{
+  "schema": "astaui.card/1",
+  "id": "hydro-annual",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T15:28:22Z"
+  },
+  "app": {
+    "title": "Zhejiang Water Resources Annual Report Query & Export",
+    "summary": "A person picks one report category, then the years and cities they want from a built-in collection of annual report tables, and runs the query. The tool finds every matching file, stacks them into one table with year and city columns, sorts it, and shows it with a row count, or a warning if nothing matches. The person then downloads the combined table as a CSV or an Excel file named after the report category.",
+    "task": {
+      "text": "Pull one category of annual statistics for chosen years and administrative areas out of a set of per-year, per-area report tables, and save it as a single spreadsheet.",
+      "verbs": [
+        "lookup",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "Annual report tables of water supply, water use and socio-economic indicators, stored as one CSV per year, city and report category, with one row per county or district and numeric indicator columns",
+      "item": "one county's row of indicators in one year's report table for one city",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "pulling report tables together into one dataset, before analysis",
+      "terms": [
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar form sets the query: one report category, several years and several cities, all selected by default. Running it merges the matching files into one table shown in the main area, with download buttons for CSV and Excel underneath.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "filter",
+        "multi-select",
+        "export"
+      ],
+      "patterns": []
+    },
+    "field": {
+      "text": "regional water resources statistics in hydrology and water management",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "water resources",
+        "water use statistics"
+      ]
+    },
+    "workflow": {
+      "name": "query a collection of report tables and export the combined subset",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Report tables ship with the tool as CSVs named year_city_category. The year, city and category options are read from the file names, and the city list is limited to the official prefecture-level cities.",
+          "parts": [
+            "query-sidebar"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Choose one report category from a dropdown, then years and cities from multi-selects (all selected by default), and press 查询 (Query)",
+          "parts": [
+            "query-sidebar"
+          ]
+        },
+        {
+          "step": "combine the matching pieces into one table",
+          "here": "Every file matching a chosen year × city for the category is read and stacked, with year and city columns added. Rows are sorted by year, city and county, and the result is kept in the session.",
+          "parts": [
+            "query-run"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The combined table is shown full width under a heading with the category name and row count, or a warning to adjust the filters if nothing matched",
+          "parts": [
+            "result-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download the table as a UTF-8-with-BOM CSV or as an Excel workbook, each named after the report category",
+          "parts": [
+            "export-buttons"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The data is split into one file per year, city and report category, and the files are joined on demand, with year and city columns added so the stacked rows stay identifiable",
+        "Only a fixed list of the province's official prefecture-level cities is offered. Sub-totals and regional aggregates in the files are left out.",
+        "Only one report category can be queried at a time, because the categories have different columns",
+        "The CSV export is written with a byte-order mark so spreadsheet software reads the non-Latin column headers correctly",
+        "No upload is needed: the dataset is built in, and the last query result stays in the session, so downloading does not clear it"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "query-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Query conditions sidebar",
+      "summary": "Lets the person choose a report category, the years and the cities to include, from options read off the available files, and start the query.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 27,
+          "end": 36,
+          "role": "markup",
+          "anchor": "5459a6b62874",
+          "first": "years = get_available_years()"
+        },
+        {
+          "file": "code/src/annual/data_loader.py",
+          "start": 40,
+          "end": 47,
+          "role": "logic",
+          "symbol": "get_available_years",
+          "anchor": "a20bb7b67753",
+          "first": "def get_available_years() -> List[int]:"
+        },
+        {
+          "file": "code/src/annual/data_loader.py",
+          "start": 50,
+          "end": 67,
+          "role": "logic",
+          "symbol": "get_available_cities",
+          "anchor": "74acd67bfdb6",
+          "first": "def get_available_cities(only_valid: bool = True) -> List[str]:"
+        },
+        {
+          "file": "code/src/annual/data_loader.py",
+          "start": 70,
+          "end": 77,
+          "role": "logic",
+          "symbol": "get_available_tables",
+          "anchor": "137272a9ce25",
+          "first": "def get_available_tables() -> List[str]:"
+        },
+        {
+          "file": "code/src/annual/data_loader.py",
+          "start": 21,
+          "end": 32,
+          "role": "data",
+          "anchor": "f30f7759372e",
+          "first": "# 项目路径"
+        }
+      ]
+    },
+    {
+      "id": "query-run",
+      "level": "component",
+      "parent": "query-sidebar",
+      "title": "Merge matching files",
+      "summary": "When Query is pressed, loads every file for the chosen category, years and cities, stacks them with year and city columns, sorts them and keeps the result in the session.",
+      "views": [],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 38,
+          "end": 42,
+          "role": "logic",
+          "anchor": "bef2a32973bc",
+          "first": "if run:"
+        },
+        {
+          "file": "code/src/annual/data_loader.py",
+          "start": 147,
+          "end": 150,
+          "role": "logic",
+          "symbol": "load_table",
+          "anchor": "f0dc0e589f97",
+          "first": "def load_table("
+        },
+        {
+          "file": "code/src/annual/query_core.py",
+          "start": 17,
+          "end": 22,
+          "role": "logic",
+          "symbol": "query_data",
+          "anchor": "08df37639e97",
+          "first": "def query_data("
+        },
+        {
+          "file": "code/data/input/2019_杭州市_用水量.csv",
+          "start": 1,
+          "end": 4,
+          "role": "data",
+          "anchor": "33ac143a6124",
+          "first": "县区,农业用水量,工业用水量,生活用水量,生态用水量,总用水量"
+        }
+      ]
+    },
+    {
+      "id": "result-table",
+      "level": "view",
+      "parent": null,
+      "title": "Query result table",
+      "summary": "Shows the combined table with the category name and row count, a warning when nothing matched, or a prompt to run a query.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 44,
+          "end": 51,
+          "role": "markup",
+          "anchor": "aa1a59553cb6",
+          "first": "if \"last_df\" in st.session_state:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 63,
+          "end": 64,
+          "role": "markup",
+          "anchor": "2e0893a1a9be",
+          "first": "else:"
+        }
+      ]
+    },
+    {
+      "id": "export-buttons",
+      "level": "component",
+      "parent": "result-table",
+      "title": "CSV and Excel download",
+      "summary": "Saves the queried table as a CSV with a byte-order mark or as an Excel workbook, each named after the report category.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 52,
+          "end": 62,
+          "role": "markup",
+          "anchor": "c41a07ab517f",
+          "first": "csv_bytes = df.to_csv(index=False).encode(\"utf-8-sig\")"
+        },
+        {
+          "file": "code/src/common/st_utils.py",
+          "start": 30,
+          "end": 34,
+          "role": "logic",
+          "symbol": "excel_download",
+          "anchor": "6ef846075250",
+          "first": "def excel_download("
+        }
+      ]
+    }
+  ]
+}

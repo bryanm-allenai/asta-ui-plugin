@@ -1,0 +1,504 @@
+{
+  "schema": "astaui.card/1",
+  "id": "structdiff-card",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:24:11Z"
+  },
+  "app": {
+    "title": "StructDiff Card",
+    "summary": "A person uploads two coordinate files, one to move and one as the reference, or loads a bundled example. They choose which coordinates to read and can optionally fix which chains pair up, then run the alignment. The page shows the global scores and the chain pairing. It then shows a 3D overlay coloured by per-residue difference, a table of ranked difference regions with a per-residue trace, and gained and lost contacts. It also splits each chain's motion into rigid-body and internal parts, lists 3D difference patches, and shows a track of gaps and unmatched chains. Last, the person downloads a bundle with tables, coloured structures, a viewer script and a one-page summary card.",
+    "task": {
+      "text": "Compare two versions of a multi-chain macromolecular structure after one global superposition, find where and how they differ, and export an auditable result bundle.",
+      "verbs": [
+        "compare",
+        "derive",
+        "locate",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Two 3D coordinate files of polymer chains. They are aligned into residue-to-residue and chain-to-chain mappings, and each matched residue gets a displacement and a residual vector. Unmatched chains and gap rows are kept.",
+      "item": "a pair of matched residues, one from each structure, after the global fit",
+      "shapes": [
+        "field",
+        "sequence",
+        "table",
+        "network",
+        "versions"
+      ]
+    },
+    "stage": {
+      "text": "comparing solved or modelled structures after they are built, before interpreting or reporting a change",
+      "terms": [
+        "compare",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar takes the two uploads and the alignment options, and one button runs the alignment. Every result view on the long scrolling page is drawn from that single result. The views are a metric strip, a difference-coloured 3D overlay next to the chain-mapping table, difference statistics with a hotspot table and a per-residue line chart, a contact-change map with its table, a motion-decomposition bar chart with its table, a spatial patch table and a sequence gap track. A column of download buttons exports each table and figure.",
+      "views": [
+        "summary stats",
+        "image viewer",
+        "table view",
+        "line chart",
+        "scatter plot",
+        "bar chart",
+        "sequence track",
+        "sidebar list"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "multi-chain structure superposition and difference analysis in structural biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "structural biology",
+        "structure alignment",
+        "protein structure"
+      ]
+    },
+    "workflow": {
+      "name": "compare two versions of an object part by part after one global alignment",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a mobile and a reference PDB/mmCIF file, or load the bundled example. Choose asymmetric unit or biological assembly, optionally type a chain mapping like C:A,D:B and set a timeout, then press Analyze structures.",
+          "parts": [
+            "input-sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "US-align pairs chains and residues and returns one global transform. The page shows the reference-normalized TM-score, global RMSD, aligned/reference length and the number of mapped chains.",
+          "parts": [
+            "global-metrics",
+            "chain-mapping"
+          ]
+        },
+        {
+          "step": "check how the parts correspond",
+          "here": "A chain-mapping table gives per-chain TM-score, RMSD and coverage, a warning names any unmatched chains, and a sequence track marks residues as matched, only mobile or only reference.",
+          "parts": [
+            "chain-mapping",
+            "coverage-track"
+          ]
+        },
+        {
+          "step": "locate where the two versions differ",
+          "here": "A 3D overlay is coloured blue to red on a 0–5 Å residual scale, with spokes for residues above the adaptive threshold. Beside it are the median, 90th-percentile and maximum residual, a ranked table of coherent hotspot regions and a per-residue displacement chart.",
+          "parts": [
+            "overlay-viewer",
+            "difference-localization"
+          ]
+        },
+        {
+          "step": "explain the kind of difference",
+          "here": "Contacts gained and lost between the structures are shown as a map and a table. Each chain's motion is split into rigid-body and internal RMSD. High-residual residues within 10 Å are grouped into 3D patches.",
+          "parts": [
+            "structural-diagnostics"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download buttons save the residue, chain, hotspot, contact, motion and patch CSVs, the summary JSONs, the aligned and difference-coded PDBs (difference stored in the B-factor column), a PyMOL script and an SVG publication card. A provenance panel records the engine version, the command and the hashes of both inputs.",
+          "parts": [
+            "export-panel"
+          ]
+        }
+      ],
+      "distinctive": [
+        "All residuals use one global transform for the whole assembly; any per-chain refit is shown only as a separate diagnostic and never replaces the main map.",
+        "Unequal chain and residue counts stay visible as unmatched-chain warnings and gap rows, instead of being hidden behind one RMSD.",
+        "The hotspot threshold adapts to the data: the larger of 2 Å and the 90th percentile, with two residues of context added to each region.",
+        "Contacts only count as gained or lost across a 1 Å transition margin around the 8 Å cutoff, so values near the cutoff do not flip back and forth.",
+        "The export records which engine version, command and input hashes produced the result, so the comparison can be reproduced."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "input-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Run locally sidebar",
+      "summary": "Takes the two structure uploads, coordinate scope, optional chain mapping and timeout, then runs the alignment or loads the bundled example.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 147,
+          "end": 214,
+          "role": "markup",
+          "anchor": "3a8500e1c90d",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 43,
+          "end": 64,
+          "role": "style",
+          "anchor": "a61f523ef9f4",
+          "first": "[data-testid=\"stSidebar\"] { background: #07131b; color: #edf7f5; }"
+        },
+        {
+          "file": "code/app.py",
+          "start": 90,
+          "end": 99,
+          "role": "logic",
+          "symbol": "parse_manual_mapping",
+          "anchor": "0d98abd869a4",
+          "first": "def parse_manual_mapping(text: str) -> list[tuple[str, str]] | None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 102,
+          "end": 109,
+          "role": "logic",
+          "symbol": "run_analysis",
+          "anchor": "6cbc5f9d260a",
+          "first": "def run_analysis("
+        }
+      ]
+    },
+    {
+      "id": "global-metrics",
+      "level": "view",
+      "parent": null,
+      "title": "Global alignment metrics",
+      "summary": "Shows the reference-normalized TM-score, global RMSD, aligned length out of reference length, and the number of mapped chains.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 225,
+          "end": 244,
+          "role": "markup",
+          "anchor": "46f8ec951076",
+          "first": "analysis = st.session_state.get(\"analysis\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 68,
+          "end": 70,
+          "role": "style",
+          "anchor": "0958e6075953",
+          "first": ".metric { border-top: 3px solid #0d9488; padding-top: .8rem; }"
+        }
+      ]
+    },
+    {
+      "id": "overlay-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "Difference-coloured 3D overlay",
+      "summary": "Superimposes the aligned mobile structure on the reference, colours each residue by its residual, and draws spokes at high-residual residues and labels for 3D patches.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 246,
+          "end": 253,
+          "role": "markup",
+          "anchor": "f5d078b186f3",
+          "first": "left, right = st.columns([1.55, 1])"
+        },
+        {
+          "file": "code/src/structdiff_card/visuals.py",
+          "start": 23,
+          "end": 28,
+          "role": "logic",
+          "symbol": "overlay_figure",
+          "anchor": "bf9571c30fc4",
+          "first": "def overlay_figure("
+        }
+      ]
+    },
+    {
+      "id": "chain-mapping",
+      "level": "view",
+      "parent": null,
+      "title": "Chain mapping",
+      "summary": "Lists each mobile→reference chain pair with its TM-score, RMSD, aligned length and coverage, and warns about chains left unmatched.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 254,
+          "end": 276,
+          "role": "markup",
+          "anchor": "025c0b6d9e83",
+          "first": "with right:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 79,
+          "end": 79,
+          "role": "style",
+          "anchor": "595326e5291b",
+          "first": ".unmatched-chip { display: inline-block; border-left: 4px solid #e76f51; background: #fff0e9; padding: .45rem .7rem; mar"
+        }
+      ]
+    },
+    {
+      "id": "difference-localization",
+      "level": "view",
+      "parent": null,
+      "title": "Difference localization",
+      "summary": "Summarizes the residual distribution and adaptive threshold, ranks the coherent high-residual regions, and plots per-residue displacement in chain-mapping order.",
+      "views": [
+        "summary stats",
+        "table view",
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 278,
+          "end": 322,
+          "role": "markup",
+          "anchor": "7b6eac79ba54",
+          "first": "st.markdown(\"### Difference localization\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 82,
+          "end": 83,
+          "role": "style",
+          "anchor": "36d4d4ab28fd",
+          "first": ".difference-scale { height: 10px; background: linear-gradient(90deg, #2166ac, #67a9cf 20%, #d1e5f0 40%, #fddbc7 60%, #ef"
+        },
+        {
+          "file": "code/src/structdiff_card/difference.py",
+          "start": 20,
+          "end": 25,
+          "role": "logic",
+          "symbol": "summarize_differences",
+          "anchor": "74f708987d32",
+          "first": "def summarize_differences("
+        },
+        {
+          "file": "code/src/structdiff_card/visuals.py",
+          "start": 202,
+          "end": 313,
+          "role": "logic",
+          "symbol": "displacement_figure",
+          "anchor": "0a6a4ff4a3af",
+          "first": "def displacement_figure(result: AlignmentResult) -> go.Figure:"
+        }
+      ]
+    },
+    {
+      "id": "structural-diagnostics",
+      "level": "view",
+      "parent": null,
+      "title": "Contacts, motion and spatial patches",
+      "summary": "Shows gained and lost residue contacts as a map and a table, splits each chain's motion into rigid-body and internal parts, and lists 3D-connected difference patches.",
+      "views": [
+        "scatter plot",
+        "bar chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 324,
+          "end": 414,
+          "role": "markup",
+          "anchor": "628b8265635f",
+          "first": "st.markdown(\"### Gained and lost contacts\")"
+        },
+        {
+          "file": "code/src/structdiff_card/advanced.py",
+          "start": 47,
+          "end": 53,
+          "role": "logic",
+          "symbol": "summarize_contact_changes",
+          "anchor": "62b5c6a10134",
+          "first": "def summarize_contact_changes("
+        },
+        {
+          "file": "code/src/structdiff_card/advanced.py",
+          "start": 186,
+          "end": 247,
+          "role": "logic",
+          "symbol": "decompose_chain_motion",
+          "anchor": "45c70407a551",
+          "first": "def decompose_chain_motion(rows: list[ResidueMapping]) -> list[MotionDecomposition]:"
+        },
+        {
+          "file": "code/src/structdiff_card/advanced.py",
+          "start": 250,
+          "end": 255,
+          "role": "logic",
+          "symbol": "cluster_spatial_patches",
+          "anchor": "1b6346ff7c1a",
+          "first": "def cluster_spatial_patches("
+        },
+        {
+          "file": "code/src/structdiff_card/visuals.py",
+          "start": 316,
+          "end": 371,
+          "role": "logic",
+          "symbol": "contact_change_figure",
+          "anchor": "ad3c820fb7c6",
+          "first": "def contact_change_figure(result: AlignmentResult) -> go.Figure:"
+        },
+        {
+          "file": "code/src/structdiff_card/visuals.py",
+          "start": 374,
+          "end": 411,
+          "role": "logic",
+          "symbol": "motion_decomposition_figure",
+          "anchor": "f8e5c5ea76fa",
+          "first": "def motion_decomposition_figure(result: AlignmentResult) -> go.Figure:"
+        }
+      ]
+    },
+    {
+      "id": "coverage-track",
+      "level": "view",
+      "parent": null,
+      "title": "Alignment and unmatched-chain track",
+      "summary": "Draws each chain's sequence as cells marked matched, only mobile or only reference, so gaps and unmatched chains stay visible.",
+      "views": [
+        "sequence track"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 416,
+          "end": 417,
+          "role": "markup",
+          "anchor": "deaf8a46e0b9",
+          "first": "st.markdown(\"### Alignment and unmatched-chain track\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 71,
+          "end": 78,
+          "role": "style",
+          "anchor": "5aa6c984165d",
+          "first": ".track-wrap { background: white; border: 1px solid #d8e4e1; padding: 1rem; overflow-x: auto; }"
+        },
+        {
+          "file": "code/src/structdiff_card/visuals.py",
+          "start": 414,
+          "end": 450,
+          "role": "logic",
+          "symbol": "gap_track_html",
+          "anchor": "3a60c8902656",
+          "first": "def gap_track_html(result: AlignmentResult) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "export-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Publication card and result bundle",
+      "summary": "Previews the SVG summary card and offers downloads for every table, the coloured structures and the PyMOL script, alongside a provenance record of the engine, command and input hashes.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 419,
+          "end": 470,
+          "role": "markup",
+          "anchor": "90ed5d09bd80",
+          "first": "card_column, download_column = st.columns([1.35, 1])"
+        },
+        {
+          "file": "code/app.py",
+          "start": 80,
+          "end": 81,
+          "role": "style",
+          "anchor": "325a9557ec7d",
+          "first": ".provenance { font-family: monospace; font-size: .78rem; background: #eaf1ef; padding: .7rem; overflow-wrap: anywhere; }"
+        },
+        {
+          "file": "code/src/structdiff_card/export.py",
+          "start": 96,
+          "end": 100,
+          "role": "logic",
+          "symbol": "write_bundle",
+          "anchor": "110d4a39ff6c",
+          "first": "def write_bundle("
+        },
+        {
+          "file": "code/src/structdiff_card/export.py",
+          "start": 31,
+          "end": 57,
+          "role": "logic",
+          "symbol": "publication_card_svg",
+          "anchor": "2a820367a6bc",
+          "first": "def publication_card_svg(result: AlignmentResult) -> str:"
+        }
+      ]
+    }
+  ]
+}

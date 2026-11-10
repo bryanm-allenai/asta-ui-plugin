@@ -1,0 +1,495 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cell-painting-shortcut-audit",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T10:34:04Z"
+  },
+  "app": {
+    "title": "Cell Painting Shortcut Audit",
+    "summary": "A person starts from an overview where every assay endpoint is a dot, coloured by its verdict. The verdicts say whether a full image-feature model beats a cell-count-only baseline, with a count for each verdict. Clicking a dot or searching for an endpoint opens its detail: the verdict, a plain-language explanation, ranking accuracy for each model, the statistics behind the verdict and a reliability diagram. They can also look up one compound to see its dose-response readouts and what each model predicted for it. Then they set full-model against baseline accuracy across all endpoints, filter the results table by category and verdict, and download it. Further tabs test whether certified advantages cluster in particular assay families, and estimate the smallest advantage a smaller study could detect.",
+    "task": {
+      "text": "Show, for each assay endpoint, whether a rich morphology model really beats a simple cell-count baseline once testing many endpoints and too-thin data are accounted for, so a person can tell which predictions are a shortcut.",
+      "verbs": [
+        "compare",
+        "identify",
+        "lookup",
+        "summarize",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "A precomputed table of results with one row per endpoint: the accuracy of each model, the difference between them with its interval and p and q values, calibration scores and a verdict from a fixed set. Alongside it are out-of-fold predictions for each compound and endpoint, readouts for each compound across concentrations, and enrichment and sensitivity tables.",
+      "item": "an assay endpoint (one binary toxicity or bioactivity readout) with its model comparison and verdict",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "comparing a rich model against a shortcut baseline after the models have been fitted, to confirm which advantages hold before reporting",
+      "terms": [
+        "compare",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "A dot grid of every endpoint, grouped and coloured by verdict, drives a detail view: clicking a dot selects that endpoint in the search box below, which shows bar charts and a reliability diagram. The other tabs show the same verdicts as a scatter of full-model against baseline accuracy, a results table filtered by verdict and category with CSV export, a lookup by compound, enrichment tables by assay group, and a study planner driven by sliders.",
+      "views": [
+        "fixed-layout grid",
+        "summary stats",
+        "detail panel",
+        "bar chart",
+        "line chart",
+        "scatter plot",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select",
+        "search",
+        "filter",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "auditing image-based morphological profiling models against a cell-count baseline in toxicology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "toxicology",
+        "cell painting",
+        "image based profiling"
+      ]
+    },
+    "workflow": {
+      "name": "check, item by item, whether a rich model beats a simple baseline, and export the verdicts",
+      "steps": [
+        {
+          "step": "look over every item at a glance",
+          "here": "Each endpoint is a dot in a plate-like grid, grouped by verdict (advantage, positive control, no detectable advantage, indeterminate). A legend gives the count for each verdict, and hovering shows the endpoint's change in AUROC.",
+          "parts": [
+            "endpoint-plate-map"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Clicking a dot, or typing in the endpoint search box, opens the endpoint's verdict marker, a sentence explaining it, and its compound and active counts.",
+          "parts": [
+            "endpoint-plate-map",
+            "endpoint-detail"
+          ]
+        },
+        {
+          "step": "compare the full model with the baseline for that item",
+          "here": "Horizontal bars show the AUROC of the full profile, morphology plus cell count, the cell-count curve and the single cell-count number. An expander lists the AUROC difference, bootstrap interval, z-score, calibrated p, BH q and the smallest detectable effect. A reliability diagram shows whether the predicted probabilities match how often compounds are actually active.",
+          "parts": [
+            "model-comparison",
+            "reliability-diagram"
+          ]
+        },
+        {
+          "step": "look up one item from the other side",
+          "here": "Choosing a compound shows its hit chips, its cell count, MT and LDH readouts across eight concentrations on a log axis, and a table of recalibrated predictions for each endpoint, filtered by verdict.",
+          "parts": [
+            "compound-explorer"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "A scatter plots full-model AUROC against cell-count AUROC for every endpoint, with a diagonal line. Category and verdict pills narrow the results table, which is sorted by q-value.",
+          "parts": [
+            "all-results"
+          ]
+        },
+        {
+          "step": "summarize where the advantage falls",
+          "here": "Choose which baseline counts as certified and how to group endpoints (target family, assay design, cell type) to get enrichment counts, Fisher and assay-level p and q values, and a table of certified counts under other analysis choices.",
+          "parts": [
+            "enrichment"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "A 'Download the audit table (CSV)' button saves the full table of verdicts for every endpoint.",
+          "parts": [
+            "all-results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The baseline is a deliberately strong shortcut model that sees only cell count across the whole dose-response curve. An advantage therefore means information beyond the confound, not beyond a strawman.",
+        "Items with too few positive or negative cases (fewer than 15 of either) get an 'indeterminate' verdict and no claim, kept apart from 'no detectable advantage'.",
+        "Verdicts use p-values calibrated against a shuffled-label null, with Benjamini–Hochberg correction across all endpoints that have enough data, and each endpoint also reports the smallest advantage its data could detect.",
+        "A positive-control endpoint, defined from the baseline quantity itself, checks that the audit can catch a pure shortcut.",
+        "A planner turns the number of compounds and the share that are active into the smallest detectable advantage for a smaller future study (such as one on organ chips)."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "endpoint-plate-map",
+      "level": "view",
+      "parent": null,
+      "title": "Endpoint plate map with verdict counts",
+      "summary": "Shows every endpoint as a dot in a plate-like grid, grouped and coloured by verdict, with the count for each verdict, and clicking a dot opens that endpoint below.",
+      "views": [
+        "fixed-layout grid",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/demo/app.py",
+          "start": 26,
+          "end": 35,
+          "role": "data",
+          "anchor": "2403435a9c5b",
+          "first": "VERDICT_ORDER = [\"morphology_advantage\", \"positive_control\", \"no_advantage\", \"indeterminate\"]"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 59,
+          "end": 65,
+          "role": "style",
+          "anchor": "72889de1edc5",
+          "first": "/* finding line + legend that doubles as the headline numbers */"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 155,
+          "end": 185,
+          "role": "logic",
+          "symbol": "plate_map",
+          "anchor": "d2998cb0e295",
+          "first": "def plate_map(audit: pd.DataFrame, current: str) -> tuple[go.Figure, list[str]]:"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 232,
+          "end": 282,
+          "role": "markup",
+          "anchor": "c7a7605adbfe",
+          "first": "audit = load_audit()"
+        }
+      ]
+    },
+    {
+      "id": "endpoint-detail",
+      "level": "view",
+      "parent": null,
+      "title": "Endpoint detail",
+      "summary": "For the endpoint chosen by search or click, shows its verdict marker, a plain-language explanation of the verdict, and its counts and annotations.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "search",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/demo/app.py",
+          "start": 67,
+          "end": 75,
+          "role": "style",
+          "anchor": "fbb7f783385b",
+          "first": "/* verdict marker */"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 207,
+          "end": 210,
+          "role": "logic",
+          "symbol": "verdict_marker",
+          "anchor": "8833e9d774e4",
+          "first": "def verdict_marker(verdict: str) -> str:"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 213,
+          "end": 228,
+          "role": "logic",
+          "symbol": "answer_sentence",
+          "anchor": "b22a10070a89",
+          "first": "def answer_sentence(r: pd.Series, n_powered: int) -> str:"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 296,
+          "end": 309,
+          "role": "markup",
+          "anchor": "6a97eac2a2e7",
+          "first": "with tab_ep:"
+        }
+      ]
+    },
+    {
+      "id": "model-comparison",
+      "level": "component",
+      "parent": "endpoint-detail",
+      "title": "Ranking accuracy by model, with statistics",
+      "summary": "Bars compare the AUROC of the full model, the nested model and the two baselines, and an expander lists the difference, its interval, the calibrated p and q values and the smallest detectable effect.",
+      "views": [
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/demo/app.py",
+          "start": 95,
+          "end": 98,
+          "role": "style",
+          "anchor": "49f103d32569",
+          "first": ".stats { margin: 0.2rem 0 0.6rem; }"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 144,
+          "end": 152,
+          "role": "logic",
+          "symbol": "style",
+          "anchor": "52e102462254",
+          "first": "def style(fig: go.Figure, height: int, **layout) -> go.Figure:"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 138,
+          "end": 140,
+          "role": "data",
+          "symbol": "load_optional",
+          "anchor": "191d5cd80e03",
+          "first": "def load_optional(name: str):"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 310,
+          "end": 360,
+          "role": "logic",
+          "anchor": "da9a530c3310",
+          "first": "left, right = st.columns([1, 1], gap=\"large\")"
+        }
+      ]
+    },
+    {
+      "id": "reliability-diagram",
+      "level": "component",
+      "parent": "endpoint-detail",
+      "title": "Reliability diagram",
+      "summary": "Groups the full model's out-of-fold predicted probabilities into bins and plots each bin against the share actually active, with Brier score, calibration error and slope.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/demo/app.py",
+          "start": 188,
+          "end": 204,
+          "role": "logic",
+          "symbol": "reliability_figure",
+          "anchor": "1d17ebb44ab5",
+          "first": "def reliability_figure(y: np.ndarray, p: np.ndarray, n_bins: int = 8) -> go.Figure:"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 117,
+          "end": 118,
+          "role": "data",
+          "symbol": "load_oof",
+          "anchor": "af7a5837ff2d",
+          "first": "def load_oof() -> pd.DataFrame:"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 361,
+          "end": 369,
+          "role": "markup",
+          "anchor": "55b0397fd68c",
+          "first": "with right:"
+        }
+      ]
+    },
+    {
+      "id": "compound-explorer",
+      "level": "view",
+      "parent": null,
+      "title": "Compound explorer",
+      "summary": "Looks up one compound to show its hit chips, its readouts across concentrations, and the predictions from both models for each endpoint, filtered by verdict.",
+      "views": [
+        "detail panel",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "search",
+        "filter"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/demo/app.py",
+          "start": 73,
+          "end": 75,
+          "role": "style",
+          "anchor": "d24594f87190",
+          "first": ".chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.3rem 0 1rem; }"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 128,
+          "end": 129,
+          "role": "data",
+          "symbol": "load_compounds",
+          "anchor": "761bbb943389",
+          "first": "def load_compounds() -> pd.DataFrame:"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 133,
+          "end": 134,
+          "role": "data",
+          "symbol": "load_dose_response",
+          "anchor": "cb74615de3df",
+          "first": "def load_dose_response() -> pd.DataFrame:"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 372,
+          "end": 418,
+          "role": "logic",
+          "anchor": "49805ade8f72",
+          "first": "with tab_cmp:"
+        }
+      ]
+    },
+    {
+      "id": "all-results",
+      "level": "view",
+      "parent": null,
+      "title": "All results: scatter, filtered table and export",
+      "summary": "Plots full-model against baseline AUROC for every endpoint, filters the results table by category and verdict, and downloads the table as CSV.",
+      "views": [
+        "scatter plot",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "filter",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/demo/app.py",
+          "start": 112,
+          "end": 113,
+          "role": "data",
+          "symbol": "load_audit",
+          "anchor": "6b6aae2cb0ca",
+          "first": "def load_audit() -> pd.DataFrame:"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 421,
+          "end": 446,
+          "role": "logic",
+          "anchor": "c0cbddaa8bd8",
+          "first": "with tab_tbl:"
+        }
+      ]
+    },
+    {
+      "id": "enrichment",
+      "level": "view",
+      "parent": null,
+      "title": "Where morphology wins",
+      "summary": "Tests whether certified advantages are over-represented in a chosen grouping of endpoints, against a chosen baseline, and shows how many endpoints are certified under other analysis choices.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/demo/app.py",
+          "start": 122,
+          "end": 124,
+          "role": "data",
+          "symbol": "load_enrichment",
+          "anchor": "3dd1a283491f",
+          "first": "def load_enrichment():"
+        },
+        {
+          "file": "code/demo/app.py",
+          "start": 449,
+          "end": 495,
+          "role": "logic",
+          "anchor": "6fa3d6d9bed7",
+          "first": "with tab_enr:"
+        }
+      ]
+    },
+    {
+      "id": "chip-planner",
+      "level": "view",
+      "parent": null,
+      "title": "Study-size planner",
+      "summary": "Sliders for the number of compounds and the share that are active compute the smallest detectable advantage from a fitted planning curve, next to simulation results across study sizes.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/demo/app.py",
+          "start": 628,
+          "end": 694,
+          "role": "logic",
+          "anchor": "849dd39bf7a5",
+          "first": "with tab_chip:"
+        }
+      ]
+    }
+  ]
+}

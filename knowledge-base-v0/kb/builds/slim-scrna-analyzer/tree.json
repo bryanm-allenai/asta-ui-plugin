@@ -1,0 +1,450 @@
+{
+ "interface": {
+  "title": "SLIM — Single-cell Analysis in Minutes",
+  "field": "Single-cell transcriptomics (scRNA-seq)",
+  "stage_of_work": "Primary analysis of a single-cell count matrix: loading, QC, normalization/dimensionality reduction, clustering, annotation, differential expression and export",
+  "what_it_is_for": "A Streamlit app with one tab per step that takes a researcher from an uploaded single-cell count matrix through QC filtering, HVG/PCA preprocessing, Leiden/UMAP clustering, marker-based annotation and Wilcoxon DEG to downloadable results, including a CSV for the BRIM bulk RNA-seq tool."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "pbmc_mini_counts.csv (genes x cells, 6.9 KB) was uploaded with File Type 'csv' and loaded as 24 cells x 120 genes. The 'Load Sample Data (Mouse PBMC)' button was not pressed, as instructed, because it needs internet access the server does not have. Clustering fails with \"No module named 'leidenalg'\". According to the reviewer, leidenalg and python-igraph are missing from the repo's requirements.txt, so this is a dependency omission in the repo, not a server limit. Because of it, Annotate, DEG and the result downloads were not reached in this run."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Turn a raw table of per-cell gene counts into filtered, normalized, reduced data, then into labelled groups of cells and the genes that differ between them",
+  "specific": "Take pbmc_mini_counts.csv through Upload, QC and Preprocess in SLIM and review the run in the Export tab's Analysis Log. Cluster, Annotate, DEG and the result downloads were not reached in this run.",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Load the data and check its size",
+    "specific": "Upload tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load a count matrix and check how many cells and genes it has",
+      "specific": "Choose File Type csv, upload pbmc_mini_counts.csv, press Submit Upload, then read the Cells / Genes metrics. If the declared File Type does not match the file (for example h5ad for this csv), Submit Upload shows 'Failed to read file: Unable to synchronously open file (file signature not found)' and nothing is logged.",
+      "screens": [
+       "screens/012.webp",
+       "screens/056.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose File Type 'csv'",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Upload and gave pbmc_mini_counts.csv",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Submit Upload ('Data loaded successfully!', Cells 24, Genes 120)",
+        "screens": [
+         "screens/011.webp",
+         "screens/012.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Look at the per-cell metadata table",
+      "specific": "Expand 'Show Metadata (obs)'. It shows the first 5 cell barcodes (T_01 to T_05) and has no metadata columns for this csv.",
+      "branch": "optional",
+      "screens": [
+       "screens/013.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded Show Metadata (obs)",
+        "screens": [
+         "screens/013.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Remove low-quality cells",
+    "specific": "QC tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Set quality thresholds and confirm how many cells pass",
+      "specific": "Set Min Genes to 100 (Max Genes 5000, Max Mito % 20), press Apply QC, and read the gene-count and mito % violins and 'Cells (After): 20'",
+      "screens": [
+       "screens/018.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged Min Genes slider from 200 to 100",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Apply QC",
+        "screens": [
+         "screens/017.webp",
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the top outlier point on the Gene Count violin (n_genes_by_counts=115)",
+        "screens": [
+         "screens/019.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Try a too-strict threshold, then loosen it and filter again",
+      "specific": "Apply QC with the default Min Genes 200, which gives 'Cells (After): 0' and empty violins. Then drag Min Genes to 100 and apply again. The 20 cells come back, which shows that each QC run starts from the uploaded data, not from the last result.",
+      "branch": "repeat",
+      "screens": [
+       "screens/060.webp",
+       "screens/061.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Apply QC with Min Genes 200",
+        "screens": [
+         "screens/059.webp",
+         "screens/060.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Min Genes to 100",
+        "screens": [
+         "screens/061.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Apply QC",
+        "screens": [
+         "screens/061.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Normalize, select variable genes and reduce dimensions",
+    "specific": "Preprocess tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Normalize, select highly variable genes and run PCA, then check how variance falls across components",
+      "specific": "With Number of PCs set to 10 (the default of 30 must be lowered when there are only 20 cells), Run Preprocessing draws the Elbow Plot (PCA Variance Ratio).",
+      "screens": [
+       "screens/026.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "set Number of PCs slider to 10 (Home key)",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run Preprocessing",
+        "screens": [
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Re-run computing more principal components to see where the variance drops off",
+      "specific": "Set Number of PCs to 15 (HVG count was also set to 500) and run again. The elbow is flat to about PC 8 and drops sharply after PC 9–10. With only 120 genes the HVG setting changes nothing: PCs 1–10 match the first run, and only the extra PCs show the drop. The Export log records both runs.",
+      "branch": "repeat",
+      "screens": [
+       "screens/047.webp",
+       "screens/051.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "set HVG count to 500 (Home key)",
+        "screens": [
+         "screens/045.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Number of PCs to 15",
+        "screens": [
+         "screens/045.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run Preprocessing",
+        "screens": [
+         "screens/047.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered PC 9 point (9, 0.0816)",
+        "screens": [
+         "screens/048.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Review the record of what was done, and start over",
+    "specific": "Export tab (Results & Logs) and sidebar Reset All Data",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Check a timestamped log of each analysis step and its parameters",
+      "specific": "The Analysis Log table lists Data Loaded (csv, 24x120), QC Applied (cells before/after with thresholds) and each Preprocessing Done (HVG, PCs). Failed runs are not logged.",
+      "screens": [
+       "screens/042.webp",
+       "screens/051.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Export tab",
+        "screens": [
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "reopened Export tab after second preprocessing",
+        "screens": [
+         "screens/051.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Clear all results and start over",
+      "specific": "Press Reset All Data in the sidebar. The Analysis Log table disappears from Export, and only the 'Results & Logs' heading remains.",
+      "branch": "optional",
+      "screens": [
+       "screens/053.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Reset All Data",
+        "screens": [
+         "screens/052.webp",
+         "screens/053.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Threshold sliders with before/after cell count and distribution violins",
+   "general": "Set lower and upper cut-offs on per-cell quality metrics (genes detected, mitochondrial fraction), apply them, see the distribution of the cells that remain and how many passed, and re-apply with other cut-offs without losing the original data",
+   "specific": "QC tab: Min Genes / Max Genes / Max Mito % sliders, Apply QC, Plotly violins of n_genes_by_counts and pct_counts_mt with jittered points and hover values, and a 'Cells (After): N' message. Each run filters from the uploaded matrix, and the result is passed to Preprocess and logged.",
+   "steps": [
+    "drag Min Genes / Max Genes / Max Mito % sliders",
+    "press Apply QC",
+    "read the Cells (After) count and the violins of the surviving cells",
+    "hover outlier points to read their values",
+    "loosen or tighten a slider and apply again"
+   ],
+   "serves_tasks": [
+    "Set quality thresholds and confirm how many cells pass",
+    "Try a too-strict threshold, then loosen it and filter again"
+   ],
+   "screens": [
+    "screens/015.webp",
+    "screens/018.webp",
+    "screens/019.webp",
+    "screens/060.webp",
+    "screens/061.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Parameterised normalization and PCA with elbow plot",
+   "general": "Choose how many variable genes to keep and how many principal components to compute, run the reduction, judge from a variance-per-component curve how many components carry signal, and re-run with other settings",
+   "specific": "Preprocess tab: HVG count (500–5000) and Number of PCs (10–50) sliders, Run Preprocessing (normalize, HVG, PCA), and an Elbow Plot (PCA Variance Ratio) line chart. Invalid settings show an error banner, for example when PCs exceed the number of cells. The chart has Plotly's standard hover, box-zoom, reset-axes and PNG download (elbow-plot-pca-variance-ratio.png).",
+   "steps": [
+    "set HVG count slider",
+    "set Number of PCs slider",
+    "press Run Preprocessing",
+    "read the elbow plot and hover points for exact variance ratios",
+    "adjust and re-run if the elbow is not visible"
+   ],
+   "serves_tasks": [
+    "Normalize, select highly variable genes and run PCA, then check how variance falls across components",
+    "Re-run computing more principal components to see where the variance drops off"
+   ],
+   "screens": [
+    "screens/023.webp",
+    "screens/026.webp",
+    "screens/047.webp",
+    "screens/048.webp",
+    "screens/049.webp",
+    "screens/050.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Typed file upload with shape summary",
+   "general": "Declare the format of a data file, upload and submit it, and confirm the cell and gene counts and the per-cell metadata before analysis. A format mismatch gives a readable error.",
+   "specific": "Upload tab: File Type radio (h5ad / csv / 10x_zip), drag-and-drop uploader (200 MB, H5AD/CSV/ZIP), Submit Upload, success or error banner, Cells/Genes metrics, and a 'Show Metadata (obs)' expander table (first 5 rows)",
+   "steps": [
+    "choose File Type",
+    "upload file",
+    "press Submit Upload",
+    "read Cells and Genes metrics",
+    "expand Show Metadata (obs)"
+   ],
+   "serves_tasks": [
+    "Load a count matrix and check how many cells and genes it has",
+    "Look at the per-cell metadata table"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/012.webp",
+    "screens/013.webp",
+    "screens/056.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Step-wise analysis log with session reset",
+   "general": "Keep an automatic, timestamped record of each processing step and its parameters, and clear all state to start a fresh run",
+   "specific": "Export tab 'Analysis Log' table (Time / Action / Details) records Data Loaded, QC Applied (cells before/after and thresholds) and each Preprocessing Done (HVG, PCs). Failed runs are not logged. The sidebar 'Reset All Data' removes the table.",
+   "steps": [
+    "run analysis steps on other tabs",
+    "open Export to read the log",
+    "repeat a step with new parameters and see a new row",
+    "press Reset All Data to clear"
+   ],
+   "serves_tasks": [
+    "Check a timestamped log of each analysis step and its parameters",
+    "Clear all results and start over"
+   ],
+   "screens": [
+    "screens/042.webp",
+    "screens/051.webp",
+    "screens/053.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Two-language interface toggle",
+   "general": "Switch the interface between two languages so labels can be read in the user's own language",
+   "specific": "Sidebar Language / 言語 dropdown (English / 日本語). It relabels tab names, headings and the sample button. Some labels stay in English (File Type, Upload single-cell data, Sample Data, Reset All Data).",
+   "steps": [
+    "open the Language / 言語 dropdown",
+    "choose 日本語 or English",
+    "read the relabelled tabs and headings"
+   ],
+   "serves_tasks": [],
+   "screens": [
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/010.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Cluster results (UMAP coloured by Leiden cluster): Run Clustering fails with \"Clustering error: No module named 'leidenalg'\" at both 15 neighbors / 0.50 resolution and 5 / 1.00 (screens/039.webp, screens/044.webp). leidenalg is missing from the repo's requirements.txt.",
+  "Annotate tab (marker gene expression per cluster, manual cell-type labels): shows 'Please complete Clustering step first.' (screens/040.webp)",
+  "DEG tab (Wilcoxon test between two groups, volcano plot): shows 'Please complete Clustering or Annotation first.' (screens/041.webp)",
+  "Export downloads (DEG CSV, BRIM-formatted CSV, h5ad): only the Analysis Log appears, because no clustering or DEG results exist (screens/042.webp)",
+  "10x_zip upload path: no zipped 10x test file was available"
+ ],
+ "not_done": [
+  "Cluster cells with Leiden and view them on a UMAP: blocked because leidenalg (and python-igraph) are not in the repo's requirements.txt, so they were not installed",
+  "Check canonical marker expression per cluster and annotate cell types (CD3E, CD19, CD14, MS4A1, CD8A, GNLY): blocked because it needs clusters",
+  "Run a Wilcoxon DEG test, inspect the volcano plot, and export DEG or BRIM CSV: blocked because it needs clusters or annotation",
+  "Download the processed h5ad: no download control appeared on Export at this stage",
+  "Load Sample Data (Mouse PBMC): not pressed, per the instructions (needs internet)",
+  "Run Preprocessing with the default Number of PCs (30) failed on 20 cells: 'n_components=30 must be between 1 and min(n_samples, n_features)=20' (screens/022.webp, screens/023.webp)",
+  "A stricter mito re-filter was not tried: the Max Mito % slider minimum is 5% and every surviving cell is at or below about 4.05% mito, so it could not change the result"
+ ],
+ "applied": [
+  "Removed the 'Set up the workspace' phase",
+  "Moved Reset All Data (t2) under the log/record phase, renamed 'Review the record of what was done, and start over'",
+  "Turned language switching (t1) into feature f6 (two-language toggle), keeping its replay check",
+  "Folded t5 (format mismatch) into a note on the upload task t3 and added screens/056.webp to t3; dropped t5 and its 'one-of' branch",
+  "Dropped the Plotly toolbar feature (f3) and folded hover/zoom/reset/PNG into f2 as a note",
+  "Rewrote general labels to say cells/genes instead of items/features",
+  "Reworded t9 so the elbow change comes from computing more PCs, not fewer HVGs (HVG setting is a no-op with 120 genes)",
+  "Fixed t2 wording: the Analysis Log table disappears rather than emptying",
+  "Fixed t4: only the first 5 barcodes (T_01–T_05) are shown, with no columns",
+  "Moved the PCs=30 crash action out of t8 into not_done",
+  "Fixed the goal's specific label so it no longer claims Annotate/DEG/Export were done",
+  "Updated data.note, screens_never_reached and not_done: leidenalg missing from requirements.txt (repo omission)",
+  "Deleted the 'normalized twice' caveat (reviewer: app.py:159 preprocesses adata_qc.copy())",
+  "Updated serves_tasks in features to match the relabelled tasks"
+ ],
+ "open_fixes": [
+  "Install leidenalg and python-igraph, then rerun Cluster → Annotate → DEG → Export and add those phases and tasks (neighbors/resolution tuning, marker dot plot, per-cluster labelling, One vs Rest / One vs One DEG with volcano and table, BRIM CSV, slim_result.h5ad and deg_results.csv downloads). These screens were never reached in this run.",
+  "Add the matching features (clustering + UMAP, marker dot plot, manual labelling, DEG picker + volcano, BRIM/h5ad/DEG export) once the rerun shows them working.",
+  "Try the 10x_zip upload path with a zipped matrix/barcodes/features test file. None was available in this run.",
+  "Load the built-in sample dataset on a server with internet access. It was not pressed here, per the instructions."
+ ],
+ "screens_at": "pilot/public/runs/slim-scrna-analyzer/20261029-123008/",
+ "screens_filed": {
+  "screens/012.webp": "screens/012.webp",
+  "screens/018.webp": "screens/018.webp",
+  "screens/026.webp": "screens/026.webp",
+  "screens/042.webp": "screens/042.webp"
+ }
+}

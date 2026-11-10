@@ -1,0 +1,579 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cprd-extractor",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T19:20:46Z"
+  },
+  "app": {
+    "title": "CPRD Extractor",
+    "summary": "A researcher builds a clinical code list by matching candidate SNOMED CT and ICD-10 codes against the practice dictionary, or picks conditions and drugs from built-in libraries. They can narrow the run to patients from an earlier extraction or to an uploaded list of IDs, then extract the matching records from every practice folder while a progress bar tracks the scan. Next they assemble a cohort: they load a starting population and apply inclusion criteria one at a time, such as age, sex, registration period, a diagnosis, a drug, a hospital record or linkage eligibility. A funnel chart shows how many patients remain after each step. They end with a cohort file or record extract in Parquet or CSV, with code descriptions added, ready for analysis.",
+    "task": {
+      "text": "Turn clinical code lists into extracted patient records and a filtered study cohort, with a count of the patients left after each criterion.",
+      "verbs": [
+        "identify",
+        "curate",
+        "summarize",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "Electronic health record tables: coded primary-care observations and prescriptions, linked hospital and death records, patient demographics, and dictionaries that map clinical codes to the database's internal codes.",
+      "item": "a coded clinical record for one patient (an observation, a drug issue, or a hospital episode)",
+      "shapes": [
+        "table",
+        "events",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "extracting records and assembling a study cohort from health records, before analysis",
+      "terms": [
+        "collect"
+      ]
+    },
+    "mechanism": {
+      "text": "Pages in a sidebar each carry one stage of the work and hand their output to the next. Matched codes from the code-list pipeline or the drug lookup are pushed into the extraction tabs, and a patient scope chosen on one page limits later extractions. The cohort builder applies one filter at a time and redraws an attrition funnel. Each result table offers CSV or Parquet download and is also saved to disk.",
+      "views": [
+        "sidebar list",
+        "form",
+        "table view",
+        "summary stats",
+        "funnel chart"
+      ],
+      "interactions": [
+        "import",
+        "multi-select",
+        "search",
+        "filter",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "step by step wizard",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "code-list-based cohort extraction from electronic health records in epidemiology",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "epidemiology",
+        "electronic health records",
+        "clinical code lists"
+      ]
+    },
+    "workflow": {
+      "name": "build a filtered cohort from coded records and export it",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A Data Mode radio picks mock data, a cluster, a custom server path or a Windows folder; the CPRD root is set and the folder structure is detected",
+          "parts": [
+            "app-shell"
+          ]
+        },
+        {
+          "step": "define the set of codes that identifies the condition",
+          "here": "Stage 5 parses pasted or uploaded SNOMED CT and ICD-10 codes and matches them to medcodeids in the EMIS dictionary, with tabs for matched, unmatched, expansion and audit log. Stage 6 exports an Excel workbook for a clinician to mark Include, Exclude or Uncertain; the drug lookup turns drug names, brand names and BNF codes into product codes",
+          "parts": [
+            "code-list-matching",
+            "drug-lookup"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Patient scope limits an extraction to all patients, the patients from the previous extraction, or a pasted or uploaded list of IDs",
+          "parts": [
+            "patient-scope"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Choose codes from the disease or drug library, type them in, upload them or accept codes pushed from another page, then run the extraction. It scans every practice folder in parallel while a progress tracker shows the scan, and reports how many records and unique patients it found",
+          "parts": [
+            "aurum-extraction"
+          ]
+        },
+        {
+          "step": "apply inclusion criteria one at a time",
+          "here": "Load a starting population, then add one criterion after another (age range at a reference year, sex, registration window, has a SNOMED diagnosis, has a drug, has a HES ICD-10 record, linkage eligible). Each criterion narrows the patients left by the one before",
+          "parts": [
+            "cohort-builder"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "A funnel chart shows the patient count after each criterion as a share of the starting population, and the sidebar shows the records and patients in the last extraction",
+          "parts": [
+            "attrition-funnel",
+            "app-shell"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download CSV or Parquet, optionally with readable column names and code descriptions added. Every extraction and the final cohort are also saved to the output folder",
+          "parts": [
+            "extraction-results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Codes cross between coding systems: SNOMED CT is mapped to the database's own medcodeids through a dictionary, ICD-10 is used for hospital and death records, and BNF codes for drugs",
+        "The code list is checked by a clinician outside the tool: it generates an Include, Exclude or Uncertain workbook with an audit trail",
+        "An attrition funnel records how many patients each inclusion criterion removes, as cohort reporting requires",
+        "Linkage eligibility decides which patients can appear in hospital and death data, so it is one of the cohort filters",
+        "The same extraction can be run as batch jobs on an HPC cluster, using generated Slurm job-array scripts and a merge step"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "app-shell",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar: data mode, output settings and navigation",
+      "summary": "Chooses the data environment and output format, moves between modules, and shows the record and patient counts of the last extraction.",
+      "views": [
+        "sidebar list",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 7570,
+          "end": 7800,
+          "role": "logic",
+          "symbol": "main",
+          "anchor": "874769cb48ce",
+          "first": "def main():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 62,
+          "end": 77,
+          "role": "logic",
+          "symbol": "_reconfigure_paths",
+          "anchor": "bc199b37b865",
+          "first": "def _reconfigure_paths(new_base):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3042,
+          "end": 3044,
+          "role": "logic",
+          "symbol": "get_extraction_stats",
+          "anchor": "0e92986d23f4",
+          "first": "def get_extraction_stats():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2866,
+          "end": 3000,
+          "role": "style",
+          "symbol": "apply_custom_css",
+          "anchor": "e2e7b58c1e56",
+          "first": "def apply_custom_css():"
+        }
+      ]
+    },
+    {
+      "id": "code-list-matching",
+      "level": "view",
+      "parent": null,
+      "title": "Code List Development",
+      "summary": "Six tabbed stages. In the two working stages, candidate codes are matched against the practice dictionary and a clinician review workbook is exported.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "export"
+      ],
+      "patterns": [
+        "step by step wizard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 5092,
+          "end": 5112,
+          "role": "markup",
+          "symbol": "page_code_list_dev",
+          "anchor": "0b8b22460636",
+          "first": "def page_code_list_dev():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 5325,
+          "end": 5604,
+          "role": "logic",
+          "symbol": "_render_stage5_matching",
+          "anchor": "cf66e505e852",
+          "first": "def _render_stage5_matching():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 6016,
+          "end": 6104,
+          "role": "logic",
+          "symbol": "_render_stage6_clinical_review",
+          "anchor": "293347983264",
+          "first": "def _render_stage6_clinical_review():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 6147,
+          "end": 6520,
+          "role": "logic",
+          "symbol": "_build_clinical_review_excel",
+          "anchor": "796c21e1e56f",
+          "first": "def _build_clinical_review_excel(master_df, study_name, researcher, institution,"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1855,
+          "end": 1876,
+          "role": "data",
+          "symbol": "_load_emis_medical_dict",
+          "anchor": "347a01228abe",
+          "first": "def _load_emis_medical_dict():"
+        }
+      ]
+    },
+    {
+      "id": "drug-lookup",
+      "level": "view",
+      "parent": null,
+      "title": "Drug Lookup",
+      "summary": "Searches a curated drug library by BNF code, name or therapeutic class against the product dictionary, collects the matching product codes and pushes them to drug extraction.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "search",
+        "multi-select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 6667,
+          "end": 7091,
+          "role": "logic",
+          "symbol": "page_drug_lookup",
+          "anchor": "85b8a506f00c",
+          "first": "def page_drug_lookup():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 7094,
+          "end": 7130,
+          "role": "logic",
+          "symbol": "_show_drug_matches",
+          "anchor": "681bb97c19ca",
+          "first": "def _show_drug_matches(matches, key_prefix):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1909,
+          "end": 1937,
+          "role": "logic",
+          "symbol": "_search_product_dict_by_terms",
+          "anchor": "fe362b308b20",
+          "first": "def _search_product_dict_by_terms(search_terms):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1879,
+          "end": 1906,
+          "role": "data",
+          "symbol": "_load_emis_product_dict",
+          "anchor": "81f206df7aca",
+          "first": "def _load_emis_product_dict():"
+        }
+      ]
+    },
+    {
+      "id": "aurum-extraction",
+      "level": "view",
+      "parent": null,
+      "title": "CPRD Aurum Extraction",
+      "summary": "Tabs for extracting by medcode, by SNOMED code, by drug, or a whole file type. Codes come from the libraries, a paste, an upload or another page, and every practice folder is scanned with progress shown.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "multi-select",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3650,
+          "end": 4043,
+          "role": "markup",
+          "symbol": "page_aurum_extraction",
+          "anchor": "ac15d3e12328",
+          "first": "def page_aurum_extraction():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2395,
+          "end": 2448,
+          "role": "logic",
+          "symbol": "extract_observation_by_snomed",
+          "anchor": "7da8e4422647",
+          "first": "def extract_observation_by_snomed(self, snomed_codes, practice_folders=None, progress_callback=None):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2469,
+          "end": 2486,
+          "role": "logic",
+          "symbol": "extract_drugs_by_prodcode",
+          "anchor": "29161ad5d489",
+          "first": "def extract_drugs_by_prodcode(self, prodcode_list, practice_folders=None, progress_callback=None):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2333,
+          "end": 2393,
+          "role": "logic",
+          "symbol": "_parallel_extract",
+          "anchor": "da683305b065",
+          "first": "def _parallel_extract(self, file_type, filter_col, filter_values,"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2692,
+          "end": 2733,
+          "role": "logic",
+          "symbol": "ProgressTracker",
+          "anchor": "51efe0a0140f",
+          "first": "class ProgressTracker:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 438,
+          "end": 449,
+          "role": "data",
+          "anchor": "7120cd6e7145",
+          "first": "DISEASE_GROUPS = {"
+        }
+      ]
+    },
+    {
+      "id": "patient-scope",
+      "level": "component",
+      "parent": "aurum-extraction",
+      "title": "Patient scope selector",
+      "summary": "Limits an extraction to all patients, to the patients in the previous extraction, or to a custom list of IDs.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "import"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3068,
+          "end": 3131,
+          "role": "markup",
+          "symbol": "render_patient_scope",
+          "anchor": "304341469146",
+          "first": "def render_patient_scope(page_key=\"default\"):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3134,
+          "end": 3185,
+          "role": "logic",
+          "symbol": "_render_custom_patient_input",
+          "anchor": "6688d1ef1e48",
+          "first": "def _render_custom_patient_input(page_key):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3057,
+          "end": 3065,
+          "role": "logic",
+          "symbol": "apply_patient_scope",
+          "anchor": "d0857153ae74",
+          "first": "def apply_patient_scope(df):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3047,
+          "end": 3054,
+          "role": "logic",
+          "symbol": "get_scope_patient_ids",
+          "anchor": "49358e32775a",
+          "first": "def get_scope_patient_ids():"
+        }
+      ]
+    },
+    {
+      "id": "extraction-results",
+      "level": "component",
+      "parent": "aurum-extraction",
+      "title": "Results table and export",
+      "summary": "Previews the extracted records, gives a plain-language summary, and saves the result as CSV or Parquet with readable column names and code descriptions.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 2743,
+          "end": 2813,
+          "role": "logic",
+          "symbol": "download_results",
+          "anchor": "3600fa8b815b",
+          "first": "def download_results(df, filename, key_prefix, show_merge=False, all_results=None):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2816,
+          "end": 2859,
+          "role": "logic",
+          "symbol": "generate_plain_summary",
+          "anchor": "03f2688370db",
+          "first": "def generate_plain_summary(all_results, code_classification):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3007,
+          "end": 3039,
+          "role": "logic",
+          "symbol": "save_extraction",
+          "anchor": "a6772c73f09c",
+          "first": "def save_extraction(result, source_label=\"extraction\"):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3310,
+          "end": 3376,
+          "role": "logic",
+          "symbol": "_auto_save_to_disk",
+          "anchor": "54c7a28fec3a",
+          "first": "def _auto_save_to_disk(df, source_label=\"extraction\"):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1940,
+          "end": 2034,
+          "role": "logic",
+          "symbol": "enrich_with_code_details",
+          "anchor": "664249cf7172",
+          "first": "def enrich_with_code_details(df):"
+        }
+      ]
+    },
+    {
+      "id": "cohort-builder",
+      "level": "view",
+      "parent": null,
+      "title": "Cohort Builder",
+      "summary": "Loads a starting population and applies inclusion criteria one after another, each narrowing the patients left by the one before, then exports the final cohort.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "import",
+        "export",
+        "undo"
+      ],
+      "patterns": [
+        "step by step wizard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 4544,
+          "end": 4828,
+          "role": "logic",
+          "anchor": "ad897065664e",
+          "first": "def page_cohort_builder():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 4847,
+          "end": 4867,
+          "role": "logic",
+          "anchor": "efd5b81e5614",
+          "first": "col_reset1, col_reset2 = st.columns(2)"
+        }
+      ]
+    },
+    {
+      "id": "attrition-funnel",
+      "level": "component",
+      "parent": "cohort-builder",
+      "title": "Attrition funnel",
+      "summary": "Draws the patient count after each applied criterion as a funnel, with each step's share of the starting population.",
+      "views": [
+        "funnel chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 4829,
+          "end": 4845,
+          "role": "logic",
+          "anchor": "3ac66c09863a",
+          "first": "st.markdown(\"### Attrition Funnel\")"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "funnel chart"
+    },
+    {
+      "facet": "mechanism",
+      "list": "patterns",
+      "term": "step by step wizard"
+    }
+  ]
+}

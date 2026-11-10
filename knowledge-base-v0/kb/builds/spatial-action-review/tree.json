@@ -1,0 +1,867 @@
+{
+ "interface": {
+  "title": "Spatial Action Review — Autonomous EM Oversight",
+  "field": "AI evaluation for bioimage analysis (vision-language models on electron-microscopy images of mitochondria)",
+  "stage_of_work": "model evaluation and audit before a model's outputs are used in later steps; human review and sign-off",
+  "what_it_is_for": "Audit a vision-language model's paired MCQ answer and point predictions on EM image crops, find regions where the answer is right but the points are unusable (silent failures), and record and export a routing decision for each region reviewed."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "Most work used the built-in 'Case study (541)' set (Qwen3-VL / Staged GRPO) and the 'SFT-variant audit (753)' set (5 conditions: Zero-shot, Perception SFT, Grounding SFT, Staged SFT, Joint SFT). I also uploaded the test files example_inspector_data.json (10 records) and example_crops.zip under 'Your own run'. All 10 crops matched (screens/034.webp, screens/035.webp). Downloads I read: audit_queue_Staged_GRPO_tau0.50.csv, routing_decisions.csv, routing_decisions.json and example_inspector_data.json."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Find where a model's stated answer looks correct but the points it predicts on the image are unusable, and record a review decision for each case",
+  "specific": "Audit the language-to-action hand-off of Qwen3-VL on EM crops: find silent failures (A=1, Rτ=0), inspect crops with GT and predicted points, route each one (accept/escalate/hold/revise) and export the review log",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Choose the dataset and model run to audit",
+    "specific": "Pick the audit source and model condition in the Run configuration sidebar",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load a built-in record set",
+      "specific": "Select 'Case study (541)' or 'SFT-variant audit (753)'",
+      "screens": [
+       "screens/003.webp",
+       "screens/027.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Case study (541) (default on load)",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed SFT-variant audit (753)",
+        "screens": [
+         "screens/027.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Switch which model variant is being audited",
+      "specific": "Choose a Model condition from the dropdown (SFT-variant source only)",
+      "screens": [
+       "screens/028.webp",
+       "screens/030.webp"
+      ],
+      "branch": "when SFT-variant audit is selected",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Model condition dropdown (Zero-shot)",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Staged SFT",
+        "screens": [
+         "screens/030.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Upload your own model's results and images to audit them the same way",
+      "specific": "Under 'Your own run (upload)', upload inspector_data.json and an optional crops zip",
+      "screens": [
+       "screens/032.webp",
+       "screens/034.webp",
+       "screens/035.webp"
+      ],
+      "branch": "sequence",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Your own run (upload)",
+        "screens": [
+         "screens/032.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened 'Try it without a run of your own' for the example files (example_inspector_data.json); the kept screen shows the panel after the uploads",
+        "screens": [
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "uploaded example_inspector_data.json to the inspector_data.json uploader",
+        "screens": [
+         "screens/034.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "uploaded example_crops.zip to the crop images uploader (10 matching crops)",
+        "screens": [
+         "screens/035.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Set the pass/fail threshold for the predicted points and see how the counts change",
+    "specific": "Move the action-reliability gate τ (object-recall threshold) and read the ledger, header and threshold-sensitivity tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Change the reliability threshold",
+      "specific": "Drag or key the τ slider; the ledger, risk map, queue and header statistics are recomputed",
+      "screens": [
+       "screens/021.webp",
+       "screens/031.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged τ slider from 0.50 to 0.70 (silent failure 27.4% → 37.9%, queue 148 → 205)",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed ArrowLeft twice on the slider (0.70 → 0.60)",
+        "screens": [
+         "screens/031.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "See how outcome rates change across all thresholds",
+      "specific": "Read the Threshold sensitivity chart (aligned-pass vs silent-failure rate against τ) and its table",
+      "screens": [
+       "screens/022.webp",
+       "screens/023.webp",
+       "screens/040.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to the Threshold sensitivity tab",
+        "screens": [
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the gate-in-force point (tooltip: silent-failure rate 0.379 at gate 0.70)",
+        "screens": [
+         "screens/023.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Decide which model variant to trust",
+    "specific": "Re-audit across conditions: compare training variants by trust gap and bootstrap CI",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Compare model variants at the current threshold",
+      "specific": "Open 'Re-audit across conditions' for the per-condition table (VQA accuracy, object recall, silent failure, trust gap with CI)",
+      "screens": [
+       "screens/024.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Re-audit across conditions tab",
+        "screens": [
+         "screens/024.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Find where silent failures concentrate",
+    "specific": "Read the run summary, then use the answer–action ledger and the task × dataset risk map to build the audit queue",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Read the run-level summary before drilling down",
+      "specific": "Read the header: source, model, condition, gate, VQA accuracy, object recall, silent-failure rate, P(Rτ=0|A=1), trust gap with CI, point-biserial",
+      "screens": [
+       "screens/003.webp",
+       "screens/021.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "read the header on load (Case study (541), Staged GRPO, τ 0.50)",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "read the header after moving τ to 0.70 (silent failure 27.4% → 37.9%)",
+        "screens": [
+         "screens/021.webp"
+        ]
+       }
+      ],
+      "id": "n1"
+     },
+     {
+      "kind": "task",
+      "general": "Pick an outcome category to review",
+      "specific": "Select a cell of the 2×2 answer–action ledger (Aligned pass / Silent failure / Action-only pass / Blocked)",
+      "screens": [
+       "screens/005.webp",
+       "screens/006.webp",
+       "screens/010.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Aligned pass cell (queue 124)",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Action-only pass cell (queue 107)",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Silent failure cell",
+        "screens": [
+         "screens/010.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "See which question type and dataset concentrate the risk, and limit the queue to it",
+      "specific": "Click a task × dataset cell on the risk map to restrict the queue; click it again to clear",
+      "screens": [
+       "screens/008.webp",
+       "screens/009.webp",
+       "screens/010.webp",
+       "screens/048.webp",
+       "screens/049.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked presence / EM-H cell (73.7%, n=19; tooltip VQA acc 0.95, mean recall 0.24)",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "saw the empty-queue message for Action-only pass × presence/EM-H",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Silent failure in the ledger with the risk cell kept (queue 14)",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked presence / VNC cell (queue 4)",
+        "screens": [
+         "screens/048.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked presence / VNC cell again to clear (queue back to 148)",
+        "screens": [
+         "screens/049.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check for predicted points that land on no true object",
+      "specific": "Read the stray-action panel under the ledger and the per-record stray-action warning (points a recall-only gate cannot see)",
+      "screens": [
+       "screens/010.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "read the ledger-level panel ('172 (74%) also emit at least one point that lands on no ground-truth object')",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "read the per-record stray-action warning on the queued crop",
+        "screens": [
+         "screens/010.webp"
+        ]
+       }
+      ],
+      "id": "n2"
+     },
+     {
+      "kind": "task",
+      "general": "Jump to a curated example",
+      "specific": "Pick a pinned record under 'Worked examples' in the sidebar",
+      "screens": [
+       "screens/017.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 'counting · EM-H · recall 0.00' under Silent failure (jumped to 87/148)",
+        "screens": [
+         "screens/017.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Inspect individual images",
+    "specific": "Step through the image-region audit queue",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Look at one image with the true and predicted locations drawn on it, alongside the model's answer and scores",
+      "specific": "Read the crop with GT (green X) and predicted points (red rings), the Record, Language channel and Action channel panels",
+      "screens": [
+       "screens/010.webp",
+       "screens/012.webp",
+       "screens/014.webp",
+       "screens/015.webp",
+       "screens/018.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed next › (1/14 → 2/14)",
+        "screens": [
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Fullscreen on the crop",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Escape and scrolled to the Action channel scores",
+        "screens": [
+         "screens/015.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Record and export review decisions",
+    "specific": "Routing decision panel and Review log tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Decide whether the model's predicted points may be used for the current item, and record the decision with an optional reason",
+      "specific": "Pick Accept action / Escalate for expert review / Hold for a stricter gate / Flag for model revision; the decision is stored with τ, state and timestamp",
+      "screens": [
+       "screens/016.webp",
+       "screens/020.webp",
+       "screens/039.webp",
+       "screens/040.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed reason 'both points on non-mitochondrial membranes; GT mito at top-left corner'",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Escalate for expert review (signed off 1/14)",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Flag for model revision on the worked example",
+        "screens": [
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Hold for a stricter gate on an uploaded record",
+        "screens": [
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Accept action on the same record (replaced Hold)",
+        "screens": [
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "task",
+        "general": "Undo a decision",
+        "specific": "Press 'Clear this decision' under the recorded decision",
+        "screens": [
+         "screens/053.webp",
+         "screens/054.webp"
+        ],
+        "branch": "optional",
+        "children": [
+         {
+          "kind": "action",
+          "label": "pressed Escalate for expert review",
+          "screens": [
+           "screens/053.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "pressed Clear this decision (signed off back to 0/148)",
+          "screens": [
+           "screens/054.webp"
+          ]
+         }
+        ],
+        "id": "t12",
+        "check": "replayed"
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Review all decisions and export them",
+      "specific": "Open the Review log tab (per-route totals, stale-gate warning, table) and download CSV / JSON",
+      "screens": [
+       "screens/025.webp",
+       "screens/041.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Review log tab",
+        "screens": [
+         "screens/025.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download decisions (CSV) → routing_decisions.csv",
+        "screens": [
+         "screens/025.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download decisions (JSON) → routing_decisions.json (schema, route vocabulary, totals, field notes)",
+        "screens": [
+         "screens/025.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the current filtered list of items",
+      "specific": "Download this audit queue (CSV)",
+      "screens": [
+       "screens/016.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Download this audit queue (CSV) → audit_queue_Staged_GRPO_tau0.50.csv (14 rows, presence/EM-H)",
+        "screens": [
+         "screens/016.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Share or reset the view",
+    "specific": "Restore the view from URL query parameters; Reset run configuration; Night/Day appearance",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Reopen an exact view from a link",
+      "specific": "Load a URL with source, tau, state, theme, condition and risk_cell parameters",
+      "screens": [
+       "screens/044.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "navigated to ?source=case_study&tau=0.30&state=aligned_pass&theme=day&risk_cell=location:VNC (queue 21, Day theme)",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Return to the default settings",
+      "specific": "Press Reset run configuration",
+      "screens": [
+       "screens/045.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Reset run configuration (τ 0.50, Silent failure, risk cell cleared; theme kept)",
+        "screens": [
+         "screens/045.webp"
+        ]
+       }
+      ],
+      "id": "t16",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "2×2 agreement ledger that builds a review queue",
+   "general": "Cross-tabulate two pass/fail judgements on the same items into four clickable cells; clicking a cell fills a review queue with those items, and the cell counts update when the pass threshold moves",
+   "specific": "Answer–action ledger: A(c) correct/wrong × Rτ(c) reliable/unreliable gives Aligned pass, Silent failure, Action-only pass and Blocked; clicking a cell sets the image-region audit queue",
+   "steps": [
+    "read the four cell percentages and counts",
+    "click a cell (e.g. Silent failure)",
+    "the queue header updates to 'Queue: <state> · with crop image — N record(s)'",
+    "move τ to see the cells redistribute"
+   ],
+   "serves_tasks": [
+    "Pick an outcome category to review",
+    "Change the reliability threshold"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/006.webp",
+    "screens/010.webp",
+    "screens/021.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Risk heatmap with click-to-filter toggle",
+   "general": "Heatmap of a failure rate over two categorical axes, with n per cell and a hover tooltip; clicking a cell filters the downstream list and clicking it again clears the filter",
+   "specific": "Risk map of silent-failure rate by task (presence/counting/location/relation/attribute) × dataset (Lucchi/VNC/EM-H); restricts the audit queue and works together with the ledger state",
+   "steps": [
+    "scan for dark cells and note small-n warnings",
+    "hover a cell for VQA accuracy, mean recall and n",
+    "click the cell to restrict the queue",
+    "combine it with a ledger state (an empty combination shows a message)",
+    "click the cell again to clear"
+   ],
+   "serves_tasks": [
+    "See which question type and dataset concentrate the risk, and limit the queue to it"
+   ],
+   "screens": [
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/010.webp",
+    "screens/048.webp",
+    "screens/049.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Image viewer with true and predicted points drawn over it, plus per-item scores",
+   "general": "Step through a queue one item at a time; each image shows true locations and predicted points drawn on it, can be opened fullscreen, and sits next to the item's text answer and its scores",
+   "specific": "Image-region audit: crop with GT centroids (green X) and predicted points (red rings), state banner, stray-action warning, Record / Language channel / Action channel tables (object recall, hit rate, point F1, gate verdict)",
+   "steps": [
+    "press next › / ‹ prev to move through the queue",
+    "open the crop fullscreen",
+    "read the question, options, model answer and expected answer",
+    "read the point counts, recall and gate verdict"
+   ],
+   "serves_tasks": [
+    "Look at one image with the true and predicted locations drawn on it, alongside the model's answer and scores"
+   ],
+   "screens": [
+    "screens/012.webp",
+    "screens/014.webp",
+    "screens/015.webp",
+    "screens/035.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Per-item decision buttons with a session log and export",
+   "general": "Give each reviewed item one of a fixed set of decisions plus a free-text reason; decisions are stamped with time and the settings in force, can be replaced or cleared, are counted in a log that flags decisions made under different settings, and export as CSV or a self-describing JSON. Decisions live only in the current session and are not carried by a shared link",
+   "specific": "Routing decision (Accept action / Escalate for expert review / Hold for a stricter gate / Flag for model revision) with reason, saved with τ and state; the Review log tab shows per-route totals, a stale-τ warning, a table, and Download decisions (CSV/JSON) / Clear all decisions. Known issue from the replay: routing_decisions.json writes context.queue_state as 'lucky' for the Action-only pass state instead of 'action_only'. Decisions are session-only: opening a shared URL starts at 0 signed off",
+   "steps": [
+    "type an optional reason",
+    "press a route button",
+    "change or clear the decision",
+    "open the Review log to see totals and the stale-gate warning",
+    "download CSV or JSON"
+   ],
+   "serves_tasks": [
+    "Decide whether the model's predicted points may be used for the current item, and record the decision with an optional reason",
+    "Undo a decision",
+    "Review all decisions and export them"
+   ],
+   "screens": [
+    "screens/016.webp",
+    "screens/020.webp",
+    "screens/053.webp",
+    "screens/025.webp",
+    "screens/040.webp",
+    "screens/041.webp",
+    "screens/054.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Threshold slider with a sensitivity curve",
+   "general": "One threshold slider recomputes every view; a companion line chart shows the two outcome rates across all threshold values, with the current threshold marked, plus a table of counts per threshold",
+   "specific": "Action-reliability gate τ slider (0.05–0.95) plus the Threshold sensitivity tab: aligned-pass vs silent-failure rate, a dashed 'gate in force' line, and a table of actions cleared / held / silent-failure queue per τ",
+   "steps": [
+    "drag the slider or use the arrow keys",
+    "watch the header statistics and ledger update",
+    "read the curve and hover the in-force dots",
+    "read the per-τ table"
+   ],
+   "serves_tasks": [
+    "Change the reliability threshold",
+    "See how outcome rates change across all thresholds"
+   ],
+   "screens": [
+    "screens/021.webp",
+    "screens/022.webp",
+    "screens/023.webp",
+    "screens/031.webp",
+    "screens/040.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Upload your own results file and images",
+   "general": "Upload a per-item results file (JSON) and an optional zip of images matched by ID; the tool lists the required and optional fields, reports how many images matched and which fields are missing, and recomputes every view; an example file pair can be downloaded",
+   "specific": "Your own run (upload): inspector_data.json plus crop zip named <crop_id>.png, a schema card (crop_id, dataset, task, answer_correct, obj_recall, n_gt, n_pred), a matched-crops banner, an absent-fields notice (point_f1, pim_prec), and a 'Try it without a run of your own' example download",
+   "steps": [
+    "choose Your own run",
+    "download the example files if needed",
+    "upload the JSON",
+    "upload the crops zip",
+    "read the match and missing-field banners, then audit as usual"
+   ],
+   "serves_tasks": [
+    "Upload your own model's results and images to audit them the same way"
+   ],
+   "screens": [
+    "screens/032.webp",
+    "screens/034.webp",
+    "screens/035.webp",
+    "screens/042.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "View state stored in the URL",
+   "general": "The full view (data source, model variant, threshold, category, filter cell, selected item, theme) is kept in the URL so a link reopens the same view; a reset button restores defaults. Review decisions are not part of the link: opening it starts a fresh session with none recorded",
+   "specific": "Query params source, condition, tau, state, risk_cell, record, theme; Reset run configuration (keeps theme). Decisions are session-only and not carried by the URL (screens/044.webp shows 0 signed off)",
+   "steps": [
+    "adjust the view",
+    "copy the URL",
+    "open the URL to restore the view",
+    "press Reset run configuration to return to defaults"
+   ],
+   "serves_tasks": [
+    "Reopen an exact view from a link",
+    "Return to the default settings"
+   ],
+   "screens": [
+    "screens/044.webp",
+    "screens/045.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Cross-condition comparison table with trust gap and confidence interval",
+   "general": "One table that scores every model variant at the current threshold side by side: item count, answer accuracy, location recall, failure and pass rates, the conditional failure rate, and the gap between answer and location reliability with a bootstrap confidence interval",
+   "specific": "Re-audit across conditions tab: per condition (Zero-shot, Perception SFT, Grounding SFT, Staged SFT, Joint SFT) n, VQA accuracy, object recall, silent failure, aligned pass, P(R|A), trust gap and CI low/high at the gate in force",
+   "steps": [
+    "open the Re-audit across conditions tab",
+    "read accuracy, recall, silent-failure and aligned-pass rates per condition",
+    "compare trust gap and its CI across conditions to choose which variant to trust"
+   ],
+   "serves_tasks": [
+    "Compare model variants at the current threshold"
+   ],
+   "screens": [
+    "screens/024.webp"
+   ],
+   "id": "f8"
+  },
+  {
+   "name": "Run-summary header",
+   "general": "A header card that states what is being audited and the headline rates (accuracy, location recall, failure rate, conditional failure rate, gap with confidence interval, correlation) and recomputes when the data, variant or threshold changes",
+   "specific": "Header with source, model, condition, gate definition, VQA accuracy, object recall, silent-failure rate, P(Rτ=0|A=1), trust gap with CI and point-biserial",
+   "steps": [
+    "read the source, model, condition and gate in force",
+    "read the headline rates and the trust gap with its CI",
+    "change τ or condition and watch the figures update"
+   ],
+   "serves_tasks": [
+    "Read the run-level summary before drilling down"
+   ],
+   "screens": [
+    "screens/003.webp",
+    "screens/021.webp"
+   ],
+   "id": "f9"
+  },
+  {
+   "name": "Uncovered-prediction (stray-point) warning",
+   "general": "Counts predicted points that land on no true object, both for the whole selected group and for the current item, because a recall-only pass/fail test cannot see them",
+   "specific": "Stray-action panel under the ledger ('N (x%) also emit at least one point that lands on no ground-truth object') and the per-record stray-action warning in the image-region audit",
+   "steps": [
+    "read the group-level count of items with stray points",
+    "read the per-record warning while stepping through the queue"
+   ],
+   "serves_tasks": [
+    "Check for predicted points that land on no true object"
+   ],
+   "screens": [
+    "screens/010.webp"
+   ],
+   "id": "f10"
+  }
+ ],
+ "screens_never_reached": [
+  "Live model re-ask results: the tab needs an endpoint base URL and a served model name for a reachable checkpoint (screens/026.webp); none is available here",
+  "Unchecked state of 'Audit queue: records with a crop image only': the box is disabled (checked) for the built-in sources; I did not toggle it on the upload source"
+ ],
+ "not_done": [
+  "Live model re-querying: no served checkpoint is reachable from this sandbox",
+  "Threshold table 'Download as CSV' (Streamlit dataframe toolbar): clicked it, but no download was captured (screens/051.webp)",
+  "'Clear all decisions', 'Show data', 'Download as PNG' and 'Copy Vega-Lite spec' on the chart were not tried",
+  "'Release scope' expander and the help (?) tooltips were not opened; 'About this dashboard' was only opened, not read in full",
+  "Decisions live only in the session: loading the shared URL started a fresh session with 0 signed off (screens/044.webp), so the review log does not travel with the link"
+ ],
+ "applied": [
+  "moved t6 into its own phase 'Decide which model variant to trust'",
+  "added feature f8 for the cross-condition table with trust gap and CI",
+  "added task n1 (read the run-level summary) as the first task under 'Find where silent failures concentrate', citing screens/003 and 021, plus feature f9 for the header",
+  "added task n2 (check stray/uncovered predicted points) citing screens/010.webp, plus feature f10",
+  "changed t3's branch from 'one-of' to 'sequence' and noted that screens/042 was taken after the uploads",
+  "folded t12 'Undo a decision' into t11 as an optional sub-task (id, check and screens kept)",
+  "noted in f4 that routing_decisions.json labels the action-only state 'lucky'",
+  "noted in f4 and f7 that decisions are session-only and not carried by the shared URL",
+  "replaced f4's citation of screens/024.webp with screens/053.webp (decision panel)",
+  "unified wording on 'predicted points' in the goal and threshold phase labels",
+  "reworded t11's general label as a plain routing decision and updated f4's serves_tasks to match",
+  "left `check` off new tasks n1, n2 and features f8–f10 because the replay did not test them as separate items"
+ ],
+ "open_fixes": [
+  "Replay n1, n2, f8, f9 and f10 so they get their own check status; this run has no second-agent result for them",
+  "Live model re-ask has no task or feature; it needs a run with a reachable served checkpoint",
+  "Behaviour with 'Audit queue: records with a crop image only' unchecked on the upload source needs a run that toggles it",
+  "'Clear all decisions' in the Review log was never pressed; f4 should be confirmed against it in a new run",
+  "The threshold-table CSV download produced no captured file; a new run should retry it before it is listed under f5",
+  "Fully confirming the 'lucky' queue_state label needs a JSON export taken with the Action-only pass state selected; this run's own export was read but not cited for that field"
+ ],
+ "screens_at": "pilot/public/runs/spatial-action-review/20261101-093552/",
+ "screens_filed": {
+  "screens/003.webp": "screens/003.webp",
+  "screens/021.webp": "screens/021.webp",
+  "screens/024.webp": "screens/024.webp",
+  "screens/010.webp": "screens/010.webp",
+  "screens/016.webp": "screens/016.webp"
+ }
+}

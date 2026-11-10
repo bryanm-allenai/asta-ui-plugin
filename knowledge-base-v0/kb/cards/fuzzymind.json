@@ -1,0 +1,715 @@
+{
+  "schema": "astaui.card/1",
+  "id": "fuzzymind",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T14:49:27Z"
+  },
+  "app": {
+    "title": "FuzzyMind: build, simulate and learn fuzzy cognitive maps",
+    "summary": "A person builds a fuzzy cognitive map, a set of concepts joined by signed causal weights. They can type the weights into a matrix, upload a matrix file, write each link as a word such as -High or +Low and convert the words to numbers, or merge maps from several experts. They view the map as a graph, set starting values for the concepts, and run inference that repeats the update until the values settle. A separate page learns the weights from data instead: the person uploads a table, cleans, encodes and normalizes it, picks input and output columns, trains a Neural-FCM model, and then inspects test metrics and the learned weight matrix for any single test instance.",
+    "task": {
+      "text": "Build a causal map of concepts, from expert judgement or from data, and simulate how the concepts' values change from a starting state until they settle.",
+      "verbs": [
+        "derive",
+        "explore",
+        "clean",
+        "reconcile"
+      ]
+    },
+    "data": {
+      "text": "A square matrix of causal weights between named concepts. The weights are numbers in [-1, 1] or words from a fuzzy term scale with membership functions. On the learning page, the data is a table of variables, with optional rows over time, used to train the weights.",
+      "item": "a directed, weighted causal link between two concepts (a cell in the weight matrix)",
+      "shapes": [
+        "network",
+        "table",
+        "categories",
+        "judgements",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "building and simulating a causal model of a system, from expert judgement or prepared data, to explore scenarios",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "The causal weights are edited in an editable matrix table, with a graph view of the same matrix that can be toggled on. An inference tab then iterates a starting state vector and shows each step in a table and a line chart. On the learning page, tabs unlock in order: upload, plot, clean, transform, normalize, split, train. Training results show metrics, a picker for one test instance and that instance's weight matrix as a heatmap, plus mean and standard deviation across the test set.",
+      "views": [
+        "table view",
+        "network diagram",
+        "line chart",
+        "heatmap",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "inline edit",
+        "import",
+        "export",
+        "apply label",
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "category palette",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "fuzzy cognitive map modelling and learning in soft computing",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "fuzzy cognitive maps",
+        "fuzzy logic",
+        "neural fcm"
+      ]
+    },
+    "workflow": {
+      "name": "build a weighted causal map of concepts and simulate it until it settles",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Either set a number of concepts (3–50) and rename them in a one-row table, or upload a weight-matrix CSV with delimiter, decimal and index options. Uploaded matrices can optionally be edited.",
+          "parts": [
+            "fcm-design",
+            "weight-matrix-editor"
+          ]
+        },
+        {
+          "step": "select a stretch and label it with a category",
+          "here": "Each matrix cell gets a causal weight in [-1, 1], or a word from a 5-, 7- or 11-term scale (-High … None … +High). The word's triangular, trapezoidal or Gaussian membership function can be reshaped with sliders and downloaded as JSON.",
+          "parts": [
+            "weight-matrix-editor",
+            "linguistic-terms"
+          ]
+        },
+        {
+          "step": "find where people disagree and resolve it",
+          "here": "Paired CSV and JSON files from several experts are matched by filename. A table lists every term each expert gave per link, and those terms are combined by fuzzy union. The person can inspect any concept pair's curves before defuzzifying.",
+          "parts": [
+            "expert-aggregation"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Linguistic or merged weights are defuzzified to numbers by centroid, bisector or mean of maximum.",
+          "parts": [
+            "linguistic-terms",
+            "expert-aggregation"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A toggle draws the matrix as a directed graph, with edges coloured by sign and weight. Layout, figure size and node size are adjustable, and the figure downloads as PNG.",
+          "parts": [
+            "fcm-graph"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Choose the iteration cap, equilibrium threshold, update rule (Kosko, Modified Kosko, Rescaled) and activation function (sigmoid with λ and b, tanh, bivalent, trivalent). Enter the initial state vector and press Inference to see each iteration as a table and a line chart.",
+          "parts": [
+            "inference"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Alternatively, learn the weights from data. Upload a CSV, impute missing values or drop them, replace or discard z-score outliers, encode text columns, apply min-max normalization and split inputs from outputs. Then fit Neural-FCM and read the metrics and the per-instance learned weight matrix as a heatmap.",
+          "parts": [
+            "data-preparation",
+            "learning-results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Causal links can be given as words on a symmetric negative-to-positive scale. Each word is backed by an editable membership function and turned into a number by defuzzification.",
+        "Maps from several experts are merged link by link. The interface shows which term each expert gave and the merged membership curve for any concept pair.",
+        "Inference repeats the concept-state update under a selectable rule and activation function. It stops when no concept changes by more than the equilibrium threshold, or at the iteration cap.",
+        "Neural-FCM predicts a separate weight matrix for every instance. The results show one test instance's matrix (optionally with the diagonal and output rows zeroed), or the mean and standard deviation across the test set.",
+        "Concept values must lie in [0, 1], so only min-max normalization is allowed. A timestep split turns a time series into state-at-t versus state-at-t+k pairs."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "fcm-design",
+      "level": "view",
+      "parent": null,
+      "title": "FCM Design tab",
+      "summary": "Lets the person choose how to build the map: by hand, from a file, or, on the linguistic page, by merging several experts' maps.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/FCM_Designer.py",
+          "start": 50,
+          "end": 83,
+          "role": "markup",
+          "anchor": "46cddf66158a",
+          "first": "tab_design, tab_inference = st.tabs([\"🎨 FCM Design\", \"🧠 Inference\"])"
+        },
+        {
+          "file": "code/pages/FCM_Designer_Linguistic.py",
+          "start": 44,
+          "end": 109,
+          "role": "markup",
+          "anchor": "a7eebf8b2570",
+          "first": "tab_design, tab_inference = st.tabs([\"Linguistic FCM Design\", \"Inference\"])"
+        }
+      ]
+    },
+    {
+      "id": "weight-matrix-editor",
+      "level": "component",
+      "parent": "fcm-design",
+      "title": "Concept and weight matrix editor",
+      "summary": "Sets the number and names of the concepts and edits the square matrix of causal weights in place, with the diagonal highlighted. A matrix can also be uploaded from a CSV.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app_components/design_manually.py",
+          "start": 11,
+          "end": 90,
+          "role": "logic",
+          "symbol": "manual_tab",
+          "anchor": "ef8efbb0ff71",
+          "first": "def manual_tab():"
+        },
+        {
+          "file": "code/app_components/file_upload.py",
+          "start": 17,
+          "end": 53,
+          "role": "logic",
+          "symbol": "matrix_upload",
+          "anchor": "95e41b0754e3",
+          "first": "def matrix_upload():"
+        },
+        {
+          "file": "code/fcm_codes/general_functions.py",
+          "start": 125,
+          "end": 130,
+          "role": "style",
+          "symbol": "highlight_diagonal",
+          "anchor": "0d82989618a2",
+          "first": "def highlight_diagonal(x):"
+        },
+        {
+          "file": "code/fcm_codes/general_functions.py",
+          "start": 88,
+          "end": 103,
+          "role": "logic",
+          "symbol": "fix_configs",
+          "anchor": "ca4ba3d12415",
+          "first": "def fix_configs(df, index = '-'):"
+        }
+      ]
+    },
+    {
+      "id": "linguistic-terms",
+      "level": "component",
+      "parent": "fcm-design",
+      "title": "Linguistic terms and defuzzification",
+      "summary": "Lets the person pick a 5-, 7- or 11-term scale and shape each term's membership function with sliders, plotted live and downloadable as JSON. The person then fills the matrix with these words and defuzzifies it to numeric weights.",
+      "views": [
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "apply label",
+        "inline edit",
+        "export"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/app_components/design_manually_linguistic.py",
+          "start": 52,
+          "end": 80,
+          "role": "logic",
+          "symbol": "fuzzy_sets",
+          "anchor": "ea5b2ac3f234",
+          "first": "def fuzzy_sets():"
+        },
+        {
+          "file": "code/app_components/design_manually_linguistic.py",
+          "start": 84,
+          "end": 143,
+          "role": "logic",
+          "symbol": "initialize_fuzzy_memberships",
+          "anchor": "471023d7b333",
+          "first": "def initialize_fuzzy_memberships(memberships, method):"
+        },
+        {
+          "file": "code/app_components/design_manually_linguistic.py",
+          "start": 146,
+          "end": 253,
+          "role": "logic",
+          "symbol": "modify_fuzzy_memberships",
+          "anchor": "a76852a55974",
+          "first": "def modify_fuzzy_memberships(initialized_dic):"
+        },
+        {
+          "file": "code/app_components/design_manually_linguistic.py",
+          "start": 256,
+          "end": 340,
+          "role": "logic",
+          "symbol": "manual_tab_linguistic",
+          "anchor": "9e361be860a2",
+          "first": "def manual_tab_linguistic(dic):"
+        },
+        {
+          "file": "code/app_components/design_manually_linguistic.py",
+          "start": 343,
+          "end": 366,
+          "role": "logic",
+          "symbol": "defuzzification_single",
+          "anchor": "f5cf6d109b0e",
+          "first": "def defuzzification_single(edited_matrix, final_dic):"
+        },
+        {
+          "file": "code/app_components/design_manually_linguistic.py",
+          "start": 13,
+          "end": 48,
+          "role": "data",
+          "anchor": "c9c72d2aae15",
+          "first": "dic_variables_caption = {"
+        },
+        {
+          "file": "code/fcm_codes/general_functions.py",
+          "start": 105,
+          "end": 121,
+          "role": "logic",
+          "symbol": "fix_configs_linguistic",
+          "anchor": "1fbcafabc6e1",
+          "first": "def fix_configs_linguistic(df, mfs, index = '-'):"
+        }
+      ]
+    },
+    {
+      "id": "expert-aggregation",
+      "level": "component",
+      "parent": "fcm-design",
+      "title": "Knowledge aggregation from several experts",
+      "summary": "Checks that each expert's matrix CSV has a matching membership JSON. Shows which term each expert gave per link, merges the terms by fuzzy union, lets the person inspect any concept pair, and defuzzifies the merged matrix.",
+      "views": [
+        "table view",
+        "line chart"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [
+        "agreement summary"
+      ],
+      "spans": [
+        {
+          "file": "code/app_components/file_upload_linguistic.py",
+          "start": 117,
+          "end": 169,
+          "role": "logic",
+          "symbol": "matrices_upload",
+          "anchor": "753ea7cc3cce",
+          "first": "def matrices_upload():"
+        },
+        {
+          "file": "code/app_components/file_upload_linguistic.py",
+          "start": 172,
+          "end": 223,
+          "role": "logic",
+          "symbol": "check_uploads",
+          "anchor": "40fcdd5b8a5e",
+          "first": "def check_uploads(csv_files, json_files):"
+        },
+        {
+          "file": "code/app_components/file_upload_linguistic.py",
+          "start": 227,
+          "end": 261,
+          "role": "logic",
+          "symbol": "handle_uploads",
+          "anchor": "4937faed973a",
+          "first": "def handle_uploads(csv_files, json_files, delimiter, decimal, index_col):"
+        },
+        {
+          "file": "code/app_components/design_manually_linguistic.py",
+          "start": 400,
+          "end": 457,
+          "role": "logic",
+          "symbol": "aggregation_info_display",
+          "anchor": "cdb2c42ecae4",
+          "first": "def aggregation_info_display(dic_uploads):"
+        },
+        {
+          "file": "code/app_components/design_manually_linguistic.py",
+          "start": 496,
+          "end": 545,
+          "role": "logic",
+          "symbol": "aggregation_info",
+          "anchor": "af257d549a59",
+          "first": "def aggregation_info(dic_uploads):"
+        },
+        {
+          "file": "code/app_components/design_manually_linguistic.py",
+          "start": 549,
+          "end": 582,
+          "role": "logic",
+          "symbol": "aggregate",
+          "anchor": "e35b0b45e189",
+          "first": "def aggregate(df_matrix, mfs, undefined=\"Undefined\"):"
+        },
+        {
+          "file": "code/app_components/design_manually_linguistic.py",
+          "start": 460,
+          "end": 474,
+          "role": "logic",
+          "symbol": "defuzification_widgets",
+          "anchor": "d51150a2499f",
+          "first": "def defuzification_widgets(dummy_df, stored_mfs):"
+        },
+        {
+          "file": "code/app_components/design_manually_linguistic.py",
+          "start": 478,
+          "end": 492,
+          "role": "logic",
+          "symbol": "defuzzify_aggregated",
+          "anchor": "404f51530817",
+          "first": "def defuzzify_aggregated(dummy_df, stored_mfs, defuzification_method):"
+        }
+      ]
+    },
+    {
+      "id": "fcm-graph",
+      "level": "component",
+      "parent": "fcm-design",
+      "title": "FCM graph",
+      "summary": "Draws the weight matrix as a directed graph, with edges coloured and labelled by weight or by the sign of the linguistic term. The layout and sizes can be changed and the figure downloaded as PNG.",
+      "views": [
+        "network diagram"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app_components/fcm_graph_component.py",
+          "start": 20,
+          "end": 90,
+          "role": "logic",
+          "symbol": "graph",
+          "anchor": "87eb79747170",
+          "first": "def graph(edited_matrix, linguistic=False):"
+        },
+        {
+          "file": "code/app_components/fcm_graph_component.py",
+          "start": 145,
+          "end": 153,
+          "role": "logic",
+          "symbol": "create_visual_map",
+          "anchor": "35340d9d328d",
+          "first": "def create_visual_map("
+        },
+        {
+          "file": "code/app_components/fcm_graph_component.py",
+          "start": 215,
+          "end": 223,
+          "role": "logic",
+          "symbol": "create_visual_map_linguistic",
+          "anchor": "b8b83c4c1669",
+          "first": "def create_visual_map_linguistic("
+        },
+        {
+          "file": "code/app_components/fcm_graph_component.py",
+          "start": 13,
+          "end": 18,
+          "role": "data",
+          "anchor": "a2bef4fd8b29",
+          "first": "layouts = {"
+        }
+      ]
+    },
+    {
+      "id": "inference",
+      "level": "view",
+      "parent": null,
+      "title": "Inference tab",
+      "summary": "Takes inference settings and an initial concept state, then repeats the map's update until it settles or hits the cap. Each iteration's concept values are shown as a table and a line chart.",
+      "views": [
+        "form",
+        "table view",
+        "line chart"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/FCM_Designer.py",
+          "start": 85,
+          "end": 116,
+          "role": "markup",
+          "anchor": "5a463c074de4",
+          "first": "with tab_inference:"
+        },
+        {
+          "file": "code/app_components/inference_parameters.py",
+          "start": 22,
+          "end": 59,
+          "role": "logic",
+          "symbol": "inference_parameters",
+          "anchor": "7cb0ab98f484",
+          "first": "def inference_parameters():"
+        },
+        {
+          "file": "code/app_components/inference_tab.py",
+          "start": 19,
+          "end": 30,
+          "role": "logic",
+          "symbol": "define_initial_values",
+          "anchor": "f467d5393106",
+          "first": "def define_initial_values(edited_matrix, activation):"
+        },
+        {
+          "file": "code/app_components/inference_tab.py",
+          "start": 33,
+          "end": 42,
+          "role": "logic",
+          "symbol": "inference_results",
+          "anchor": "8ac318eaaf2b",
+          "first": "def inference_results(df_inference_process):"
+        },
+        {
+          "file": "code/fcm_codes/general_functions.py",
+          "start": 134,
+          "end": 165,
+          "role": "logic",
+          "symbol": "create_initial_state_vector",
+          "anchor": "eaeec1e945d9",
+          "first": "def create_initial_state_vector(concepts, activation):"
+        },
+        {
+          "file": "code/fcm_codes/fcm_class.py",
+          "start": 6,
+          "end": 116,
+          "role": "logic",
+          "symbol": "FCM_numpy",
+          "anchor": "87d298f5a2e2",
+          "first": "class FCM_numpy:"
+        }
+      ]
+    },
+    {
+      "id": "data-preparation",
+      "level": "view",
+      "parent": null,
+      "title": "Data upload and preprocessing (learning page)",
+      "summary": "Prepares a CSV for training in tabs that unlock in order. The person imports it with parsing options, plots columns, imputes or drops missing values, replaces or discards z-score outliers, and encodes text columns. They then apply min-max normalization and split inputs from outputs, with a button to restore the raw data.",
+      "views": [
+        "table view",
+        "line chart",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/Learning.py",
+          "start": 76,
+          "end": 180,
+          "role": "markup",
+          "anchor": "00b238a01b06",
+          "first": "data_tab, data_visual, preprocessing_tab, learning_tab = st.tabs("
+        },
+        {
+          "file": "code/app_components/data_upload.py",
+          "start": 23,
+          "end": 90,
+          "role": "logic",
+          "symbol": "upload_widgets",
+          "anchor": "89049a9811ed",
+          "first": "def upload_widgets():"
+        },
+        {
+          "file": "code/app_components/data_upload.py",
+          "start": 94,
+          "end": 119,
+          "role": "logic",
+          "symbol": "modify_dataset",
+          "anchor": "6ce8115b50ec",
+          "first": "def modify_dataset():"
+        },
+        {
+          "file": "code/app_components/data_upload.py",
+          "start": 148,
+          "end": 152,
+          "role": "logic",
+          "symbol": "restore_df_changes_callback",
+          "anchor": "82aa553079c2",
+          "first": "def restore_df_changes_callback():"
+        },
+        {
+          "file": "code/app_components/visualization_tab.py",
+          "start": 8,
+          "end": 35,
+          "role": "logic",
+          "symbol": "plot_widgets",
+          "anchor": "b76112fb8ff7",
+          "first": "def plot_widgets():"
+        },
+        {
+          "file": "code/app_components/data_cleansing_tab.py",
+          "start": 8,
+          "end": 20,
+          "role": "logic",
+          "symbol": "datacleansing_widgets",
+          "anchor": "bd70ccc59941",
+          "first": "def datacleansing_widgets():"
+        },
+        {
+          "file": "code/app_components/data_transformation_tab.py",
+          "start": 7,
+          "end": 56,
+          "role": "logic",
+          "symbol": "transformation_widgets",
+          "anchor": "af69cd10f186",
+          "first": "def transformation_widgets():"
+        },
+        {
+          "file": "code/app_components/data_norm_tab.py",
+          "start": 12,
+          "end": 59,
+          "role": "logic",
+          "symbol": "data_normalization",
+          "anchor": "b8a416465f28",
+          "first": "def data_normalization():"
+        },
+        {
+          "file": "code/app_components/data_split_tab.py",
+          "start": 29,
+          "end": 66,
+          "role": "logic",
+          "symbol": "spliting_widgets",
+          "anchor": "6ee5066d5694",
+          "first": "def spliting_widgets():"
+        }
+      ]
+    },
+    {
+      "id": "learning-results",
+      "level": "view",
+      "parent": null,
+      "title": "Learning and results",
+      "summary": "Sets the Neural-FCM training parameters and fits the model. Results show learning curves and test metrics, per fold under k-fold, and one test instance's learned weight matrix as a heatmap and graph, plus mean and standard deviation across the test set.",
+      "views": [
+        "heatmap",
+        "line chart",
+        "summary stats",
+        "table view",
+        "network diagram"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/Learning.py",
+          "start": 182,
+          "end": 201,
+          "role": "markup",
+          "anchor": "e48f4104058b",
+          "first": "with learning_tab:"
+        },
+        {
+          "file": "code/app_components/learning_tab.py",
+          "start": 69,
+          "end": 92,
+          "role": "logic",
+          "symbol": "learning_method_widgets",
+          "anchor": "db9961ec38a5",
+          "first": "def learning_method_widgets():"
+        },
+        {
+          "file": "code/app_components/learning_tab.py",
+          "start": 95,
+          "end": 211,
+          "role": "logic",
+          "symbol": "parameters_tab_neural_fcm",
+          "anchor": "f0ff25398ffd",
+          "first": "def parameters_tab_neural_fcm():"
+        },
+        {
+          "file": "code/app_components/learning_tab.py",
+          "start": 310,
+          "end": 360,
+          "role": "logic",
+          "symbol": "results_widgets",
+          "anchor": "7928ece5ca52",
+          "first": "def results_widgets():"
+        },
+        {
+          "file": "code/app_components/learning_results.py",
+          "start": 33,
+          "end": 51,
+          "role": "logic",
+          "symbol": "learning_results",
+          "anchor": "560a94076591",
+          "first": "def learning_results(fold = None):"
+        },
+        {
+          "file": "code/app_components/testing_results.py",
+          "start": 15,
+          "end": 40,
+          "role": "logic",
+          "symbol": "testing_results",
+          "anchor": "af7175500104",
+          "first": "def testing_results(fold = None):"
+        },
+        {
+          "file": "code/app_components/weight_matrix_results.py",
+          "start": 38,
+          "end": 164,
+          "role": "logic",
+          "symbol": "weight_matrix_widgets_neuralfcm",
+          "anchor": "5064b999e40d",
+          "first": "def weight_matrix_widgets_neuralfcm(model, x_test, y_test):"
+        }
+      ]
+    }
+  ]
+}

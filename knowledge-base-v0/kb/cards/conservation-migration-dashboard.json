@@ -1,0 +1,420 @@
+{
+  "schema": "astaui.card/1",
+  "id": "conservation-migration-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T09:41:19Z"
+  },
+  "app": {
+    "title": "Migration Analysis Dashboard",
+    "summary": "A person picks one of two bundled tracking datasets (GPS location fixes or accelerometer bursts) and chooses one tagged individual from the sidebar. For a location-tracked animal, they read its summary figures: days tracked, total distance, start and end dates, and average daily distance. They then follow its route on a map, see the distance it covered each day, see a correlation heatmap of two habitat covariates, and see how many fixes fall in each hour of the day. For an accelerometer-tagged animal, they pick one burst and see its three-axis trace and its movement intensity, see how measurements are spread across the hours of the day, and can show the distribution of intensity across every burst.",
+    "task": {
+      "text": "Summarize how one tagged animal moved, from its location fixes or its accelerometer bursts: route, distance per day, and activity by hour.",
+      "verbs": [
+        "summarize",
+        "explore",
+        "derive",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "Animal-borne tag records, one row per timestamped record and individual: either GPS fixes with latitude, longitude and habitat covariates, or raw three-axis accelerometer bursts stored as space-separated values.",
+      "item": "one tagged individual's series of timestamped location fixes or acceleration bursts",
+      "shapes": [
+        "table",
+        "time series",
+        "geospatial",
+        "events"
+      ]
+    },
+    "stage": {
+      "text": "exploring animal tracking data after tag retrieval, before movement analysis",
+      "terms": [
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar radio switches between the location dataset and the accelerometer dataset, and a dropdown picks one individual. Every metric, map and chart below then redraws for that individual. In accelerometer mode, a second dropdown picks one burst for the trace and intensity plots, and a checkbox shows a histogram of intensity across all bursts.",
+      "views": [
+        "sidebar list",
+        "summary stats",
+        "map",
+        "line chart",
+        "bar chart",
+        "heatmap"
+      ],
+      "interactions": [
+        "select",
+        "toggle view",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "dashboard",
+        "master-detail",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "GPS telemetry and accelerometry of tagged animals in movement ecology",
+      "disciplines": [
+        "ecology"
+      ],
+      "terms": [
+        "movement ecology",
+        "animal tracking",
+        "accelerometry"
+      ]
+    },
+    "workflow": {
+      "name": "summarize one tracked individual's movement from its tag records",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Two bundled CSVs load at startup and are cached. Timestamps are split into date, month and hour, and each raw acceleration string is parsed into x, y, z columns.",
+          "parts": [
+            "dataset-sidebar"
+          ]
+        },
+        {
+          "step": "pick the dataset and one individual to look at",
+          "here": "A 'Select Dataset' radio chooses between bird migration and bat activity, then a 'Select Bird ID' or 'Select Bat ID' dropdown picks one individual.",
+          "parts": [
+            "dataset-sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Metric tiles show days tracked, total great-circle distance between consecutive fixes, start and end dates, average km/day and the tag ID, or for accelerometer data the recording span and measurement count.",
+          "parts": [
+            "bird-metrics",
+            "bat-activity"
+          ]
+        },
+        {
+          "step": "see the track in space",
+          "here": "A zoomable map, centred on the individual's mean position, draws line segments between consecutive fixes.",
+          "parts": [
+            "route-map"
+          ]
+        },
+        {
+          "step": "break movement down by day and by hour",
+          "here": "A line chart shows the km covered each calendar day. Bar charts count fixes or measurements per hour of the day, and a heatmap shows the correlation between two vegetation-cover covariates.",
+          "parts": [
+            "daily-distance-chart",
+            "bird-migration",
+            "bat-activity"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "A 'Select Timestamp for Detailed Analysis' dropdown picks one burst. Its X/Y/Z trace and its vector-magnitude intensity are plotted side by side.",
+          "parts": [
+            "acceleration-burst"
+          ]
+        },
+        {
+          "step": "summarize the distribution across all items",
+          "here": "Ticking 'Show Movement Statistics' pools the intensity of every burst for the individual into a 50-bin histogram.",
+          "parts": [
+            "intensity-histogram"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Distances are great-circle (haversine) distances summed between consecutive GPS fixes, both over the whole track and within each calendar day.",
+        "Two kinds of tag data share one dashboard: location fixes for one taxon and raw tri-axial accelerometer bursts for another, switched by a radio.",
+        "Raw accelerometer bursts arrive as one space-separated string per record and are split into interleaved x, y, z samples. Intensity is the per-sample vector magnitude.",
+        "Activity by time of day is read as how many records fall in each hour."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "dataset-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Dataset and individual selector",
+      "summary": "Loads both tracking datasets, then chooses which one to view and which tagged individual every view below shows.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "select",
+        "toggle view",
+        "import"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 14,
+          "end": 38,
+          "role": "logic",
+          "symbol": "load_data",
+          "anchor": "ed47a885a993",
+          "first": "def load_data():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 40,
+          "end": 50,
+          "role": "logic",
+          "anchor": "9f9596663562",
+          "first": "bird_data, bat_data = load_data()"
+        },
+        {
+          "file": "code/app.py",
+          "start": 155,
+          "end": 157,
+          "role": "logic",
+          "anchor": "fb6e6ba1ea87",
+          "first": "# Sidebar filters for bat data"
+        },
+        {
+          "file": "code/src/data/migration_original.csv",
+          "start": 1,
+          "end": 37,
+          "role": "data",
+          "anchor": "858a88d7140d",
+          "first": "timestamp,location-lat,location-long,individual-local-identifier,individual-taxon-canonical-name,tag-local-identifier,EC"
+        },
+        {
+          "file": "code/src/data/hammer_headed_fruit_bats_congo.csv",
+          "start": 1,
+          "end": 10,
+          "role": "data",
+          "anchor": "8f59185c342c",
+          "first": "timestamp,individual-local-identifier,individual-taxon-canonical-name,eobs:accelerations-raw"
+        }
+      ]
+    },
+    {
+      "id": "bird-migration",
+      "level": "view",
+      "parent": null,
+      "title": "Bird migration analysis",
+      "summary": "The location-tracking page for the selected individual. Besides the components inside it, it draws a correlation heatmap of two habitat covariates and a bar chart of fixes per hour of the day.",
+      "views": [
+        "summary stats",
+        "heatmap",
+        "bar chart"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 52,
+          "end": 58,
+          "role": "logic",
+          "anchor": "2aebd6f262b1",
+          "first": "# Bird Information Section"
+        },
+        {
+          "file": "code/app.py",
+          "start": 78,
+          "end": 79,
+          "role": "logic",
+          "anchor": "524e1d386129",
+          "first": "# Main content"
+        },
+        {
+          "file": "code/app.py",
+          "start": 131,
+          "end": 149,
+          "role": "logic",
+          "anchor": "9b1a91d22761",
+          "first": "with col2:"
+        }
+      ]
+    },
+    {
+      "id": "bird-metrics",
+      "level": "component",
+      "parent": "bird-migration",
+      "title": "Individual summary metrics",
+      "summary": "Shows days tracked, total distance, start and end dates, average daily distance and tag ID for the selected individual.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 60,
+          "end": 76,
+          "role": "logic",
+          "anchor": "233598d28ac4",
+          "first": "# Other metrics in columns"
+        },
+        {
+          "file": "code/src/utils.py",
+          "start": 3,
+          "end": 19,
+          "role": "logic",
+          "symbol": "haversine",
+          "anchor": "dbe8f0905b79",
+          "first": "def haversine(coord1, coord2):"
+        }
+      ]
+    },
+    {
+      "id": "route-map",
+      "level": "component",
+      "parent": "bird-migration",
+      "title": "Migration route map",
+      "summary": "Draws the individual's track as line segments between consecutive fixes on a zoomable map.",
+      "views": [
+        "map"
+      ],
+      "interactions": [
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 81,
+          "end": 101,
+          "role": "logic",
+          "anchor": "b8944c3f2528",
+          "first": "# 1. Map Visualization"
+        }
+      ]
+    },
+    {
+      "id": "daily-distance-chart",
+      "level": "component",
+      "parent": "bird-migration",
+      "title": "Daily distance traveled",
+      "summary": "Sums the haversine distance between consecutive fixes within each calendar day and plots km per day as a line chart.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 103,
+          "end": 129,
+          "role": "logic",
+          "anchor": "71aed2f2c596",
+          "first": "# 2. Movement Analysis"
+        },
+        {
+          "file": "code/src/utils.py",
+          "start": 3,
+          "end": 19,
+          "role": "logic",
+          "symbol": "haversine",
+          "anchor": "dbe8f0905b79",
+          "first": "def haversine(coord1, coord2):"
+        }
+      ]
+    },
+    {
+      "id": "bat-activity",
+      "level": "view",
+      "parent": null,
+      "title": "Bat acceleration analysis",
+      "summary": "The accelerometer page for the selected individual. It shows the recording span and measurement count, and a bar chart of measurements per hour of the day.",
+      "views": [
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 151,
+          "end": 169,
+          "role": "logic",
+          "anchor": "9c06342a7ff0",
+          "first": "else:  # Bat Activity"
+        },
+        {
+          "file": "code/app.py",
+          "start": 207,
+          "end": 216,
+          "role": "logic",
+          "anchor": "ded91ada54f3",
+          "first": "# Daily activity pattern"
+        }
+      ]
+    },
+    {
+      "id": "acceleration-burst",
+      "level": "component",
+      "parent": "bat-activity",
+      "title": "Acceleration burst detail",
+      "summary": "Picks one timestamped burst and plots its X, Y, Z acceleration trace beside its vector-magnitude movement intensity.",
+      "views": [
+        "line chart",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 29,
+          "end": 35,
+          "role": "logic",
+          "symbol": "parse_acceleration",
+          "anchor": "bf1aa4e7ea2e",
+          "first": "def parse_acceleration(acc_str):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 171,
+          "end": 205,
+          "role": "logic",
+          "anchor": "954e7149fe4f",
+          "first": "# Acceleration Analysis"
+        }
+      ]
+    },
+    {
+      "id": "intensity-histogram",
+      "level": "component",
+      "parent": "bat-activity",
+      "title": "Movement intensity distribution",
+      "summary": "Shown on request, it pools the intensity of every burst for the individual into a histogram.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 218,
+          "end": 232,
+          "role": "logic",
+          "anchor": "f4fede175a8e",
+          "first": "# Movement characteristics"
+        }
+      ]
+    }
+  ]
+}

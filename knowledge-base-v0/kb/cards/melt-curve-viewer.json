@@ -1,0 +1,426 @@
+{
+  "schema": "astaui.card/1",
+  "id": "melt-curve-viewer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T08:10:40Z"
+  },
+  "app": {
+    "title": "Melt Curve Viewer",
+    "summary": "A person uploads a raw melt curve export from a plate instrument: a temperature column and one fluorescence column per well. They can also upload a results export that maps wells to sample names. The tool computes the negative derivative of fluorescence against temperature (this can be switched off) and draws every well's curve on one chart. In a sortable, searchable table of wells and samples, the person checks the wells they want, so the chart overlays only those curves and they can compare melt peaks. Pointing at a curve shows its well, sample, temperature and value.",
+    "task": {
+      "text": "Overlay the melt curves of chosen wells from a qPCR run, as raw fluorescence or its negative derivative, to compare their melt peaks.",
+      "verbs": [
+        "compare",
+        "explore",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "Instrument export of fluorescence read at a series of temperatures for every well on a plate, plus an optional table that maps wells to sample names.",
+      "item": "a well on a qPCR plate, with its melt curve and sample name",
+      "shapes": [
+        "grid of series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "looking over melt curves straight after a qPCR run",
+      "terms": [
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A well table with checkboxes drives one overlaid line chart: searching filters the rows, Select All checks the visible rows, and only the checked wells are plotted. A checkbox switches the chart between raw RFU and the computed -d(RFU)/dT.",
+      "views": [
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "multi-select",
+        "search",
+        "filter",
+        "sort",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "qPCR melt curve analysis in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "qpcr",
+        "melt curve analysis",
+        "molecular biology"
+      ]
+    },
+    "workflow": {
+      "name": "load per-well curves and overlay a chosen subset to compare them",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drag and drop the raw melt curve RFU export. The tool finds the temperature column and the well columns (A01 to P24), and handles malformed xlsx, xls, HTML or delimited text. A status line reports how many wells it loaded.",
+          "parts": [
+            "upload-panel",
+            "rfu-upload"
+          ]
+        },
+        {
+          "step": "attach names to the items",
+          "here": "Optionally upload a Peak Results or Cq Results export. Its Well and Sample columns label each well with a sample name, in the table and in the chart legend.",
+          "parts": [
+            "sample-map-upload",
+            "well-table"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The 'My file has raw RFU values' checkbox, on by default, turns each curve into -d(RFU)/dT so the melt peaks show. Unchecking it plots the values as they are.",
+          "parts": [
+            "derivative-toggle",
+            "melt-graph"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Type in the search box to narrow the well table by well ID or sample name, case-insensitive. Click a column header to sort.",
+          "parts": [
+            "search-select-controls",
+            "well-table"
+          ]
+        },
+        {
+          "step": "choose which items to show",
+          "here": "Check individual rows, or use Select All to check every visible row and Unselect All to clear. Changing the search clears the selection.",
+          "parts": [
+            "search-select-controls",
+            "well-table"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "The chart overlays the checked wells' curves, each in its own colour, against temperature. With nothing checked it shows every well. Hovering a curve shows its well, sample, temperature and value.",
+          "parts": [
+            "melt-graph"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The curves can be turned into the negative derivative of fluorescence against temperature, so each well's melt peak shows up as a peak on the chart.",
+        "Sample names come from a second instrument export, joined to the curves by normalised well ID (A1 becomes A01).",
+        "The importer tries file formats in turn, including repairing instrument xlsx files with miscased or backslashed internal part names.",
+        "Select All only checks the rows the search leaves visible, so a search narrows the chart to a group of wells."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "upload-panel",
+      "level": "view",
+      "parent": null,
+      "title": "File inputs",
+      "summary": "Holds the two file drop zones and the derivative switch that load and prepare the run's data.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 204,
+          "end": 225,
+          "role": "style",
+          "anchor": "7c7aef2b02f9",
+          "first": "UPLOAD_STYLE = {"
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 226,
+          "end": 264,
+          "role": "markup",
+          "anchor": "db52754c5ba5",
+          "first": "html.Div("
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 92,
+          "end": 137,
+          "role": "logic",
+          "symbol": "_read_export_bytes",
+          "anchor": "af90d57297f6",
+          "first": "def _read_export_bytes(raw_bytes):"
+        }
+      ]
+    },
+    {
+      "id": "rfu-upload",
+      "level": "component",
+      "parent": "upload-panel",
+      "title": "Melt curve RFU upload",
+      "summary": "Reads the raw export into a temperature axis and one curve per well, and reports how many wells it loaded or why the file failed.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 228,
+          "end": 238,
+          "role": "markup",
+          "anchor": "2b719210ed0f",
+          "first": "html.Label("
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 322,
+          "end": 332,
+          "role": "logic",
+          "symbol": "handle_rfu_upload",
+          "anchor": "6722c8427061",
+          "first": "def handle_rfu_upload(contents, filename):"
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 146,
+          "end": 171,
+          "role": "logic",
+          "symbol": "parse_rfu_upload",
+          "anchor": "05786a601180",
+          "first": "def parse_rfu_upload(contents):"
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 58,
+          "end": 89,
+          "role": "logic",
+          "symbol": "_repair_malformed_xlsx_bytes",
+          "anchor": "73e465f2cdd4",
+          "first": "def _repair_malformed_xlsx_bytes(raw_bytes):"
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 304,
+          "end": 304,
+          "role": "data",
+          "anchor": "1d88f927c3ac",
+          "first": "dcc.Store(id=\"curve-store\"),"
+        }
+      ]
+    },
+    {
+      "id": "sample-map-upload",
+      "level": "component",
+      "parent": "upload-panel",
+      "title": "Sample name upload",
+      "summary": "Optionally reads a results export's Well and Sample columns to label each well with its sample name.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 240,
+          "end": 250,
+          "role": "markup",
+          "anchor": "1a8f94000148",
+          "first": "html.Label("
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 342,
+          "end": 349,
+          "role": "logic",
+          "symbol": "handle_samplemap_upload",
+          "anchor": "9e4393650ba5",
+          "first": "def handle_samplemap_upload(contents, filename):"
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 174,
+          "end": 194,
+          "role": "logic",
+          "symbol": "parse_sample_map_upload",
+          "anchor": "df64349aa957",
+          "first": "def parse_sample_map_upload(contents):"
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 305,
+          "end": 305,
+          "role": "data",
+          "anchor": "cb448381c581",
+          "first": "dcc.Store(id=\"samplemap-store\"),"
+        }
+      ]
+    },
+    {
+      "id": "derivative-toggle",
+      "level": "component",
+      "parent": "upload-panel",
+      "title": "Derivative switch",
+      "summary": "Switches the chart between raw RFU and the computed -d(RFU)/dT.",
+      "views": [],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 252,
+          "end": 262,
+          "role": "markup",
+          "anchor": "74d5e31166f1",
+          "first": "dcc.Checklist("
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 417,
+          "end": 429,
+          "role": "logic",
+          "anchor": "3a531d42d724",
+          "first": "compute_deriv = \"derivative\" in (derivative_option or [])"
+        }
+      ]
+    },
+    {
+      "id": "melt-graph",
+      "level": "view",
+      "parent": null,
+      "title": "Melt curve chart",
+      "summary": "Overlays the selected wells' curves against temperature, one colour each, with hover details and a title giving how many wells are shown.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 265,
+          "end": 265,
+          "role": "markup",
+          "anchor": "a8dc7a2366cb",
+          "first": "dcc.Graph(id=\"melt-graph\", figure=go.Figure()),"
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 410,
+          "end": 454,
+          "role": "logic",
+          "symbol": "update_graph",
+          "anchor": "3e0dd145b009",
+          "first": "def update_graph(selected_rows, virtual_data, curve_data, sample_map, derivative_option):"
+        }
+      ]
+    },
+    {
+      "id": "well-table",
+      "level": "view",
+      "parent": null,
+      "title": "Well and sample table",
+      "summary": "Lists every well with its sample name in sortable rows whose checkboxes decide which curves the chart draws.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "multi-select",
+        "sort"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 266,
+          "end": 273,
+          "role": "markup",
+          "anchor": "823aa1a89470",
+          "first": "html.P("
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 289,
+          "end": 309,
+          "role": "markup",
+          "anchor": "e910323ca63a",
+          "first": "dash_table.DataTable("
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 357,
+          "end": 362,
+          "role": "logic",
+          "symbol": "update_table",
+          "anchor": "6de1e0068f19",
+          "first": "def update_table(curve_data, sample_map):"
+        }
+      ]
+    },
+    {
+      "id": "search-select-controls",
+      "level": "component",
+      "parent": "well-table",
+      "title": "Search and select-all controls",
+      "summary": "Filters the table by well or sample text and checks or clears all visible rows at once.",
+      "views": [],
+      "interactions": [
+        "search",
+        "filter",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 274,
+          "end": 288,
+          "role": "markup",
+          "anchor": "aefd5d4cb1a0",
+          "first": "html.Div("
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 370,
+          "end": 378,
+          "role": "logic",
+          "symbol": "filter_table",
+          "anchor": "fe10aab56fdc",
+          "first": "def filter_table(search_text, full_table_data):"
+        },
+        {
+          "file": "code/melt_curve_webapp.py",
+          "start": 389,
+          "end": 399,
+          "role": "logic",
+          "symbol": "select_or_unselect_all",
+          "anchor": "478cbe2122bb",
+          "first": "def select_or_unselect_all(select_clicks, unselect_clicks, search_text, virtual_data):"
+        }
+      ]
+    }
+  ]
+}

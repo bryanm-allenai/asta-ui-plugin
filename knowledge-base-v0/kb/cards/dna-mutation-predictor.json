@@ -1,0 +1,514 @@
+{
+  "schema": "astaui.card/1",
+  "id": "dna-mutation-predictor",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:44:24Z"
+  },
+  "app": {
+    "title": "DNA Mutation Effect Predictor",
+    "summary": "A person enters one protein-level variant as a gene symbol and a protein change, or picks a ready example, and runs the classifier; the interface fetches the protein sequence, embeds the wild-type and mutant windows, and returns a pathogenic or benign call with its probability, the parsed residues, and the variant marked on a predicted 3D structure. Each call joins a short list of recent predictions. For many variants they upload a two-column CSV instead, run the whole file with a progress bar, see the counts of each call, and download the predictions as a CSV. A separate page shows how well the classifier did on its held-out test set.",
+    "task": {
+      "text": "Predict whether each missense variant is likely pathogenic or benign from protein language model embeddings, one at a time or for a whole file, and save the calls.",
+      "verbs": [
+        "derive",
+        "identify",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A list of protein-level variants given as gene symbol plus HGVSp change; for each, the canonical protein sequence and a predicted structure are fetched, and the output is a label with a probability per variant.",
+      "item": "a single missense variant: a gene and an amino-acid change at one position",
+      "shapes": [
+        "table",
+        "sequence",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "scoring candidate missense variants for likely effect, after they are identified and before follow-up",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar switches between a single-variant page, where a two-field form produces a verdict card, gauge, residue details and a rotatable 3D structure with the mutated residue marked, and a batch page, where an uploaded CSV is previewed, run row by row, totalled and exported. A performance page shows the classifier's confusion matrix, ROC curve, summary metrics and top features as a dashboard.",
+      "views": [
+        "form",
+        "detail panel",
+        "summary stats",
+        "table view",
+        "scatter plot",
+        "heatmap",
+        "line chart",
+        "bar chart",
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "select",
+        "hover for detail",
+        "zoom and pan",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "variant effect prediction with protein language models in human genetics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "variant effect prediction",
+        "missense pathogenicity",
+        "protein language models"
+      ]
+    },
+    "workflow": {
+      "name": "classify items with a trained model, singly or as a batch, and export the calls",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "type a gene symbol and an HGVSp change into a two-field form, or click a quick example to fill it; for many variants, upload a CSV with gene and hgvsp columns (capped at 500 rows) and check the preview of its first rows, with a sample template to download",
+          "parts": [
+            "variant-form",
+            "batch-page"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "CLASSIFY MUTATION parses the change, looks up the protein sequence, embeds wild-type and mutant windows around the site, and scores them with the classifier, blending in a second DNA-model opinion when it is reachable; the label is set at a 0.5 probability",
+          "parts": [
+            "verdict-panel"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "the verdict card shows the call, probability, inference time and the per-model breakdown, beside a gauge, a pathogenic/benign bar and the parsed wild-type residue, position and mutant residue; below, the predicted structure is drawn in 3D, coloured by distance from the mutated residue",
+          "parts": [
+            "verdict-panel",
+            "structure-viewer"
+          ]
+        },
+        {
+          "step": "keep a record of changes",
+          "here": "each call is pushed onto a recent-predictions strip (last ten kept, five shown) with its label and probability, and the sidebar counts them",
+          "parts": [
+            "prediction-history"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "a batch run shows a progress bar row by row, then a results table and totals of pathogenic and benign calls with their shares",
+          "parts": [
+            "batch-page"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download Results (CSV) saves each row's call, blended probability and component model scores as predictions.csv",
+          "parts": [
+            "batch-page"
+          ]
+        },
+        {
+          "step": "check how far the model can be trusted",
+          "here": "a performance page shows held-out accuracy, precision, recall, F1, specificity, MCC and AUC, a confusion matrix, an ROC curve and the most important selected embedding dimensions",
+          "parts": [
+            "performance-page"
+          ]
+        }
+      ],
+      "distinctive": [
+        "the input is written in a standard notation for an amino-acid change (HGVSp), parsed into wild-type residue, position and mutant residue before anything is computed",
+        "the reference sequence and predicted structure are fetched from public databases for each gene rather than loaded by the person",
+        "two models give separate opinions that are blended, and the breakdown is shown so the person sees when the second model was unavailable",
+        "the result is placed on a 3D protein structure with every residue coloured by its distance from the change",
+        "the classifier's own held-out performance is published alongside the predictions so each call can be weighed against it"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "predict-page",
+      "level": "view",
+      "parent": null,
+      "title": "Predict Mutation Effect",
+      "summary": "The single-variant page: enter a variant, classify it, and read the verdict, structure and recent history.",
+      "views": [
+        "form",
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 1058,
+          "end": 1169,
+          "role": "logic",
+          "symbol": "page_predict",
+          "anchor": "d4968ce33d1b",
+          "first": "def page_predict():"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 1368,
+          "end": 1407,
+          "role": "logic",
+          "anchor": "cdfcc5a65960",
+          "first": "PAGES = {"
+        }
+      ]
+    },
+    {
+      "id": "variant-form",
+      "level": "component",
+      "parent": "predict-page",
+      "title": "Gene and HGVSp form with quick examples",
+      "summary": "Two text fields for gene symbol and protein change, with example buttons here and on the home page that fill them in and jump to this page.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 1062,
+          "end": 1082,
+          "role": "markup",
+          "anchor": "29cfe4617e14",
+          "first": "st.markdown('<div style=\"color:var(--text-dim);font-size:0.8rem;margin-bottom:0.8rem;\">Quick examples:</div>', unsafe_al"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 562,
+          "end": 565,
+          "role": "logic",
+          "symbol": "_fill_predict",
+          "anchor": "a0b44a6d0fa2",
+          "first": "def _fill_predict(gene: str, hgvsp: str):"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 548,
+          "end": 559,
+          "role": "logic",
+          "symbol": "_go_predict",
+          "anchor": "562ce9ca4e3f",
+          "first": "def _go_predict(gene: str, hgvsp: str):"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 1034,
+          "end": 1049,
+          "role": "markup",
+          "anchor": "52de8f9ee6c5",
+          "first": "cols = st.columns(4)"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 39,
+          "end": 47,
+          "role": "data",
+          "anchor": "829c06e1d496",
+          "first": "EXAMPLES = ["
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 455,
+          "end": 468,
+          "role": "style",
+          "anchor": "5ef9ca1d0d95",
+          "first": "/* ─── INPUTS ─── */"
+        }
+      ]
+    },
+    {
+      "id": "verdict-panel",
+      "level": "component",
+      "parent": "predict-page",
+      "title": "Verdict card, gauge and protein info",
+      "summary": "Runs the classifier on the entered variant and shows the pathogenic or benign call, its probability as a number, gauge and stacked bar, the per-model breakdown and the parsed residues.",
+      "views": [
+        "detail panel",
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 1079,
+          "end": 1139,
+          "role": "markup",
+          "anchor": "b738b5241a64",
+          "first": "if submitted:"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 648,
+          "end": 695,
+          "role": "logic",
+          "symbol": "run_prediction",
+          "anchor": "55ae0893694d",
+          "first": "def run_prediction(gene: str, hgvsp_str: str):"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 632,
+          "end": 645,
+          "role": "logic",
+          "symbol": "_parse_evo2_msg",
+          "anchor": "8e6cac1c027d",
+          "first": "def _parse_evo2_msg(msg):"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 937,
+          "end": 951,
+          "role": "logic",
+          "symbol": "build_prediction_gauge",
+          "anchor": "27c6ff9912ba",
+          "first": "def build_prediction_gauge(prob):"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 900,
+          "end": 905,
+          "role": "logic",
+          "symbol": "build_esi_bar",
+          "anchor": "9f2b88b61d67",
+          "first": "def build_esi_bar(prob):"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 327,
+          "end": 367,
+          "role": "style",
+          "anchor": "5ca696412995",
+          "first": "/* ─── RESULT CARD ─── */"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 377,
+          "end": 402,
+          "role": "style",
+          "anchor": "d2d6c494fe9d",
+          "first": "/* ─── CORNER MARKERS (blueprint aesthetic) ─── */"
+        }
+      ]
+    },
+    {
+      "id": "structure-viewer",
+      "level": "component",
+      "parent": "predict-page",
+      "title": "3D protein structure",
+      "summary": "Draws the predicted backbone of the protein in 3D, colours each residue by its distance from the mutated site and marks the site, with hover readouts.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "hover for detail"
+      ],
+      "patterns": [
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 1141,
+          "end": 1152,
+          "role": "markup",
+          "anchor": "69f57291939c",
+          "first": "if uniprot_id:"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 699,
+          "end": 732,
+          "role": "logic",
+          "symbol": "fetch_alphafold_coords",
+          "anchor": "ea700c553803",
+          "first": "def fetch_alphafold_coords(uniprot_id: str):"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 735,
+          "end": 808,
+          "role": "logic",
+          "symbol": "build_3d_plot",
+          "anchor": "83ee11cb8244",
+          "first": "def build_3d_plot(coords, b_factors, atom_names, resseqs, mutation_pos, hgvsp_str):"
+        }
+      ]
+    },
+    {
+      "id": "prediction-history",
+      "level": "component",
+      "parent": "predict-page",
+      "title": "Recent predictions",
+      "summary": "A strip of the most recent calls in this session, each with gene, change, label and probability.",
+      "views": [
+        "list"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 568,
+          "end": 571,
+          "role": "logic",
+          "symbol": "_push_history",
+          "anchor": "dc3b6914010a",
+          "first": "def _push_history(gene: str, hgvsp: str, status: str, prob: float):"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 1154,
+          "end": 1169,
+          "role": "markup",
+          "anchor": "4ed9df9b86fb",
+          "first": "hist = st.session_state.get(\"history\", [])"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 1396,
+          "end": 1405,
+          "role": "markup",
+          "anchor": "6956a80c51a6",
+          "first": "n_hist = len(st.session_state.get(\"history\", []))"
+        }
+      ]
+    },
+    {
+      "id": "batch-page",
+      "level": "view",
+      "parent": null,
+      "title": "Batch Prediction",
+      "summary": "Upload a CSV of variants, preview it, run every row with a progress bar, see totals of each call and download the predictions as CSV.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 1172,
+          "end": 1247,
+          "role": "logic",
+          "symbol": "page_batch",
+          "anchor": "7667c385d182",
+          "first": "def page_batch():"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 470,
+          "end": 477,
+          "role": "style",
+          "anchor": "a9df08a3b0f7",
+          "first": "/* ─── FILE UPLOADER ─── */"
+        }
+      ]
+    },
+    {
+      "id": "performance-page",
+      "level": "view",
+      "parent": null,
+      "title": "Model Performance",
+      "summary": "Shows the classifier's held-out metrics, confusion matrix, ROC curve and top selected features so a person can weigh how much to trust a call.",
+      "views": [
+        "summary stats",
+        "heatmap",
+        "line chart",
+        "bar chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/webapp/app.py",
+          "start": 1250,
+          "end": 1311,
+          "role": "logic",
+          "symbol": "page_performance",
+          "anchor": "c6c97020c392",
+          "first": "def page_performance():"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 908,
+          "end": 922,
+          "role": "logic",
+          "symbol": "build_confusion_matrix",
+          "anchor": "12e0f84f64b0",
+          "first": "def build_confusion_matrix():"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 925,
+          "end": 934,
+          "role": "logic",
+          "symbol": "build_roc_curve",
+          "anchor": "cb4d401bb4a5",
+          "first": "def build_roc_curve():"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 954,
+          "end": 969,
+          "role": "logic",
+          "symbol": "build_feature_importance",
+          "anchor": "55c0cc99cf78",
+          "first": "def build_feature_importance():"
+        },
+        {
+          "file": "code/data/metrics.json",
+          "start": 1,
+          "end": 268,
+          "role": "data",
+          "anchor": "9b0cf93be012",
+          "first": "{"
+        },
+        {
+          "file": "code/webapp/app.py",
+          "start": 431,
+          "end": 453,
+          "role": "style",
+          "anchor": "c0a43c400445",
+          "first": "/* ─── METRIC OVERRIDE ─── */"
+        }
+      ]
+    }
+  ]
+}

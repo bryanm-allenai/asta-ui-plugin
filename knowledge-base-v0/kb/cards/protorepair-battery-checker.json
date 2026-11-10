@@ -1,0 +1,478 @@
+{
+  "schema": "astaui.card/1",
+  "id": "protorepair-battery-checker",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T00:10:06Z"
+  },
+  "app": {
+    "title": "ProtoRepair",
+    "summary": "A person uploads a protocol document (PDF, DOCX, LaTeX, text or a scanned image) or picks an example. The app extracts the text, tables and figure captions into an editable text box. The person can correct that text, then runs a fixed set of rule checks on it, with an optional model-assisted reading pass for fields the parser left missing. The app returns a three-level readiness verdict, counts of findings by severity, and a list of findings. Each finding quotes the source line, names its assumptions and evidence, and may offer one local patch, which the person can preview and re-check to see whether it clears the finding without causing a new failure. The person can also look over a derived budget table, override a few parsed values and re-run the checks, read the cited evidence, and download the full report as JSON or Markdown.",
+    "task": {
+      "text": "Check a written experimental protocol for unit, arithmetic and stated-limit inconsistencies before anyone carries it out, and report whether it is ready, along with proposed local fixes.",
+      "verbs": [
+        "review",
+        "derive",
+        "identify",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "One protocol document, extracted to text with line-level steps, tables and figure captions, and parsed into a structured recipe of quantities with units. Checking it produces findings with severity, status, quote and an optional patch, plus a derived per-component budget table.",
+      "item": "a finding raised against one step or quoted line of a protocol",
+      "shapes": [
+        "document",
+        "table",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "reviewing a written assembly protocol before running it at the bench",
+      "terms": [
+        "review",
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar takes in a document or an example. The extracted text sits in an editable box, and buttons run the checks on it. A readiness banner with severity counts sums up the result. Tabs below show the finding cards with patch preview and re-check, the derived budget table, an override form that re-runs the checks, the evidence cards and the export buttons.",
+      "views": [
+        "sidebar list",
+        "text editor",
+        "summary stats",
+        "list",
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "toggle view",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [
+        "rubric",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "consistency checks on coin-cell assembly protocols in battery materials research",
+      "disciplines": [
+        "materials science"
+      ],
+      "terms": [
+        "battery research",
+        "electrochemistry",
+        "coin cell assembly"
+      ]
+    },
+    "workflow": {
+      "name": "check a written procedure against fixed rules and propose local fixes",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a PDF, DOCX, LaTeX, Markdown, text or scanned-image protocol, which is read locally into text with tables, captions and OCR. Or pick an example protocol from the sidebar.",
+          "parts": [
+            "input-sidebar"
+          ]
+        },
+        {
+          "step": "correct the extracted text, then compute a value from the data",
+          "here": "Edit the extracted text in the text box, then press 'Run deterministic checks'. Or use the optional model-assisted reading, which only fills parsed fields before the same checks run.",
+          "parts": [
+            "protocol-editor"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "A banner shows the verdict (NOT READY, REVIEW or READY), with counts of Critical, High, Medium and Low findings, fails, unknowns and proposed patches. A note explains the rule behind the verdict.",
+          "parts": [
+            "readiness-summary"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Each finding card gives its check class, status, severity, step, confidence, explanation, the quoted line, and the ids of its assumptions and evidence. Unknowns are shown as unknown rather than guessed.",
+          "parts": [
+            "findings-list",
+            "evidence-cards"
+          ]
+        },
+        {
+          "step": "preview a proposed fix and re-check it",
+          "here": "Where a check has a target faithful to the source, a one-span diff patch is shown. 'Preview patched text' applies the patch and re-runs every check to confirm the target finding is gone and no new failure appeared.",
+          "parts": [
+            "findings-list"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "The person can enter new values for loading, areal capacity, specific capacity, Li thickness and electrolyte volume in the form and re-run every check. The moisture budget tab shows the derived per-component water table and totals.",
+          "parts": [
+            "overrides-form",
+            "moisture-budget"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download a JSON or Markdown report with the original text, parsed recipe, assumptions, findings, patches, evidence, readiness and missing fields. It never includes a merged protocol.",
+          "parts": [
+            "export-panel"
+          ]
+        }
+      ],
+      "distinctive": [
+        "A patch is a proposal and is never merged: one contiguous span for one finding, checked by re-running every check for target removal and new failures.",
+        "A model may only read the document into fields that pass schema and quote validation. Findings, arithmetic, patches and readiness stay with deterministic code.",
+        "Missing values stay visible as 'unknown' findings that block READY, rather than being filled in.",
+        "Every arithmetic default is listed as a named assumption, and each finding cites its assumptions and evidence ids.",
+        "A derived water and HF upper-bound budget per cell is set against component limits, with one reference line explicitly marked as not applying to this chemistry."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "input-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Input sidebar",
+      "summary": "Takes in a protocol document or an example protocol, reports what the reader extracted, and explains when to use the optional model reading.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/protorepair_app.py",
+          "start": 49,
+          "end": 147,
+          "role": "logic",
+          "anchor": "9c59447b74dc",
+          "first": "examples = public_examples()"
+        },
+        {
+          "file": "code/protorepair/documents.py",
+          "start": 687,
+          "end": 719,
+          "role": "logic",
+          "symbol": "extract_document",
+          "anchor": "50b2adebcc21",
+          "first": "def extract_document(filename: str, data: bytes) -> DocumentExtraction:"
+        },
+        {
+          "file": "code/protorepair/fixtures.py",
+          "start": 412,
+          "end": 423,
+          "role": "data",
+          "symbol": "public_examples",
+          "anchor": "a12f32302bc7",
+          "first": "def public_examples() -> list[tuple[str, str]]:"
+        }
+      ]
+    },
+    {
+      "id": "protocol-editor",
+      "level": "view",
+      "parent": null,
+      "title": "Protocol text and check buttons",
+      "summary": "Shows the extracted protocol text for editing, along with reader details, and runs the deterministic checks, or the model-assisted reading followed by the same checks.",
+      "views": [
+        "text editor"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/protorepair_app.py",
+          "start": 149,
+          "end": 237,
+          "role": "logic",
+          "anchor": "e97c6feceb8c",
+          "first": "left, right = st.columns([1.15, 0.85], gap=\"large\")"
+        },
+        {
+          "file": "code/protorepair_app.py",
+          "start": 196,
+          "end": 204,
+          "role": "logic",
+          "symbol": "_fixture_base",
+          "anchor": "cde438899638",
+          "first": "def _fixture_base(text: str):"
+        },
+        {
+          "file": "code/protorepair/pipeline.py",
+          "start": 118,
+          "end": 125,
+          "role": "logic",
+          "symbol": "run_pipeline",
+          "anchor": "2b6900e3db0f",
+          "first": "def run_pipeline("
+        },
+        {
+          "file": "code/protorepair/extract.py",
+          "start": 247,
+          "end": 278,
+          "role": "logic",
+          "symbol": "extract",
+          "anchor": "9fae5dbfb14c",
+          "first": "def extract(text: str, recipe: Recipe | None = None, api_key: str | None = None, use_cache: bool = True) -> ExtractionOu"
+        }
+      ]
+    },
+    {
+      "id": "readiness-summary",
+      "level": "view",
+      "parent": null,
+      "title": "Readiness banner and counts",
+      "summary": "Gives the three-level readiness verdict, the finding counts by severity, and guidance on whether missing fields call for the optional model reading.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/protorepair_app.py",
+          "start": 33,
+          "end": 44,
+          "role": "style",
+          "anchor": "21318ae8369d",
+          "first": "st.markdown("
+        },
+        {
+          "file": "code/protorepair_app.py",
+          "start": 241,
+          "end": 299,
+          "role": "logic",
+          "anchor": "95d8ea8eee8b",
+          "first": "with right:"
+        },
+        {
+          "file": "code/protorepair/pipeline.py",
+          "start": 64,
+          "end": 71,
+          "role": "logic",
+          "symbol": "readiness",
+          "anchor": "6afc3f58cc79",
+          "first": "def readiness(findings: list[Finding]) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "findings-list",
+      "level": "view",
+      "parent": null,
+      "title": "Findings",
+      "summary": "Lists each finding as a card with class, severity, quote, assumptions and evidence. Where a finding has a local patch, the person can preview its diff and re-check the patched text.",
+      "views": [
+        "list",
+        "detail panel"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "rubric"
+      ],
+      "spans": [
+        {
+          "file": "code/protorepair_app.py",
+          "start": 302,
+          "end": 339,
+          "role": "logic",
+          "anchor": "d29febfb13f5",
+          "first": "tabs = st.tabs([\"Findings\", \"Moisture budget\", \"Assumptions / overrides\", \"Evidence\", \"Export\"])"
+        },
+        {
+          "file": "code/protorepair/patches.py",
+          "start": 59,
+          "end": 63,
+          "role": "logic",
+          "symbol": "apply_patch",
+          "anchor": "08bf84544714",
+          "first": "def apply_patch(recipe: Recipe, patch: Patch) -> tuple[str, Recipe]:"
+        },
+        {
+          "file": "code/protorepair/pipeline.py",
+          "start": 162,
+          "end": 180,
+          "role": "logic",
+          "symbol": "validate_patch",
+          "anchor": "33fcf80569b4",
+          "first": "def validate_patch(result: PipelineResult, patch: Patch) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "moisture-budget",
+      "level": "view",
+      "parent": null,
+      "title": "Moisture budget",
+      "summary": "Shows the derived per-component water table, the total water per cell, the ppm on a cathode basis, and the HF upper bound, with a warning about the reference line.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/protorepair_app.py",
+          "start": 341,
+          "end": 354,
+          "role": "logic",
+          "anchor": "c4a111ea2b3e",
+          "first": "with tabs[1]:"
+        },
+        {
+          "file": "code/protorepair/checks/moisture.py",
+          "start": 90,
+          "end": 162,
+          "role": "logic",
+          "symbol": "check_moisture",
+          "anchor": "d3eb97783aee",
+          "first": "def check_moisture(recipe: Recipe) -> CheckResult:"
+        },
+        {
+          "file": "code/protorepair/report.py",
+          "start": 53,
+          "end": 73,
+          "role": "logic",
+          "symbol": "moisture_markdown",
+          "anchor": "fb2d4ca8d2de",
+          "first": "def moisture_markdown(result: PipelineResult) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "overrides-form",
+      "level": "view",
+      "parent": null,
+      "title": "Assumptions and overrides",
+      "summary": "Lists every arithmetic default as a named assumption and lets the person override key parsed quantities, then re-run all checks.",
+      "views": [
+        "form",
+        "list"
+      ],
+      "interactions": [
+        "inline edit",
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/protorepair_app.py",
+          "start": 356,
+          "end": 381,
+          "role": "logic",
+          "anchor": "2798a96f2979",
+          "first": "with tabs[2]:"
+        },
+        {
+          "file": "code/protorepair/models.py",
+          "start": 393,
+          "end": 407,
+          "role": "data",
+          "symbol": "default_assumptions",
+          "anchor": "7a398feb92b8",
+          "first": "def default_assumptions() -> list[Assumption]:"
+        }
+      ]
+    },
+    {
+      "id": "evidence-cards",
+      "level": "view",
+      "parent": null,
+      "title": "Evidence",
+      "summary": "Shows a metadata-only card for each cited reference or curated formula behind the findings, with a link.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/protorepair_app.py",
+          "start": 383,
+          "end": 396,
+          "role": "logic",
+          "anchor": "c7a72a337f6b",
+          "first": "with tabs[3]:"
+        },
+        {
+          "file": "code/protorepair/evidence.py",
+          "start": 16,
+          "end": 22,
+          "role": "logic",
+          "symbol": "load_evidence",
+          "anchor": "016c858d9d57",
+          "first": "def load_evidence(mode: str | None = None) -> dict[str, dict]:"
+        },
+        {
+          "file": "code/data/evidence.json",
+          "start": 1,
+          "end": 141,
+          "role": "data",
+          "anchor": "9f5842305749",
+          "first": "{"
+        }
+      ]
+    },
+    {
+      "id": "export-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Export",
+      "summary": "Downloads the full report as JSON or Markdown, and shows a JSON preview.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/protorepair_app.py",
+          "start": 398,
+          "end": 404,
+          "role": "logic",
+          "anchor": "313d7124b35c",
+          "first": "with tabs[4]:"
+        },
+        {
+          "file": "code/protorepair/report.py",
+          "start": 177,
+          "end": 178,
+          "role": "logic",
+          "symbol": "to_json",
+          "anchor": "9429d3023f08",
+          "first": "def to_json(result: PipelineResult) -> str:"
+        },
+        {
+          "file": "code/protorepair/report.py",
+          "start": 76,
+          "end": 174,
+          "role": "logic",
+          "symbol": "to_markdown",
+          "anchor": "25a8fd3b8311",
+          "first": "def to_markdown(result: PipelineResult) -> str:"
+        }
+      ]
+    }
+  ]
+}

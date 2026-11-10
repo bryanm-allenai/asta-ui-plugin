@@ -1,0 +1,773 @@
+{
+ "interface": {
+  "title": "IRS Survival Explorer (Immune Risk Score survival explorer)",
+  "field": "Cancer transcriptomics / immuno-oncology biostatistics (RNA-seq differential expression, gene set enrichment, survival analysis)",
+  "stage_of_work": "Downstream interpretation: turning finished DESeq2 and clusterProfiler GSEA results into a prognostic-score demonstration",
+  "what_it_is_for": "Build an immune risk score from significant immune DEGs, simulate a patient cohort from the DEA and GSEA effect sizes, then inspect Kaplan-Meier, log-rank and Cox PH results while tuning the significance cut-offs and simulation settings, with volcano, GSEA lollipop and precomputed PPI network views alongside."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "On first load the app read its bundled DEA_Full_Results_macOS.csv and GSEA_Results_Detailed.csv and showed every tab without any upload. I later uploaded the test files: DEA_results_3_samples.csv in the DEA slot (rejected: 'Missing columns: ['symbol']'), DEA_Full_Results_macOS.csv in the GSEA slot (rejected: missing Description/NES/p.adjust/setSize), and then the correct pair, which gave the same results as the bundled data. The patient cohort is simulated, as the app's own banner says. The sidebar was never reset between tasks, so each task's numbers depend on the settings left by the tasks before it; these carried-over settings are stated in each task's specific label."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Show how a gene-expression-derived score separates outcomes and how robust that separation is to analysis choices",
+  "specific": "Explore how the Immune Risk Score (IRS), built from immune DEGs and GSEA effect sizes, separates survival on a simulated cohort, as a method demonstration, and how DEG/GSEA cut-offs and cohort settings change the hazard ratio and log-rank p",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Load input results",
+    "specific": "The bundled DESeq2 DEA and clusterProfiler GSEA CSVs load automatically; optionally replace them with uploaded CSVs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Check that malformed inputs are rejected with a clear message",
+      "specific": "Upload a DEA file without a 'symbol' column, and a DEA file in the GSEA slot, and read the error banner",
+      "screens": [
+       "screens/038.webp",
+       "screens/040.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked DEA Upload and gave DEA_results_3_samples.csv → 'Analysis failed: Missing columns: ['symbol']'",
+        "screens": [
+         "screens/038.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "removed the DEA file with its × button",
+        "screens": [
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked GSEA Upload and gave DEA_Full_Results_macOS.csv → 'Missing columns: ['Description','NES','p.adjust','setSize']'",
+        "screens": [
+         "screens/040.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Load your own pair of result files",
+      "specific": "Upload the correct DEA and GSEA CSVs and confirm the analysis runs on them (results match the bundled data at the same sidebar settings)",
+      "screens": [
+       "screens/041.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "removed the wrong GSEA file, uploaded GSEA_Results_Detailed.csv",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "uploaded DEA_Full_Results_macOS.csv in the DEA slot; results re-rendered",
+        "screens": [
+         "screens/041.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Read the survival result",
+    "specific": "Read the Survival tab: headline metrics, Kaplan-Meier with log-rank, Cox PH forest plot and coefficient table, Schoenfeld proportional-hazards test",
+    "children": [
+     {
+      "kind": "task",
+      "general": "View the baseline result with the default data",
+      "specific": "Open the app at default settings (padj 0.05, |log2FC| 1.0, GSEA FDR 0.05, seed 42, 200 patients, 60 mo, penalizer 0.01) and read the headline metrics, Kaplan-Meier curves, log-rank p and Cox (IRS + age + stage) forest plot: 335 sig DEGs, 28 immune DEGs, 138/200 events, HR 0.66 [0.56-0.79], C-index 0.625, log-rank p=2.16e-05",
+      "screens": [
+       "screens/004.webp",
+       "screens/005.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened http://127.0.0.1:8501/ and waited for the first run",
+        "screens": [
+         "screens/004.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check the proportional-hazards assumption behind the regression",
+      "specific": "Read the Schoenfeld residual test table under the Cox forest plot (p < 0.05 flags a violation); at DEG padj < 0.001 (t4) the IRS row was flagged, p=0.0345",
+      "screens": [
+       "screens/005.webp",
+       "screens/016.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "read the Schoenfeld test table on the Survival tab at default settings",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "after setting DEG padj < 0.001, read the IRS Schoenfeld p=0.0345 (flagged)",
+        "screens": [
+         "screens/016.webp"
+        ]
+       }
+      ],
+      "id": "n1"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Choose which genes and gene sets define the score",
+    "specific": "Tune DEG padj, |log2FC| and GSEA FDR cut-offs in the sidebar",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Tighten the significance threshold and watch the gene list and effect size change",
+      "specific": "From defaults, set DEG padj < 0.001: significant DEGs 335→73, immune DEGs 28→9, IRS HR 0.66→0.59; the Schoenfeld test then flagged IRS (p=0.0345)",
+      "screens": [
+       "screens/016.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 0.001 into DEG padj < and pressed Enter",
+        "screens": [
+         "screens/015.webp",
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 0.05 back into DEG padj < (done after the first two |log2FC| moves in t5)",
+        "screens": [
+         "screens/022.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Raise the effect-size threshold",
+      "specific": "Move the |log2FC| slider: 1.5 and 3.0 were set while DEG padj was still 0.001 from t4, and the metrics did not change; after padj was restored to 0.05, 4.5 gave 335→231 sig DEGs, 28→14 immune DEGs, HR 0.65, and the volcano threshold lines moved",
+      "screens": [
+       "screens/018.webp",
+       "screens/020.webp",
+       "screens/024.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed ArrowRight twice on the |log2FC| slider (1.00→1.50), padj 0.001",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged the |log2FC| slider to 3.00, padj 0.001",
+        "screens": [
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "after padj was reset to 0.05, dragged the |log2FC| slider to 4.50 and opened the DEA tab",
+        "screens": [
+         "screens/023.webp",
+         "screens/024.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Change the enrichment FDR that sets the simulated effect strength",
+      "specific": "With |log2FC| 4.5 carried over from t5 (padj 0.05, other settings default), set GSEA FDR < 0.0001: IRS HR 0.65→0.61, log-rank p 2.30e-05, KM separation shifted; GSEA tab re-rendered",
+      "screens": [
+       "screens/026.webp",
+       "screens/027.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 0.0001 into GSEA FDR < and pressed Enter",
+        "screens": [
+         "screens/025.webp",
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the GSEA tab",
+        "screens": [
+         "screens/027.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Push the cut-offs toward the low-hit edge case",
+      "specific": "With GSEA FDR 0.0001, seed 7, 600 patients, 24 mo follow-up and Cox penalizer 1.0 carried over from t6-t11 (so the HR is penalised), padj 0.0001 with |log2FC| 5.0 (slider maximum) still left 36 sig and 5 immune DEGs (HR 0.88); padj was not set below 0.0001, so the low-hit error was not reached",
+      "screens": [
+       "screens/043.webp",
+       "screens/044.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 0.0001 into DEG padj <",
+        "screens": [
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed End on the |log2FC| slider (→5.00)",
+        "screens": [
+         "screens/043.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the DEA tab",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Test how stable the result is to simulation and model settings",
+    "specific": "Vary random seed, simulated patients, follow-up and Cox penalizer (each change builds on the previous one)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Re-draw the simulated sample with different random seeds",
+      "specific": "With |log2FC| 4.5 and GSEA FDR 0.0001 carried over from t5/t6 (padj 0.05, 200 patients, 60 mo, penalizer 0.01): seed 42→43→7 gave HR 0.61/0.63/0.67, log-rank p 2.30e-05/4.89e-04/3.35e-03, events 135/142/134",
+      "screens": [
+       "screens/029.webp",
+       "screens/031.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked + on Random seed (42→43)",
+        "screens": [
+         "screens/028.webp",
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 7 into Random seed",
+        "screens": [
+         "screens/030.webp",
+         "screens/031.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Increase sample size",
+      "specific": "With seed 7, |log2FC| 4.5 and GSEA FDR 0.0001 carried over (60 mo, penalizer 0.01): drag Simulated patients 200→600: events 426/600, HR 0.62 (CI 0.56-0.69), log-rank p 4.46e-12",
+      "screens": [
+       "screens/033.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged the Simulated patients slider to 600",
+        "screens": [
+         "screens/032.webp",
+         "screens/033.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Shorten follow-up",
+      "specific": "With 600 patients, seed 7, |log2FC| 4.5 and GSEA FDR 0.0001 carried over (penalizer 0.01): drag Follow-up 60→24 months: events 219/600, KM x-axis to 25 mo, median OS reported as 'inf mo' (not reached)",
+      "screens": [
+       "screens/035.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged the Follow-up (months) slider to 24",
+        "screens": [
+         "screens/034.webp",
+         "screens/035.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Regularise the regression model",
+      "specific": "With 600 patients, 24 mo follow-up, seed 7, |log2FC| 4.5 and GSEA FDR 0.0001 carried over: set Cox penalizer 0.01→1.0 (its maximum): IRS HR shrank 0.66→0.90 (CI 0.84-0.96) while the log-rank result stayed the same (chi2 23.50); the replay on defaults saw 0.66→0.85 (CI 0.77-0.95)",
+      "screens": [
+       "screens/037.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 1.0 into Cox penalizer",
+        "screens": [
+         "screens/036.webp",
+         "screens/037.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Inspect the supporting evidence behind the score",
+    "specific": "Read the DEA, GSEA, PPI network and Cohort data tabs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "See which genes feed the score",
+      "specific": "DEA tab: volcano plot with padj/|log2FC| threshold lines and Up/Down/NS counts, plus the 'Immune DEGs used in IRS' table",
+      "screens": [
+       "screens/006.webp",
+       "screens/044.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the DEA tab",
+        "screens": [
+         "screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Review the enriched pathways",
+      "specific": "GSEA tab: lollipop of NES coloured by -log10(FDR); the Top terms slider (5-40) sets how many terms; the table below lists terms",
+      "screens": [
+       "screens/007.webp",
+       "screens/009.webp",
+       "screens/046.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the GSEA tab",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Top terms 15→7",
+        "screens": [
+         "screens/008.webp",
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed End on Top terms (→40)",
+        "screens": [
+         "screens/046.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Look at the interaction network of the leading-edge genes",
+      "specific": "PPI network tab: precomputed STRINGdb/igraph figure (network, Louvain communities, degree distribution, top-20 hubs) plus the PPI_hub_genes.csv and PPI_centrality_metrics.csv tables; these stay the same whatever the sidebar settings",
+      "screens": [
+       "screens/010.webp",
+       "screens/011.webp",
+       "screens/053.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the PPI network tab",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the hub and centrality tables",
+        "screens": [
+         "screens/011.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the betweenness header twice to sort descending (IL6 top)",
+        "screens": [
+         "screens/054.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Inspect and export the per-subject simulated data",
+      "specific": "Cohort data tab: table of patient_id, IRS, risk_group, time_months, event, age, stage; sort by IRS; Download cohort CSV",
+      "screens": [
+       "screens/012.webp",
+       "screens/014.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the Cohort data tab",
+        "screens": [
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Download cohort CSV (simulated_cohort.csv saved, 13.7 kB)",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the IRS column header to sort ascending",
+        "screens": [
+         "screens/014.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Threshold-driven gene-signature metrics strip",
+   "general": "Change significance and effect-size cut-offs in a side panel; a row of headline numbers (item count, signature size, events, hazard ratio with CI, concordance) updates live, with the CI shown as a badge under the HR",
+   "specific": "Sidebar DEG padj < number input, |log2FC| > slider and GSEA FDR < number input drive the Significant DEGs / Immune DEGs (IRS) / Events / IRS HR (per SD) with 95% CI / C-index metrics",
+   "steps": [
+    "Type a padj cut-off and press Enter",
+    "Drag or arrow-key the |log2FC| slider",
+    "Type a GSEA FDR cut-off",
+    "Read the updated metric row and compare with the previous values"
+   ],
+   "serves_tasks": [
+    "Tighten the significance threshold and watch the gene list and effect size change",
+    "Raise the effect-size threshold",
+    "Change the enrichment FDR that sets the simulated effect strength"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/016.webp",
+    "screens/024.webp",
+    "screens/026.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Kaplan-Meier with log-rank and median survival",
+   "general": "Split subjects into high/low score groups and show survival curves with confidence bands and censor ticks, the log-rank p printed on the plot, chi2/p and per-group median survival in text, and a fullscreen view",
+   "specific": "Kaplan-Meier panel on the Survival tab: High IRS (immune-active) vs Low IRS (immune-suppressed) curves with CIs, 'Log-rank p' annotation, Log-rank chi2 line and Median OS per group ('inf mo' when not reached), Fullscreen button",
+   "steps": [
+    "Open the Survival tab",
+    "Read the curves, the log-rank p and the median OS lines",
+    "Change cohort parameters and watch the curves redraw",
+    "Open the plot fullscreen and press Escape to return"
+   ],
+   "serves_tasks": [
+    "View the baseline result with the default data",
+    "Shorten follow-up",
+    "Increase sample size"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/033.webp",
+    "screens/035.webp",
+    "screens/052.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Cox PH forest plot with coefficient and proportional-hazards tables",
+   "general": "Fit a multivariable proportional-hazards model and show a forest plot of hazard ratios with CIs, the coefficient table, and a residual-based test of the proportional-hazards assumption; a penalty setting shrinks the estimates",
+   "specific": "Cox PH (IRS + age + stage) forest plot, exp(coef)/lower/upper/p table, Schoenfeld residual test table (p < 0.05 flags violation), Cox penalizer number input",
+   "steps": [
+    "Read HRs and CIs in the forest plot",
+    "Check the Schoenfeld p for each covariate",
+    "Change the Cox penalizer and watch the HR shrink toward 1",
+    "Compare against the unchanged log-rank result"
+   ],
+   "serves_tasks": [
+    "View the baseline result with the default data",
+    "Check the proportional-hazards assumption behind the regression",
+    "Regularise the regression model",
+    "Tighten the significance threshold and watch the gene list and effect size change"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/016.webp",
+    "screens/037.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Seeded simulation-robustness controls",
+   "general": "Re-draw a simulated dataset by changing the random seed, sample size and follow-up length, then compare the test statistics across draws",
+   "specific": "Random seed number input (+/− or typed), Simulated patients slider (50-1000), Follow-up (months) slider (12-120); results recompute live",
+   "steps": [
+    "Step or type a new random seed",
+    "Note the HR and log-rank p",
+    "Drag Simulated patients to a new size",
+    "Drag Follow-up to a new horizon",
+    "Compare events, HR CI width and p across settings"
+   ],
+   "serves_tasks": [
+    "Re-draw the simulated sample with different random seeds",
+    "Increase sample size",
+    "Shorten follow-up"
+   ],
+   "screens": [
+    "screens/029.webp",
+    "screens/031.webp",
+    "screens/033.webp",
+    "screens/035.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Volcano plot with live threshold lines and selected-gene table",
+   "general": "Scatter of effect size versus significance with dashed cut-off lines that follow the side-panel thresholds, Up/Down/NS counts in the legend, top genes labelled, and a table of the genes that pass and enter the score",
+   "specific": "DEA tab volcano (log2 fold change vs -log10 padj) with legend counts and the 'Immune DEGs used in IRS' table (Ensembl ID, symbol, log2FC, padj)",
+   "steps": [
+    "Open the DEA tab",
+    "Change padj or |log2FC| in the sidebar",
+    "See the threshold lines move and the Up/Down counts change",
+    "Read which immune genes remain in the IRS table"
+   ],
+   "serves_tasks": [
+    "See which genes feed the score",
+    "Raise the effect-size threshold",
+    "Push the cut-offs toward the low-hit edge case"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/024.webp",
+    "screens/044.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Top-N enrichment lollipop with searchable term table",
+   "general": "Show the N most enriched pathways as a lollipop of normalised enrichment score coloured by significance, with a slider for N and a searchable, column-toggleable table underneath",
+   "specific": "GSEA tab: Top terms slider (5-40), NES lollipop coloured by -log10(FDR), table of GO ID/Description/setSize/NES/p.adjust with Search (match count, next/previous) and Show/hide columns",
+   "steps": [
+    "Drag the Top terms slider to set N",
+    "Read the lollipop ordering by NES",
+    "Open the table search and type a term (e.g. 'natural killer'; the match count depends on the sidebar state: 7 in the original run with GSEA FDR 0.0001 carried over, 16 in the replay at default settings)",
+    "Step to the next match",
+    "Hide a column with the eye menu"
+   ],
+   "serves_tasks": [
+    "Review the enriched pathways",
+    "Change the enrichment FDR that sets the simulated effect strength"
+   ],
+   "screens": [
+    "screens/009.webp",
+    "screens/046.webp",
+    "screens/048.webp",
+    "screens/049.webp",
+    "screens/051.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Exportable simulated-cohort table",
+   "general": "Per-subject table of score, risk group, time, event and covariates that can be sorted by column and downloaded as CSV",
+   "specific": "Cohort data tab: patient_id, IRS, risk_group, time_months, event, age, stage; click a header to sort; 'Download cohort CSV' saves simulated_cohort.csv",
+   "steps": [
+    "Open the Cohort data tab",
+    "Click a column header to sort",
+    "Press Download cohort CSV",
+    "Open the CSV elsewhere"
+   ],
+   "serves_tasks": [
+    "Inspect and export the per-subject simulated data"
+   ],
+   "screens": [
+    "screens/012.webp",
+    "screens/013.webp",
+    "screens/014.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Paired results-file upload with schema validation",
+   "general": "Two upload slots for paired result tables; the app checks for required columns and shows a red error naming the missing columns, then recomputes when valid files are given",
+   "specific": "Sidebar 'DEA results (DESeq2 CSV with symbol)' and 'GSEA results (clusterProfiler CSV)' uploaders with remove (×) and add (+) controls; 'Analysis failed: Missing columns: [...]' banner",
+   "steps": [
+    "Click Upload in a slot and choose a CSV",
+    "Read the error banner if columns are missing",
+    "Remove the file with ×",
+    "Upload the correct file to both slots and see the tabs return"
+   ],
+   "serves_tasks": [
+    "Check that malformed inputs are rejected with a clear message",
+    "Load your own pair of result files"
+   ],
+   "screens": [
+    "screens/038.webp",
+    "screens/040.webp",
+    "screens/041.webp"
+   ],
+   "id": "f8",
+   "check": "replayed"
+  },
+  {
+   "name": "Static network-analysis panel with sortable centrality tables",
+   "general": "Show a precomputed protein-interaction network figure (network, communities, degree distribution, top hubs) alongside hub and centrality tables that can be sorted by any metric",
+   "specific": "PPI network tab: STRINGdb + igraph figure and the PPI_hub_genes.csv / PPI_centrality_metrics.csv tables (gene, degree, betweenness, log2FC, is_hub)",
+   "steps": [
+    "Open the PPI network tab",
+    "Read the four-panel figure",
+    "Scroll to the hub table",
+    "Click the betweenness header to sort descending"
+   ],
+   "serves_tasks": [
+    "Look at the interaction network of the leading-edge genes"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/011.webp",
+    "screens/054.webp"
+   ],
+   "id": "f9",
+   "check": "replayed"
+  },
+  {
+   "name": "Simulated-data caveat banner",
+   "general": "A notice on the results page stating that the outcome data are simulated, so the survival statistics are read as a method demonstration rather than clinical evidence",
+   "specific": "The app's banner saying the patient cohort is simulated, shown with the results",
+   "steps": [
+    "Open the app",
+    "Read the banner before interpreting the survival panels"
+   ],
+   "serves_tasks": [
+    "View the baseline result with the default data"
+   ],
+   "screens": [
+    "screens/004.webp"
+   ],
+   "id": "f10"
+  }
+ ],
+ "screens_never_reached": [
+  "The low-hit error (the reviewer's reading of app.py gives the text 'No significant DEGs or negatively enriched GSEA terms at these cut-offs.'): the run went only as strict as padj 0.0001, |log2FC| 5.0 (slider maximum) and GSEA FDR 0.0001, which still left 36 significant and 5 immune DEGs. The padj and GSEA FDR inputs accept values down to 1e-6 (the box rounds the display to 4 decimals), so stricter cut-offs were never tried",
+  "A live-recomputed PPI network: the tab only shows bundled precomputed outputs and says to re-run PPI-Analysis.R to update them"
+ ],
+ "not_done": [
+  "The grid toolbar 'Download as CSV' on the Immune DEGs table did not produce a file in the headless browser (only simulated_cohort.csv was recorded); I did not retry it on the other tables",
+  "A click on the GSEA tab after setting Top terms to 40 timed out (element may have been hidden), and its target was not recorded",
+  "Did not test the Cox and Schoenfeld table toolbars (search/fullscreen) on their own, since they are the same component as the GSEA table toolbar I did use",
+  "Did not reset the sidebar to defaults after the stress tests; the later screens show the changed settings, and tasks t6-t11 and t7 ran on carried-over settings (stated in each task)",
+  "Did not read the age and stage hazard ratios as a negative control, and did not set the KM/log-rank result against the continuous-IRS Cox estimate as a separate comparison",
+  "Did not record a full run for reporting (all sidebar values, input file versions and the cohort CSV together)"
+ ],
+ "applied": [
+  "Moved t1 out of 'Load input results' into a new phase 'Read the survival result' and dropped the window-resize action",
+  "Added task n1 (Schoenfeld proportional-hazards check) under the new phase, citing screens 005 and 016",
+  "Stated carried-over sidebar settings in t5, t6, t7, t8, t9, t10 and t11, including that t5's 1.5/3.0 moves ran at padj 0.001 and that t7's HR is penalised (penalizer 1.0)",
+  "Added the replay's default-settings t11 result (0.66→0.85) beside the original",
+  "Removed 'GSEA FDR 0.0001 (its minimum)' and relabelled t7 so it no longer claims the error is unreachable",
+  "Rewrote the screens_never_reached widget limits (padj and GSEA FDR accept down to 1e-6) and quoted the low-hit error text",
+  "Reconciled the f6 'natural killer' count as setting-dependent (7 with GSEA FDR 0.0001 carried over, 16 at defaults)",
+  "Added 'on a simulated cohort, as a method demonstration' to the goal's specific label",
+  "Added feature f10 for the simulated-data caveat banner",
+  "Added n1 and t1 to f3's serves_tasks; updated f5's serves_tasks for t7's new label",
+  "Moved the timed-out click and the unperformed negative-control, comparison and reporting steps into not_done"
+ ],
+ "open_fixes": [
+  "Rerun t5-t11 each from defaults (and try |log2FC| 1.5/3.0 at padj 0.05) so their numbers can be replayed directly. This run only recorded them on carried-over settings.",
+  "Add a task reading the age and stage HRs in the Cox forest plot as a negative control (expected near 1). The run never recorded those values.",
+  "Add a task comparing the median-split KM/log-rank result with the continuous-IRS Cox estimate under the same settings, as the README Limitations suggests. This needs a run that reads both side by side.",
+  "Add an optional reporting task (record all sidebar values incl. seed, the input file versions, the downloaded cohort CSV, and repeat over several seeds before interpreting p). The run never recorded the settings as a set.",
+  "Set padj and GSEA FDR below 0.0001 (down to 1e-6) to reach the low-hit error screen, and confirm the 1e-6 minimum in the UI. The minimum is currently taken from the reviewer's reading of app.py.",
+  "Search 'natural killer' at GSEA FDR 0.05 and at 0.0001 to confirm that the 7 vs 16 difference comes from the FDR filter.",
+  "Replay f10 (banner) and confirm which screen shows it best. It was noted in the run's data note but not checked separately."
+ ],
+ "screens_at": "pilot/public/runs/irs-survival-analysis/20261101-110154/",
+ "screens_filed": {
+  "screens/038.webp": "screens/038.webp",
+  "screens/004.webp": "screens/004.webp",
+  "screens/016.webp": "screens/016.webp",
+  "screens/029.webp": "screens/029.webp",
+  "screens/006.webp": "screens/006.webp"
+ }
+}

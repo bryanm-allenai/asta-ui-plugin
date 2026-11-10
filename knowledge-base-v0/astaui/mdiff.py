@@ -319,7 +319,10 @@ def fit(pid: str, body: str, limit: int, salt: str = "") -> Tuple[str, List[Dict
                 head, used = head + piece, used + size
                 continue
             later: List[Dict[str, Any]] = []
-            if piece.lstrip().startswith("<"):
+            # Cut into an element only when it is too big to insert whole; one that
+            # fits an insert goes whole, so a small element (a table row, a cell
+            # with a number beside its label) is never cut where text sits.
+            if piece.lstrip().startswith("<") and size > limit:
                 open_tag, sub, close = opened(piece)
                 left = room - used - minted_len(open_tag + close)
                 if sub and left > 0:

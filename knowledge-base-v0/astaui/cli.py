@@ -18,6 +18,7 @@ from .extract import EXTRACT_VERSION, QUERY_VERSION, call_claude, card_schema, d
 from .index import Index
 from .kb import KB, KBError, check_id, init as kb_init, read_json, set_user_config, user_config, write_json, write_jsonl
 from .ontology import Ontology
+from . import memo
 from .privacy import scan_build, strip_build
 
 
@@ -47,7 +48,7 @@ def _read_json_arg(value: str) -> Any:
 
 
 def _kb(args) -> KB:
-    return KB.open(getattr(args, "kb", None))
+    return KB.open(getattr(args, "kb", None), everything=True if getattr(args, "with_set_aside", False) else None)
 
 
 def _ont(kb: KB) -> Ontology:
@@ -77,6 +78,8 @@ def cmd_config(args) -> int:
         return 0
     if args.key == "inbox-link":
         return _config_inbox(args)
+    if args.key == "database":
+        return _config_database(args)
     if args.unset:
         set_user_config("kb", None)
         _say("astaui will look for a knowledge base above the working folder, then use the one it shipped with.")
@@ -87,6 +90,41 @@ def cmd_config(args) -> int:
     KB.open(str(path))  # checks it is one
     where = set_user_config("kb", str(path))
     _say(f"astaui now uses {path} (saved in {where}).")
+    return 0
+
+
+def _config_database(args) -> int:
+    """The Postgres database this knowledge base keeps its vectors in, on this computer.
+    Kept per knowledge base in this computer's astaui settings, never in kb.json, so
+    the plugin scientists install carries no database."""
+    from .kb import user_config
+    from .store_pg import PgStore
+
+    kb = _kb(args)
+    key = str(kb.root.resolve())
+    per_kb = dict(user_config().get("database") or {})
+    if args.unset:
+        per_kb.pop(key, None)
+        set_user_config("database", per_kb or None)
+        _say(f"{kb.root} searches from its own index again; the database keeps its copy until you drop it.")
+        return 0
+    if not args.value:
+        raise KBError("astaui config database URL   (for example postgresql:///astaui)")
+    store = PgStore(args.value, kb, "check")
+    try:
+        with store._tx() as cur:
+            cur.execute("SELECT extversion FROM pg_extension WHERE extname = 'vector'")
+            row = cur.fetchone()
+    except Exception as e:
+        raise KBError(f"Could not reach {args.value}: {e}") from None
+    finally:
+        store.close()
+    if not row:
+        raise KBError(f"{args.value} answers, but pgvector is not on there (CREATE EXTENSION vector, as the postgres user)")
+    per_kb[key] = args.value
+    where = set_user_config("database", per_kb)
+    _say(f"{kb.root} keeps its vectors in {args.value} too (pgvector {row[0]}; saved in {where}). "
+         "`astaui index` copies them there now.")
     return 0
 
 
@@ -215,6 +253,8 @@ def cmd_status(args) -> int:
         _say(f"Cards with no build: {', '.join(orphan)}")
     _say(f"Evaluation: {data['queries']} queries, {data['pairs']} judged pairs")
     _say(f"Index: {info['embedder']}, built {info.get('built')}, {'up to date' if fresh else 'needs `astaui index`'}")
+    if info.get("database"):
+        _say(f"Database: {info['database']}")
     return 0
 
 
@@ -328,13 +368,14 @@ def cmd_extract(args) -> int:
         _print_json(card_schema())
         return 0
     if not args.api:
-        sys.stdout.write(extract_prompt(ont, build, args.out))
+        sys.stdout.write(extract_prompt(ont, build, args.out, code_only=args.code_only))
         return 0
     _writable(kb)
     provider = args.provider or kb.config["extract"].get("provider", "anthropic")
     model = args.model or kb.config["extract"].get("model", "claude-opus-5")
-    raw = call_claude(extract_prompt(ont, build), card_schema(), provider=provider, model=model)
-    card, chk = check_card(ont, raw, build, made={"by": f"api:{provider}", "model": model, "prompt": EXTRACT_VERSION})
+    raw = call_claude(extract_prompt(ont, build, code_only=args.code_only), card_schema(), provider=provider, model=model)
+    made = {"by": f"api:{provider}", "model": model, "prompt": EXTRACT_VERSION, "from": "code" if args.code_only else "prompts"}
+    card, chk = check_card(ont, raw, build, made=made)
     if args.out:
         write_json(Path(args.out), raw)
     return _finish_put(kb, args.id, card, chk, args.json, dry=args.dry_run)
@@ -374,7 +415,7 @@ def cmd_card(args) -> int:
             raise KBError("astaui card put <build id> <file or ->")
         build = kb.build(args.id)
         raw = _read_json_arg(args.file)
-        made = {"by": args.by or "agent", "prompt": EXTRACT_VERSION}
+        made = {"by": args.by or "agent", "prompt": EXTRACT_VERSION, "from": args.source}
         if args.model:
             made["model"] = args.model
         card, chk = check_card(ont, raw, build, made=made)
@@ -488,6 +529,9 @@ def cmd_index(args) -> int:
     else:
         _say(f"Index for {idx.embedder.id}: {stats['builds']} builds, {stats['cards']} cards, {stats['parts']} parts; "
              f"embedded {stats['embedded']} new texts, reused {stats['reused']}.")
+        if "database" in stats:
+            d = stats["database"]
+            _say(f"Database {idx.store.url}: wrote {d['added']}, removed {d['removed']}, kept {d['kept']}.")
     return 0
 
 
@@ -820,6 +864,76 @@ def cmd_workflows(args) -> int:
     return 0
 
 
+def cmd_features(args) -> int:
+    """The features agents named in the builds they ran, by group (kb/features.json)."""
+    from . import features as F
+
+    kb = _kb(args)
+    if args.what == "todo":
+        _print_json(F.todo(kb.root))
+        return 0
+    if args.what == "put":
+        if not args.file:
+            raise KBError("features put needs a JSON file mapping each feature (build/fN) to a group key")
+        try:
+            _print_json(F.put(kb.root, _read_json_arg(args.file)))
+        except ValueError as e:
+            raise KBError(str(e))
+        return 0
+    gs = F.groups(kb.root, set(kb.build_ids()))
+    if args.json:
+        _print_json([{"key": g.key, "name": g.name, "about": g.about, "features": len(g.members), "builds": len(g.builds())} for g in gs])
+    else:
+        for g in gs:
+            _say(f"{len(g.members):4d} features in {len(g.builds()):3d} builds  {g.name}")
+    return 0
+
+
+def cmd_aside(args) -> int:
+    """Which builds kb.json's set_aside rules leave out, and what other rules would."""
+    from . import aside as A
+
+    kb = _kb(args)
+    ids = kb.all_build_ids()
+    rules = kb.config.get("set_aside") or {}
+    if args.clear or args.set:
+        _writable(kb)
+        try:
+            new = {} if args.clear else A.parse(args.set)
+        except ValueError as e:
+            raise KBError(str(e))
+        if not args.clear and rules.get("builds"):
+            new["builds"] = rules["builds"]
+        conf = read_json(kb.root / "kb.json")
+        if new:
+            conf["set_aside"] = new
+        else:
+            conf.pop("set_aside", None)
+        write_json(kb.root / "kb.json", conf)
+        rules = new
+        _say("Saved. Run `astaui index` so search follows, then refresh the console.")
+    if args.rules:
+        try:
+            rules = A.parse(args.rules)
+        except ValueError as e:
+            raise KBError(str(e))
+    out = A.set_aside(kb.builds_dir, ids, rules)
+    if args.json:
+        _print_json({"rules": rules, "builds": len(ids), "kept": len(ids) - len(out), "set_aside": out,
+                     "ways": [{"rule": f"{k}={v}", "would_set_aside": n} for k, v, n in A.tally(kb.builds_dir, ids)]})
+        return 0
+    said = " ".join(f"{k}={','.join(v) if isinstance(v, list) else v}" for k, v in rules.items() if k != "builds")
+    _say(f"{'Trying' if args.rules else 'Rules'}: {said or 'none'}" + (f" (and {len(rules['builds'])} by hand)" if rules.get("builds") else ""))
+    _say(f"{len(ids)} builds; {len(out)} set aside, {len(ids) - len(out)} kept.")
+    for b, why in sorted(out.items()):
+        _say(f"  {b}: {'; '.join(why)}")
+    _say("\nOther ways to set builds aside, and how many each leaves out on its own:")
+    for k, v, n in A.tally(kb.builds_dir, ids):
+        _say(f"  {n:4d}  {k}={v}    ({A.RULES[k]})")
+    _say("\nTry a mix with `astaui aside --try depth=shallow,deep coverage_below=3`; save it with --set.")
+    return 0
+
+
 def cmd_compare(args) -> int:
     from .workflows import StepSpace, compare_cards, format_diff
 
@@ -857,8 +971,8 @@ def cmd_feedback(args) -> int:
 
 def _card_problems(kb: KB, ont: Ontology, cid: str) -> List[str]:
     card = kb.card(cid)
-    _, chk = check_card(ont, card, kb.build(cid), made=card.get("made"))
-    problems = [f"card {cid}: {e}" for e in chk.errors]
+    errors, _ = memo.card_check(kb, ont, card, kb.build(cid))
+    problems = [f"card {cid}: {e}" for e in errors]
     if card.get("ontology") != ont.version:
         problems.append(f"card {cid}: written for ontology {card.get('ontology')}, the ontology is {ont.version} (re-extract it)")
     return problems
@@ -886,7 +1000,7 @@ def run_checks(kb: KB) -> List[str]:
     builds = kb.build_ids()
     for bid in builds:
         problems += [f"build {bid}: {p}" for p in check_build(kb, bid)]
-        for f in scan_build(kb.build(bid)):
+        for f in memo.findings(kb, kb.build(bid)):
             if f.level == "block":
                 problems.append(f"build {bid}: {f.what} in {f.file}:{f.line}")
     for cid in kb.card_ids():
@@ -969,6 +1083,8 @@ def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="astaui", description="A knowledge base of the interfaces scientists build: file them, describe them, find them.")
     p.add_argument("--version", action="version", version=f"astaui {__version__}")
     p.add_argument("--kb", help="the knowledge base folder (default: $ASTAUI_KB, `astaui config kb`, a kb above here, or the bundled one)")
+    p.add_argument("--with-set-aside", action="store_true",
+                   help="also see the builds kb.json's set_aside rules leave out (or set ASTAUI_WITH_SET_ASIDE=1); `astaui aside` lists them")
     sub = p.add_subparsers(dest="command", metavar="command")
 
     def cmd(name: str, help: str, fn, json_flag: bool = True, embedder: bool = False):
@@ -980,13 +1096,20 @@ def parser() -> argparse.ArgumentParser:
             sp.add_argument("--embedder", help="lexical, st:<model>, voyage:<model>, gemini:<model> or vertex:<model> (default: kb.json)")
         return sp
 
+    sp = cmd("aside", "show which builds are set aside (left out of search, the index and the console) and why, "
+             "try other rules, or save them to kb.json", cmd_aside)
+    sp.add_argument("--try", dest="rules", nargs="+", metavar="RULE", help="rules to try without saving, e.g. depth=shallow,deep point_below=4")
+    sp.add_argument("--set", nargs="+", metavar="RULE", help="save these rules as kb.json's set_aside (builds named by hand are kept)")
+    sp.add_argument("--clear", action="store_true", help="set nothing aside")
+
     sp = cmd("init", "make an empty knowledge base", cmd_init, json_flag=False)
     sp.add_argument("path")
     sp.add_argument("--name", default="AstaUI knowledge base")
 
-    sp = cmd("config", "set which knowledge base astaui uses (config kb PATH), or the drive link builds are sent through "
-             "(config inbox-link LINK)", cmd_config, json_flag=False)
-    sp.add_argument("key", nargs="?", choices=["kb", "inbox-link", "show"])
+    sp = cmd("config", "set which knowledge base astaui uses (config kb PATH), the drive link builds are sent through "
+             "(config inbox-link LINK), or the Postgres database its vectors are kept in (config database URL)",
+             cmd_config, json_flag=False)
+    sp.add_argument("key", nargs="?", choices=["kb", "inbox-link", "database", "show"])
     sp.add_argument("value", nargs="?")
     sp.add_argument("--unset", action="store_true")
     sp.add_argument("--public", metavar="ADDRESS", help="the address the drive answers at from outside, for a link made on this computer")
@@ -1032,6 +1155,9 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--provider", choices=["anthropic", "vertex"])
     sp.add_argument("--model")
     sp.add_argument("--out", help="where the card JSON goes (named in the instructions; with --api, the raw answer)")
+    sp.add_argument("--with-prompts", dest="code_only", action="store_false",
+                    help="also read the prompts and the filer's notes, as cards were written before extract/4; by default the card is written from the code alone")
+    sp.add_argument("--code-only", dest="code_only", action="store_true", help=argparse.SUPPRESS)
     sp.add_argument("--missing", action="store_true", help="list builds that have no card")
     sp.add_argument("--schema", action="store_true", help="print the card's JSON Schema")
     sp.add_argument("--dry-run", action="store_true")
@@ -1042,6 +1168,8 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("file", nargs="?", help="card JSON: a file, - for stdin, or inline JSON")
     sp.add_argument("--by", help="who wrote it (default: agent)")
     sp.add_argument("--model")
+    sp.add_argument("--from", dest="source", choices=["code", "prompts"], default="code",
+                    help="what the card was written from: the code alone (the default), or the prompts and the code")
     sp.add_argument("--all", action="store_true")
     sp.add_argument("--dry-run", action="store_true")
 
@@ -1120,6 +1248,11 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--dry-run", action="store_true")
 
     cmd("workflows", "group builds into workflow families, and say what is each one's own", cmd_workflows, embedder=True)
+
+    sp = cmd("features", "the features agents named in the builds they ran, by group; todo lists those no group holds, put places them",
+             cmd_features)
+    sp.add_argument("what", nargs="?", choices=["list", "todo", "put"], default="list")
+    sp.add_argument("file", nargs="?", help="for put: a JSON file mapping build/fN to a group key, or - for stdin")
 
     sp = cmd("compare", "line up two builds' workflows: shared steps, how each does them, what is each one's own", cmd_compare, embedder=True)
     sp.add_argument("a")

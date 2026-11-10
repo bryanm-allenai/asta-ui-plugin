@@ -1,0 +1,409 @@
+{
+  "schema": "astaui.card/1",
+  "id": "tess-star-tracker",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:26:11Z"
+  },
+  "app": {
+    "title": "Star Tracker Pipeline — Interactive Walkthrough",
+    "summary": "A person picks a test sky image from a list, or uploads one with its calibration label, and chooses whether to replay a stored run or run the solver live. They can set the detection threshold and the pause between stages. Pressing Run plays the pipeline one stage at a time, each with an overlay or a table: detected sources, the brightest subset turned into direction vectors, the matched catalog triangle, the first rotation, and the iterative refinement. It ends with a pass/fail quality gate and a final attitude, compared with the ground truth as an angular error and an overlay of matched pairs.",
+    "task": {
+      "text": "Watch an image-to-attitude solver work through each stage on one image, and check its final orientation estimate against the ground truth.",
+      "verbs": [
+        "derive",
+        "identify",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "Grayscale sky images, each with a label holding the camera calibration and ground-truth pointing, matched against a star catalog table",
+      "item": "one sky image with its calibration and ground-truth label",
+      "shapes": [
+        "image",
+        "image collection",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "checking a trained detection-and-matching pipeline on held-out images, after training",
+      "terms": [
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar sets the input image, live or replay mode, the threshold and the pacing. The main column then shows one collapsible status block per pipeline stage, in order, each with an image overlay, a small table or the key numbers, and ends with summary metrics and a predicted-versus-truth table.",
+      "views": [
+        "image viewer",
+        "table view",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "import",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "step by step walkthrough",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "lost-in-space star identification and attitude determination in astronomy",
+      "disciplines": [
+        "astronomy"
+      ],
+      "terms": [
+        "star tracker",
+        "plate solving",
+        "attitude determination"
+      ]
+    },
+    "workflow": {
+      "name": "run a multi-stage solver on one item and judge its result against a reference",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pick a test-set PNG from a dropdown, or upload a PNG with its JSON label, which holds the WCS and the ground truth. Replay mode locks you to images that have stored artefacts.",
+          "parts": [
+            "run-controls"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The input image is shown with metrics for size, plate scale, boresight RA/Dec and the number of ground-truth stars before anything runs",
+          "parts": [
+            "input-preview"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The U-Net finds centroids on 512 px tiles, drawn as red circles, with an optional heatmap of the centre tile. The 60 brightest are kept and turned into distortion-corrected body unit vectors, with a sample table.",
+          "parts": [
+            "detection-stage",
+            "body-vector-stage"
+          ]
+        },
+        {
+          "step": "match items against a reference set",
+          "here": "A RANSAC triangle search matches three detections to three catalog stars by their pairwise angles. The triangle is drawn in lime, with a table of body and catalog angles.",
+          "parts": [
+            "triangle-stage"
+          ]
+        },
+        {
+          "step": "refine the estimate iteratively",
+          "here": "A Wahba SVD gives a rough rotation matrix. A plate solve then refits RA, Dec and roll as the matching tolerance tightens (30, then 5, then 1.5 px), and each pass is logged in a history table.",
+          "parts": [
+            "refinement-stage"
+          ]
+        },
+        {
+          "step": "check the result against the reference and pass or fail it",
+          "here": "The quality gate needs a median residual under 2 px and at least 8 matches. The final angular error against the truth, a predicted-versus-truth pose table, and an overlay of detections linked to projected catalog stars are shown. Stored failures are shown as refusals.",
+          "parts": [
+            "result-stage",
+            "stage-walkthrough"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Replay and Live modes give the same numbers: replay renders stored artefacts instantly, while live mode runs a solver that can take minutes",
+        "A quality gate refuses to publish an unreliable attitude, and a recorded refusal is shown as the intended output rather than an error",
+        "Pixels are turned into direction vectors through the camera's distortion polynomial before they are matched against the catalog",
+        "An animation delay paces the stages so each result can be read before the next appears"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "run-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Execution mode, input and settings sidebar",
+      "summary": "Choose replay or live mode, pick a test image or upload an image with its label, set the detection threshold and stage delay, and start the run.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/Code/Streamlit_app/pipeline_app.py",
+          "start": 92,
+          "end": 154,
+          "role": "markup",
+          "anchor": "ac7e9c2a3081",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/Code/Streamlit_app/pipeline_app.py",
+          "start": 64,
+          "end": 69,
+          "role": "logic",
+          "symbol": "load_model",
+          "anchor": "064ad13084d0",
+          "first": "def load_model():"
+        },
+        {
+          "file": "code/Code/Streamlit_app/pipeline_app.py",
+          "start": 73,
+          "end": 74,
+          "role": "logic",
+          "symbol": "load_identifier",
+          "anchor": "c7dd14a47640",
+          "first": "def load_identifier():"
+        }
+      ]
+    },
+    {
+      "id": "input-preview",
+      "level": "view",
+      "parent": null,
+      "title": "Input image preview",
+      "summary": "Shows the chosen image with its size, plate scale, boresight and ground-truth star count before the run starts.",
+      "views": [
+        "image viewer",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/Code/Streamlit_app/pipeline_app.py",
+          "start": 180,
+          "end": 207,
+          "role": "markup",
+          "anchor": "aa2b56e4a66c",
+          "first": "if img_np is None:"
+        },
+        {
+          "file": "code/Code/Streamlit_app/pipeline_app.py",
+          "start": 159,
+          "end": 164,
+          "role": "logic",
+          "symbol": "show_image_with_overlay",
+          "anchor": "abf01d12a643",
+          "first": "def show_image_with_overlay(ax, img, vmin, vmax, title=\"\"):"
+        }
+      ]
+    },
+    {
+      "id": "stage-walkthrough",
+      "level": "view",
+      "parent": null,
+      "title": "Staged pipeline walkthrough",
+      "summary": "Sets up the camera model, loads a stored artefact or the live models, and shows a stored quality-gate refusal when the replayed image had no solution.",
+      "views": [
+        "image viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "step by step walkthrough"
+      ],
+      "spans": [
+        {
+          "file": "code/Code/Streamlit_app/pipeline_app.py",
+          "start": 209,
+          "end": 266,
+          "role": "logic",
+          "anchor": "208fab1eadcf",
+          "first": "# ---------------------------------------------------------------------------"
+        }
+      ]
+    },
+    {
+      "id": "detection-stage",
+      "level": "component",
+      "parent": "stage-walkthrough",
+      "title": "Stage 1: source detection",
+      "summary": "Runs or replays tiled U-Net detection and overlays the centroids on the image, with the raw heatmap of the centre tile in live mode.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/Code/Streamlit_app/pipeline_app.py",
+          "start": 267,
+          "end": 332,
+          "role": "logic",
+          "anchor": "9e77c17d676e",
+          "first": "# ============================ STAGE 1 ==================================="
+        },
+        {
+          "file": "code/Code/Star_ID/inference_full.py",
+          "start": 339,
+          "end": 361,
+          "role": "logic",
+          "symbol": "detect_unet",
+          "anchor": "163e1576d876",
+          "first": "def detect_unet(model, img_np, device, threshold=0.55, flux_window=7):"
+        }
+      ]
+    },
+    {
+      "id": "body-vector-stage",
+      "level": "component",
+      "parent": "stage-walkthrough",
+      "title": "Stage 2: brightest subset and body vectors",
+      "summary": "Keeps the brightest detections, turns them into distortion-corrected unit vectors, highlights them on the image and lists a sample in both coordinate systems.",
+      "views": [
+        "image viewer",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/Code/Streamlit_app/pipeline_app.py",
+          "start": 334,
+          "end": 392,
+          "role": "logic",
+          "anchor": "ecfcdba98859",
+          "first": "# ============================ STAGE 2 ==================================="
+        },
+        {
+          "file": "code/Code/Star_ID/inference_full.py",
+          "start": 59,
+          "end": 73,
+          "role": "logic",
+          "symbol": "pixels_to_body_vecs",
+          "anchor": "05a586cf8418",
+          "first": "def pixels_to_body_vecs(xy, wcs_full, ps_rad):"
+        }
+      ]
+    },
+    {
+      "id": "triangle-stage",
+      "level": "component",
+      "parent": "stage-walkthrough",
+      "title": "Stage 3: triangle match to the catalog",
+      "summary": "Finds or replays the three-star triangle that matches the catalog, and shows it on the image with a table of pairwise angles.",
+      "views": [
+        "image viewer",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/Code/Streamlit_app/pipeline_app.py",
+          "start": 394,
+          "end": 496,
+          "role": "logic",
+          "anchor": "4d1b1ef307a2",
+          "first": "# ============================ STAGE 3 ==================================="
+        }
+      ]
+    },
+    {
+      "id": "refinement-stage",
+      "level": "component",
+      "parent": "stage-walkthrough",
+      "title": "Stages 4–5: rotation and plate-solve refinement",
+      "summary": "Shows the first rotation matrix and the boresight it implies, then refines the pose over tightening tolerances, logging matches and residuals at each pass.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/Code/Streamlit_app/pipeline_app.py",
+          "start": 498,
+          "end": 622,
+          "role": "logic",
+          "anchor": "5e0219a52225",
+          "first": "# ============================ STAGE 4 ==================================="
+        },
+        {
+          "file": "code/Code/Streamlit_app/pipeline_app.py",
+          "start": 561,
+          "end": 566,
+          "role": "logic",
+          "symbol": "matches_to_pairs",
+          "anchor": "ba8078d7ccde",
+          "first": "def matches_to_pairs(matches):"
+        },
+        {
+          "file": "code/Code/Star_ID/inference_full.py",
+          "start": 183,
+          "end": 208,
+          "role": "logic",
+          "symbol": "plate_solve",
+          "anchor": "5546f84e3438",
+          "first": "def plate_solve(pixel_xy, ref_radec, intr_keys, cd_intrinsic, init_pose,"
+        },
+        {
+          "file": "code/Code/Star_ID/inference_full.py",
+          "start": 219,
+          "end": 257,
+          "role": "logic",
+          "symbol": "refine_matches_by_projection",
+          "anchor": "7f5b663424c4",
+          "first": "def refine_matches_by_projection(wcs, det_xy, identifier, img_w, img_h,"
+        }
+      ]
+    },
+    {
+      "id": "result-stage",
+      "level": "component",
+      "parent": "stage-walkthrough",
+      "title": "Stages 6–7: quality gate and final attitude",
+      "summary": "Passes or fails the solution on residual and match count, then reports the angular error against the truth, a predicted-versus-truth pose table, and an overlay linking detections to projected catalog stars.",
+      "views": [
+        "summary stats",
+        "table view",
+        "image viewer"
+      ],
+      "interactions": [],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/Code/Streamlit_app/pipeline_app.py",
+          "start": 624,
+          "end": 700,
+          "role": "logic",
+          "anchor": "6dec241b9482",
+          "first": "# ============================ STAGE 6 ==================================="
+        },
+        {
+          "file": "code/Code/Star_ID/inference_full.py",
+          "start": 328,
+          "end": 332,
+          "role": "logic",
+          "symbol": "angular_error_arcsec",
+          "anchor": "b14c8d43a0f4",
+          "first": "def angular_error_arcsec(q1, q2):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "patterns",
+      "term": "step by step walkthrough"
+    }
+  ]
+}

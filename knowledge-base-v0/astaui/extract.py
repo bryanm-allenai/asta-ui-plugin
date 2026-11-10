@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .kb import Build, KBError
 from .ontology import FACETS, LISTS, PART_LISTS, Ontology
 
-EXTRACT_VERSION = "extract/3"
+EXTRACT_VERSION = "extract/4"
 QUERY_VERSION = "describe/2"
 MAX_CODE_LINES = 2500
 MAX_FILE_LINES = 1600
@@ -58,17 +58,23 @@ def _numbered(text: str, limit: int) -> Tuple[str, int, bool]:
     return body, len(lines), len(lines) > limit
 
 
-def build_material(build: Build, max_lines: int = MAX_CODE_LINES) -> str:
+def build_material(build: Build, max_lines: int = MAX_CODE_LINES, code_only: bool = True) -> str:
     """The build as the extractor reads it: metadata, every prompt, the code with
-    line numbers (entry file first)."""
-    meta = {k: build.meta.get(k) for k in ("id", "title", "author", "sources", "entry", "notes") if build.meta.get(k)}
-    out = ["### build.json", json.dumps(meta, indent=2, ensure_ascii=False), "", "### Prompts, in order"]
-    if build.prompts:
-        for i, t in enumerate(build.prompts, 1):
-            out.append(f"[{i}] {t.get('text', '').strip()}")
-    else:
-        out.append("(none: this build came without prompts)")
-    out.append("")
+    line numbers (entry file first). By default (``code_only``) the prompts and
+    the filer's notes are left out, so the card says only what the code shows and
+    a build found in a repository, with no conversation behind it, is described
+    the same way as one filed with its prompts."""
+    keys = ("id", "title", "sources", "entry") if code_only else ("id", "title", "author", "sources", "entry", "notes")
+    meta = {k: build.meta.get(k) for k in keys if build.meta.get(k)}
+    out = ["### build.json", json.dumps(meta, indent=2, ensure_ascii=False), ""]
+    if not code_only:
+        out.append("### Prompts, in order")
+        if build.prompts:
+            for i, t in enumerate(build.prompts, 1):
+                out.append(f"[{i}] {t.get('text', '').strip()}")
+        else:
+            out.append("(none: this build came without prompts)")
+        out.append("")
     files = build.code_files()
     entry = build.meta.get("entry")
     files.sort(key=lambda p: (0 if str(p.relative_to(build.path)) == entry else 1, str(p)))
@@ -189,7 +195,22 @@ def query_schema() -> Dict[str, Any]:
     return {"type": "object", "properties": props, "required": list(props), "additionalProperties": False}
 
 
-def extract_prompt(ont: Ontology, build: Build, out_path: Optional[str] = None) -> str:
+CODE_ONLY_NOTE = """
+## Reading the code for what nobody said
+
+This build is read from its code alone: there are no prompts and no notes from the person who made it. Everything on the card has to come from what the code shows: its labels, headings, button text and placeholders, the names of its functions, fields and files, its sample or seed data, its comments, and a README if there is one. Three facets are easy to get wrong this way. Work them out in this order before you write the card.
+
+1. **The workflow.** Walk the interface as a person would use it. Start where the data comes in (a file input, a paste box, seeded data) and end where the result leaves (an export, a copy button, a saved file, a final status). On the way, go through every control a person touches, in the order the code makes them available: what is disabled until something else is done, what a view needs before it can draw. Every control that does part of the job is a step, including the small ones: a search that finds every occurrence, a slider that narrows to one period, a total by category, a click in one view that finds the item in another. Merge two controls only when they make the same move. Then name the workflow by what the person ends up with, because that is the job: the file it exports, the number it computes, the text it drafts, the decision it records. "Estimate each sample's concentration from a standard curve and flag the ones out of range" names the job; "plot absorbance against standards" names only the screen.
+
+2. **The stage.** Read it from what must already exist before the interface is any use, and from what it hands on. The input says what has been done: raw instrument output means it comes early (explore, clean); items someone already labelled mean it comes after annotating (compare, confirm). The output says what comes next: a cleaned table goes to analysis; a written judgement goes to review or report. Write `text` as one short phrase that names the work and where it sits, the way the person would say it ("cleaning sensor logs after a deployment, before modelling"), with no data values. Put first the term for what the person spends most of their time doing, and add another only when the interface covers that stage as a whole, not because one button touches it: an export button is not "report", and a confirm dialog is not "confirm". Whether the scheme can change during the work says something too: a label set the person can edit as they go means exploratory, inductive work; a fixed one means applying a scheme already agreed.
+
+3. **The field.** The code can show three things that are easy to mix up. The sample's topic is what this one study is about (coral bleaching, voter turnout). The method is what the interface computes and how it treats the data (curves fitted per sample, passages coded against a scheme, agreement measured between raters). The discipline is the community whose method that is. `field` is the method and the discipline, never the sample's topic, because the next person with the same method studies a different topic. Write `text` as the method in the discipline ("dose-response assays in pharmacology"), and put the discipline's usual name among the `terms` ("pharmacology"). Read the method from the domain words in labels and function names, the units, the statistics computed, the file formats and the libraries, and name it in that field's own terms ("dose-response", "peak picking", "occupancy modelling"). Add a narrower term (a subfield, a venue, a community) only when the code names it, in a heading, a label or a README.
+
+When the code does not show a facet, say the least it supports rather than guessing, and leave the words empty if nothing supports any.
+"""
+
+
+def extract_prompt(ont: Ontology, build: Build, out_path: Optional[str] = None, code_only: bool = True) -> str:
     example = {
         "app": {
             "title": "…",
@@ -210,13 +231,13 @@ def extract_prompt(ont: Ontology, build: Build, out_path: Optional[str] = None) 
                        {"file": "code/index.html", "start": 412, "end": 420, "role": "logic"}]},
         ],
     }
-    finish = (f"Write the JSON to {out_path} and run `astaui card put {build.id} {out_path}`. "
-              if out_path else f"Write the JSON to a file and run `astaui card put {build.id} <file>`. ")
+    put = f"astaui card put {build.id} {out_path or '<file>'}" + ("" if code_only else " --from prompts")
+    finish = f"Write the JSON to {out_path or 'a file'} and run `{put}`. "
     return f"""\
 # Write the card for build `{build.id}`
 
-You are describing an interface a scientist built with a coding agent, so that other scientists can find it when they need something with the same structure. Read the build below (its prompts and its code) and write its card as JSON.
-
+You are describing an interface a scientist built with a coding agent, so that other scientists can find it when they need something with the same structure. Read the build below ({'its code' if code_only else 'its prompts and its code'}) and write its card as JSON.
+{CODE_ONLY_NOTE if code_only else ''}
 ## The card
 
 {FACET_GUIDE}
@@ -244,7 +265,7 @@ Then list the parts: the views (regions of the screen) and the components inside
 
 ## The build
 
-{build_material(build)}
+{build_material(build, code_only=code_only)}
 """
 
 

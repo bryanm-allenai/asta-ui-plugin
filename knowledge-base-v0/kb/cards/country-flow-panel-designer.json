@@ -1,0 +1,785 @@
+{
+  "schema": "astaui.card/1",
+  "id": "country-flow-panel-designer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T09:00:33Z"
+  },
+  "app": {
+    "title": "Country Flow — Panel designer · BD FACSCanto II",
+    "summary": "The person names an experiment, chooses a species and turns a live/dead dye on or off. They search their lab's antibody catalog to pick the markers to measure, and can mark some as backbone so those markers go on every panel. A solver assigns each marker to a panel and a detector using reagents that are in stock. It flags markers that do not fit or have no usable reagent, warns about low-stock, expired or spillover-prone choices, and offers to add a panel. The person adds or removes panels until everything fits, enters the operator and run date, then exports a printable panel figure and a CSV with one row per panel × detector for the lab notebook.",
+    "task": {
+      "text": "Plan a multicolour flow cytometry experiment by splitting the chosen markers across panels so that each one gets a free detector and an antibody the lab has in stock, then record the plan for the notebook.",
+      "verbs": [
+        "plan",
+        "derive",
+        "curate",
+        "lookup",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "An inventory of antibody reagents (marker, species, fluor, clone, vendor, lot, location, expiry, stock status) matched against a fixed set of instrument detectors, which yields an assignment of markers to panel × detector slots.",
+      "item": "an antibody vial in the catalog, or a marker placed in one detector slot of one panel",
+      "shapes": [
+        "table",
+        "per element",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "planning the stain panels before a cytometry run, using the lab's antibody inventory",
+      "terms": [
+        "plan",
+        "maintain"
+      ]
+    },
+    "mechanism": {
+      "text": "A setup column of experiment settings and a searchable marker picker drives a solver that redraws a board of panel tables on every change, with alerts for markers that do not fit and buttons to add panels. A separate catalog tab keeps the reagent inventory the solver draws on, and an export tab draws the same assignment as a printable figure and writes it out as a CSV.",
+      "views": [
+        "form",
+        "list",
+        "table view",
+        "summary stats",
+        "canvas"
+      ],
+      "interactions": [
+        "search",
+        "select",
+        "keyboard shortcuts",
+        "filter",
+        "inline edit",
+        "import",
+        "export",
+        "toggle view"
+      ],
+      "patterns": [
+        "master-detail",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "multicolour flow cytometry panel design in immunology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "flow cytometry",
+        "immunology",
+        "panel design"
+      ]
+    },
+    "workflow": {
+      "name": "assign requested items to limited slots from an inventory and record the plan",
+      "steps": [
+        {
+          "step": "set up the run's constraints",
+          "here": "Experiment name, Human or Mouse species, and a checkbox for PI live/dead that reserves the PerCP-Cy5.5 detector on every panel. Switching species clears the picks.",
+          "parts": [
+            "experiment-setup"
+          ]
+        },
+        {
+          "step": "choose the items to place",
+          "here": "A combobox search over the species' catalog markers, with arrow keys and Enter to add, shows which fluors are in stock for each marker. Each picked marker can be toggled Backbone or removed, and a counter shows slots needed against slots available.",
+          "parts": [
+            "marker-picker"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A branch-and-bound solver places as many markers as possible, keeps panels evenly loaded, and avoids low-stock or expired vials and detectors that PI spills into. Each panel is drawn as a detector × marker × reagent × location table.",
+          "parts": [
+            "panel-board"
+          ]
+        },
+        {
+          "step": "resolve what does not fit",
+          "here": "A red alert lists the markers left without a free detector, says how many panels the set needs and offers an 'Add Panel X' button. A note lists markers with no usable reagent, and 'Things to check' lists warnings about spillover, low stock and expiry.",
+          "parts": [
+            "panel-board"
+          ]
+        },
+        {
+          "step": "keep the inventory in order",
+          "here": "The catalog tab filters by species and text, and lets the person add, edit or delete antibodies, import a CSV with loose header matching, sync from a published Google Sheet (replace or merge), and download the catalog or a blank template.",
+          "parts": [
+            "catalog-view",
+            "catalog-import",
+            "antibody-form"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "After the operator and run date are entered, the panels are drawn as a canvas figure that can be downloaded as a PNG or printed, and a CSV is written with one row per panel × detector.",
+          "parts": [
+            "export-view"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The slots are fixed by an instrument configuration: a set number of detectors per panel, each reading a family of fluor names, plus a viability dye that takes one detector on every panel.",
+        "Backbone markers must take the same detector and reagent on every panel, while other markers go on one panel each.",
+        "The solver's score ranks the most markers placed first, then even panel load, then penalties for low-stock or expired vials and for detectors that receive spillover from the viability dye.",
+        "When the markers do not fit, the app computes the smallest number of panels that would hold them and offers to add one.",
+        "Only reagents marked as not Out and read by a configured detector can be used, so the inventory directly limits what the plan can contain."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "experiment-setup",
+      "level": "component",
+      "parent": "panel-board",
+      "title": "Experiment setup",
+      "summary": "Sets the experiment name, the species and whether PI live/dead reserves a detector, and can start a new experiment.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 41,
+          "end": 61,
+          "role": "markup",
+          "anchor": "b15100d9082d",
+          "first": "<div class=\"card\">"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 108,
+          "end": 108,
+          "role": "style",
+          "symbol": ".seg",
+          "anchor": "6651263ef4b9",
+          "first": ".seg { display: inline-flex; border: 1px solid var(--rule-strong); border-radius: 8px; overflow: hidden; align-self: fle"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 112,
+          "end": 112,
+          "role": "style",
+          "symbol": ".check",
+          "anchor": "29476808d9ef",
+          "first": ".check { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--ru"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 142,
+          "end": 148,
+          "role": "logic",
+          "symbol": "renderSetup",
+          "anchor": "b724fbd6a3c2",
+          "first": "function renderSetup() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 281,
+          "end": 289,
+          "role": "logic",
+          "symbol": "setSpecies",
+          "anchor": "086f4dc753cf",
+          "first": "function setSpecies(sp) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 278,
+          "end": 290,
+          "role": "logic",
+          "anchor": "868afdfdd883",
+          "first": "$('exp-name').addEventListener('input', function (e) { state.exp.name = e.target.value; saveExp(); renderBoard(); });"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 335,
+          "end": 343,
+          "role": "logic",
+          "anchor": "0f01fcb1e6a1",
+          "first": "$('new-exp').addEventListener('click', function () {"
+        }
+      ]
+    },
+    {
+      "id": "marker-picker",
+      "level": "component",
+      "parent": "panel-board",
+      "title": "Surface marker picker",
+      "summary": "Searches the catalog for markers and shows which fluors are in stock for each. Picked markers are listed with where each one landed, and each can be marked as backbone or removed.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "search",
+        "select",
+        "keyboard shortcuts"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 63,
+          "end": 82,
+          "role": "markup",
+          "anchor": "d6ff331d6249",
+          "first": "<div class=\"card\">"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 118,
+          "end": 118,
+          "role": "style",
+          "symbol": ".results",
+          "anchor": "9784ffc7ec22",
+          "first": ".results { display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 119,
+          "end": 119,
+          "role": "style",
+          "symbol": ".result",
+          "anchor": "3394a3e6b26a",
+          "first": ".result { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 6px 12px; border: 0; border-bottom: "
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 126,
+          "end": 126,
+          "role": "style",
+          "symbol": ".pick",
+          "anchor": "49edc780092a",
+          "first": ".pick { display: flex; align-items: center; gap: 8px; min-height: 50px; border-top: 1px solid var(--rule); }"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 129,
+          "end": 129,
+          "role": "style",
+          "symbol": ".bb",
+          "anchor": "46bcc6406bfd",
+          "first": ".bb { min-height: 36px; padding: 0 12px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px solid var(--"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 150,
+          "end": 174,
+          "role": "logic",
+          "symbol": "renderResults",
+          "anchor": "ff2b1ca22da5",
+          "first": "function renderResults() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 176,
+          "end": 183,
+          "role": "logic",
+          "symbol": "addMarker",
+          "anchor": "ca93210c580e",
+          "first": "function addMarker(m) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 185,
+          "end": 212,
+          "role": "logic",
+          "symbol": "renderPicked",
+          "anchor": "54136534ceb0",
+          "first": "function renderPicked() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 92,
+          "end": 99,
+          "role": "logic",
+          "symbol": "stockSummary",
+          "anchor": "dafa26417bc1",
+          "first": "function stockSummary(marker) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 291,
+          "end": 317,
+          "role": "logic",
+          "anchor": "8e305ad686ee",
+          "first": "$('marker-q').addEventListener('input', function (e) { state.query = e.target.value; state.active = 0; renderResults(); "
+        }
+      ]
+    },
+    {
+      "id": "panel-board",
+      "level": "view",
+      "parent": null,
+      "title": "Panel board",
+      "summary": "Runs the solver and draws each panel as a detector table with its marker, reagent and storage location. It also alerts on markers that do not fit or have no stock and lets the person add or remove panels.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 85,
+          "end": 103,
+          "role": "markup",
+          "anchor": "118b17eeae6d",
+          "first": "<div class=\"board\">"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 141,
+          "end": 141,
+          "role": "style",
+          "symbol": ".panels",
+          "anchor": "1cb42577f16f",
+          "first": ".panels { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 16px; }"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 142,
+          "end": 142,
+          "role": "style",
+          "symbol": ".panel",
+          "anchor": "3f0b7eafbf4d",
+          "first": ".panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; min-width: 0;"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 143,
+          "end": 143,
+          "role": "style",
+          "symbol": ".panel-head",
+          "anchor": "b05703d16500",
+          "first": ".panel-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--rule); }"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 135,
+          "end": 135,
+          "role": "style",
+          "symbol": ".alert",
+          "anchor": "1a3ede8caefa",
+          "first": ".alert { background: var(--danger-tint); border: 2px solid var(--danger); border-radius: 12px; padding: 16px; display: f"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 139,
+          "end": 139,
+          "role": "style",
+          "symbol": ".notes",
+          "anchor": "5a4cb8cb00fd",
+          "first": ".notes { background: var(--warn-tint); border: 1px solid var(--warn-rule); border-radius: 12px; padding: 14px 16px; disp"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 270,
+          "end": 276,
+          "role": "logic",
+          "symbol": "renderDesign",
+          "anchor": "42032488c559",
+          "first": "function renderDesign() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 214,
+          "end": 268,
+          "role": "logic",
+          "symbol": "renderBoard",
+          "anchor": "5ad5f71ffcc4",
+          "first": "function renderBoard() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 110,
+          "end": 122,
+          "role": "logic",
+          "symbol": "panelRows",
+          "anchor": "f2e9f0fdb78b",
+          "first": "function panelRows(p) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 101,
+          "end": 108,
+          "role": "logic",
+          "symbol": "solve",
+          "anchor": "b34dd86964bf",
+          "first": "function solve() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 320,
+          "end": 326,
+          "role": "logic",
+          "symbol": "addPanel",
+          "anchor": "67b54e684c4f",
+          "first": "function addPanel() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 327,
+          "end": 334,
+          "role": "logic",
+          "anchor": "e715179a68cc",
+          "first": "$('remove-panel').addEventListener('click', function () {"
+        },
+        {
+          "file": "code/js/solver.js",
+          "start": 22,
+          "end": 172,
+          "role": "logic",
+          "anchor": "69d2f2b73106",
+          "first": "CF.isExpired = function (entry, onDate) {"
+        },
+        {
+          "file": "code/js/config.js",
+          "start": 10,
+          "end": 50,
+          "role": "data",
+          "anchor": "acff70e10fdd",
+          "first": "CF.INSTRUMENT = 'BD FACSCanto II';"
+        }
+      ]
+    },
+    {
+      "id": "catalog-view",
+      "level": "view",
+      "parent": null,
+      "title": "Antibody catalog",
+      "summary": "Lists every antibody with the detector that reads its fluor, its expiry and a stock-status pill. The list can be filtered by species and text, and each row can be edited or deleted.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "search",
+        "inline edit",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 107,
+          "end": 119,
+          "role": "markup",
+          "anchor": "e598328b2cd6",
+          "first": "<section id=\"view-catalog\" role=\"tabpanel\" aria-labelledby=\"tab-catalog\" hidden>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 170,
+          "end": 199,
+          "role": "markup",
+          "anchor": "0b4f46315a9a",
+          "first": "<div class=\"toolbar\">"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 163,
+          "end": 163,
+          "role": "style",
+          "symbol": ".cat-table td",
+          "anchor": "9f5e3b6cd1bf",
+          "first": ".cat-table td { font-size: 14px; }"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 97,
+          "end": 97,
+          "role": "style",
+          "symbol": ".pill",
+          "anchor": "00c00449ff67",
+          "first": ".pill { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 355,
+          "end": 379,
+          "role": "logic",
+          "symbol": "renderCatalog",
+          "anchor": "137c6adead07",
+          "first": "function renderCatalog() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 346,
+          "end": 353,
+          "role": "logic",
+          "symbol": "catalogView",
+          "anchor": "c72c23867f88",
+          "first": "function catalogView() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 435,
+          "end": 442,
+          "role": "logic",
+          "symbol": "askConfirm",
+          "anchor": "0b426a893727",
+          "first": "function askConfirm(html, onYes) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 381,
+          "end": 384,
+          "role": "logic",
+          "anchor": "c836f12f26f0",
+          "first": "['All', 'Human', 'Mouse'].forEach(function (s) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 444,
+          "end": 456,
+          "role": "logic",
+          "anchor": "02e448f2c4a4",
+          "first": "$('cat-body').addEventListener('click', function (ev) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 530,
+          "end": 551,
+          "role": "logic",
+          "anchor": "3ff7c07ce19b",
+          "first": "var TEMPLATE_HEADER = ['marker', 'species', 'fluor', 'clone', 'vendor', 'catalog_number', 'lot', 'location', 'expires', "
+        },
+        {
+          "file": "code/js/sample-catalog.js",
+          "start": 8,
+          "end": 60,
+          "role": "data",
+          "anchor": "2b8b62b61368",
+          "first": "CF.sampleCatalog = function () {"
+        }
+      ]
+    },
+    {
+      "id": "catalog-import",
+      "level": "component",
+      "parent": "catalog-view",
+      "title": "CSV import and Sheet sync",
+      "summary": "Loads the inventory from a CSV file or a published Google Sheet. Loose column headers are mapped onto catalog fields, and the person chooses whether to replace the catalog or add to it.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 120,
+          "end": 146,
+          "role": "markup",
+          "symbol": "#sheet-card",
+          "anchor": "4399310f4080",
+          "first": "<div class=\"card\" id=\"sheet-card\" hidden>"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 166,
+          "end": 166,
+          "role": "style",
+          "symbol": ".sheet-steps",
+          "anchor": "99d8268598e3",
+          "first": ".sheet-steps { margin: 0; padding-left: 20px; font-size: 14px; color: var(--muted); display: flex; flex-direction: colum"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 458,
+          "end": 465,
+          "role": "logic",
+          "symbol": "applyImport",
+          "anchor": "9a71595e1178",
+          "first": "function applyImport(rows, mode, source) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 467,
+          "end": 528,
+          "role": "logic",
+          "anchor": "90804dec6735",
+          "first": "$('import-btn').addEventListener('click', function () { $('import-file').value = ''; $('import-file').click(); });"
+        },
+        {
+          "file": "code/js/csv.js",
+          "start": 1,
+          "end": 100,
+          "role": "logic",
+          "anchor": "1a1efdd25961",
+          "first": "/* CSV reading and writing, plus mapping loose spreadsheet headers onto catalog fields. */"
+        }
+      ]
+    },
+    {
+      "id": "antibody-form",
+      "level": "component",
+      "parent": "catalog-view",
+      "title": "Antibody form",
+      "summary": "Adds or edits one antibody's marker, fluor (grouped by detector), species, clone, vendor, lot, location, expiry, status and notes, and warns about duplicates.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 148,
+          "end": 168,
+          "role": "markup",
+          "symbol": "#ab-form",
+          "anchor": "f67a46529344",
+          "first": "<form class=\"card\" id=\"ab-form\" hidden novalidate>"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 162,
+          "end": 162,
+          "role": "style",
+          "symbol": ".form-grid",
+          "anchor": "f9ec7548f28b",
+          "first": ".form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); gap: 12px; }"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 393,
+          "end": 410,
+          "role": "logic",
+          "symbol": "openForm",
+          "anchor": "11d6e45b5085",
+          "first": "function openForm(index, preset) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 411,
+          "end": 415,
+          "role": "logic",
+          "symbol": "closeForm",
+          "anchor": "1e9db19ab3c5",
+          "first": "function closeForm() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 386,
+          "end": 392,
+          "role": "logic",
+          "anchor": "1cedc49a2d00",
+          "first": "// Fluor dropdown: every known fluor name, grouped by detector."
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 416,
+          "end": 433,
+          "role": "logic",
+          "anchor": "90a89fdf3898",
+          "first": "$('add-toggle').addEventListener('click', function () {"
+        }
+      ]
+    },
+    {
+      "id": "export-view",
+      "level": "view",
+      "parent": null,
+      "title": "Notebook record export",
+      "summary": "Takes the operator and run date, previews the panel figure on a canvas, and downloads it as a PNG, prints it, or writes a CSV with one row per panel × detector.",
+      "views": [
+        "canvas",
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 202,
+          "end": 226,
+          "role": "markup",
+          "symbol": "#view-export",
+          "anchor": "7fe6656083fd",
+          "first": "<section id=\"view-export\" role=\"tabpanel\" aria-labelledby=\"tab-export\" class=\"export print-me\" hidden>"
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 170,
+          "end": 170,
+          "role": "style",
+          "symbol": ".figure-wrap",
+          "anchor": "5e389c960d39",
+          "first": ".figure-wrap { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 12px; overflow: "
+        },
+        {
+          "file": "code/css/app.css",
+          "start": 178,
+          "end": 184,
+          "role": "style",
+          "symbol": "@media print",
+          "anchor": "c37da53cf8c0",
+          "first": "@media print {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 557,
+          "end": 570,
+          "role": "logic",
+          "symbol": "record",
+          "anchor": "7deec8009686",
+          "first": "function record() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 573,
+          "end": 587,
+          "role": "logic",
+          "symbol": "renderExport",
+          "anchor": "94d83174dfc5",
+          "first": "function renderExport() {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 59,
+          "end": 76,
+          "role": "logic",
+          "symbol": "saveFile",
+          "anchor": "9e42856d8028",
+          "first": "function saveFile(filename, data, mime) {"
+        },
+        {
+          "file": "code/js/app.js",
+          "start": 590,
+          "end": 624,
+          "role": "logic",
+          "anchor": "96515f305b7f",
+          "first": "$('op-name').addEventListener('input', function (e) { state.exp.operator = e.target.value; saveExp(); renderExport(); })"
+        },
+        {
+          "file": "code/js/figure.js",
+          "start": 7,
+          "end": 103,
+          "role": "logic",
+          "anchor": "2e6c2d842fff",
+          "first": "CF.drawFigure = function (canvas, rec, hatImg) {"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,586 @@
+{
+  "schema": "astaui.card/1",
+  "id": "rs-change-detection-platform",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T23:30:44Z"
+  },
+  "app": {
+    "title": "Remote-sensing change detection platform (two-date spectral-index change detection, with land-cover classification and pixel trend pages)",
+    "summary": "The person picks a study area, either from a boundary file or by searching a place name. They set two years, a seasonal month window, a satellite source and a spectral index. The interface then fetches the matching cloud-masked imagery in the background, or reuses a cached copy. Next the person sets the change thresholds, the minimum patch size and the sampling limits, and runs the detection. This computes the index difference between the two dates, grades every pixel into severe or moderate loss, stable, or moderate or strong gain, and drops patches that are too small. They get a graded change map they can click to read a pixel's class, a table and charts of area per change class, and one sample point per change patch. The map, the points (GeoJSON and CSV) and PNG and PDF reports can all be downloaded.",
+    "task": {
+      "text": "Find and measure where a surface index changed between two image dates over an area, and produce graded change maps, area totals and points to check on the ground.",
+      "verbs": [
+        "derive",
+        "locate",
+        "summarize",
+        "identify",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "Multispectral satellite raster bands for one area at two dates, clipped to a boundary polygon. They become a per-pixel index difference, a graded change raster, per-class area statistics and a set of sample points with coordinates.",
+      "item": "a pixel of the area-of-interest grid, grouped into connected change patches",
+      "shapes": [
+        "field",
+        "image",
+        "geospatial",
+        "versions",
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "detecting and measuring land-surface change between two image dates, before checking it on the ground",
+      "terms": [
+        "analyze",
+        "collect"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar holds the area, period, source, index and threshold settings that drive a tabbed workspace: get imagery, run, result map, statistics, sample points. Each tab unlocks once the step before it has finished in the background, and the result map, class-area table and point table all read from the same graded raster.",
+      "views": [
+        "form",
+        "map",
+        "summary stats",
+        "table view",
+        "bar chart",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select",
+        "search",
+        "hover for detail",
+        "zoom and pan",
+        "toggle view",
+        "export",
+        "import"
+      ],
+      "patterns": [
+        "status pipeline",
+        "overview and detail",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "bi-temporal change detection on spectral indices in satellite remote sensing",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "remote sensing",
+        "change detection",
+        "land cover"
+      ]
+    },
+    "workflow": {
+      "name": "compare a measured surface at two dates and grade where it changed",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Choose a boundary GeoJSON or fetch one by place-name search, set two years, a month window, a data source and an index, then press 'collect imagery'. A background job searches the catalogue, downloads the bands and masks clouds, or reports a matching local cache.",
+          "parts": [
+            "parameter-sidebar",
+            "imagery-tab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Set the mode (multi-level, binary or random forest), the change and severe thresholds, the minimum patch area and bilateral pre-filtering, then run. The job differences the index between the two dates, grades pixels into five classes and filters out small connected patches, with step-by-step progress shown.",
+          "parts": [
+            "parameter-sidebar",
+            "run-tab"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A web map lays the graded change layer over the boundary, with an opacity slider, a legend and a choice of street or satellite basemap.",
+          "parts": [
+            "result-map"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Clicking the map converts the location to a pixel and reports its change class, coordinates and row and column.",
+          "parts": [
+            "result-map"
+          ]
+        },
+        {
+          "step": "summarize by category",
+          "here": "A table gives area in hectares and share per change class plus the changed total, with bar and pie charts and a side-by-side view of the graded map and highlighted change.",
+          "parts": [
+            "stats-tab"
+          ]
+        },
+        {
+          "step": "pick representative locations to check",
+          "here": "Each change patch gives one interior point, kept largest first under an optional count limit and minimum spacing in metres, and listed with lon/lat, area and class.",
+          "parts": [
+            "sample-points-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download buttons save the Cloud Optimized GeoTIFF (COG) change raster, sample points as GeoJSON and CSV, the report PNG and an automatic PDF report.",
+          "parts": [
+            "result-map",
+            "sample-points-tab",
+            "run-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Seven spectral indices (NDVI, NDWI, MNDWI, NBR, EVI, SAVI, NDBI), each with its own class names, colours and default thresholds. The thresholds can instead be estimated from the robust noise of stable pixels.",
+        "The minimum patch area is set in square metres and converted to pixels using the real pixel size of the analysis grid. Each change class is filtered separately.",
+        "The sample points are guaranteed to fall inside their patch even for concave or ring-shaped patches, and are thinned by distance in projected metres.",
+        "Imagery for one date is cached under area, source, year, months, cloud cap and band set, so other pages and later runs reuse it without downloading again.",
+        "Sister pages use the same imagery: one classifies land cover with GMM clusters mapped to classes plus an active-learning queue of uncertain patches, and one runs per-pixel Mann-Kendall trend tests with Theil-Sen slopes over many years."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "parameter-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Area, period and detection parameters",
+      "summary": "Sets the study area (boundary file or place search), the two years and month window, the source and index, the detection mode and thresholds, and the sampling and output options that every run uses.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "search",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 502,
+          "end": 570,
+          "role": "markup",
+          "anchor": "1b1e90c3d02d",
+          "first": "sidebar_header(\"变化检测参数\", \"分析范围、时相与检测阈值\")"
+        },
+        {
+          "file": "code/frontend/components/sidebar.py",
+          "start": 50,
+          "end": 108,
+          "role": "logic",
+          "symbol": "region_picker",
+          "anchor": "beb61c50a25b",
+          "first": "def region_picker(prefix, on_change=None, boundary_dir=None):"
+        },
+        {
+          "file": "code/frontend/components/sidebar.py",
+          "start": 119,
+          "end": 125,
+          "role": "logic",
+          "symbol": "year_pair",
+          "anchor": "df132900394d",
+          "first": "def year_pair(default1, default2):"
+        },
+        {
+          "file": "code/frontend/components/sidebar.py",
+          "start": 146,
+          "end": 152,
+          "role": "logic",
+          "symbol": "month_range",
+          "anchor": "f1db6582f813",
+          "first": "def month_range(default_start=6, default_end=10):"
+        },
+        {
+          "file": "code/frontend/components/sidebar.py",
+          "start": 170,
+          "end": 187,
+          "role": "logic",
+          "symbol": "index_picker",
+          "anchor": "acd640fa495a",
+          "first": "def index_picker(data_source, default=None, allowed=None, remember_as=None):"
+        },
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 100,
+          "end": 110,
+          "role": "logic",
+          "symbol": "_base_params",
+          "anchor": "d49dc7c68cc2",
+          "first": "def _base_params(y1, y2, ms, me, data_src, idx_type, **extra):"
+        },
+        {
+          "file": "code/engine/params.py",
+          "start": 20,
+          "end": 144,
+          "role": "data",
+          "symbol": "RunParams",
+          "anchor": "099b8c0d6fa1",
+          "first": "class RunParams:"
+        }
+      ]
+    },
+    {
+      "id": "imagery-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Prepare imagery",
+      "summary": "Checks for cached imagery that matches the current settings, or submits a background job that searches for, downloads and cloud-masks the bands for both dates. It shows the area outline and the data size once ready.",
+      "views": [
+        "map",
+        "summary stats"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 629,
+          "end": 692,
+          "role": "markup",
+          "anchor": "7c8e08a01768",
+          "first": "with tab_dl:"
+        },
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 127,
+          "end": 148,
+          "role": "logic",
+          "symbol": "_submit_collect",
+          "anchor": "16e7bf58a5f1",
+          "first": "def _submit_collect(y1, y2, ms, me, data_src, idx_type):"
+        },
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 151,
+          "end": 154,
+          "role": "logic",
+          "symbol": "_apply_collect",
+          "anchor": "e049df11c132",
+          "first": "def _apply_collect(ctx):"
+        },
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 157,
+          "end": 170,
+          "role": "logic",
+          "symbol": "_check_cache",
+          "anchor": "b303b889b297",
+          "first": "def _check_cache(y1, y2, ms, me, data_src, idx_type):"
+        },
+        {
+          "file": "code/services/change_detection.py",
+          "start": 16,
+          "end": 35,
+          "role": "logic",
+          "symbol": "collect",
+          "anchor": "954e4155ba34",
+          "first": "def collect(params, boundary, data_dir, progress_callback=None):"
+        }
+      ]
+    },
+    {
+      "id": "run-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Run change detection",
+      "summary": "Runs index differencing, multi-level grading and per-class patch filtering as a background job with step-by-step progress. It then shows the changed area, point count, the parameters actually used, the output files and a PDF report download.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 698,
+          "end": 761,
+          "role": "markup",
+          "anchor": "75d61b848d15",
+          "first": "with tab_run:"
+        },
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 173,
+          "end": 199,
+          "role": "logic",
+          "symbol": "_submit_run",
+          "anchor": "08b72e6f9f80",
+          "first": "def _submit_run(y1, y2, ms, me, dmode, ct, sthr, ma, bf,"
+        },
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 202,
+          "end": 217,
+          "role": "logic",
+          "symbol": "_apply_run",
+          "anchor": "0b157835812f",
+          "first": "def _apply_run(res):"
+        },
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 84,
+          "end": 97,
+          "role": "logic",
+          "symbol": "_render_run",
+          "anchor": "61cfe1f25cb6",
+          "first": "def _render_run(job, runner):"
+        },
+        {
+          "file": "code/engine/core.py",
+          "start": 328,
+          "end": 462,
+          "role": "logic",
+          "symbol": "run_change_detection_generic",
+          "anchor": "e8828d9396a6",
+          "first": "def run_change_detection_generic(bands_y1, bands_y2, meta, boundary_wgs84,"
+        },
+        {
+          "file": "code/engine/core.py",
+          "start": 145,
+          "end": 183,
+          "role": "logic",
+          "symbol": "estimate_adaptive_threshold",
+          "anchor": "e2995a6640a7",
+          "first": "def estimate_adaptive_threshold(diff, valid_mask, k_change=3.0, k_severe=5.0):"
+        },
+        {
+          "file": "code/engine/core.py",
+          "start": 203,
+          "end": 230,
+          "role": "logic",
+          "symbol": "_filter_multi_level",
+          "anchor": "98ff786685df",
+          "first": "def _filter_multi_level(result, area_per_px_ha=0.01, min_area_m2=None,"
+        }
+      ]
+    },
+    {
+      "id": "result-map",
+      "level": "view",
+      "parent": null,
+      "title": "Change result map",
+      "summary": "Lays the graded change classes over the boundary on a web map with opacity, basemap switching and a legend. Clicking a spot reports that pixel's change class, and download buttons sit below for the result files.",
+      "views": [
+        "map"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select",
+        "zoom and pan",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 224,
+          "end": 315,
+          "role": "logic",
+          "symbol": "_show_map",
+          "anchor": "eeb8a9c54c8a",
+          "first": "def _show_map():"
+        },
+        {
+          "file": "code/frontend/components/map_view.py",
+          "start": 38,
+          "end": 116,
+          "role": "logic",
+          "symbol": "change_overlays",
+          "anchor": "0ba996c2a2d5",
+          "first": "def change_overlays(result, meta, index_type=\"NDVI\", max_side=MAX_OVERLAY_SIDE):"
+        },
+        {
+          "file": "code/frontend/components/map_view.py",
+          "start": 133,
+          "end": 158,
+          "role": "logic",
+          "symbol": "add_change_result_layer",
+          "anchor": "c8cdfa6779cb",
+          "first": "def add_change_result_layer(m, result=None, meta=None, index_type=\"NDVI\","
+        },
+        {
+          "file": "code/frontend/components/map_view.py",
+          "start": 161,
+          "end": 189,
+          "role": "logic",
+          "symbol": "legend_html",
+          "anchor": "38a36b0aab45",
+          "first": "def legend_html(index_type=\"NDVI\"):"
+        }
+      ]
+    },
+    {
+      "id": "stats-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Change statistics",
+      "summary": "Totals the area and share of each change class in a table, with bar and pie charts, a summary banner and a side-by-side view of the graded map and highlighted change.",
+      "views": [
+        "table view",
+        "bar chart",
+        "summary stats",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 318,
+          "end": 420,
+          "role": "logic",
+          "symbol": "_show_stats",
+          "anchor": "153a5c992566",
+          "first": "def _show_stats():"
+        }
+      ]
+    },
+    {
+      "id": "sample-points-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Sample points",
+      "summary": "Lists one representative point per change patch with coordinates, area and class, counts points per class, and downloads them as CSV.",
+      "views": [
+        "table view",
+        "bar chart"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/01_变化检测.py",
+          "start": 423,
+          "end": 444,
+          "role": "logic",
+          "symbol": "_show_points",
+          "anchor": "7ad034f4375d",
+          "first": "def _show_points():"
+        },
+        {
+          "file": "code/engine/core.py",
+          "start": 521,
+          "end": 594,
+          "role": "logic",
+          "symbol": "generate_sample_points",
+          "anchor": "4c9ccd1dbc35",
+          "first": "def generate_sample_points(result, boundary_wgs84, meta, out_dir, params, stats=None):"
+        },
+        {
+          "file": "code/engine/core.py",
+          "start": 473,
+          "end": 502,
+          "role": "logic",
+          "symbol": "_patch_points",
+          "anchor": "5bcb2b539be8",
+          "first": "def _patch_points(result, change_classes):"
+        },
+        {
+          "file": "code/engine/core.py",
+          "start": 505,
+          "end": 518,
+          "role": "logic",
+          "symbol": "_thin_by_distance",
+          "anchor": "3b0ba08bba65",
+          "first": "def _thin_by_distance(xs, ys, min_dist):"
+        }
+      ]
+    },
+    {
+      "id": "active-learning-queue",
+      "level": "component",
+      "parent": null,
+      "title": "Uncertain-patch labelling queue (land-cover page)",
+      "summary": "Shows image patches the clustering is least sure about, one at a time with an uncertainty score. The person labels each with a land-cover class or skips it, sees progress, then trains a random forest to classify the whole image.",
+      "views": [
+        "image viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "apply label",
+        "accept or reject"
+      ],
+      "patterns": [
+        "review queue",
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/02_地物分类.py",
+          "start": 501,
+          "end": 590,
+          "role": "markup",
+          "anchor": "7dc5ef95457e",
+          "first": "with tab_al:"
+        },
+        {
+          "file": "code/pages/02_地物分类.py",
+          "start": 189,
+          "end": 202,
+          "role": "logic",
+          "symbol": "_init_active_learning",
+          "anchor": "9851e3f98a70",
+          "first": "def _init_active_learning(n_patches):"
+        },
+        {
+          "file": "code/pages/02_地物分类.py",
+          "start": 205,
+          "end": 221,
+          "role": "logic",
+          "symbol": "_run_al_refine",
+          "anchor": "095cac7df037",
+          "first": "def _run_al_refine():"
+        },
+        {
+          "file": "code/frontend/components/classifier_view.py",
+          "start": 138,
+          "end": 158,
+          "role": "logic",
+          "symbol": "render_annotation_patch",
+          "anchor": "126f07b83edd",
+          "first": "def render_annotation_patch(bands, row, col, patch_size=32):"
+        },
+        {
+          "file": "code/engine/classifier.py",
+          "start": 378,
+          "end": 408,
+          "role": "logic",
+          "symbol": "sample_patches",
+          "anchor": "68dcc28de861",
+          "first": "def sample_patches(bands, pca_3d, gmm, patch_size=32, n_patches=50):"
+        },
+        {
+          "file": "code/engine/classifier.py",
+          "start": 415,
+          "end": 458,
+          "role": "logic",
+          "symbol": "train_from_annotations",
+          "anchor": "5b3dca954209",
+          "first": "def train_from_annotations(feature_stack, annotation_labels, annotation_mask,"
+        }
+      ]
+    }
+  ]
+}

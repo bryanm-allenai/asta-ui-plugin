@@ -1,0 +1,814 @@
+{
+  "schema": "astaui.card/1",
+  "id": "kbarn-sns-explorer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T23:40:53Z"
+  },
+  "app": {
+    "title": "KBarn Social Network Explorer",
+    "summary": "A person loads timestamped RFID detection files from a tracked animal colony. The files are cleaned and turned into co-location counts within sampling periods. They then set the sampling period, edge threshold, time window, permutation count and date range, and work through three layers. The group layer draws the association network, its communities and directed approach counts, and runs a permutation test that marks which pairs are significantly preferred or avoided. The group sociality layer gives cohesion, density, differentiation and modularity, and shows how they change across time windows. The individual layer builds a multi-parameter sociality profile for each animal and clusters the animals into named types. It opens any one animal in detail and correlates the profiles with behavioural metrics. Each layer exports its matrices and tables as CSV, and a full phenotype run can be saved with its parameters.",
+    "task": {
+      "text": "Infer a social network from co-location records, test which bonds exceed chance, track how group structure changes over time, and characterise each individual's social phenotype.",
+      "verbs": [
+        "derive",
+        "explore",
+        "summarize",
+        "compare",
+        "organize",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Timestamped tag detections of individuals at fixed antennas. These become an animal-by-animal association matrix, per-animal network metrics, per-window time series and a per-animal phenotype table.",
+      "item": "an individual animal in the colony, or a pair of animals (a dyad)",
+      "shapes": [
+        "events",
+        "network",
+        "table",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "analysing social structure from cleaned tracking detections, exploratory, before reporting",
+      "terms": [
+        "analyze",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar parameters and a date-range slider feed every view, and a layer switch picks a set of tabbed views. These include network diagrams, heatmaps, metric tables and charts, plus a per-animal detail view and a phenotype-vs-behaviour correlation view with a scatter you pick from two dropdowns. Every figure can be opened full size, and each layer has its own CSV export tab.",
+      "views": [
+        "network diagram",
+        "heatmap",
+        "table view",
+        "summary stats",
+        "bar chart",
+        "line chart",
+        "scatter plot",
+        "small multiples",
+        "detail panel",
+        "radar chart"
+      ],
+      "interactions": [
+        "import",
+        "time slider",
+        "toggle view",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "small multiples",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "animal social network analysis of co-location from automated RFID tracking, in animal behaviour",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "animal social network analysis",
+        "behavioural phenotyping",
+        "rfid tracking"
+      ]
+    },
+    "workflow": {
+      "name": "turn co-occurrence records into a tested association network and per-member profiles",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload the per-pen RFID CSVs or point to a data folder, then press Load data. Duplicate exports, bad-UID noise reads and stray tags are dropped, and the sidebar reports how many reads and animals are left.",
+          "parts": [
+            "data-controls"
+          ]
+        },
+        {
+          "step": "set the analysis parameters and narrow to a time range",
+          "here": "Pick the sampling period, minimum SRI for an edge, temporal window length and number of permutations, then drag the date-range slider. Every view recomputes from those settings.",
+          "parts": [
+            "data-controls"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A Simple Ratio Index is computed for every pair and drawn as an association network (size = strength, colour = greedy-modularity community) and an SRI heatmap. Alongside are a node-metrics table (strength, partners, eigenvector, betweenness, clustering) and a directed approach-count matrix.",
+          "parts": [
+            "network-layer"
+          ]
+        },
+        {
+          "step": "test which links differ from chance",
+          "here": "A datastream permutation test classes each dyad as preferred, avoided or neutral and draws them as green and red edges. Mouse A and Mouse B pickers plot one dyad's SRI across time windows, and a table lists each pair's p-values.",
+          "parts": [
+            "significant-dyads"
+          ]
+        },
+        {
+          "step": "track change across time windows",
+          "here": "Headline cohesion, density, differentiation and modularity, plus an SRI histogram and centrality bars. Then the same group metrics and a chosen centrality per animal over time, as a line chart and a heatmap, and network snapshots per window on a fixed layout.",
+          "parts": [
+            "group-sociality",
+            "network-layer"
+          ]
+        },
+        {
+          "step": "group items into clusters",
+          "here": "Builds a 14-parameter sociality profile per animal, z-scores it and runs PCA and Ward clustering into k types, each named from its standout z-scores. A Focus mouse picker opens one animal's radar, raw values against the group median, ego-network, approach arrows, significant partners and partner trajectories. A Pearson correlation heatmap and a scatter set the phenotypes against behavioural metrics.",
+          "parts": [
+            "phenotype-overview",
+            "individual-detail",
+            "phenotype-behaviour"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download CSVs of the SRI, node-metric, approach, group-over-time, phenotype, z-score and correlation tables. Save phenotype run writes all of them plus a params.txt into a timestamped outputs folder.",
+          "parts": [
+            "exports"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Two individuals count as associated only when both are at the same pen, floor and zone within the same sampling period, using each animal's most-read location in that period.",
+        "Significance comes from a datastream permutation that shuffles locations among the animals present in each period. This keeps group sizes fixed and marks each pair as preferred or avoided.",
+        "A social-residual parameter regresses association on Pianka spatial overlap, which separates real attraction from shared space use.",
+        "Directed approach counts record who arrived where another animal already was, giving an initiator-vs-magnet balance for each animal.",
+        "Clusters are named automatically from their standout profile axes, for example social hub, broker or peripheral loner, and a glossary popover defines every metric."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Data and controls sidebar",
+      "summary": "Loads and cleans the detection files, then sets the layer, sampling period, edge threshold, window, permutations, cluster count and date range that drive every view.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "time slider",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 109,
+          "end": 158,
+          "role": "markup",
+          "anchor": "173c58550ef2",
+          "first": "st.sidebar.title(\"🕸️ Data\")"
+        },
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 55,
+          "end": 59,
+          "role": "logic",
+          "symbol": "compute_sri",
+          "anchor": "7910b0617714",
+          "first": "def compute_sri(df, period):"
+        },
+        {
+          "file": "code/src/sns/loader.py",
+          "start": 78,
+          "end": 92,
+          "role": "logic",
+          "symbol": "load",
+          "anchor": "6be1836cdcd4",
+          "first": "def load(data_dir=None, min_reads: int = 50) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/sns/loader.py",
+          "start": 95,
+          "end": 109,
+          "role": "logic",
+          "symbol": "load_files",
+          "anchor": "a6076fbd6b17",
+          "first": "def load_files(files, min_reads: int = 50) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/sns/social.py",
+          "start": 38,
+          "end": 54,
+          "role": "logic",
+          "symbol": "sri_matrix",
+          "anchor": "cb7e3ab42b39",
+          "first": "def sri_matrix(apl: pd.DataFrame, animal_list: list[str]):"
+        },
+        {
+          "file": "code/src/sns/glossary.py",
+          "start": 82,
+          "end": 86,
+          "role": "data",
+          "symbol": "glossary_md",
+          "anchor": "8ef037a9ddc2",
+          "first": "def glossary_md() -> str:"
+        }
+      ]
+    },
+    {
+      "id": "network-layer",
+      "level": "view",
+      "parent": null,
+      "title": "Group social network",
+      "summary": "Shows the association network, SRI matrix, node metrics, communities with modularity, network snapshots per time window, and the directed approach matrix.",
+      "views": [
+        "network diagram",
+        "heatmap",
+        "table view",
+        "summary stats",
+        "small multiples"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "small multiples",
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 162,
+          "end": 187,
+          "role": "markup",
+          "anchor": "c2bcd36e6207",
+          "first": "if layer.startswith(\"🕸\"):"
+        },
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 205,
+          "end": 209,
+          "role": "markup",
+          "anchor": "346b1dc9f035",
+          "first": "with tabs[3]:"
+        },
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 83,
+          "end": 105,
+          "role": "logic",
+          "symbol": "show",
+          "anchor": "1c9718904d78",
+          "first": "def show(fig, dpi=150):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 33,
+          "end": 52,
+          "role": "logic",
+          "symbol": "network_graph",
+          "anchor": "53fa32a94356",
+          "first": "def network_graph(M, threshold=0.0, title=\"Association network\", pos=None, focus=None):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 78,
+          "end": 90,
+          "role": "logic",
+          "symbol": "sri_heatmap",
+          "anchor": "b2dbccd59b47",
+          "first": "def sri_heatmap(M, focus=None):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 450,
+          "end": 475,
+          "role": "logic",
+          "symbol": "network_snapshots",
+          "anchor": "b3362862265e",
+          "first": "def network_snapshots(sri_by: dict, threshold, ref_M=None, ncols=4):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 164,
+          "end": 185,
+          "role": "logic",
+          "symbol": "approach_matrix",
+          "anchor": "fa90f2e0758d",
+          "first": "def approach_matrix(App: pd.DataFrame, focus=None):"
+        },
+        {
+          "file": "code/src/sns/network.py",
+          "start": 21,
+          "end": 43,
+          "role": "logic",
+          "symbol": "node_metrics",
+          "anchor": "34c82fb633de",
+          "first": "def node_metrics(M: pd.DataFrame, threshold: float = 0.0) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/sns/network.py",
+          "start": 46,
+          "end": 54,
+          "role": "logic",
+          "symbol": "communities",
+          "anchor": "466bd018b4bb",
+          "first": "def communities(M: pd.DataFrame, threshold: float = 0.0):"
+        },
+        {
+          "file": "code/src/sns/social.py",
+          "start": 102,
+          "end": 117,
+          "role": "logic",
+          "symbol": "approaches",
+          "anchor": "f7419c86cf24",
+          "first": "def approaches(df: pd.DataFrame, period: str = \"10min\") -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "significant-dyads",
+      "level": "component",
+      "parent": "network-layer",
+      "title": "Significant dyads",
+      "summary": "Runs the permutation test, draws the preferred and avoided pairs, and plots any chosen pair's association across time windows next to a table of p-values.",
+      "views": [
+        "network diagram",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 189,
+          "end": 203,
+          "role": "markup",
+          "anchor": "311fc2d146dd",
+          "first": "with tabs[2]:"
+        },
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 63,
+          "end": 65,
+          "role": "logic",
+          "symbol": "compute_perm",
+          "anchor": "06713a9f3055",
+          "first": "def compute_perm(df, period, n_perm):"
+        },
+        {
+          "file": "code/src/sns/social.py",
+          "start": 61,
+          "end": 99,
+          "role": "logic",
+          "symbol": "permutation_test",
+          "anchor": "8d41ecfeab42",
+          "first": "def permutation_test(apl: pd.DataFrame, animal_list: list[str], comp: dict,"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 93,
+          "end": 118,
+          "role": "logic",
+          "symbol": "preferred_avoided_network",
+          "anchor": "69bf6f9733a0",
+          "first": "def preferred_avoided_network(perm: pd.DataFrame, animal_list, pos=None, focus=None):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 286,
+          "end": 297,
+          "role": "logic",
+          "symbol": "dyad_trajectory_plot",
+          "anchor": "df3f4747edc7",
+          "first": "def dyad_trajectory_plot(traj: pd.Series, a, b, sig=None):"
+        },
+        {
+          "file": "code/src/sns/temporal.py",
+          "start": 43,
+          "end": 46,
+          "role": "logic",
+          "symbol": "dyad_trajectory",
+          "anchor": "904d8f1cb589",
+          "first": "def dyad_trajectory(sri_by: dict, a: str, b: str) -> pd.Series:"
+        }
+      ]
+    },
+    {
+      "id": "group-sociality",
+      "level": "view",
+      "parent": null,
+      "title": "Group sociality and temporal dynamics",
+      "summary": "Gives headline group metrics, the distribution of pair associations, and a chosen centrality across animals, then shows how group metrics and per-animal centrality change across time windows.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "line chart",
+        "heatmap"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 220,
+          "end": 250,
+          "role": "markup",
+          "anchor": "a656a649fbb7",
+          "first": "elif layer.startswith(\"👥\"):"
+        },
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 69,
+          "end": 70,
+          "role": "logic",
+          "symbol": "compute_temporal",
+          "anchor": "eebf62e8092a",
+          "first": "def compute_temporal(df, window, period, threshold):"
+        },
+        {
+          "file": "code/src/sns/network.py",
+          "start": 57,
+          "end": 68,
+          "role": "logic",
+          "symbol": "group_metrics",
+          "anchor": "fdbb60d8578e",
+          "first": "def group_metrics(M: pd.DataFrame, threshold: float = 0.0) -> dict:"
+        },
+        {
+          "file": "code/src/sns/temporal.py",
+          "start": 16,
+          "end": 40,
+          "role": "logic",
+          "symbol": "windowed",
+          "anchor": "01e207e3bc4f",
+          "first": "def windowed(df: pd.DataFrame, animal_list, window=\"12h\", period=\"10min\", threshold=0.0):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 301,
+          "end": 311,
+          "role": "logic",
+          "symbol": "sri_histogram",
+          "anchor": "28678c0d878b",
+          "first": "def sri_histogram(M: pd.DataFrame):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 314,
+          "end": 324,
+          "role": "logic",
+          "symbol": "centrality_bars",
+          "anchor": "00b33f74e1ec",
+          "first": "def centrality_bars(nm: pd.DataFrame, metric: str, focus=None):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 254,
+          "end": 266,
+          "role": "logic",
+          "symbol": "group_over_time",
+          "anchor": "5f542b638fe1",
+          "first": "def group_over_time(grp: pd.DataFrame):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 220,
+          "end": 235,
+          "role": "logic",
+          "symbol": "centrality_heatmap",
+          "anchor": "be31fff76994",
+          "first": "def centrality_heatmap(cot: pd.DataFrame, metric, focus=None):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 238,
+          "end": 251,
+          "role": "logic",
+          "symbol": "centrality_lines",
+          "anchor": "e2614e1b75d3",
+          "first": "def centrality_lines(nodes: pd.DataFrame, metric, focus, colors):"
+        }
+      ]
+    },
+    {
+      "id": "phenotype-overview",
+      "level": "view",
+      "parent": null,
+      "title": "Sociality phenotypes of all animals",
+      "summary": "Builds a 14-parameter profile per animal and shows it as a z-score heatmap grouped by cluster, a PCA scatter coloured by named type, a membership table and bars of what defines each type.",
+      "views": [
+        "heatmap",
+        "scatter plot",
+        "table view",
+        "bar chart"
+      ],
+      "interactions": [],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 264,
+          "end": 292,
+          "role": "markup",
+          "anchor": "71c72709e56e",
+          "first": "else:"
+        },
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 74,
+          "end": 75,
+          "role": "logic",
+          "symbol": "compute_phenotype",
+          "anchor": "0e0906b52008",
+          "first": "def compute_phenotype(df, period, n_perm, threshold):"
+        },
+        {
+          "file": "code/src/sns/phenotype.py",
+          "start": 111,
+          "end": 143,
+          "role": "logic",
+          "symbol": "phenotype_table",
+          "anchor": "00bfc5099d61",
+          "first": "def phenotype_table(df, animal_list, period=\"10min\", n_perm=200, threshold=0.05) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/sns/phenotype.py",
+          "start": 147,
+          "end": 150,
+          "role": "logic",
+          "symbol": "zscore",
+          "anchor": "571b79dd83d8",
+          "first": "def zscore(table: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/sns/phenotype.py",
+          "start": 153,
+          "end": 160,
+          "role": "logic",
+          "symbol": "pca",
+          "anchor": "84e74fe30233",
+          "first": "def pca(z: pd.DataFrame, k: int = 2):"
+        },
+        {
+          "file": "code/src/sns/phenotype.py",
+          "start": 163,
+          "end": 167,
+          "role": "logic",
+          "symbol": "cluster",
+          "anchor": "5ec943647448",
+          "first": "def cluster(z: pd.DataFrame, k: int = 3) -> pd.Series:"
+        },
+        {
+          "file": "code/src/sns/phenotype.py",
+          "start": 175,
+          "end": 199,
+          "role": "logic",
+          "symbol": "name_types",
+          "anchor": "b7122ff3b311",
+          "first": "def name_types(profiles: pd.DataFrame) -> dict:"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 328,
+          "end": 346,
+          "role": "logic",
+          "symbol": "phenotype_heatmap",
+          "anchor": "330c1a99fba9",
+          "first": "def phenotype_heatmap(z: pd.DataFrame, labels=None, focus=None):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 364,
+          "end": 380,
+          "role": "logic",
+          "symbol": "pca_scatter",
+          "anchor": "7ee12426f0c1",
+          "first": "def pca_scatter(coords: pd.DataFrame, labels: pd.Series, names: dict, var, focus=None):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 383,
+          "end": 395,
+          "role": "logic",
+          "symbol": "type_profile_bars",
+          "anchor": "57d84bfebc99",
+          "first": "def type_profile_bars(profiles: pd.DataFrame, names: dict):"
+        }
+      ]
+    },
+    {
+      "id": "individual-detail",
+      "level": "view",
+      "parent": null,
+      "title": "Individual detail",
+      "summary": "For one chosen animal, shows its phenotype radar, its raw values against the group median, its ego-network, two-way approach arrows, significant partners and its association with each partner over time.",
+      "views": [
+        "detail panel",
+        "radar chart",
+        "bar chart",
+        "network diagram",
+        "heatmap",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 295,
+          "end": 318,
+          "role": "markup",
+          "anchor": "c44b5a5d2740",
+          "first": "with tabs[1]:"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 349,
+          "end": 361,
+          "role": "logic",
+          "symbol": "phenotype_radar",
+          "anchor": "3b8204aa60c4",
+          "first": "def phenotype_radar(z: pd.DataFrame, mouse, group_row=None):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 436,
+          "end": 447,
+          "role": "logic",
+          "symbol": "phenotype_bars",
+          "anchor": "78bc98a1f59e",
+          "first": "def phenotype_bars(table: pd.DataFrame, mouse):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 55,
+          "end": 75,
+          "role": "logic",
+          "symbol": "ego_network",
+          "anchor": "8e068c99231e",
+          "first": "def ego_network(M, focus, threshold=0.0):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 121,
+          "end": 161,
+          "role": "logic",
+          "symbol": "approach_ego",
+          "anchor": "3f04ea32860c",
+          "first": "def approach_ego(App: pd.DataFrame, focus):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 269,
+          "end": 283,
+          "role": "logic",
+          "symbol": "partner_trajectory_heatmap",
+          "anchor": "04553d331085",
+          "first": "def partner_trajectory_heatmap(apt: pd.DataFrame, focus):"
+        },
+        {
+          "file": "code/src/sns/temporal.py",
+          "start": 49,
+          "end": 55,
+          "role": "logic",
+          "symbol": "animal_partner_trajectory",
+          "anchor": "c0bc9ff3415e",
+          "first": "def animal_partner_trajectory(sri_by: dict, animal: str) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "phenotype-behaviour",
+      "level": "view",
+      "parent": null,
+      "title": "Phenotype vs behaviour",
+      "summary": "Correlates each sociality parameter with each behavioural metric across animals as a heatmap, and plots any chosen pair of them as a labelled scatter with a fit line.",
+      "views": [
+        "heatmap",
+        "scatter plot"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 320,
+          "end": 336,
+          "role": "markup",
+          "anchor": "e7ad6d2460b1",
+          "first": "with tabs[2]:"
+        },
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 79,
+          "end": 80,
+          "role": "logic",
+          "symbol": "compute_behaviour",
+          "anchor": "5bee3ead3b04",
+          "first": "def compute_behaviour(df):"
+        },
+        {
+          "file": "code/src/sns/behavior_link.py",
+          "start": 37,
+          "end": 56,
+          "role": "logic",
+          "symbol": "behavioural_summary",
+          "anchor": "3bffcca968c5",
+          "first": "def behavioural_summary(df: pd.DataFrame, dwell_cap: int = 300) -> pd.DataFrame | None:"
+        },
+        {
+          "file": "code/src/sns/behavior_link.py",
+          "start": 59,
+          "end": 69,
+          "role": "logic",
+          "symbol": "cross_correlation",
+          "anchor": "860f56ccbc21",
+          "first": "def cross_correlation(soc: pd.DataFrame, beh: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 398,
+          "end": 413,
+          "role": "logic",
+          "symbol": "cross_corr_heatmap",
+          "anchor": "6053d66f9b23",
+          "first": "def cross_corr_heatmap(R: pd.DataFrame):"
+        },
+        {
+          "file": "code/src/sns/plots.py",
+          "start": 416,
+          "end": 433,
+          "role": "logic",
+          "symbol": "cross_scatter",
+          "anchor": "3aca20977457",
+          "first": "def cross_scatter(soc, beh, sparam, bparam, labels, names, colors, focus=None):"
+        }
+      ]
+    },
+    {
+      "id": "exports",
+      "level": "view",
+      "parent": null,
+      "title": "Export tabs",
+      "summary": "Downloads each layer's matrices and tables as CSV, and saves a full phenotype run with its parameters into a timestamped folder.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 211,
+          "end": 216,
+          "role": "logic",
+          "anchor": "568e676bac48",
+          "first": "with tabs[4]:"
+        },
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 252,
+          "end": 260,
+          "role": "logic",
+          "anchor": "cf997ae77b19",
+          "first": "with tabs[2]:"
+        },
+        {
+          "file": "code/app/sns_gui.py",
+          "start": 338,
+          "end": 357,
+          "role": "logic",
+          "anchor": "6bf189744cf0",
+          "first": "with tabs[3]:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "radar chart"
+    }
+  ]
+}

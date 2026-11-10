@@ -1,0 +1,560 @@
+{
+  "schema": "astaui.card/1",
+  "id": "tess-tpf-inspector",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T15:47:53Z"
+  },
+  "app": {
+    "title": "TESS Target Pixels Inspector",
+    "summary": "A person enters a target ID, with an optional observing sector and magnitude limit, and the app downloads that target's pixel data. A sky view shows the pixels with catalog sources drawn on top. The person can switch catalogs on and off, search for a source by ID, and click a source to read its details and links. Next they build a light curve from pixels they select, step through the frames in time, and draw one small light curve for each pixel over the zoomed time and pixel range. Last, they paste a link to an external survey light curve and fold it by a period, to check which nearby source the variable signal comes from.",
+    "task": {
+      "text": "Find which star among the sources near a target is producing a variable signal, by checking the signal pixel by pixel against catalog positions and other surveys' light curves.",
+      "verbs": [
+        "identify",
+        "locate",
+        "compare",
+        "derive",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A stack of image frames over time from one patch of sky, light curves built from those pixels, catalog tables of nearby sources with positions and magnitudes, and light curves from other surveys fetched by URL",
+      "item": "a pixel in a time-stacked image cutout around one target, with the catalog sources that fall on it",
+      "shapes": [
+        "image collection",
+        "time series",
+        "table",
+        "geospatial"
+      ]
+    },
+    "stage": {
+      "text": "vetting where a detected variable signal comes from, before claiming or following up the source",
+      "terms": [
+        "confirm",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A pixel image with catalog sources overlaid acts as the spatial overview. Clicking a source opens its details, and selecting pixels rebuilds the light curve next to the image. The cadence slider and clicks on the light curve keep the image frame and the time marker in step. A per-pixel grid and an external light curve viewer, which can fold by period, give closer and independent views of the same signal.",
+      "views": [
+        "image viewer",
+        "scatter plot",
+        "line chart",
+        "small multiples",
+        "detail panel",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "hover for detail",
+        "search",
+        "toggle view",
+        "zoom and pan",
+        "time slider",
+        "import",
+        "filter"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail",
+        "small multiples",
+        "focus and context"
+      ]
+    },
+    "field": {
+      "text": "pixel-level photometry and source identification for variable signals in time-domain astronomy",
+      "disciplines": [
+        "astronomy"
+      ],
+      "terms": [
+        "time domain astronomy",
+        "photometry",
+        "variable stars"
+      ]
+    },
+    "workflow": {
+      "name": "trace a signal back to its source among nearby objects",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "A plain HTML form takes a target ID (TIC), plus an optional sector and magnitude limit. On Show the app searches the archive and downloads the pixel file (SPOC or TessCut), showing an in-progress message while it works.",
+          "parts": [
+            "search-form"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The sky view draws the pixel image a few days into the sector. It marks the target with a cross and overlays sources from Gaia DR3/TIC, ZTF, ASAS-SN SkyPatrol and VSX, each corrected for proper motion and sized by magnitude. Checkboxes show or hide each catalog, and a stretch slider adjusts the image.",
+          "parts": [
+            "skyview",
+            "catalog-controls"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Typing a Gaia DR3 source, TIC or other ID selects that star among the visible catalogs. Clicking a star does the same. Either way an arrow points to the star and a table lists its magnitudes, separation and links to catalog pages and variability cross-matches.",
+          "parts": [
+            "catalog-controls",
+            "star-detail"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Inspect builds a light curve from the pipeline aperture, or from the target's own pixel in TessCut data. Clicking or shift-clicking pixels rebuilds it straight away. Options set normalization, rough background subtraction and manual y limits.",
+          "parts": [
+            "pixel-inspection"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "A cadence slider and < / > buttons move through the image frames while a vertical marker follows on the light curve. Clicking a point on the light curve jumps the image to that frame.",
+          "parts": [
+            "pixel-inspection"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Per-Pixel Plot draws a grid with one small light curve per pixel. It covers only the pixel and time range currently zoomed, with the selected aperture outlined, and warns when the time span is long.",
+          "parts": [
+            "per-pixel-plot"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Pasting a ZTF CSV or SkyPatrol v2 URL plots that survey's light curve in magnitudes. A period and epoch (BTJD or HJD) fold it, 1/2 P and 2x P re-fold at half or double the period, and a color map can show time within the phase plot.",
+          "parts": [
+            "lc-viewer"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Catalog positions are corrected for proper motion to the observation date, so sources line up with where they actually were on the pixels",
+        "Several independent catalogs and surveys are overlaid on the same pixels, and the last-drawn layer gets priority when an ID is searched",
+        "Clicking pixels rebuilds the aperture light curve live, so the person can see which pixels the signal sits in",
+        "Per-pixel light curves are limited to the zoomed region and time window, to keep them readable",
+        "An external survey light curve can be folded and the period halved or doubled, to check whether a neighbor shows the same periodic signal"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "search-form",
+      "level": "view",
+      "parent": null,
+      "title": "Target search form",
+      "summary": "Takes a target ID, an optional sector and an optional magnitude limit, and loads that target's pixel data, with links to outside target pages.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "search"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/tpf/main.py",
+          "start": 315,
+          "end": 363,
+          "role": "markup",
+          "symbol": "create_search_form",
+          "anchor": "b78946b100b2",
+          "first": "def create_search_form(tic, sector, magnitude_limit):"
+        },
+        {
+          "file": "code/src/tpf/main.py",
+          "start": 532,
+          "end": 565,
+          "role": "logic",
+          "symbol": "show_app",
+          "anchor": "70f6279c61f2",
+          "first": "def show_app(tic, sector, magnitude_limit=None):"
+        },
+        {
+          "file": "code/src/tpf/main.py",
+          "start": 489,
+          "end": 529,
+          "role": "logic",
+          "symbol": "search_and_download_tpf_with_ui",
+          "anchor": "098c9166d673",
+          "first": "async def search_and_download_tpf_with_ui(tic, sector):"
+        },
+        {
+          "file": "code/src/tpf/tpf_utils.py",
+          "start": 125,
+          "end": 132,
+          "role": "logic",
+          "symbol": "get_tpf",
+          "anchor": "35ba8adfa6c6",
+          "first": "async def get_tpf("
+        }
+      ]
+    },
+    {
+      "id": "skyview",
+      "level": "view",
+      "parent": null,
+      "title": "Sky view with catalog overlay",
+      "summary": "Shows the pixel image with the target marked and nearby catalog sources drawn as magnitude-sized markers corrected for proper motion, with hover tooltips.",
+      "views": [
+        "image viewer",
+        "scatter plot",
+        "map"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "overview and detail",
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 1574,
+          "end": 1580,
+          "role": "logic",
+          "symbol": "show_skyview_widget",
+          "anchor": "222c1a5168d8",
+          "first": "def show_skyview_widget("
+        },
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 885,
+          "end": 898,
+          "role": "logic",
+          "symbol": "make_tpf_figure_elements",
+          "anchor": "81b2175c6a6d",
+          "first": "def make_tpf_figure_elements("
+        },
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 473,
+          "end": 491,
+          "role": "logic",
+          "symbol": "add_target_figure_elements",
+          "anchor": "895bfae4f260",
+          "first": "def add_target_figure_elements(tpf, fig):"
+        },
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 540,
+          "end": 541,
+          "role": "logic",
+          "symbol": "add_catalog_figure_elements",
+          "anchor": "04f857c65dc0",
+          "first": "def add_catalog_figure_elements("
+        },
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 494,
+          "end": 532,
+          "role": "logic",
+          "symbol": "create_provider",
+          "anchor": "3771c2fe2c39",
+          "first": "def create_provider(provider_class, tpf, magnitude_limit, extra_kwargs=None):"
+        },
+        {
+          "file": "code/src/tpf/tpf_inspect.py",
+          "start": 683,
+          "end": 792,
+          "role": "data",
+          "symbol": "create_app_body_ui_from_tpf",
+          "anchor": "4e0f953df0ef",
+          "first": "async def create_app_body_ui_from_tpf(doc, tpf, magnitude_limit=None, catalogs=None):"
+        },
+        {
+          "file": "code/src/tpf/tpf_inspect.py",
+          "start": 394,
+          "end": 395,
+          "role": "markup",
+          "symbol": "create_skyview_metadata_ui",
+          "anchor": "dd062d3ea380",
+          "first": "def create_skyview_metadata_ui("
+        }
+      ]
+    },
+    {
+      "id": "catalog-controls",
+      "level": "component",
+      "parent": "skyview",
+      "title": "Catalog toggles and star search",
+      "summary": "Checkboxes show or hide each catalog layer, and a search box selects a star by its catalog ID among the visible layers.",
+      "views": [],
+      "interactions": [
+        "toggle view",
+        "filter",
+        "search"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 1473,
+          "end": 1483,
+          "role": "logic",
+          "symbol": "_create_select_catalog_ui",
+          "anchor": "fe63f782e4dc",
+          "first": "def _create_select_catalog_ui(providers, ui_ctr):"
+        },
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 1506,
+          "end": 1548,
+          "role": "logic",
+          "symbol": "_create_search_star_ui",
+          "anchor": "560034e3371f",
+          "first": "def _create_search_star_ui(providers, ui_ctr):"
+        }
+      ]
+    },
+    {
+      "id": "star-detail",
+      "level": "component",
+      "parent": "skyview",
+      "title": "Selected star details",
+      "summary": "When a star is selected, an arrow points to it and a table shows its catalog values, separation from the target and links to catalog pages and variability cross-matches.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 1551,
+          "end": 1571,
+          "role": "logic",
+          "symbol": "make_interact_sky_selection_elements",
+          "anchor": "d07bc18e1618",
+          "first": "def make_interact_sky_selection_elements(fig_tpf):"
+        },
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 640,
+          "end": 644,
+          "role": "logic",
+          "symbol": "show_target_info",
+          "anchor": "be9bec47c299",
+          "first": "def show_target_info(attr, old, new):"
+        },
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 677,
+          "end": 715,
+          "role": "logic",
+          "symbol": "show_arrow_at_target",
+          "anchor": "30e72d62ca98",
+          "first": "def show_arrow_at_target(attr, old, new):"
+        },
+        {
+          "file": "code/src/tpf/ext_gaia_tic.py",
+          "start": 29,
+          "end": 56,
+          "role": "logic",
+          "symbol": "get_detail_view",
+          "anchor": "98391eb7ab1d",
+          "first": "def get_detail_view(self, data: dict) -> Tuple[dict, list]:"
+        }
+      ]
+    },
+    {
+      "id": "pixel-inspection",
+      "level": "view",
+      "parent": null,
+      "title": "Pixels inspection",
+      "summary": "Builds a light curve from the selected pixels and rebuilds it as the selection changes, while a cadence slider and clicks on the light curve keep the image frame and time marker in step.",
+      "views": [
+        "image viewer",
+        "line chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "time slider",
+        "hover for detail",
+        "zoom and pan",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/tpf/tpf_inspect.py",
+          "start": 83,
+          "end": 84,
+          "role": "logic",
+          "symbol": "create_tpf_interact_ui",
+          "anchor": "698ad6f54a48",
+          "first": "def create_tpf_interact_ui("
+        },
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 1098,
+          "end": 1113,
+          "role": "logic",
+          "symbol": "show_interact_widget",
+          "anchor": "f1726727c027",
+          "first": "def show_interact_widget("
+        },
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 1319,
+          "end": 1348,
+          "role": "logic",
+          "symbol": "update_upon_pixel_selection",
+          "anchor": "bbd5f70c7f93",
+          "first": "def update_upon_pixel_selection(attr, old, new):"
+        },
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 1350,
+          "end": 1366,
+          "role": "logic",
+          "symbol": "update_upon_cadence_change",
+          "anchor": "051ee6bc93dd",
+          "first": "def update_upon_cadence_change(attr, old, new):"
+        },
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 1409,
+          "end": 1411,
+          "role": "logic",
+          "symbol": "jump_to_lightcurve_position",
+          "anchor": "1b241bdd06ea",
+          "first": "def jump_to_lightcurve_position(attr, old, new):"
+        },
+        {
+          "file": "code/src/tpf/lk_patch/interact.py",
+          "start": 318,
+          "end": 462,
+          "role": "logic",
+          "symbol": "make_lightcurve_figure_elements",
+          "anchor": "7d5c66857d6e",
+          "first": "def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None, plot_scatter_only=False, fig_name=\"fig_lc\"):"
+        },
+        {
+          "file": "code/src/tpf/tpf_utils.py",
+          "start": 378,
+          "end": 389,
+          "role": "logic",
+          "symbol": "create_background_per_pixel_lc",
+          "anchor": "b3f26a8d45a6",
+          "first": "def create_background_per_pixel_lc(tpf, exclude_target_pixels=True):"
+        }
+      ]
+    },
+    {
+      "id": "per-pixel-plot",
+      "level": "component",
+      "parent": "pixel-inspection",
+      "title": "Per-pixel light curves",
+      "summary": "Draws one small light curve per pixel, over the zoomed pixel and time range, with the selected aperture outlined.",
+      "views": [
+        "small multiples"
+      ],
+      "interactions": [],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/src/tpf/tpf_inspect.py",
+          "start": 244,
+          "end": 352,
+          "role": "logic",
+          "anchor": "3fcdb6ca3b8d",
+          "first": "# add UI and functions for per-pixel plot"
+        },
+        {
+          "file": "code/src/tpf/tpf_utils.py",
+          "start": 296,
+          "end": 318,
+          "role": "logic",
+          "symbol": "cutout_by_range",
+          "anchor": "b6106746795e",
+          "first": "def cutout_by_range(tpf, aperture_mask, col_range, row_range):"
+        },
+        {
+          "file": "code/src/tpf/tpf_inspect.py",
+          "start": 61,
+          "end": 80,
+          "role": "logic",
+          "symbol": "export_plt_fig_as_data_uri",
+          "anchor": "6bac2c003937",
+          "first": "def export_plt_fig_as_data_uri(fig, close_fig=True):"
+        }
+      ]
+    },
+    {
+      "id": "lc-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "External light curve viewer",
+      "summary": "Loads a ZTF or SkyPatrol light curve from a pasted URL and plots it in magnitudes, optionally folded by a period and epoch that can be halved or doubled.",
+      "views": [
+        "scatter plot",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/tpf/tpf_inspect.py",
+          "start": 578,
+          "end": 670,
+          "role": "logic",
+          "symbol": "create_lc_viewer_ui",
+          "anchor": "2d31224d9df0",
+          "first": "def create_lc_viewer_ui():"
+        },
+        {
+          "file": "code/src/tpf/tpf_inspect.py",
+          "start": 449,
+          "end": 450,
+          "role": "logic",
+          "symbol": "make_lc_fig",
+          "anchor": "ba5dced25c97",
+          "first": "def make_lc_fig("
+        },
+        {
+          "file": "code/src/tpf/lc_utils.py",
+          "start": 108,
+          "end": 120,
+          "role": "logic",
+          "symbol": "read_lc",
+          "anchor": "4428685f6ffc",
+          "first": "def read_lc(url):"
+        },
+        {
+          "file": "code/src/tpf/lc_utils.py",
+          "start": 13,
+          "end": 20,
+          "role": "logic",
+          "symbol": "read_ztf_csv",
+          "anchor": "ac19e36a8dd4",
+          "first": "def read_ztf_csv("
+        }
+      ]
+    }
+  ]
+}

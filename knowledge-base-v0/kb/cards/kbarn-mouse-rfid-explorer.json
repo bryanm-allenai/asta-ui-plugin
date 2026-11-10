@@ -1,0 +1,536 @@
+{
+  "schema": "astaui.card/1",
+  "id": "kbarn-mouse-rfid-explorer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T02:38:48Z"
+  },
+  "app": {
+    "title": "Individual mouse explorer for RFID colony logs",
+    "summary": "The person uploads raw RFID reader CSV files, or points to a folder, and loads them. Duplicate and noise reads are removed as the files load. They then pick one tagged animal and set the analysis parameters: date window, time bin, dwell cap and light cycle. Tabs show that animal's summary metrics and a roaming timeline for the whole colony, activity over time with an actogram and circadian profile, where it spends time by pen, floor and zone, and its moves between zones and pens. Finally the person downloads a per-animal metrics table and a figure bundle, or saves a timestamped full run to disk with a manifest of the parameters used.",
+    "task": {
+      "text": "Build a behavioural profile of each tagged animal from home-cage RFID detections (activity, circadian rhythm, space use and movement) and save the metrics along with the parameters that produced them.",
+      "verbs": [
+        "explore",
+        "derive",
+        "summarize",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "Timestamped RFID antenna reads from a multi-pen, two-floor enclosure. They are turned into visits, zone transitions and pen crossings for each tagged animal, and summarised in a per-animal metrics table.",
+      "item": "one tagged animal's detections across all pens and zones over the recording period",
+      "shapes": [
+        "events",
+        "time series",
+        "table",
+        "network"
+      ]
+    },
+    "stage": {
+      "text": "exploring and profiling home-cage tracking logs after a recording run, before group-level analysis",
+      "terms": [
+        "explore",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar loads the data and holds the controls: animal, date window, bin, dwell cap and light cycle. Every tab and metric recomputes from these, so one selected animal drives several tabs of charts and metrics. An export tab saves the summary table, figures and a manifest of the parameters.",
+      "views": [
+        "summary stats",
+        "timeline",
+        "line chart",
+        "heatmap",
+        "bar chart",
+        "network diagram",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "time slider",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail",
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "home-cage RFID behavioural phenotyping of individual animals, in behavioural neuroscience",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "behavioral phenotyping",
+        "circadian activity",
+        "rfid tracking"
+      ]
+    },
+    "workflow": {
+      "name": "profile one individual's activity and space use from a detection log and save the metrics with their parameters",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload RFID CSVs, or give a folder path, and press Load data. The loader parses pen and floor from each filename, de-duplicates the cumulative exports and drops noise reads.",
+          "parts": [
+            "data-sidebar"
+          ]
+        },
+        {
+          "step": "set the parameters every result depends on",
+          "here": "Pick the mouse by RFID tag (defaults to the most-read one), narrow the date range slider, and set the time bin Δt, the dwell cap in seconds, and the lights-on and lights-off hours.",
+          "parts": [
+            "analysis-controls"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The Overview tab shows the animal's signature metrics: located %, zone and pen moves per day, roaming entropy, nocturnality, ascents and descents, food dwell, and dwell % per pen. Below them, a roaming timeline shows every mouse's pen and floor over time.",
+          "parts": [
+            "overview-tab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The Activity & Circadian tab plots zone-transition activity, time at the food antenna, an actogram with food-visit markers, and the animal's circadian profile against the group mean.",
+          "parts": [
+            "activity-tab"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The Space use tab shows pen·floor location and zone occupancy over time, per-pen dwell bars and the lower/upper floor split. The Movement tab shows a zone transition matrix and a pen·floor move network.",
+          "parts": [
+            "space-tab",
+            "movement-tab"
+          ]
+        },
+        {
+          "step": "check data quality",
+          "here": "The Data / QC tab lists the full per-mouse summary table, with counts of raw, de-duplicated and clean rows.",
+          "parts": [
+            "qc-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download the all-mice summary CSV or a ZIP of figures for the selected mouse, or save the full run to a timestamped folder of cleaned data, figures and a parameter manifest.",
+          "parts": [
+            "export-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The unit is the individual animal, followed across all pens, rather than a pen. Animals roam through bridges, so the person picks a tag, not a cage.",
+        "Occupancy uses dwell time capped at a chosen gap rather than read counts, and activity is counted as zone transitions so that lingering under one antenna does not inflate it.",
+        "A light-cycle setting splits day from night for the nocturnality measure, the actogram and the circadian shading.",
+        "The movement graph follows the enclosure's layout: stairs within a pen and bridges between adjacent pens. Impossible jumps are routed through the bridge chain.",
+        "Every export records its parameters in a manifest, in an immutable timestamped run folder, so that runs with different parameter choices can be compared later."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Data loading sidebar",
+      "summary": "Takes uploaded RFID CSVs or a folder path and loads them into a cleaned, de-duplicated read table, reporting how many reads and mice were loaded.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/rfid_gui.py",
+          "start": 44,
+          "end": 67,
+          "role": "markup",
+          "anchor": "d0e218b69c3a",
+          "first": "# =============================================================== DATA LOADING"
+        },
+        {
+          "file": "code/src/rfid/behavior.py",
+          "start": 217,
+          "end": 219,
+          "role": "logic",
+          "symbol": "load_all_files",
+          "anchor": "e19f6fd47aac",
+          "first": "def load_all_files(files, min_reads: int = 50) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/rfid/behavior.py",
+          "start": 212,
+          "end": 214,
+          "role": "logic",
+          "symbol": "load_all",
+          "anchor": "70a901498be5",
+          "first": "def load_all(data_dir: str | Path, min_reads: int = 50) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "analysis-controls",
+      "level": "component",
+      "parent": "data-sidebar",
+      "title": "Animal and parameter controls",
+      "summary": "Selects the focal animal and sets the date window, time bin, dwell cap and light cycle. All visits, transitions and summary metrics are recomputed from these.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "time slider"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app/rfid_gui.py",
+          "start": 75,
+          "end": 102,
+          "role": "markup",
+          "anchor": "54c75113ffee",
+          "first": "# =============================================================== CONTROLS"
+        },
+        {
+          "file": "code/app/rfid_gui.py",
+          "start": 34,
+          "end": 36,
+          "role": "logic",
+          "symbol": "compute_full",
+          "anchor": "950ca0340f37",
+          "first": "def compute_full(df, dwell_cap: int):"
+        },
+        {
+          "file": "code/src/rfid/behavior.py",
+          "start": 472,
+          "end": 508,
+          "role": "logic",
+          "symbol": "per_mouse_summary",
+          "anchor": "2d6b48857791",
+          "first": "def per_mouse_summary(df, visits, zev, pev, lights_on=7, lights_off=19) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "overview-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Overview: behavioural signature",
+      "summary": "Shows the focal animal's headline metrics as number tiles, with dwell % per pen, above a roaming timeline of every animal's pen and floor over time.",
+      "views": [
+        "summary stats",
+        "timeline"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/rfid_gui.py",
+          "start": 105,
+          "end": 138,
+          "role": "markup",
+          "anchor": "8193792cbc2b",
+          "first": "# =============================================================== HEADER + TABS"
+        },
+        {
+          "file": "code/src/rfid/plots.py",
+          "start": 47,
+          "end": 112,
+          "role": "logic",
+          "symbol": "tag_timeline",
+          "anchor": "f38a2e5c0201",
+          "first": "def tag_timeline(df, visits, bin=\"60min\", lights_on=7, lights_off=19, dwell_cap_s=300):"
+        }
+      ]
+    },
+    {
+      "id": "activity-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Activity & circadian",
+      "summary": "Plots the animal's locomotor activity and food-antenna time over time, an actogram by day and hour with food visits marked, and a circadian profile against the group mean.",
+      "views": [
+        "line chart",
+        "heatmap"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/rfid_gui.py",
+          "start": 140,
+          "end": 150,
+          "role": "markup",
+          "anchor": "249a72edabd0",
+          "first": "# ---- Activity & Circadian ----"
+        },
+        {
+          "file": "code/src/rfid/plots.py",
+          "start": 178,
+          "end": 189,
+          "role": "logic",
+          "symbol": "activity_series",
+          "anchor": "55520e35e2aa",
+          "first": "def activity_series(series: pd.Series, animal, bin, lights_on, lights_off):"
+        },
+        {
+          "file": "code/src/rfid/plots.py",
+          "start": 127,
+          "end": 138,
+          "role": "logic",
+          "symbol": "food_dwell_trace",
+          "anchor": "ea6984559cee",
+          "first": "def food_dwell_trace(series: pd.Series, animal, bin, lights_on, lights_off):"
+        },
+        {
+          "file": "code/src/rfid/plots.py",
+          "start": 303,
+          "end": 341,
+          "role": "logic",
+          "symbol": "actogram",
+          "anchor": "bf04b7beb762",
+          "first": "def actogram(df, zev, animal, food_ev, lights_on=7, lights_off=19):"
+        },
+        {
+          "file": "code/src/rfid/plots.py",
+          "start": 288,
+          "end": 300,
+          "role": "logic",
+          "symbol": "circadian_profile",
+          "anchor": "ee1b8eeb0480",
+          "first": "def circadian_profile(profile: pd.Series, lights_on, lights_off, title, group=None):"
+        },
+        {
+          "file": "code/src/rfid/behavior.py",
+          "start": 425,
+          "end": 429,
+          "role": "logic",
+          "symbol": "circadian_profile",
+          "anchor": "cc33fa2cbad9",
+          "first": "def circadian_profile(zev: pd.DataFrame, animal: str | None = None) -> pd.Series:"
+        }
+      ]
+    },
+    {
+      "id": "space-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Space use",
+      "summary": "Shows where the animal is over time by pen and floor and by zone, how its time splits across pens, and the lower/upper floor split.",
+      "views": [
+        "timeline",
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/rfid_gui.py",
+          "start": 152,
+          "end": 166,
+          "role": "markup",
+          "anchor": "bc312d88b0af",
+          "first": "# ---- Space use ----"
+        },
+        {
+          "file": "code/src/rfid/plots.py",
+          "start": 141,
+          "end": 155,
+          "role": "logic",
+          "symbol": "pen_over_time",
+          "anchor": "c047331176a9",
+          "first": "def pen_over_time(piv: pd.DataFrame, animal, bin):"
+        },
+        {
+          "file": "code/src/rfid/plots.py",
+          "start": 158,
+          "end": 174,
+          "role": "logic",
+          "symbol": "occupancy_over_time",
+          "anchor": "765a995a6dce",
+          "first": "def occupancy_over_time(piv: pd.DataFrame, animal, bin):"
+        },
+        {
+          "file": "code/src/rfid/plots.py",
+          "start": 116,
+          "end": 124,
+          "role": "logic",
+          "symbol": "dwell_by_pen_bar",
+          "anchor": "31041a79634a",
+          "first": "def dwell_by_pen_bar(dwell_pct: pd.Series, animal):"
+        },
+        {
+          "file": "code/src/rfid/behavior.py",
+          "start": 275,
+          "end": 283,
+          "role": "logic",
+          "symbol": "dwell_pct_by_floor",
+          "anchor": "b111c80dd6cf",
+          "first": "def dwell_pct_by_floor(visits: pd.DataFrame, animal: str) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "movement-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Movement",
+      "summary": "Draws the animal's zone-to-zone transition matrix and a pen·floor network of stair and bridge crossings, with counts.",
+      "views": [
+        "heatmap",
+        "network diagram"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/rfid_gui.py",
+          "start": 168,
+          "end": 178,
+          "role": "markup",
+          "anchor": "997eb15d78b5",
+          "first": "# ---- Movement ----"
+        },
+        {
+          "file": "code/src/rfid/plots.py",
+          "start": 192,
+          "end": 202,
+          "role": "logic",
+          "symbol": "transition_matrix",
+          "anchor": "972d60f5b4fb",
+          "first": "def transition_matrix(M: pd.DataFrame, title):"
+        },
+        {
+          "file": "code/src/rfid/plots.py",
+          "start": 205,
+          "end": 244,
+          "role": "logic",
+          "symbol": "pen_floor_network",
+          "anchor": "6a672c863fd3",
+          "first": "def pen_floor_network(edges: dict, animal):"
+        },
+        {
+          "file": "code/src/rfid/behavior.py",
+          "start": 364,
+          "end": 383,
+          "role": "logic",
+          "symbol": "pen_floor_crossings",
+          "anchor": "70bfe979466c",
+          "first": "def pen_floor_crossings(visits: pd.DataFrame) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "export-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Export outcomes",
+      "summary": "Downloads the all-animals summary CSV or the focal animal's figure ZIP, or writes a timestamped full run with cleaned data, figures and a parameter manifest.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/rfid_gui.py",
+          "start": 180,
+          "end": 202,
+          "role": "markup",
+          "anchor": "c06a4d096ae3",
+          "first": "# ---- Export ----"
+        },
+        {
+          "file": "code/src/rfid/report.py",
+          "start": 32,
+          "end": 47,
+          "role": "logic",
+          "symbol": "mouse_figures",
+          "anchor": "9906fe3d6fb2",
+          "first": "def mouse_figures(df, visits, zev, pev, animal, bin=\"60min\","
+        },
+        {
+          "file": "code/src/rfid/report.py",
+          "start": 50,
+          "end": 59,
+          "role": "logic",
+          "symbol": "figures_zip",
+          "anchor": "8e2e97d5aa93",
+          "first": "def figures_zip(figs: dict, dpi: int = 130) -> bytes:"
+        },
+        {
+          "file": "code/src/rfid/report.py",
+          "start": 89,
+          "end": 134,
+          "role": "logic",
+          "symbol": "save_run",
+          "anchor": "03b3c2ed297c",
+          "first": "def save_run(df, visits, zev, pev, summary, out_root, params, animals=None) -> Path:"
+        },
+        {
+          "file": "code/src/rfid/report.py",
+          "start": 63,
+          "end": 85,
+          "role": "logic",
+          "symbol": "build_manifest",
+          "anchor": "9a65da63d929",
+          "first": "def build_manifest(params: dict, df, animals) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "qc-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Data / QC",
+      "summary": "Lists the per-animal summary table with counts of raw, de-duplicated and clean reads, so the person can check how much data survived cleaning.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "sort"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/rfid_gui.py",
+          "start": 204,
+          "end": 212,
+          "role": "markup",
+          "anchor": "d7f58fd3ef1b",
+          "first": "# ---- Data / QC ----"
+        }
+      ]
+    }
+  ]
+}

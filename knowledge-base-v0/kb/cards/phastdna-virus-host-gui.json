@@ -1,0 +1,622 @@
+{
+  "schema": "astaui.card/1",
+  "id": "phastdna-virus-host-gui",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T23:45:22Z"
+  },
+  "app": {
+    "title": "phastDNA 1.2.0 (web GUI)",
+    "summary": "A person picks Predict or Train. To predict, they enter an output folder, a trained classifier and a folder of viral genomes, set the number of host hits and threads, and press Run. To train, they point at host and virus genome folders with taxonomy metadata, and give a lower and upper bound for each model setting (word-vector size, k-mer sizes, read length, samples, learning rate, epochs, noise), plus one or more loss functions, the number of optimisation iterations and the taxonomic filter and label level. They can check the whole setup in a preview panel before starting. A run page then follows the job through its named pipeline stages, counts optimisation iterations, scores each iteration and marks the best one, and shows the raw log, the full command to copy and the path of the predictions file.",
+    "task": {
+      "text": "Configure and launch training or prediction runs of a k-mer embedding classifier that predicts each virus's host, then follow the runs and compare how each hyperparameter-search iteration scores.",
+      "verbs": [
+        "derive",
+        "monitor",
+        "compare",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Folders of genome sequence files for viruses and candidate hosts, with taxonomic lineage metadata per genome. Training also produces a per-iteration log of chosen hyperparameters and evaluation scores at taxonomic ranks.",
+      "item": "a virus genome whose host taxon is predicted, or one iteration of a hyperparameter search",
+      "shapes": [
+        "sequence",
+        "hierarchy",
+        "events",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "analyzing genome collections by training and running a classifier, after the sequences and taxonomy are gathered",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Tabbed accordion forms collect paths and parameter bounds, which are checked live and summarised in an off-canvas preview. Submitting opens a run page that polls the server log every few seconds and updates a step-progress bar, an iteration counter, a console view and an expanding list of iteration records with score badges.",
+      "views": [
+        "form",
+        "list",
+        "detail panel",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "select",
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "machine-learning host prediction from k-mer embeddings of genomes, in bioinformatics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "bioinformatics",
+        "virus host prediction",
+        "sequence classification"
+      ]
+    },
+    "workflow": {
+      "name": "configure a model run with parameter ranges, launch it and follow its search iterations",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Text fields with path validation for the output folder, the classifier or host/virus genome folders, and the fastDNA executable. Each field has an info toggle that explains it.",
+          "parts": [
+            "predict-form",
+            "train-form"
+          ]
+        },
+        {
+          "step": "set each parameter as a fixed value or a range to search",
+          "here": "Lower and upper bound inputs for each hyperparameter, with sliders for k-mer sizes and threads. When the bounds differ, an 'optimise' icon appears, and an upper bound below the lower one is raised to match. Several loss functions can be picked in a multi-select.",
+          "parts": [
+            "train-form",
+            "bound-validation"
+          ]
+        },
+        {
+          "step": "check the whole setup before running",
+          "here": "'Parameters preview' opens a 'Current setup' panel listing every filled field, with ranges shown as low–high. Run raises toasts naming each accordion section that has invalid fields.",
+          "parts": [
+            "params-preview"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "The run page polls the log and moves a seven-step progress bar (reading metadata → sampling genomes → labelling → sampling virus sequences → fastDNA-supervised → fastDNA-predict → scoring), with hover popovers showing progress inside a step and an iteration counter out of the total.",
+          "parts": [
+            "run-monitor",
+            "run-server"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Each optimisation iteration gets a record with its accordance score as a badge, and the highest score so far is marked. Opening a record shows the chosen hyperparameters, top/top-3 accuracy at each taxonomic rank, and elapsed time.",
+          "parts": [
+            "iteration-records"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Run details show the search space and the full command, with a copy-to-clipboard button. Prediction runs show the path of the predictions.csv they write, and the raw console log stays readable.",
+          "parts": [
+            "run-details",
+            "run-monitor"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every training hyperparameter is entered as a lower/upper bound, so the same form either fixes a value or defines the space for Bayesian optimisation.",
+        "Accuracy is reported at each taxonomic rank (species up to phylum) as top-1 and top-3, along with a single accordance score used to rank iterations.",
+        "Taxonomic data and label filters choose which rank genomes are grouped by and which rank the classifier predicts.",
+        "The GUI only wraps a command-line pipeline: it launches it as a subprocess and parses its log lines for events, progress, hyperparameters and evaluations."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "predict-form",
+      "level": "view",
+      "parent": null,
+      "title": "Predict tab",
+      "summary": "Collects the output folder, classifier and viral genome paths, considered hits and threads to start a host prediction run.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 102,
+          "end": 351,
+          "role": "markup",
+          "symbol": "#predict-form",
+          "anchor": "7970a6a43b8c",
+          "first": "<form action=\"/task\" method=\"post\" class=\"was-validated\" id=\"predict-form\" target=\"_blank\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 45,
+          "end": 73,
+          "role": "markup",
+          "symbol": "header.viewport-header",
+          "anchor": "3be1e0639f82",
+          "first": "<header class=\"viewport-header d-flex align-items-center pb-3 mb-5\">"
+        },
+        {
+          "file": "code/static/phastDNA_ui.css",
+          "start": 671,
+          "end": 673,
+          "role": "style",
+          "symbol": ".accordion-button",
+          "anchor": "8db8bc0b3de9",
+          "first": ".accordion-button{"
+        },
+        {
+          "file": "code/static/phastDNA_ui.css",
+          "start": 335,
+          "end": 339,
+          "role": "style",
+          "symbol": ".form-control",
+          "anchor": "aff8b71f8ce7",
+          "first": ".form-control {"
+        },
+        {
+          "file": "code/static/ui_controller.js",
+          "start": 464,
+          "end": 471,
+          "role": "logic",
+          "anchor": "eb2603b62a31",
+          "first": "threads_slider_predict.addEventListener('input', (e) => {"
+        }
+      ]
+    },
+    {
+      "id": "train-form",
+      "level": "view",
+      "parent": null,
+      "title": "Train tab",
+      "summary": "Collects host and virus genome paths, a lower/upper bound for each hyperparameter, loss functions, iteration counts and taxonomic filters for a training run with optimisation.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "multi-select",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 359,
+          "end": 1343,
+          "role": "markup",
+          "symbol": "#train-form",
+          "anchor": "c6a45ae5e648",
+          "first": "<form action=\"/task\" method=\"post\" class=\"was-validated\" id=\"train-form\" target=\"_blank\">"
+        },
+        {
+          "file": "code/static/phastDNA_ui.css",
+          "start": 522,
+          "end": 538,
+          "role": "style",
+          "symbol": ".slider",
+          "anchor": "551fb32bfed3",
+          "first": ".slider {"
+        },
+        {
+          "file": "code/static/phastDNA_ui.css",
+          "start": 369,
+          "end": 374,
+          "role": "style",
+          "symbol": ".choices__inner",
+          "anchor": "c5db75d96e02",
+          "first": ".choices__inner {"
+        },
+        {
+          "file": "code/static/ui_controller.js",
+          "start": 468,
+          "end": 698,
+          "role": "logic",
+          "anchor": "065b6074e4f2",
+          "first": "threads_slider_train.addEventListener('input', (e) => {"
+        },
+        {
+          "file": "code/static/ui_controller.js",
+          "start": 1061,
+          "end": 1070,
+          "role": "logic",
+          "anchor": "f8b5cdf050cb",
+          "first": "tax_dropdown.addEventListener('change', (e) => {"
+        },
+        {
+          "file": "code/static/ui_controller.js",
+          "start": 1222,
+          "end": 1300,
+          "role": "logic",
+          "anchor": "02e7b81f5649",
+          "first": "var multipleLoss = new Choices('#train-training-loss', {"
+        }
+      ]
+    },
+    {
+      "id": "bound-validation",
+      "level": "component",
+      "parent": "train-form",
+      "title": "Range bounds with optimise marker",
+      "summary": "Keeps each upper bound at or above its lower bound, and shows an optimise icon when a parameter is given a range to search.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/static/ui_controller.js",
+          "start": 1083,
+          "end": 1094,
+          "role": "logic",
+          "anchor": "391a3c534a10",
+          "first": "var lowerBoundInputs = document.querySelectorAll('.lower-bound-input');"
+        },
+        {
+          "file": "code/static/ui_controller.js",
+          "start": 1109,
+          "end": 1171,
+          "role": "logic",
+          "symbol": "validateBounds",
+          "anchor": "8d0e058a14fc",
+          "first": "function validateBounds(event) {"
+        },
+        {
+          "file": "code/static/ui_controller.js",
+          "start": 1174,
+          "end": 1182,
+          "role": "logic",
+          "symbol": "getOptIconObj",
+          "anchor": "d8107d0b86cf",
+          "first": "function getOptIconObj(event) {"
+        },
+        {
+          "file": "code/static/phastDNA_ui.css",
+          "start": 1027,
+          "end": 1029,
+          "role": "style",
+          "symbol": ".opt-icon",
+          "anchor": "e4d66eb4f1af",
+          "first": ".opt-icon {"
+        }
+      ]
+    },
+    {
+      "id": "params-preview",
+      "level": "component",
+      "parent": null,
+      "title": "Parameters preview and run button",
+      "summary": "Lists the current setup in a side panel before running, and on Run raises a toast for every section with invalid fields.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 1357,
+          "end": 1467,
+          "role": "markup",
+          "symbol": "footer.fixed-bottom",
+          "anchor": "7ed258924a68",
+          "first": "<footer class=\"fixed-bottom my-5\">"
+        },
+        {
+          "file": "code/static/phastDNA_ui.css",
+          "start": 41,
+          "end": 47,
+          "role": "style",
+          "symbol": ".toast",
+          "anchor": "083648fa0bdd",
+          "first": ".toast {"
+        },
+        {
+          "file": "code/static/ui_controller.js",
+          "start": 121,
+          "end": 173,
+          "role": "logic",
+          "anchor": "f3206925b479",
+          "first": "param_btn.onclick = function () {"
+        },
+        {
+          "file": "code/static/ui_controller.js",
+          "start": 834,
+          "end": 908,
+          "role": "logic",
+          "anchor": "dc1621fa5f02",
+          "first": "let toast_container = document.getElementsByClassName('toast-container')[0];"
+        }
+      ]
+    },
+    {
+      "id": "run-monitor",
+      "level": "view",
+      "parent": null,
+      "title": "Run progress and console",
+      "summary": "Polls the run's log and shows the current pipeline step, progress within the step, the iteration count and the raw console output, ending in a success or error status.",
+      "views": [
+        "summary stats",
+        "document reader"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/task-train.html",
+          "start": 5,
+          "end": 11,
+          "role": "markup",
+          "symbol": "#counter-div",
+          "anchor": "33682240d985",
+          "first": "<div id=\"counter-div\" class=\"d-flex flex-row\" style=\"overflow: hidden; height: 45px; width: 100px; position: relative; j"
+        },
+        {
+          "file": "code/task-train.html",
+          "start": 15,
+          "end": 15,
+          "role": "markup",
+          "symbol": "#progress",
+          "anchor": "56b4e8997899",
+          "first": "<div class=\"progress\" id=\"progress\"></div>"
+        },
+        {
+          "file": "code/task-train.html",
+          "start": 130,
+          "end": 132,
+          "role": "markup",
+          "symbol": "#ajax-test",
+          "anchor": "cf114a0aa4a2",
+          "first": "<div class=\"console-output flavor-visibility\" id=\"ajax-test\">"
+        },
+        {
+          "file": "code/task-predict.html",
+          "start": 8,
+          "end": 8,
+          "role": "markup",
+          "symbol": "#progress",
+          "anchor": "56b4e8997899",
+          "first": "<div class=\"progress\" id=\"progress\"></div>"
+        },
+        {
+          "file": "code/static/phastDNA_ui.css",
+          "start": 1084,
+          "end": 1092,
+          "role": "style",
+          "symbol": ".progress-container",
+          "anchor": "e7d76e5c1734",
+          "first": ".progress-container {"
+        },
+        {
+          "file": "code/static/phastDNA_ui.css",
+          "start": 1129,
+          "end": 1142,
+          "role": "style",
+          "symbol": ".circle",
+          "anchor": "580703462ccc",
+          "first": ".circle {"
+        },
+        {
+          "file": "code/static/phastDNA_ui.css",
+          "start": 873,
+          "end": 883,
+          "role": "style",
+          "symbol": ".console-output",
+          "anchor": "b7f0d17d7750",
+          "first": ".console-output {"
+        },
+        {
+          "file": "code/static/task.js",
+          "start": 115,
+          "end": 217,
+          "role": "logic",
+          "symbol": "updateStep",
+          "anchor": "5c4cca2e5218",
+          "first": "function updateStep(status) {"
+        },
+        {
+          "file": "code/static/task.js",
+          "start": 70,
+          "end": 102,
+          "role": "logic",
+          "symbol": "count",
+          "anchor": "33031e563e27",
+          "first": "function count() {"
+        },
+        {
+          "file": "code/static/task.js",
+          "start": 324,
+          "end": 497,
+          "role": "logic",
+          "anchor": "4c1546dcc6ac",
+          "first": "var interval = setInterval(function() {"
+        }
+      ]
+    },
+    {
+      "id": "iteration-records",
+      "level": "component",
+      "parent": "run-monitor",
+      "title": "Iteration details",
+      "summary": "Adds a record for each optimisation iteration with its accordance badge, marks the best so far, and when opened shows the chosen hyperparameters, per-rank top/top-3 accuracy and elapsed time.",
+      "views": [
+        "list",
+        "detail panel",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/task-train.html",
+          "start": 160,
+          "end": 161,
+          "role": "markup",
+          "symbol": "#accordionIters",
+          "anchor": "769ee16f1beb",
+          "first": "<div class=\"accordion\" id=\"accordionIters\">"
+        },
+        {
+          "file": "code/static/task.js",
+          "start": 548,
+          "end": 567,
+          "role": "logic",
+          "symbol": "createIterationRecord",
+          "anchor": "85038edbb3f4",
+          "first": "function createIterationRecord(container, iter_num) {"
+        },
+        {
+          "file": "code/static/task.js",
+          "start": 374,
+          "end": 419,
+          "role": "logic",
+          "anchor": "59f39a733f3e",
+          "first": "if (response['run_info']['eval']) {"
+        },
+        {
+          "file": "code/static/task.js",
+          "start": 569,
+          "end": 733,
+          "role": "logic",
+          "anchor": "71e617101c70",
+          "first": "accordionIters.addEventListener('show.bs.collapse', e => {"
+        }
+      ]
+    },
+    {
+      "id": "run-details",
+      "level": "component",
+      "parent": "run-monitor",
+      "title": "Run details",
+      "summary": "Shows the full command to copy and a card per searched hyperparameter with its range, or for prediction runs the output predictions file path.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/task-train.html",
+          "start": 59,
+          "end": 104,
+          "role": "markup",
+          "symbol": "#search-space-grid",
+          "anchor": "c82976bbcb08",
+          "first": "<div class=\"container-fluid\" id=\"search-space-grid\">"
+        },
+        {
+          "file": "code/task-predict.html",
+          "start": 43,
+          "end": 76,
+          "role": "markup",
+          "symbol": "#run-details",
+          "anchor": "4c30594b8290",
+          "first": "<div class=\"container-fluid\" id=\"run-details\">"
+        },
+        {
+          "file": "code/static/task.js",
+          "start": 500,
+          "end": 546,
+          "role": "logic",
+          "symbol": "copyToClipboard",
+          "anchor": "8e8f18db1c47",
+          "first": "function copyToClipboard(elem) {"
+        }
+      ]
+    },
+    {
+      "id": "run-server",
+      "level": "component",
+      "parent": null,
+      "title": "Run launcher and log parser",
+      "summary": "Turns the submitted form into a pipeline command, starts it, and on each poll parses new log lines into events, progress, iteration hyperparameters, evaluation scores and elapsed time.",
+      "views": [],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/phastDNA_gui.py",
+          "start": 37,
+          "end": 97,
+          "role": "logic",
+          "symbol": "test_f",
+          "anchor": "a56c143d9b48",
+          "first": "def test_f():"
+        },
+        {
+          "file": "code/phastDNA_gui.py",
+          "start": 183,
+          "end": 203,
+          "role": "logic",
+          "symbol": "get_status",
+          "anchor": "75421c4e46be",
+          "first": "def get_status(id):"
+        },
+        {
+          "file": "code/phastDNA_gui.py",
+          "start": 108,
+          "end": 179,
+          "role": "logic",
+          "symbol": "check_events",
+          "anchor": "da9e66038e4a",
+          "first": "def check_events(logs):"
+        },
+        {
+          "file": "code/phastDNA_gui.py",
+          "start": 100,
+          "end": 105,
+          "role": "logic",
+          "symbol": "check_status",
+          "anchor": "88a9fe66dcd6",
+          "first": "def check_status(logs):"
+        },
+        {
+          "file": "code/phastDNA_gui.py",
+          "start": 16,
+          "end": 28,
+          "role": "data",
+          "anchor": "94bd7ddd46d0",
+          "first": "hypers_lookup = {"
+        }
+      ]
+    }
+  ]
+}

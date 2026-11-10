@@ -1,0 +1,603 @@
+{
+ "interface": {
+  "title": "NEURO-RX :: Drug Response Intelligence (Drug Response Prediction Engine v3.0)",
+  "field": "Pharmacogenomics / precision oncology (GDSC cancer cell-line drug sensitivity, EGFR inhibitors in lung cancer lines)",
+  "stage_of_work": "Exploratory analysis and modelling: finding biomarkers and checking a predictive model on preloaded screening data",
+  "what_it_is_for": "For a chosen EGFR inhibitor, find the genes whose expression correlates with drug sensitivity (FDR-corrected), find the most sensitive cell lines, and test a Random Forest that predicts LN(IC50) from expression on held-out cell lines."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "Seed data loads locally with no upload. It has 25 genes and 19 training plus 5 held-out cell lines per compound. The held-out lines are H23, H1703, A549, H596 and H441. In every compound, EGFR is the only significant gene. The other 24 genes have nearly identical r (about −0.059 for Erlotinib, −0.099 for Osimertinib), so they sit on top of each other in the volcano plot, and only 2–3 points show (screens/004.webp, biomarkers.csv). The volcano y-value is capped at 12 for plotting: EGFR's real −log10 p is 13.6. The sensitive-lines table column is labelled 'IC50', but its values are on the LN(IC50) scale (negative values for Osimertinib). Unreconciled: after switching to Afatinib, screens/033.webp shows the Cell Line ID box reading H23 with Actual/Predicted 2.700 / 2.372, but the replay records exactly those values for A549 under Afatinib. A549 had been selected under Erlotinib just before the switch, so the selectbox label may reset to the first option after a compound change while the shown values still belong to the previous pick. This is not confirmed, so per-line values read straight after a compound switch should not be trusted."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Find expression biomarkers of drug sensitivity, and check whether expression can predict sensitivity in unseen samples without data leakage",
+  "specific": "For each EGFR inhibitor, find genes correlated with GDSC LN(IC50), list the most sensitive cell lines, and check a train-only Random Forest on held-out cell lines",
+  "children": [
+   {
+    "kind": "task",
+    "general": "Choose the treatment to analyse",
+    "specific": "Pick the target compound in the Control Deck sidebar, then go through the compounds one after another to compare them",
+    "screens": [
+     "screens/024.webp",
+     "screens/026.webp",
+     "screens/033.webp",
+     "screens/039.webp"
+    ],
+    "branch": "repeat",
+    "children": [
+     {
+      "kind": "action",
+      "label": "opened the Target Compound dropdown",
+      "screens": [
+       "screens/024.webp"
+      ]
+     },
+     {
+      "kind": "action",
+      "label": "chose Erlotinib (default)",
+      "screens": [
+       "screens/004.webp"
+      ]
+     },
+     {
+      "kind": "action",
+      "label": "chose Gefitinib (volcano and dose-response render; model training crashes, see not_done)",
+      "screens": [
+       "screens/026.webp"
+      ]
+     },
+     {
+      "kind": "action",
+      "label": "chose Afatinib",
+      "screens": [
+       "screens/033.webp"
+      ]
+     },
+     {
+      "kind": "action",
+      "label": "chose Osimertinib",
+      "screens": [
+       "screens/039.webp"
+      ]
+     }
+    ],
+    "id": "t1",
+    "check": "replayed"
+   },
+   {
+    "kind": "phase",
+    "general": "Find candidate biomarkers",
+    "specific": "Volcano Scan tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Find the features whose correlation with the response passes the multiple-testing threshold",
+      "specific": "Read the volcano plot of Pearson r against −log10 p, with points coloured by BH-FDR significance, and the summary cards (genes scanned, significant biomarkers, train/test counts). Optionally box-zoom into the crowded non-significant cluster, or click 'False' in the Significant legend to show only the hits.",
+      "screens": [
+       "screens/004.webp",
+       "screens/005.webp",
+       "screens/040.webp",
+       "screens/007.webp",
+       "screens/009.webp",
+       "check/screens/014.webp",
+       "check/screens/017.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered the significant point (EGFR, r=−0.985, Erlotinib)",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered a non-significant point (CTNNB1, r=−0.059)",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "(optional) dragged a zoom box around the points near r=0",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "(optional) double-clicked the plot to reset the zoom",
+        "screens": [
+         "check/screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "(optional) clicked legend entry 'False' to hide non-significant genes",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "(optional) clicked legend entry 'False' again to bring them back",
+        "screens": [
+         "check/screens/017.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered EGFR for Gefitinib (r=−0.983)",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered EGFR for Osimertinib (r=−0.866, −log10 p=5.78)",
+        "screens": [
+         "screens/040.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the full table of statistics for each feature",
+      "specific": "Press Export Biomarkers to download biomarkers.csv (25 rows; columns Gene, Correlation, P_Value, P_Value_FDR, -log10_P_Raw, Significant, plot_y)",
+      "screens": [
+       "screens/005.webp",
+       "screens/040.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed ⤓ EXPORT BIOMARKERS (Erlotinib) → biomarkers.csv",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed ⤓ EXPORT BIOMARKERS (Osimertinib) → biomarkers.csv",
+        "screens": [
+         "screens/040.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Survey response across samples",
+    "specific": "Dose-Response tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "See how the response values are spread across all samples",
+      "specific": "Read the LN(IC50) histogram over all matched cell lines",
+      "screens": [
+       "screens/010.webp",
+       "screens/029.webp",
+       "screens/041.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened ◈ DOSE-RESPONSE tab",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the tallest bin (LN(IC50) 3.2–3.399, count 4)",
+        "screens": [
+         "screens/011.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "List the most responsive samples",
+      "specific": "Read the 'Top 10 Most Sensitive Cell Lines' table and sort it by the column labelled 'IC50', which holds LN(IC50) values (negative for Osimertinib)",
+      "screens": [
+       "screens/012.webp",
+       "screens/014.webp",
+       "screens/043.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked IC50 header (ascending)",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked IC50 header again (descending)",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "after switching to Osimertinib, clicked the IC50 header once (H1975 −1.384 first)",
+        "screens": [
+         "screens/043.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Check a predictive model on unseen samples",
+    "specific": "ML Predictor tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Compare the model's cross-validated training score with its score on held-out data",
+      "specific": "Read the Performance Telemetry cards: Cross-Val R² (train), Test R² (unseen), Test RMSE",
+      "screens": [
+       "screens/016.webp",
+       "screens/033.webp",
+       "screens/044.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened ◈ ML PREDICTOR with Erlotinib (0.883 / 0.503 / 0.242)",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "switched to Afatinib (0.885 / 0.486 / 0.231)",
+        "screens": [
+         "screens/033.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "switched to Osimertinib (−2.115 / 0.705 / 0.170)",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Inspect predicted against observed values for the test set",
+      "specific": "Read the Predicted vs Actual LN(IC50) scatter with its magenta OLS trend line fitted to predicted vs actual (there is no y=x reference line), hover points, box-zoom and reset",
+      "screens": [
+       "screens/017.webp",
+       "screens/046.webp",
+       "screens/048.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered a point (Actual 3.94, Predicted 3.6045)",
+        "screens": [
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged a zoom box on the scatter",
+        "screens": [
+         "screens/046.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the zoomed point matching H596 (1.178 / 1.068)",
+        "screens": [
+         "screens/047.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Reset axes",
+        "screens": [
+         "screens/048.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download plot as PNG → plot-image.png",
+        "screens": [
+         "screens/048.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Compare the prediction for one unseen sample with its measured value",
+      "specific": "In the Prediction Simulator, pick a held-out Cell Line ID and read Actual and Predicted LN(IC50) and the error",
+      "screens": [
+       "screens/021.webp",
+       "screens/037.webp",
+       "screens/044.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Cell Line ID dropdown (H23, H1703, A549, H596, H441)",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose A549 (Erlotinib: actual 3.940, predicted 3.604, error −0.336)",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose H596 (Afatinib: actual 2.050, predicted 1.695, error −0.355)",
+        "screens": [
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "kept H596 after switching to Osimertinib (actual 1.178, predicted 1.068)",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "task",
+    "general": "Confirm how leakage was avoided and see the final list of significant features",
+    "specific": "Read the Integrity tab (split before statistics, train-only median imputation, BH-FDR on train, 5-fold CV) and the Top Biomarkers (FDR < 0.05) table",
+    "screens": [
+     "screens/023.webp",
+     "screens/038.webp",
+     "screens/045.webp"
+    ],
+    "branch": "repeat",
+    "children": [
+     {
+      "kind": "action",
+      "label": "opened ◈ INTEGRITY (Erlotinib: EGFR r=−0.9848)",
+      "screens": [
+       "screens/023.webp"
+      ]
+     },
+     {
+      "kind": "action",
+      "label": "opened ◈ INTEGRITY (Afatinib: EGFR r=−0.9817)",
+      "screens": [
+       "screens/038.webp"
+      ]
+     },
+     {
+      "kind": "action",
+      "label": "opened ◈ INTEGRITY (Osimertinib: EGFR r=−0.8659, FDR 0.00004)",
+      "screens": [
+       "screens/045.webp"
+      ]
+     }
+    ],
+    "id": "t11",
+    "check": "replayed"
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Volcano plot with FDR-coloured hits, legend filter and CSV export",
+   "general": "Plot each feature's effect size against its significance, with threshold lines. Colour the points that pass multiple-testing correction, hover to identify a feature, hide the non-significant group, zoom into crowded regions, and export the full statistics table.",
+   "specific": "Volcano Scan: Pearson r against −log10(raw p), with dashed lines at p=0.05 and r=±0.2. Points are magenta when BH-FDR < 0.05. Hover gives gene, r and −log10 p (drawn capped at 12). Clicking 'False' in the legend hides the non-significant genes. Box-zoom, then double-click to reset. Summary cards show genes scanned, significant count and train/test sizes. Export Biomarkers downloads biomarkers.csv (Gene, Correlation, P_Value, P_Value_FDR, -log10_P_Raw, Significant, plot_y). The export rerun can leave the 'False' trace hidden again.",
+   "steps": [
+    "choose compound",
+    "hover points to identify genes",
+    "click the legend to hide non-significant genes",
+    "drag a box to zoom, double-click to reset",
+    "press Export Biomarkers to download the CSV"
+   ],
+   "serves_tasks": [
+    "Find the features whose correlation with the response passes the multiple-testing threshold",
+    "Export the full table of statistics for each feature"
+   ],
+   "screens": [
+    "screens/004.webp",
+    "screens/005.webp",
+    "screens/007.webp",
+    "screens/009.webp",
+    "screens/040.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Response distribution histogram with ranked most-responsive table",
+   "general": "Show how a response measure is spread across all samples, next to a sortable table of the samples that respond most.",
+   "specific": "Dose-Response tab: LN(IC50) histogram of all matched cell lines (hover shows bin range and count) above a 'Top 10 Most Sensitive Cell Lines' grid whose 'IC50' column holds LN(IC50) values. Clicking the IC50 header sorts ascending, then descending.",
+   "steps": [
+    "choose compound",
+    "hover histogram bins",
+    "read the top-10 table",
+    "click the column header to re-sort"
+   ],
+   "serves_tasks": [
+    "See how the response values are spread across all samples",
+    "List the most responsive samples"
+   ],
+   "screens": [
+    "screens/011.webp",
+    "screens/013.webp",
+    "screens/014.webp",
+    "screens/043.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Train-vs-held-out model scorecard with predicted-vs-actual scatter",
+   "general": "Report a model's cross-validated training score next to its held-out test score and error, with a scatter of predicted against observed values and a fitted trend line through them. There is no y=x reference line, so agreement has to be judged from the axis values, not from distance to a diagonal.",
+   "specific": "ML Predictor: Performance Telemetry cards (Cross-Val R² train, Test R² unseen, Test RMSE) and a Predicted vs Actual LN(IC50) scatter for the test lines with a magenta OLS trend line fitted to predicted vs actual (slope about 0.6 for Erlotinib, not y=x). Hover gives the values, box-zoom and Reset axes adjust the view, and the camera button exports a PNG.",
+   "steps": [
+    "choose compound (model retrains)",
+    "read the CV and test metrics",
+    "hover scatter points",
+    "box-zoom and reset axes",
+    "download the plot as PNG"
+   ],
+   "serves_tasks": [
+    "Compare the model's cross-validated training score with its score on held-out data",
+    "Inspect predicted against observed values for the test set"
+   ],
+   "screens": [
+    "screens/017.webp",
+    "screens/033.webp",
+    "screens/044.webp",
+    "screens/046.webp",
+    "screens/048.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Held-out sample prediction inspector",
+   "general": "Pick one sample from the held-out set and see the model's prediction next to the measured value, with the signed error.",
+   "specific": "Prediction Simulator: the Cell Line ID dropdown lists only test-set lines (H23, H1703, A549, H596, H441). The cards show Actual LN(IC50), Predicted LN(IC50) and an error badge. The selected line is not highlighted in the scatter, so you match it by hovering values. After a compound switch the box label may not match the values shown (see data note).",
+   "steps": [
+    "open the Cell Line ID dropdown",
+    "choose a held-out line",
+    "read actual, predicted and error",
+    "change compound and compare again"
+   ],
+   "serves_tasks": [
+    "Compare the prediction for one unseen sample with its measured value"
+   ],
+   "screens": [
+    "screens/018.webp",
+    "screens/021.webp",
+    "screens/037.webp",
+    "screens/044.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Global treatment (compound) selector driving every view",
+   "general": "One sidebar choice of the treatment under study recomputes every downstream analysis: statistics, distribution, model and summary.",
+   "specific": "The Target Compound selectbox (Erlotinib, Gefitinib, Afatinib, Osimertinib) reruns the volcano statistics, histogram, top-10 table, Random Forest and the Integrity biomarker table for that compound. Switching compound can send the view back to the Volcano Scan tab. Gefitinib breaks the model step (see not_done).",
+   "steps": [
+    "open the Target Compound dropdown",
+    "choose a compound",
+    "wait for the rerun",
+    "revisit each tab"
+   ],
+   "serves_tasks": [
+    "Choose the treatment to analyse"
+   ],
+   "screens": [
+    "screens/024.webp",
+    "screens/026.webp",
+    "screens/033.webp",
+    "screens/039.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Methods-provenance panel with final significant-hit table",
+   "general": "State the analysis's leakage safeguards as a fixed checklist, above a table of the features that pass the multiple-testing threshold, so a reader can audit how the hits were obtained.",
+   "specific": "Integrity tab: lists split before statistics, train-only median imputation, BH-FDR on the training set and 5-fold CV, above a Top Biomarkers (FDR < 0.05) table with Gene, r and FDR (EGFR only, for every working compound).",
+   "steps": [
+    "choose compound",
+    "open the Integrity tab",
+    "read the safeguard list",
+    "read the significant-hits table (Gene, r, FDR)"
+   ],
+   "serves_tasks": [
+    "Confirm how leakage was avoided and see the final list of significant features"
+   ],
+   "screens": [
+    "screens/023.webp",
+    "screens/038.webp",
+    "screens/045.webp",
+    "check/screens/033.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "ML Predictor and Integrity tabs for Gefitinib: training the model raises 'ValueError: Input y contains NaN' (dashboard.py line 623 → model.py rf.fit), so both tabs show only the traceback (screens/030.webp, screens/050.webp). The traceback also appears under the Gefitinib volcano plot (screens/027.webp).",
+  "Dose-Response table toolbar (Show/hide columns, Download as CSV, Search, Fullscreen): it is listed in the accessibility tree, but it never became visible or clickable (click timed out, screens/015.webp)."
+ ],
+ "not_done": [
+  "Gefitinib model evaluation and held-out comparison: blocked by the NaN-in-target error. Only its volcano and dose-response views work.",
+  "Box-zoom on the dose-response histogram: the drag had no visible effect (screens/042.webp). It was not retried with the Zoom tool selected explicitly.",
+  "Downloading the sensitive-lines table as CSV and searching it: the grid toolbar would not appear (see screens_never_reached).",
+  "Did not try pan mode, zoom in/out, autoscale or fullscreen in the Plotly toolbars, beyond Reset axes and Download PNG on the scatter.",
+  "The selected held-out cell line is not marked on the Predicted vs Actual scatter, and the scatter tooltips carry no cell-line names. Linking the two was only possible by matching values.",
+  "Collapsing the sidebar was not tried.",
+  "A third click on the IC50 header (to check whether it clears the sort) was not confirmed by either run.",
+  "Whether the Cell Line ID label goes stale after a compound switch was not tested: screens/033.webp reads H23 but shows the values the replay records for A549 under Afatinib (2.700 / 2.372)."
+ ],
+ "applied": [
+  "t9 and f3: replaced 'identity line' with 'OLS trend line fitted to predicted vs actual'; f3 general now says there is no y=x reference line",
+  "Added feature f6 (methods-provenance panel with significant-hit table) for the Integrity tab, serving t11; its check is taken from t11's replay",
+  "Renamed f5 to 'Global treatment (compound) selector' and replaced 'analyte' with 'treatment' in its general words",
+  "Folded t3 (box-zoom) and t4 (legend toggle) into t2 as optional actions; merged their screens into t2; dropped t3/t4 and the f1 serves_tasks entry for t4",
+  "Changed t1's branch from 'one-of' to 'repeat'",
+  "Re-cited the zoom-reset action with check/screens/014.webp instead of 009",
+  "Re-cited the second legend click with check/screens/017.webp, because screens/010.webp shows the Dose-Response tab",
+  "Recorded the screen 033 H23-label vs A549-values discrepancy in data, f4 and not_done",
+  "t7 specific now says the 'IC50' column holds LN(IC50) values; f2 does the same",
+  "t5 and f1 now list the real CSV columns, including -log10_P_Raw and plot_y",
+  "Relabelled t7's third action: the trace shows one header click on a fresh Osimertinib table, not a third click that cleared the sort; removed the unverified 'unsorted' state from f2",
+  "Marked the Gefitinib choice in t1 as crashing the model step",
+  "Added the replay's notes to f1 (y capped at 12, r=±0.2 lines, export rerun re-hides 'False') and f5 (compound switch can jump back to Volcano Scan)"
+ ],
+ "open_fixes": [
+  "Reconcile screen 033 with check.json: the record cannot tell whether the Cell Line ID label resets after a compound switch or one run misattributed the line. A new run should pick A549, switch compound, and compare the label with the values.",
+  "Confirm whether a third click on the IC50 header clears the sort. Neither run clicked it three times on the same table.",
+  "Confirm the f6 safeguard list and hit table for Osimertinib and Afatinib in a replay. The replay opened the Integrity tab only under Erlotinib."
+ ],
+ "screens_at": "pilot/public/runs/neuro-rx-drug-response/20261029-113842/",
+ "screens_filed": {
+  "screens/004.webp": "screens/004.webp",
+  "screens/010.webp": "screens/010.webp",
+  "screens/016.webp": "screens/016.webp"
+ }
+}

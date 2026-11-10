@@ -1,0 +1,729 @@
+{
+ "interface": {
+  "title": "CAFE – Cell Analyzer for Flow Experiment (Streamlit multipage app)",
+  "field": "Immunology / spectral flow cytometry (high-dimensional single-cell analysis)",
+  "stage_of_work": "Analysis after gating: combine samples, run QC, check and correct batch effects, reduce dimensions, cluster, annotate, compare groups and export",
+  "what_it_is_for": "Turning gated, scaled per-sample CSV exports from a spectral flow cytometer into a combined AnnData object with QC, batch correction, PCA, UMAP and Leiden clusters, then merging and annotating clusters into cell types and exporting figures, tables and .h5ad files."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "I uploaded HD01_Control.csv, HD02_Control.csv, PT01_Treated.csv and PT02_Treated.csv together. CAFE read them as 4 samples in 2 groups (Control, Treated), 40 cells and 12 shared markers (CCR5, CD11c, CD127, CD141, CD16, CD1c, CD27, CD38, CD4, CD45ra, CD56, HLA-DR). Rows with missing values were dropped, leaving 39 cells, and QC kept 38. With so few cells, every result is a toy result. No matplotlib figure loaded anywhere in the app: each one showed as a broken image labelled '0'. So plots never appeared; only tables and text did."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Turn per-sample single-cell marker measurements into cleaned, batch-checked, clustered and annotated populations, and export them",
+  "specific": "Process SFCM scaled-CSV exports into an AnnData with QC, ComBat, PCA, UMAP and Leiden, then merge and annotate the clusters",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Bring in and combine the samples",
+    "specific": "Data Processing step 1: Upload",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load several sample files at once and confirm samples, groups and shared measurements",
+      "specific": "Upload the SampleID_Group.csv files and check the 'Samples detected' and 'Markers available' panels",
+      "screens": [
+       "screens/006.webp",
+       "screens/007.webp",
+       "screens/008.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the 📋 CSV format checklist expander",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "uploaded the 4 CSVs into Choose CSV files",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Load CSV files",
+        "screens": [
+         "screens/007.webp",
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Proceed to QC",
+        "screens": [
+         "screens/009.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Remove untrustworthy events",
+    "specific": "Data Processing step 2: Quality Control (MAD outlier filter on total marker signal)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Preview how many events each threshold would remove, then apply the filter",
+      "specific": "Choose None, Perform QC or Perform QC per sample, set n_MADs, read the preview and sensitivity tables, then Apply QC",
+      "screens": [
+       "screens/012.webp",
+       "screens/013.webp",
+       "screens/015.webp",
+       "screens/017.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the 'How MAD-based filtering works' expander",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Perform QC (global): Number of MADs slider at 5.00 showed 2.56% would be removed",
+        "screens": [
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Perform QC per sample: Target % removed per tail = 5.00, per-sample table",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Fine-tune per sample and raised n_MADs for PT01 from 2.50 to 3.00",
+        "screens": [
+         "screens/014.webp",
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "went back to Perform QC (global) and pressed Apply QC",
+        "screens": [
+         "screens/016.webp",
+         "screens/017.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Check for and correct technical batch effects",
+    "specific": "Data Processing step 3: Batch Correction",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Assign each sample to a technical batch",
+      "specific": "Edit the Batch column of the Batch assignment table (HD02 and PT02 set to batch 2)",
+      "screens": [
+       "screens/024.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Continue to Batch correction →",
+        "screens": [
+         "screens/019.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected the PT02 Batch cell and typed 2, Enter",
+        "screens": [
+         "screens/023.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected the HD02 Batch cell and typed 2, Enter",
+        "screens": [
+         "screens/024.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Measure how far each measurement differs between batches",
+      "specific": "Check for batch effects: per-marker Earth Mover's Distance table and verdict text",
+      "screens": [
+       "screens/025.webp",
+       "screens/026.webp",
+       "screens/028.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Check for batch effects",
+        "screens": [
+         "screens/025.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Apply a batch correction and compare before and after",
+      "specific": "Select ComBat and Apply, then read the EMD before/after/change table",
+      "screens": [
+       "screens/030.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "selected ComBat radio",
+        "screens": [
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Apply",
+        "screens": [
+         "screens/030.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Reduce dimensionality and group cells",
+    "specific": "Data Processing steps 4–5: PCA, then UMAP + Leiden",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Reduce the measurements to the main components that explain most of the variance",
+      "specific": "Perform PCA with SVD solver Full and the 95% explained-variance threshold; 3 of 11 components kept",
+      "screens": [
+       "screens/037.webp",
+       "screens/038.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Continue to PCA →",
+        "screens": [
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected Perform PCA, pressed Proceed",
+        "screens": [
+         "screens/032.webp",
+         "screens/034.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the SVD solver dropdown (Auto/Full/Arpack/Randomized) and picked Full",
+        "screens": [
+         "screens/035.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Apply PCA",
+        "screens": [
+         "screens/036.webp",
+         "screens/037.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Build a neighbour graph, embed it in 2D and cluster cells into populations",
+      "specific": "Set Leiden Resolution 1.00, n_neighbors 15, min_dist 0.10, euclidean, igraph, X_pca, then Apply and Compute; result: 3 Leiden clusters",
+      "screens": [
+       "screens/041.webp",
+       "screens/052.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Continue to UMAP + Leiden →",
+        "screens": [
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Distance metric dropdown (euclidean/manhattan/cosine/correlation/minkowski)",
+        "screens": [
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Leiden flavor dropdown (igraph/leidenalg)",
+        "screens": [
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Leiden Resolution slider 0.50 → 1.00",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Apply and Compute",
+        "screens": [
+         "screens/043.webp",
+         "screens/052.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Export the processed dataset",
+    "specific": "Download all outputs (.zip) at the end of Data Processing; this bundle holds the pipeline results only, while Merge Clusters and Cluster Annotation each offer their own download",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Download the full set of results in one archive",
+      "specific": "Download the ZIP with adata_*.h5ad, analysis_parameters_*.txt, per_sample_clustered CSVs, umap_plots and count/frequency/median tables",
+      "screens": [
+       "screens/053.webp",
+       "screens/054.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened What's in the download expander",
+        "screens": [
+         "screens/054.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download all outputs (.zip)",
+        "screens": [
+         "screens/053.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Refine clusters into named populations",
+    "specific": "Advanced pages: Merge Clusters and Cluster Annotation, using the processed data still held in the session",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Combine several clusters under one new name",
+      "specific": "Merge Clusters: New name 'Lymphoid' ← source clusters 0 and 2, giving format string {Lymphoid:0,2}; Finalize Merging",
+      "screens": [
+       "screens/057.webp",
+       "screens/059.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed Lymphoid in New name",
+        "screens": [
+         "screens/056.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "picked 0 and 2 in Source clusters multiselect",
+        "screens": [
+         "screens/057.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed + Add group (a second empty row appeared)",
+        "screens": [
+         "screens/058.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Finalize Merging",
+        "screens": [
+         "screens/059.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Label cells as types from a positive/negative marker signature with confidence scores",
+      "specific": "Cluster Annotation → Probabilistic (GMM): signature row 'NK cell' with CD27 +, Auto-tune thresholds, Run probabilistic annotation",
+      "screens": [
+       "screens/069.webp",
+       "screens/071.webp",
+       "screens/072.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Cluster Annotation and selected Probabilistic (GMM) radio",
+        "screens": [
+         "screens/061.webp",
+         "screens/062.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "double-clicked the Cell type cell and typed NK cell",
+        "screens": [
+         "screens/065.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the CD27 cell dropdown and picked +",
+        "screens": [
+         "screens/068.webp",
+         "screens/069.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run probabilistic annotation",
+        "screens": [
+         "screens/070.webp",
+         "screens/071.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the GMM gate diagnostics expander",
+        "screens": [
+         "screens/072.webp",
+         "screens/073.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Re-cluster using only some of the measurements",
+    "specific": "Selective (Semi Supervised) Clustering: Subset by removing markers (only step 1 of 5 reached)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Build a new dataset from a chosen subset of markers",
+      "specific": "Apply 'Subset by removing markers', upload the CSVs, remove CD1c, Submit Marker Selection; AnnData built, shape (39, 11)",
+      "screens": [
+       "screens/079.webp",
+       "screens/081.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Apply with Subset by removing markers",
+        "screens": [
+         "screens/078.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "uploaded the 4 CSVs",
+        "screens": [
+         "screens/079.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "removed the CD1c chip from the marker multiselect",
+        "screens": [
+         "screens/080.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Submit Marker Selection",
+        "screens": [
+         "screens/081.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "not_confirmed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Outlier-filter preview with threshold sensitivity table",
+   "general": "Choose a robust outlier threshold globally or per group, see a live preview of how many items each group would lose plus a sensitivity sweep over nearby thresholds, adjust single groups if needed, then commit the filter and get a per-group removal report",
+   "specific": "QC step: radio None / Perform QC / Perform QC per sample; Number of MADs slider (global) or Target % removed per tail plus a 'Fine-tune per sample' n_MADs spinbox for each sample; preview table (median, MAD, lower/upper cut, % removed); sensitivity table (% removed at n_MADs 2–8); Apply QC gives a 'Cells removed per sample' table",
+   "steps": [
+    "Pick the QC mode (none, global, per sample)",
+    "Set n_MADs with the slider, or set a target % per tail",
+    "Optionally override n_MADs for individual samples",
+    "Read the preview and sensitivity tables",
+    "Press Apply QC and read the per-sample removal summary"
+   ],
+   "serves_tasks": [
+    "Preview how many events each threshold would remove, then apply the filter"
+   ],
+   "screens": [
+    "screens/012.webp",
+    "screens/013.webp",
+    "screens/015.webp",
+    "screens/017.webp"
+   ],
+   "id": "f1",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Batch assignment table with batch-effect diagnosis and before/after correction",
+   "general": "Assign each sample to a technical batch in an editable table, score each measurement for how different the batches are, apply a correction, and compare the scores before and after",
+   "specific": "Batch Correction step: editable Batch column (SampleID / Group / Batch); 'Check for batch effects' gives a per-marker EMD table (emd_max, emd_mean, worst_batch) and a verdict box ('No marker exceeds an EMD of 0.5…'); None/ComBat radio and Apply give a 'Batch effect before vs after' table (EMD before, EMD after, change)",
+   "steps": [
+    "Type a batch label for each sample in the Batch column",
+    "Press Check for batch effects and read the EMD table and verdict",
+    "Choose ComBat (or None) and press Apply",
+    "Compare EMD before and after per marker"
+   ],
+   "serves_tasks": [
+    "Assign each sample to a technical batch",
+    "Measure how far each measurement differs between batches",
+    "Apply a batch correction and compare before and after"
+   ],
+   "screens": [
+    "screens/024.webp",
+    "screens/025.webp",
+    "screens/027.webp",
+    "screens/030.webp"
+   ],
+   "id": "f2",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Dimensionality reduction with variance-threshold component selection",
+   "general": "Choose a decomposition solver and a cumulative explained-variance cut-off; the tool keeps the components needed to reach it and reports how many it kept",
+   "specific": "PCA step: Skip PCA / Perform PCA radio, then 'Choose the SVD solver' dropdown (Auto/Full/Arpack/Randomized) and an explained-variance slider (70–99); Apply PCA reports '3 of 11 components reach the 95% threshold' and shows PCA before/after ComBat coloured by Batch and by Group",
+   "steps": [
+    "Choose Perform PCA",
+    "Pick an SVD solver",
+    "Set the variance threshold",
+    "Press Apply PCA and read the retained-component count"
+   ],
+   "serves_tasks": [
+    "Reduce the measurements to the main components that explain most of the variance"
+   ],
+   "screens": [
+    "screens/034.webp",
+    "screens/035.webp",
+    "screens/037.webp",
+    "screens/038.webp"
+   ],
+   "id": "f4",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Graph clustering and embedding parameter panel",
+   "general": "Set neighbour-graph, embedding and community-detection parameters in one panel, run all of them with step-by-step progress, and get a summary of the resulting groups",
+   "specific": "UMAP + Leiden step: Leiden Resolution slider (0.01–2.50), n_neighbors slider (5–50), UMAP min_dist slider, Distance metric dropdown, Leiden flavor (igraph/leidenalg), 'Dimension reduction metric to use' (X_pca); Apply and Compute shows 'Step 1/4…' progress, then '38 cells · 4 samples · 3 Leiden clusters · PCA · ComBat correction'",
+   "steps": [
+    "Set the resolution and neighbour count",
+    "Pick a distance metric and Leiden flavor",
+    "Choose which representation to cluster on",
+    "Press Apply and Compute and wait through the 4 steps",
+    "Read the cluster summary line"
+   ],
+   "serves_tasks": [
+    "Build a neighbour graph, embed it in 2D and cluster cells into populations"
+   ],
+   "screens": [
+    "screens/039.webp",
+    "screens/040.webp",
+    "screens/041.webp",
+    "screens/043.webp",
+    "screens/052.webp"
+   ],
+   "id": "f5",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "One-click results bundle",
+   "general": "See a list of everything the archive will contain, then download the processed dataset, run parameters, per-sample tables and summary tables together in one file",
+   "specific": "End of Data Processing: 'What's in the download' expander listing adata_*.h5ad, analysis_parameters_*.txt, per_sample_clustered CSVs, umap_plots and count/frequency/median tables; 'Download all outputs (.zip)' button",
+   "steps": [
+    "Open the contents expander and read what the archive holds",
+    "Press the download button for the ZIP"
+   ],
+   "serves_tasks": [
+    "Download the full set of results in one archive"
+   ],
+   "screens": [
+    "screens/053.webp",
+    "screens/054.webp"
+   ],
+   "id": "f9"
+  },
+  {
+   "name": "Cluster merge builder with live preview",
+   "general": "Group existing category labels under new names using rows of name plus multi-select, watch chips track which labels are still unassigned, preview the mapping as a format string, then apply it and download the relabelled data",
+   "specific": "Merge Clusters: 'N remaining · M assigned' chip bar; rows of New name + Source clusters multiselect; + Add group / Remove last; Merge preview card and Generated format string {Lymphoid:0,2}; note of which clusters pass through unchanged; Finalize Merging leads to 'Download merged data + log (merged_data_xxxx.zip)' and Start a new merge",
+   "steps": [
+    "Type a new group name",
+    "Pick the source clusters in the multiselect",
+    "Optionally add more groups",
+    "Check the merge preview and format string",
+    "Press Finalize Merging and download the merged zip"
+   ],
+   "serves_tasks": [
+    "Combine several clusters under one new name"
+   ],
+   "screens": [
+    "screens/056.webp",
+    "screens/057.webp",
+    "screens/058.webp",
+    "screens/059.webp"
+   ],
+   "id": "f6",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Marker-signature grid with probabilistic type assignment",
+   "general": "Define each type as a row in a grid of +/− marks per measurement; the tool fits a two-component mixture per measurement and sample, scores every item against each signature, sorts items into high-confidence, ambiguous or unassigned, and reports purity per existing cluster plus per-sample gate diagnostics",
+   "specific": "Cluster Annotation → Probabilistic (GMM): Marker signatures data editor (Cell type + one +/− dropdown column per marker), Auto-tune thresholds checkbox, Min match score / High-confidence margin / Ambiguous margin sliders, Random seed; Run probabilistic annotation gives a 'Cells per type × confidence level' table, UMAPs by type and confidence, a Per-cluster purity table, GMM gate diagnostics (cutoff, separation, informative, source per sample × marker, with Sample/Marker pickers), and 'Prepare download (full + high-conf + high&low-conf)'",
+   "steps": [
+    "Type a cell type name in a new row",
+    "Set + or − on the defining markers",
+    "Keep auto-tune on, or set the three thresholds by hand",
+    "Run probabilistic annotation",
+    "Review the confidence table, purity and gate diagnostics",
+    "Prepare the download"
+   ],
+   "serves_tasks": [
+    "Label cells as types from a positive/negative marker signature with confidence scores"
+   ],
+   "screens": [
+    "screens/062.webp",
+    "screens/068.webp",
+    "screens/069.webp",
+    "screens/071.webp",
+    "screens/072.webp",
+    "screens/073.webp"
+   ],
+   "id": "f7",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Marker-subset dataset builder",
+   "general": "Upload raw per-sample files, keep only chosen measurements via removable chips, and build a new dataset from them, as the first of several numbered steps (later dimension-reduction and clustering steps were not reached)",
+   "specific": "Selective Clustering: 'Subset by removing markers' or 'Subset by cell type' + Apply, 'Step 1 of 5' progress bar, CSV upload, 'Select markers to retain' chip multiselect, Submit Marker Selection gives the selected-markers list, 'Expression data shape (39, 11)', 'AnnData object created', then a PCA section (None/Perform PCA) appears",
+   "steps": [
+    "Choose the subset mode and press Apply",
+    "Upload the CSVs",
+    "Remove the markers to exclude",
+    "Submit Marker Selection and read the selected-marker list and data shape"
+   ],
+   "serves_tasks": [
+    "Build a new dataset from a chosen subset of markers"
+   ],
+   "screens": [
+    "screens/078.webp",
+    "screens/079.webp",
+    "screens/080.webp",
+    "screens/081.webp"
+   ],
+   "id": "f8",
+   "check": "not_confirmed"
+  }
+ ],
+ "screens_never_reached": [
+  "Visualization page after loading data (UMAP, marker expression, cluster abundance and group statistics plots): it only accepts an uploaded .h5ad. The .h5ad exists only inside the downloaded ZIP, which I could not read or re-upload because only the four CSVs and gen_data.py can be uploaded (screens/051.webp)",
+  "Every rendered figure (QC histogram, EMD bar plot, sample-similarity heatmap, PCA scree and scatter, UMAPs, cluster map, GMM gate histogram): each showed as a broken image labelled '0'",
+  "Cluster Annotation in Manual mode: after the merge it crashed with TypeError: '<' not supported between instances of 'int' and 'str' at Cluster_Annotation.py line 107, because sorting mixed the 'Lymphoid' and integer cluster labels (screens/060.webp)",
+  "Cluster Evaluation results (resolution sweep and quality metrics): it takes server directory paths, and the output path /tmp/cafe_eval_out was rejected as 'outside the allowed directory'. The page does not say which directory is allowed (screens/076.webp)",
+  "Downsampling configuration and results: it also needs server input/output directory paths (screens/083.webp). I opened the Data I/O form but did not run it",
+  "Selective Clustering steps 2–5 (PCA, clustering, results) and the 'Subset by cell type' mode: I stopped at the action budget"
+ ],
+ "not_done": [
+  "Statistical comparison of population abundance and marker expression between Control and Treated: this lives on the Visualization page, which needs an .h5ad I could not upload",
+  "Viewing any plot: every matplotlib image failed to load in this deployment, so I saw tables and text only. I did not try loading the app from localhost to rule out a host issue",
+  "Reading the contents of the exported ZIP: the download happened (e419c144ec95e92cfb4e350c1428c970.zip), but browser_read_download reported 'no download' under that name",
+  "Downloading the merged-data ZIP and the annotation ZIP: I saw both buttons but did not press them",
+  "Leiden flavor leidenalg, distance metrics other than euclidean, and other Leiden resolutions: I opened these lists but did not run them",
+  "Uniform and density-weighted downsampling: not run, because the page needs server paths",
+  "Annotating clusters by hand (Cluster Annotation's default Manual mode): opening the page after the merge raised TypeError at Cluster_Annotation.py line 107, so manual annotation was never possible (screens/060.webp)",
+  "Choosing a clustering resolution on Cluster Evaluation: the output path was rejected as outside the allowed directory (screens/076.webp)"
+ ],
+ "applied": [
+  "Removed the 'one-of' branch from t2, since its children are a sequence of exploratory steps",
+  "Moved 'pressed Proceed to QC' from t2 to the end of t1",
+  "Removed the Manual-mode TypeError crash from t10's actions and recorded it in not_done",
+  "Removed t10's 'one-of' branch, because it has no sibling alternative until manual annotation is reached",
+  "Kept Export in pipeline order and noted in its specific label that Merge Clusters and Cluster Annotation have their own downloads",
+  "Noted in the Selective Clustering phase that only step 1 of 5 was reached",
+  "Dropped f3 (the stepper feature), whose serves_tasks list was arbitrary",
+  "Added f9, a one-click results bundle feature built from the done export task (screens 053 and 054)",
+  "Recut f8 to the subset-building steps actually shown, dropping the unreached 'continue to PCA and clustering' step",
+  "Added manual annotation and Cluster Evaluation to not_done with their blockers"
+ ],
+ "open_fixes": [
+  "Add a group-comparison and visualization phase (abundance/frequency comparisons, t-test or Wilcoxon marker statistics, UMAP/heatmap/violin/dot-plot exports) and broaden the root goal to match. This needs a run that can upload an .h5ad to the Visualization page and a deployment where matplotlib figures render",
+  "Add manual cluster annotation as a 'one-of' sibling of the GMM task. This needs a run that annotates before merging, or with integer-only labels, to avoid the TypeError",
+  "Add Cluster Evaluation (resolution sweep and metrics) and Downsampling (uniform or density-weighted) tasks and features. This needs the allowed server directory for their input and output paths",
+  "Extend t11 through Selective Clustering steps 2–5 and try the 'Subset by cell type' mode. The run stopped at the action budget",
+  "Add the Visualization, Cluster Evaluation, manual-mapping and downsampling features once those screens are reached",
+  "Re-run check.json against a stable server: the replay's server crashed at CSV load, so no task or feature is independently confirmed"
+ ],
+ "screens_at": "pilot/public/runs/cafe-flow-cytometry/20261031-042055/",
+ "screens_filed": {
+  "screens/006.webp": "screens/006.webp",
+  "screens/012.webp": "screens/012.webp",
+  "screens/024.webp": "screens/024.webp",
+  "screens/037.webp": "screens/037.webp",
+  "screens/053.webp": "screens/053.webp",
+  "screens/057.webp": "screens/057.webp"
+ }
+}

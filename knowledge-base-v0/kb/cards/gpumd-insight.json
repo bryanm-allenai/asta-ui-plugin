@@ -1,0 +1,621 @@
+{
+  "schema": "astaui.card/1",
+  "id": "gpumd-insight",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T08:04:02Z"
+  },
+  "app": {
+    "title": "GPUMD Insight — Universal Trajectory Viewer",
+    "summary": "A person loads one or two multi-frame atomistic trajectories, either bundled examples or uploaded extended XYZ files, and chooses whether to view one structure or two side by side. They pick the elements or atoms to focus on, choose between the whole periodic cell and a local environment around the focus, and set how the atoms are drawn. They then choose an element pair and a distance cutoff. They scrub or play a single shared timeline that drives both 3D viewers and a strip of per-frame measures together. Below the viewers, curves show how the minimum pair distance, the pair count and the mean coordination change over the run, so the two runs can be compared frame by frame.",
+    "task": {
+      "text": "Play back one or two simulated atomistic trajectories on a linked timeline and compare how pair distances and coordination around chosen atoms change over the run.",
+      "verbs": [
+        "explore",
+        "compare",
+        "derive",
+        "locate"
+      ]
+    },
+    "data": {
+      "text": "Multi-frame atomistic simulation trajectories: each frame has atom positions, element symbols, a periodic cell and a time stamp.",
+      "item": "a frame of a simulation trajectory, with every atom's element and position in a periodic cell",
+      "shapes": [
+        "3d structure",
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "exploring and comparing simulation trajectories after a run, before quantitative analysis",
+      "terms": [
+        "explore",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls pick the datasets, the focus atoms, the view scope and an element-pair cutoff. These build one or two 3D viewers that share a single frame slider and play button, with a strip of per-frame measures read at the current frame. Plotted curves of the same measures across all frames mark the current frame with a vertical line.",
+      "views": [
+        "3d structure viewer",
+        "side-by-side panes",
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "filter",
+        "time slider",
+        "zoom and pan",
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views",
+        "side-by-side comparison",
+        "focus and context"
+      ]
+    },
+    "field": {
+      "text": "trajectory visualisation and pair-distance and coordination analysis of molecular dynamics simulations",
+      "disciplines": [
+        "materials science"
+      ],
+      "terms": [
+        "molecular dynamics",
+        "coordination analysis",
+        "atomistic simulation"
+      ]
+    },
+    "workflow": {
+      "name": "play back two runs on a shared timeline and compare per-frame measures",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Choose the bundled examples or upload one or two multi-frame extended XYZ files. Each file is checked for a constant atom count and order and a full 3D cell.",
+          "parts": [
+            "data-workspace"
+          ]
+        },
+        {
+          "step": "choose one item or two to compare side by side",
+          "here": "Workspace mode switches between a single structure and two structures compared side by side, with primary and comparison dataset pickers.",
+          "parts": [
+            "data-workspace"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Pick focus elements or type 1-based atom numbers. Then either show the full cell or only atoms within a local-environment radius of the focus. Hydrogen can be hidden, and the drawing style can be ball-and-stick, space-filling or framework.",
+          "parts": [
+            "selection-rendering"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "For a chosen element pair and cutoff, every frame gets a minimum-image distance, a pair count and a mean coordination. An optional preset adds cluster span, the largest connected component and a second coordination.",
+          "parts": [
+            "pair-analysis",
+            "analysis-curves"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "One slider, a play/pause button and previous/next buttons move every viewer to the same frame and show the frame number and time in picoseconds.",
+          "parts": [
+            "timeline-controls",
+            "linked-viewers"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Two colour-bordered viewers share bounds and a frame. The metric strip shows each run's value at the current frame next to the other's. Clicking an atom labels it with its element, number and coordinates.",
+          "parts": [
+            "linked-viewers",
+            "metric-strip"
+          ]
+        },
+        {
+          "step": "look at how a measure changes over the run",
+          "here": "Two stacked line charts plot distance, then count and coordination, against frame for each run, with a red line at the current frame.",
+          "parts": [
+            "analysis-curves"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Distances and bonds follow periodic boundaries (the minimum-image convention), and bonds that cross the cell edge are drawn to faded ghost images of the atoms on the other side.",
+        "The compared runs are cut to the shorter one's frame count, and one timeline uses the median time per frame, so both viewers always show the same moment.",
+        "The local-environment scope recentres each frame on the focus atoms and shows only atoms within a set radius.",
+        "Analysis is a plugin: a generic element-pair measure, plus a system-specific preset that adds cluster span and largest connected component, shown with a caution against reading the results quantitatively.",
+        "A presentation mode hides the sidebar and forces a two-run comparison for a 16:9 slide capture."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-workspace",
+      "level": "view",
+      "parent": null,
+      "title": "Data & workspace sidebar",
+      "summary": "Loads bundled or uploaded multi-frame XYZ trajectories and chooses single or compare mode with a primary and a comparison dataset.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 83,
+          "end": 121,
+          "role": "markup",
+          "anchor": "f2d239145723",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 31,
+          "end": 33,
+          "role": "logic",
+          "symbol": "cached_upload",
+          "anchor": "ee95aa82153e",
+          "first": "def cached_upload(content: bytes, filename: str) -> TrajectoryModel:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 26,
+          "end": 27,
+          "role": "logic",
+          "symbol": "cached_path",
+          "anchor": "b7459f2ce66b",
+          "first": "def cached_path(path: str, label: str, preset_id: str | None) -> TrajectoryModel:"
+        },
+        {
+          "file": "code/gpumd_insight/data.py",
+          "start": 36,
+          "end": 40,
+          "role": "logic",
+          "symbol": "read_uploaded_trajectory",
+          "anchor": "7d457b6e881b",
+          "first": "def read_uploaded_trajectory(content: bytes, filename: str = \"upload.xyz\") -> list[Atoms]:"
+        },
+        {
+          "file": "code/gpumd_insight/data.py",
+          "start": 29,
+          "end": 33,
+          "role": "logic",
+          "symbol": "load_trajectory",
+          "anchor": "87f878d4c72f",
+          "first": "def load_trajectory(path: str | Path) -> list[Atoms]:"
+        },
+        {
+          "file": "code/gpumd_insight/ui_logic.py",
+          "start": 10,
+          "end": 11,
+          "role": "logic",
+          "symbol": "available_modes",
+          "anchor": "f4c781884043",
+          "first": "def available_modes(dataset_count: int) -> list[str]:"
+        },
+        {
+          "file": "code/gpumd_insight/ui_logic.py",
+          "start": 14,
+          "end": 15,
+          "role": "logic",
+          "symbol": "normalize_mode",
+          "anchor": "fd6d90cfbd71",
+          "first": "def normalize_mode(requested: str, dataset_count: int) -> str:"
+        },
+        {
+          "file": "code/gpumd_insight/presets.py",
+          "start": 17,
+          "end": 22,
+          "role": "data",
+          "symbol": "pt_al_mfi_round3_presets",
+          "anchor": "e36b4d5c10cc",
+          "first": "def pt_al_mfi_round3_presets(project_root: Path) -> list[DatasetPreset]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 184,
+          "end": 188,
+          "role": "markup",
+          "anchor": "6b3bbf1d8297",
+          "first": "for model in active_models:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 177,
+          "end": 181,
+          "role": "logic",
+          "symbol": "compact_formula",
+          "anchor": "5299447d4b11",
+          "first": "def compact_formula(model: TrajectoryModel) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "selection-rendering",
+      "level": "component",
+      "parent": "data-workspace",
+      "title": "Selection & rendering",
+      "summary": "Picks the focus elements and atoms, limits the view to the full cell or a local environment within a radius, and sets the drawing style, unit cell, hydrogen visibility and background.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "filter",
+        "toggle view"
+      ],
+      "patterns": [
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 122,
+          "end": 138,
+          "role": "markup",
+          "anchor": "43a8fde39f38",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/app.py",
+          "start": 48,
+          "end": 60,
+          "role": "logic",
+          "symbol": "parse_atom_indices",
+          "anchor": "99d6145c0d97",
+          "first": "def parse_atom_indices(text: str, atom_count: int) -> tuple[int, ...]:"
+        },
+        {
+          "file": "code/gpumd_insight/models.py",
+          "start": 102,
+          "end": 122,
+          "role": "logic",
+          "symbol": "SelectionModel",
+          "anchor": "bedfbc7ab121",
+          "first": "class SelectionModel:"
+        },
+        {
+          "file": "code/gpumd_insight/bonding.py",
+          "start": 85,
+          "end": 92,
+          "role": "logic",
+          "symbol": "visible_indices",
+          "anchor": "4d165b179a1c",
+          "first": "def visible_indices(atoms: Atoms, selection: SelectionModel, positions: np.ndarray) -> np.ndarray:"
+        },
+        {
+          "file": "code/gpumd_insight/bonding.py",
+          "start": 72,
+          "end": 82,
+          "role": "logic",
+          "symbol": "display_positions",
+          "anchor": "ad9969e2ddc5",
+          "first": "def display_positions(atoms: Atoms, focus: np.ndarray) -> np.ndarray:"
+        }
+      ]
+    },
+    {
+      "id": "pair-analysis",
+      "level": "component",
+      "parent": "data-workspace",
+      "title": "Element-pair analysis",
+      "summary": "Chooses two elements and a cutoff, or a preset with its own cutoffs, and computes per-frame minimum distances, pair counts and coordination using periodic boundaries.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 139,
+          "end": 175,
+          "role": "markup",
+          "anchor": "6a4f01d256b3",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/app.py",
+          "start": 37,
+          "end": 39,
+          "role": "logic",
+          "symbol": "cached_pair",
+          "anchor": "6cc8957545d5",
+          "first": "def cached_pair(source_key: str, _model: TrajectoryModel, a: str, b: str, cutoff: float):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 43,
+          "end": 45,
+          "role": "logic",
+          "symbol": "cached_pt",
+          "anchor": "2d58e15dc10e",
+          "first": "def cached_pt(source_key: str, _model: TrajectoryModel, pt_pt: float, pt_o: float):"
+        },
+        {
+          "file": "code/gpumd_insight/plugins.py",
+          "start": 25,
+          "end": 31,
+          "role": "logic",
+          "symbol": "trajectory_metrics",
+          "anchor": "6d454819f3c8",
+          "first": "def trajectory_metrics(self, model: TrajectoryModel) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/gpumd_insight/plugins.py",
+          "start": 34,
+          "end": 62,
+          "role": "logic",
+          "symbol": "PairAnalysisPlugin",
+          "anchor": "d1dce863946c",
+          "first": "class PairAnalysisPlugin(AnalysisPlugin):"
+        },
+        {
+          "file": "code/gpumd_insight/plugins.py",
+          "start": 65,
+          "end": 116,
+          "role": "logic",
+          "symbol": "PtAlMFIRound3Plugin",
+          "anchor": "9eb79e2f08ea",
+          "first": "class PtAlMFIRound3Plugin(AnalysisPlugin):"
+        },
+        {
+          "file": "code/gpumd_insight/analysis.py",
+          "start": 21,
+          "end": 27,
+          "role": "logic",
+          "symbol": "pair_distances",
+          "anchor": "be706977b656",
+          "first": "def pair_distances(atoms: Atoms, left: np.ndarray, right: np.ndarray) -> np.ndarray:"
+        }
+      ]
+    },
+    {
+      "id": "linked-viewers",
+      "level": "view",
+      "parent": null,
+      "title": "Linked 3D viewers",
+      "summary": "Draws one or two WebGL views of the atomic structure with periodic bonds, ghost images, the unit cell and enlarged focus atoms; hovering or clicking an atom labels it.",
+      "views": [
+        "3d structure viewer",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "hover for detail",
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/gpumd_insight/renderers/three_dmol.py",
+          "start": 196,
+          "end": 202,
+          "role": "logic",
+          "symbol": "render_linked_html",
+          "anchor": "71bd58a84dae",
+          "first": "def render_linked_html(self, payloads: list[dict[str, object]], height: int = 650) -> str:"
+        },
+        {
+          "file": "code/gpumd_insight/renderers/three_dmol.py",
+          "start": 202,
+          "end": 213,
+          "role": "style",
+          "anchor": "479e783c223d",
+          "first": "template = \"\"\"<!doctype html><html><head><meta charset=\"utf-8\"><style>"
+        },
+        {
+          "file": "code/gpumd_insight/renderers/three_dmol.py",
+          "start": 214,
+          "end": 216,
+          "role": "markup",
+          "anchor": "0e94ac75ef30",
+          "first": "</style><script>__LIBRARY__</script></head><body><div id=\"app\"><div id=\"master\">"
+        },
+        {
+          "file": "code/gpumd_insight/renderers/three_dmol.py",
+          "start": 217,
+          "end": 223,
+          "role": "logic",
+          "anchor": "0c1c20bd3e88",
+          "first": "const data=JSON.parse(document.getElementById('payload').textContent), panelsHost=document.getElementById('panels');"
+        },
+        {
+          "file": "code/gpumd_insight/renderers/three_dmol.py",
+          "start": 63,
+          "end": 65,
+          "role": "logic",
+          "symbol": "build_payload",
+          "anchor": "8f3dbda51b65",
+          "first": "def build_payload("
+        },
+        {
+          "file": "code/gpumd_insight/renderers/three_dmol.py",
+          "start": 22,
+          "end": 40,
+          "role": "logic",
+          "symbol": "element_style",
+          "anchor": "b9730c9ed0ab",
+          "first": "def element_style(symbol: str, representation: Representation) -> dict[str, object]:"
+        },
+        {
+          "file": "code/gpumd_insight/bonding.py",
+          "start": 52,
+          "end": 54,
+          "role": "logic",
+          "symbol": "periodic_bonds",
+          "anchor": "548253dc22d3",
+          "first": "def periodic_bonds("
+        },
+        {
+          "file": "code/app.py",
+          "start": 190,
+          "end": 224,
+          "role": "logic",
+          "anchor": "37e3170967fe",
+          "first": "renderer = ThreeDMolRenderer()"
+        }
+      ]
+    },
+    {
+      "id": "timeline-controls",
+      "level": "component",
+      "parent": "linked-viewers",
+      "title": "Shared timeline",
+      "summary": "One slider with play/pause and previous/next buttons moves every viewer to the same frame and shows the frame number and time in picoseconds. Buttons center on the selection, reset the view and switch the theme.",
+      "views": [],
+      "interactions": [
+        "time slider",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/gpumd_insight/renderers/three_dmol.py",
+          "start": 179,
+          "end": 194,
+          "role": "logic",
+          "symbol": "build_linked_payload",
+          "anchor": "6db6d8610d01",
+          "first": "def build_linked_payload(payloads: list[dict[str, object]]) -> dict[str, object]:"
+        },
+        {
+          "file": "code/gpumd_insight/renderers/three_dmol.py",
+          "start": 215,
+          "end": 215,
+          "role": "markup",
+          "anchor": "aa656ae5c1b7",
+          "first": "<button id=\"prev\">◀</button><button id=\"play\">▶ Play</button><button id=\"next\">▶</button><input id=\"timeline\" type=\"rang"
+        },
+        {
+          "file": "code/gpumd_insight/renderers/three_dmol.py",
+          "start": 221,
+          "end": 221,
+          "role": "logic",
+          "anchor": "cc65765b3e2c",
+          "first": "const slider=document.getElementById('timeline');slider.min=0;slider.max=data.frame_count-1;slider.step=1;slider.value=c"
+        },
+        {
+          "file": "code/gpumd_insight/renderers/three_dmol.py",
+          "start": 226,
+          "end": 228,
+          "role": "logic",
+          "anchor": "e30d76e673ca",
+          "first": "function render(index,fit=false){current=Math.max(0,Math.min(data.frame_count-1,Number(index)));states.forEach(s=>draw(s"
+        }
+      ]
+    },
+    {
+      "id": "metric-strip",
+      "level": "component",
+      "parent": "linked-viewers",
+      "title": "Per-frame metric strip",
+      "summary": "Three cards under the viewers show each run's values of the chosen measures at the current frame, set next to each other.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "side-by-side comparison",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/gpumd_insight/renderers/three_dmol.py",
+          "start": 212,
+          "end": 213,
+          "role": "style",
+          "anchor": "a15eb2f5d294",
+          "first": "#metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;padding:0 10px 8px}.metric{border:1px solid #30485e;bo"
+        },
+        {
+          "file": "code/gpumd_insight/renderers/three_dmol.py",
+          "start": 224,
+          "end": 226,
+          "role": "logic",
+          "anchor": "16d1ce5875ca",
+          "first": "function metricValue(metric,index){return data.panels.map(p=>`${p.short_title||p.title}: ${p.metric_frames?.[index]?.[me"
+        },
+        {
+          "file": "code/app.py",
+          "start": 196,
+          "end": 221,
+          "role": "data",
+          "anchor": "c52efb83aadb",
+          "first": "for payload, model in zip(payloads, active_models):"
+        }
+      ]
+    },
+    {
+      "id": "analysis-curves",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis curves",
+      "summary": "Two stacked line charts plot pair distance, then pair count and coordination, against frame for each run, with preset overlays and a marker at the current frame.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/gpumd_insight/visualization.py",
+          "start": 10,
+          "end": 12,
+          "role": "logic",
+          "symbol": "analysis_figure",
+          "anchor": "dbc4a97df90d",
+          "first": "def analysis_figure("
+        },
+        {
+          "file": "code/app.py",
+          "start": 226,
+          "end": 238,
+          "role": "markup",
+          "anchor": "98d8b58c5418",
+          "first": "if pair_series and not presentation:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "data",
+      "list": "shapes",
+      "term": "3d structure"
+    },
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "3d structure viewer"
+    }
+  ]
+}

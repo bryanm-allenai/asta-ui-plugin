@@ -1,0 +1,655 @@
+{
+ "interface": {
+  "title": "kana v3.2.0: Single cell analysis in the browser",
+  "field": "single-cell transcriptomics (scRNA-seq)",
+  "stage_of_work": "primary analysis and exploratory interpretation of a count matrix: QC, normalization, dimensionality reduction, clustering, marker genes",
+  "what_it_is_for": "Runs a standard OSCA-style single-cell pipeline in WebAssembly inside the browser on an uploaded count matrix, then lets you explore the embedding, clusters and marker genes and export the results."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "I uploaded matrix.mtx and features.tsv on the '10X MatrixMarket' tab. In the first two runs I also uploaded barcodes.tsv; the final run used only the matrix and features. The dataset is tiny: 15 cells × 20 genes with Ensembl human IDs (screens/006.webp). With default QC (3 MADs), 12 of the 15 cells were removed (header '15 cells (3 after QC)', screens/022.webp). In the final run cell filtering was off, all 15 cells were kept, and they formed a single cluster (screens/033.webp). Several steps download reference assets from GitHub through cors-proxy.aaron-lun.workers.dev, and those downloads fail here: the default mitochondrial gene list (screens/015.webp), the cell-type references, and the gene-set collections (screens/025.webp). The gene-set download cannot be turned off, so every run ended with a 'RUN ERROR: Failed to fetch' dialog that cannot be closed (screens/033.webp). The results underneath were complete except for gene sets, and I worked them from the keyboard. ARTIFACT OF THIS ENVIRONMENT: the failed downloads, the RUN ERROR dialog and the missing gene sets come from running without outbound network access; they are not how the tool behaves on a connected machine."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "turn a raw count matrix of single cells into groups of cells with characteristic genes, label the groups by cell type or define custom groups, and keep the result",
+  "specific": "upload a 10X MatrixMarket dataset to kana, run the analysis, explore the UMAP, clusters and markers, annotate clusters against cell-type references or make custom selections on the embedding, and export the results (cell-type annotation and custom selections were not reached in this run; see not_done)",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "load the data",
+    "specific": "Start a New Analysis → choose a format tab → add the dataset",
+    "children": [
+     {
+      "kind": "task",
+      "general": "choose to start a fresh analysis rather than reopen a saved one",
+      "specific": "click 'I want to analyze a new dataset' on the landing page",
+      "screens": [
+       "screens/001.webp",
+       "screens/002.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 'I want to analyze a new dataset'",
+        "screens": [
+         "screens/002.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "supply the measurement matrix, its row annotation and optional per-sample annotation",
+      "specific": "on the 10X MatrixMarket tab, browse for the .mtx, the features .tsv and the optional barcode annotation .tsv, then ADD DATASET",
+      "screens": [
+       "screens/004.webp",
+       "screens/006.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked tab '10X MatrixMarket'",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "Browse → uploaded matrix.mtx",
+        "screens": [
+         "screens/004.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "Browse → uploaded features.tsv",
+        "screens": [
+         "screens/004.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "Browse → uploaded barcodes.tsv (optional; first two runs only)",
+        "screens": [
+         "screens/004.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed ADD DATASET",
+        "screens": [
+         "screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "check what was read and map data types to roles",
+      "specific": "dataset card reports 15 cells and 20 Gene Expression features; RNA/ADT/CRISPR modality and primary feature ID (id/name) dropdowns; batch-correction and subsetting-by-annotation dropdowns appear (not used)",
+      "screens": [
+       "screens/006.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "read the dataset card (RNA modality = Gene Expression, primary ID = id)",
+        "screens": [
+         "screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "set processing parameters for each pipeline step",
+    "specific": "Set Analysis Parameters page (Modify analysis parameters / PARAMS)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "decide how strictly to discard poor-quality items",
+      "specific": "Quality control (RNA): Filter cells? toggle, Number of MADs, Use default mitochondrial list? toggle, Mitochondrial gene prefix",
+      "screens": [
+       "screens/007.webp",
+       "screens/017.webp",
+       "screens/032.webp"
+      ],
+      "branch": "one-of: outlier filtering with N MADs | no filtering",
+      "children": [
+       {
+        "kind": "action",
+        "label": "toggled 'Use default mitochondrial list?' to no (prefix field 'mt-' appears)",
+        "screens": [
+         "screens/017.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "toggled 'Filter cells?' to no (final run)",
+        "screens": [
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "size the dimensionality reduction to the data",
+      "specific": "Principal components analysis (RNA): Number of HVGs, Number of PCs",
+      "screens": [
+       "screens/008.webp",
+       "screens/020.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "set Number of PCs from 20 to 5 (runs 1 and 2; the final run kept the default 20)",
+        "screens": [
+         "screens/008.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "set how the 2-D maps balance local and global structure",
+      "specific": "t-SNE perplexity and iterations; UMAP neighbors, minimum distance and epochs",
+      "screens": [
+       "screens/009.webp",
+       "screens/011.webp",
+       "screens/021.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed t-SNE Perplexity 3 (final run: 4)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed UMAP Number of neighbors 5",
+        "screens": [
+         "screens/021.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "choose the grouping method",
+      "specific": "Clustering: Method (SNN graph / k-means), Number of neighbors, Weighting scheme (Rank/Number/Jaccard), Community detection (multilevel/Leiden/walktrap), resolution",
+      "screens": [
+       "screens/012.webp",
+       "screens/013.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "set SNN Number of neighbors to 4 (first run only)",
+        "screens": [
+         "screens/013.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "choose which reference collections to label groups against",
+      "specific": "Cell type annotation: Human/Mouse 'Select all' toggles and per-reference checkboxes (Blueprint/Encode, DICE, HPCA, Monaco, Novershtern, ImmGen, Mouse RNA-seq); all were turned off here because the references cannot be downloaded offline",
+      "screens": [
+       "screens/010.webp",
+       "screens/018.webp",
+       "screens/031.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "toggled Human and Mouse 'Select all' to no",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "unchecked all 7 reference checkboxes",
+        "screens": [
+         "screens/031.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "run the pipeline",
+    "specific": "press Analyze; the logs drawer streams each step",
+    "children": [
+     {
+      "kind": "task",
+      "general": "run the full chain of processing steps and check where it stopped",
+      "specific": "Analyze → inputs, QC, normalization, feature selection, PCA, neighbor index, t-SNE/UMAP, k-means/SNN clustering, marker detection, cell labelling, custom selections, feature set enrichment; read failures in 'What's happening?' logs. The asset-download failures and the closing RUN ERROR dialog are artifacts of this offline environment",
+      "screens": [
+       "screens/014.webp",
+       "screens/015.webp",
+       "screens/022.webp",
+       "screens/025.webp",
+       "screens/033.webp"
+      ],
+      "branch": "repeat (three runs: default mito list → failed at QC; 3 MADs → 3 cells kept; no filtering → 15 cells kept)",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Analyze (run 1: stopped at rna_quality_control, mito list fetch failed)",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Check Logs",
+        "screens": [
+         "screens/015.webp",
+         "screens/025.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Analyze (run 2: 3 of 15 cells after QC)",
+        "screens": [
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Analyze (final run: 15 cells after QC, 1 cluster)",
+        "screens": [
+         "screens/033.webp",
+         "screens/034.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "explore the result",
+    "specific": "Results view: embedding panel, Markers panel, gallery column (in this run all seen behind the RUN ERROR dialog)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "look at the 2-D map and the group sizes",
+      "specific": "UMAP embedding coloured by CLUSTERS, with gallery cards 'UMAP ⊃ clusters', 'Cluster: Num. of cells per cluster' and 'PCA (RNA): % variance explained'; the whole view sits dimmed behind the RUN ERROR dialog",
+      "screens": [
+       "screens/034.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "viewed the Results page after the final run",
+        "screens": [
+         "screens/034.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "colour the map by a different per-cell attribute",
+      "specific": "embedding 'Choose annotation' dropdown: QC::RNA_sums / RNA_detected / RNA_proportion / CLUSTERS / barcode column. Result NOT SHOWN: screens/026.webp still reads CLUSTERS and the map is empty",
+      "screens": [
+       "screens/026.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "selected 'QC::RNA_sums' in Choose annotation (run 2; selection not visible on the cited screen)",
+        "screens": [
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "rank the characteristic genes of a group and inspect one",
+      "specific": "Markers panel for Cluster 1: table of genes with Log-FC, Δ-detected and Expression bars; '+' expands a per-gene expression histogram for Cluster 1 vs other cells",
+      "screens": [
+       "screens/034.webp",
+       "screens/035.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed '+' on ENSG00000111640",
+        "screens": [
+         "screens/035.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "keep a snapshot of the current map beside the others",
+      "specific": "Copy to gallery adds another 'UMAP ⊃ clusters' card, with a delete icon, to the gallery column",
+      "screens": [
+       "screens/039.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Copy to gallery",
+        "screens": [
+         "screens/039.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "export the result",
+    "specific": "SAVE menu",
+    "children": [
+     {
+      "kind": "task",
+      "general": "download the analysis results for use elsewhere",
+      "specific": "SAVE → 'Download analysis results (as ZIP)' starts a background export (toast 'Exporting analysis as ZIP in the background'); the downloaded file itself is not shown on any kept screen",
+      "screens": [
+       "screens/036.webp",
+       "screens/037.webp",
+       "screens/038.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed SAVE (menu with three options opens)",
+        "screens": [
+         "screens/036.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked 'Download analysis results (as ZIP)' (option shown in the menu; export toast follows)",
+        "screens": [
+         "screens/036.webp",
+         "screens/038.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "not_confirmed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Multi-file dataset import with modality mapping",
+   "general": "pick a data format, attach the matrix plus row and column annotation files, check the summary of what was read, and assign each data type and ID column to a role before processing",
+   "specific": "the format tabs (ExperimentHub, 10X MatrixMarket, 10X HDF5, H5AD, RDS, ZIP) each have Browse fields; ADD DATASET creates a dataset card ('15 cells … Gene Expression (20 features)') with RNA/ADT/CRISPR modality and primary-feature-ID dropdowns, plus optional batch-correction and subset-by-annotation selectors",
+   "steps": [
+    "choose a format tab",
+    "browse for the count matrix",
+    "browse for the features file and the optional barcode annotation",
+    "press ADD DATASET",
+    "set the modality and primary feature ID on the dataset card",
+    "optionally choose a batch or subset annotation column (not tried)"
+   ],
+   "serves_tasks": [
+    "supply the measurement matrix, its row annotation and optional per-sample annotation",
+    "check what was read and map data types to roles"
+   ],
+   "screens": [
+    "screens/003.webp",
+    "screens/004.webp",
+    "screens/006.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Step-by-step pipeline parameter editor",
+   "general": "a vertical list of processing steps, each with a plain-language explanation and its own inputs, edited before a single Run",
+   "specific": "Set Analysis Parameters: tabs from Quality control (RNA) through Gene set enrichment; tabs for missing modalities (ADT, CRISPR) are greyed out; inputs include toggles (Filter cells, default mito list), spinners (MADs, PCs, perplexity, neighbors) and method dropdowns (SNN/k-means, Rank/Number/Jaccard, multilevel/Leiden/walktrap); Discard or Analyze",
+   "steps": [
+    "open Modify analysis parameters / PARAMS",
+    "pick a step tab",
+    "read the explanation and change its inputs",
+    "repeat for other steps",
+    "press Analyze (or Discard)"
+   ],
+   "serves_tasks": [
+    "decide how strictly to discard poor-quality items",
+    "size the dimensionality reduction to the data",
+    "set how the 2-D maps balance local and global structure",
+    "choose the grouping method",
+    "choose which reference collections to label groups against"
+   ],
+   "screens": [
+    "screens/007.webp",
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/011.webp",
+    "screens/013.webp",
+    "screens/017.webp",
+    "screens/018.webp",
+    "screens/031.webp",
+    "screens/032.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Reference set chooser with select-all per group",
+   "general": "choose which reference collections to compare against, grouped by organism, with a select-all switch that locks or unlocks the individual checkboxes",
+   "specific": "Cell type annotation: Human and Mouse 'Select all' yes/no toggles; when 'no', the per-reference checkboxes (Blueprint/Encode, DICE, HPCA, Monaco Immune, Novershtern; ImmGen, Mouse RNA-seq) become editable",
+   "steps": [
+    "open the Cell type annotation tab",
+    "switch Select all off for an organism",
+    "check or uncheck individual references",
+    "run the analysis"
+   ],
+   "serves_tasks": [
+    "choose which reference collections to label groups against"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/018.webp",
+    "screens/031.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Live pipeline log with error trap",
+   "general": "watch each processing step start and finish, and find the step and resource that failed",
+   "specific": "LOGS / Check Logs opens the 'What's happening?' drawer: timestamped 'started' / 'finished (from cache)' lines per step, the asset URL being downloaded, and the error in red; a 'Downloading asset' toast and a RUN ERROR dialog with Check Logs / Reload App (the errors seen here come from the offline environment)",
+   "steps": [
+    "press Analyze",
+    "watch the toast and the step list",
+    "open Check Logs on an error",
+    "read which step and URL failed",
+    "change parameters and rerun"
+   ],
+   "serves_tasks": [
+    "run the full chain of processing steps and check where it stopped"
+   ],
+   "screens": [
+    "screens/015.webp",
+    "screens/023.webp",
+    "screens/025.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Group marker table with per-gene distribution",
+   "general": "pick a group, see its genes ranked by effect size with inline bars, search or filter the list, and expand a gene to compare its distribution in the group against the rest",
+   "specific": "Markers panel: Select Modality, Choose annotation, Select Cluster (with 'general' mode), Search gene…, an id/name/type column switch, Log-FC / Δ-detected / Expression bars, '+' for a Cluster-vs-other-cells histogram, a droplet button to colour the embedding by the gene, 'Click to filter markers', and a download link",
+   "steps": [
+    "choose the annotation and cluster",
+    "scan the ranked genes",
+    "optionally search or filter (not confirmed)",
+    "press '+' on a gene to see its distribution",
+    "press the droplet to show the gene on the embedding (not confirmed: no visible change)"
+   ],
+   "serves_tasks": [
+    "rank the characteristic genes of a group and inspect one"
+   ],
+   "screens": [
+    "screens/034.webp",
+    "screens/035.webp"
+   ],
+   "id": "f5",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Embedding viewer with attribute colouring",
+   "general": "show a 2-D map of observations coloured by any per-observation attribute, with pan and point-size controls",
+   "specific": "UMAP canvas with an embedding switch button, Animate, Save as SVG, Pan / Selection modes, Choose annotation (CLUSTERS, QC metrics, barcode column), cluster legend and Point Size",
+   "steps": [
+    "pick an annotation to colour by",
+    "adjust point size or pan",
+    "switch embedding, animate or save as SVG (not confirmed)"
+   ],
+   "serves_tasks": [
+    "look at the 2-D map and the group sizes",
+    "colour the map by a different per-cell attribute"
+   ],
+   "screens": [
+    "screens/026.webp",
+    "screens/034.webp"
+   ],
+   "id": "f6",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Snapshot gallery with summary charts",
+   "general": "pin copies of the current map into a side column next to summary charts, so several views can be compared and kept",
+   "specific": "Copy to gallery adds a 'UMAP ⊃ clusters' card to the gallery column, which also holds 'Cluster: Num. of cells per cluster' bars and 'PCA (RNA): % variance explained'; each card has download and delete buttons",
+   "steps": [
+    "press Copy to gallery to pin the current view",
+    "compare the pinned card with the summary charts",
+    "download or delete a card (not tried)"
+   ],
+   "serves_tasks": [
+    "look at the 2-D map and the group sizes",
+    "keep a snapshot of the current map beside the others"
+   ],
+   "screens": [
+    "screens/034.webp",
+    "screens/039.webp"
+   ],
+   "id": "f8",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Save/export menu",
+   "general": "keep the analysis by saving its settings locally or downloading its settings or full results",
+   "specific": "SAVE menu: 'Save analysis parameters (to browser)', 'Download analysis parameters', 'Download analysis results (as ZIP)'; the ZIP export runs in the background (toast 'Exporting analysis as ZIP in the background')",
+   "steps": [
+    "press SAVE",
+    "choose save to browser, download parameters or download results ZIP (only the ZIP was tried)",
+    "wait for the background export to deliver the file"
+   ],
+   "serves_tasks": [
+    "download the analysis results for use elsewhere"
+   ],
+   "screens": [
+    "screens/036.webp",
+    "screens/038.webp"
+   ],
+   "id": "f7",
+   "check": "not_confirmed"
+  }
+ ],
+ "screens_never_reached": [
+  "t-SNE embedding view: pressing the 'UMAP' embedding button from the keyboard opened no t-SNE choice (screens/038.webp)",
+  "Gene sets tab in the Markers panel: disabled because feature_set_enrichment could not download gene-set collections in this offline environment (screens/025.webp)",
+  "Cell type annotation results: references are downloaded from GitHub, which this environment cannot reach, so I turned them all off",
+  "LOAD view and 'I want to explore existing analysis results': not visited (action budget, and no pre-analysed file among the test files)",
+  "10X HDF5, H5AD, RDS and ZIP upload tabs: seen in the tab list but not opened (only .mtx/.tsv test files are available)",
+  "ExperimentHub tab and 'I just want to try it out' (Zeisel dataset): need outbound network; seen but not used",
+  "'I want to go back to the old version!' (kana 2.0): links off the server"
+ ],
+ "not_done": [
+  "Analysis never finished without error: feature_set_enrichment always tries to fetch 9606_ensembl.tsv.gz from GitHub through cors-proxy.aaron-lun.workers.dev, and there is no setting to skip it. The failure opens a RUN ERROR dialog that Escape does not close (screens/033.webp). After that I could use the results only through keyboard focus and dropdown selection by ref; I could not click on the canvas. This is an artifact of the offline environment, not normal tool behaviour.",
+  "Gene-set enrichment for each cluster (Gene sets tab): never produced, because the gene-set collections could not be downloaded offline.",
+  "Custom cell selection and its markers: this needs a drag on the embedding canvas in Selection mode, and the error dialog blocks mouse input, so I could not do it.",
+  "Annotating clusters with cell types from a reference: the reference datasets cannot be downloaded offline, so I disabled them.",
+  "Export as a .kana file: the v3.2.0 SAVE menu offers only parameters (browser or download) and a results ZIP. I started the results ZIP download; no kept screen shows the file or its contents.",
+  "Saving and restoring an analysis: 'Save analysis parameters (to browser)', 'Download analysis parameters', LOAD and 'explore existing analysis results' were not tried.",
+  "Comparing several clusters: every run gave only one cluster, because the test file has just 15 cells and 20 genes.",
+  "Recolouring the map by QC::RNA_sums: the selection was sent, but screens/026.webp still shows CLUSTERS and an empty map, so the result is not shown.",
+  "The droplet button (colour embedding by gene), Animate, Save as SVG, Click to filter markers and gene search were not confirmed. The droplet press gave no visible change, and the rest were not tried within the ~100-action budget.",
+  "Rerunning from the results view with a QC-metric annotation selected crashed the app with a React runtime error ('NaN is not a number' in DimPlot), leaving a blank page (screens/029.webp, screens/030.webp), so I had to restart from scratch."
+ ],
+ "applied": [
+  "marked t11 as result not shown (026 still reads CLUSTERS) and recorded it in not_done; kept its screens list",
+  "replaced the 037 citation on t14's download action with 036 (menu) and 038 (export toast); dropped 037 from f7",
+  "removed the unsupported '17,129 bytes' / file-name claim from t14 and not_done",
+  "removed the 'QC metrics (RNA)' gallery-card claim from t10 and the features; noted the view sits behind the RUN ERROR dialog",
+  "widened the goal to include cell-type labelling and custom groups, noting they were not reached",
+  "rewrote t6's general label to 'set how the 2-D maps balance local and global structure'",
+  "split f6 into an embedding viewer (f6) and a snapshot gallery (f8)",
+  "marked f5's droplet and search/filter steps, and f6/f7/f1's untried steps, as not confirmed",
+  "replaced 'items' with 'observations' / 'the rest' in feature general labels",
+  "labelled the RUN ERROR dialog, failed downloads and missing gene sets as offline-environment artifacts in data, t9, f4 and not_done",
+  "added not_done entries for per-cluster gene-set enrichment and save/LOAD restore",
+  "corrected t7's action (neighbors=4 was set in the first run, not the second) and t5's (final run kept default 20 PCs), per the trace"
+ ],
+ "open_fixes": [
+  "Adding tree tasks for custom selection and its markers, cell-type annotation results, gene-set enrichment and save/LOAD restore needs a new run with network access and a closable dialog; no kept screen shows any of them, so they stay in not_done for now",
+  "Features for rectangle selection with custom-group markers, per-cluster cell-type labels, the gene-set enrichment table and save/restore of an analysis state need that same new run to observe them",
+  "Realigning check.json's screen numbers to this screens folder and re-judging t12–t14 (which 035, 036, 038 and 039 support) needs a fresh replay; the check values are kept as recorded",
+  "Confirming the QC::RNA_sums recolouring (t11) needs a new screenshot taken after the selection, ideally without the error dialog",
+  "Showing the exported ZIP and its size or contents needs a run that captures the download (e.g. a log or file listing)",
+  "Batch correction, subsetting by annotation, ADT/CRISPR modalities, multiple clusters and the other import formats need richer test data than the 15-cell, 20-gene matrix"
+ ],
+ "screens_at": "pilot/public/runs/kana-scrna-browser/20261029-102714/",
+ "screens_filed": {
+  "screens/001.webp": "screens/001.webp",
+  "screens/007.webp": "screens/007.webp",
+  "screens/014.webp": "screens/014.webp",
+  "screens/034.webp": "screens/034.webp",
+  "screens/036.webp": "screens/036.webp"
+ }
+}

@@ -1,0 +1,816 @@
+{
+ "interface": {
+  "title": "NIR Spectrum Manager",
+  "field": "Near-infrared (NIR) spectroscopy / chemometrics, with CIE L*a*b* colorimetry (plant samples, e.g. Salicornia)",
+  "stage_of_work": "Exploratory analysis after measurement: data loading, quality control (outliers, duplicates), preprocessing, unsupervised exploration and a first calibration model",
+  "what_it_is_for": "A Streamlit app, with all text in Italian, that turns multi-block JDX NIR spectra in a project folder into SNV-corrected datasets: it screens outliers and duplicate reproducibility, runs PCA and Ward clustering, and fits a PLS model with leave-one-out validation against L, a or b colour values."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "I uploaded nirlab_demo.jdx (10 spectra, Sal1–Sal9 plus Sal7bis, 1000–1700 nm) into a new project 'demo' and saved it to data/demo/raw/. After saving, the app automatically selected the saved file while the uploaded copy was still attached, so it read 20 spectra from 2 files. A save click then crashed the page with a ValueError in the PLS code at app_streamlit.py line 379 (screens/011.webp, 012.webp). Removing the uploaded copy brought it back to 10 spectra and fixed it (screens/013.webp). Sal9 has no L/a/b values."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Turn a batch of NIR spectra with colour measurements into a cleaned, preprocessed dataset, then explore its structure and test whether spectra can predict a colour value",
+  "specific": "Go from a multi-block JDX file to SNV spectra, PCA, Ward clusters and a PLS model of L, a or b with LOO-CV",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Set up the workspace and load data",
+    "specific": "Create a project folder and load the JDX into data/<project>/raw/",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Create a named project workspace",
+      "specific": "Choose '+ nuovo progetto...' and type a project name",
+      "screens": [
+       "screens/005.webp",
+       "screens/006.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the 'Progetto' selectbox (only '+ nuovo progetto...')",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 'demo' in 'Nome del nuovo progetto' and pressed Enter",
+        "screens": [
+         "screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Upload a spectra file and store it in the project",
+      "specific": "Upload nirlab_demo.jdx, click 'Salva 1 file caricati in data/demo/raw/', then remove the uploaded copy so the file is not read twice",
+      "screens": [
+       "screens/007.webp",
+       "screens/008.webp",
+       "screens/012.webp",
+       "screens/013.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Upload and gave nirlab_demo.jdx",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Salva 1 file caricati in data/demo/raw/'",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "removed the uploaded file chip (x) so that only the saved file in the 'File JDX in data/demo/raw/' multiselect stays",
+        "screens": [
+         "screens/013.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Reopen an existing project later",
+      "specific": "After a page reload, 'demo' is listed in the Progetto selectbox and its raw file is selected again automatically",
+      "screens": [
+       "screens/061.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "reloaded the page and opened the Progetto selectbox",
+        "screens": [
+         "screens/061.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Limit the analysis to one sample group",
+      "specific": "Choose 'sal' in the 'Prefisso campione' selectbox; the output folder switches to 'Sal'",
+      "screens": [
+       "screens/055.webp",
+       "screens/056.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened 'Prefisso campione' ((tutti) / sal)",
+        "screens": [
+         "screens/055.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'sal'",
+        "screens": [
+         "screens/056.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Inspect the raw data",
+    "specific": "Grezzi and Dati L,a,b tabs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "View and export the raw wavelength x sample matrix",
+      "specific": "Plot raw absorbance of all samples and download the CSV of raw spectra (whole group)",
+      "screens": [
+       "screens/009.webp",
+       "screens/010.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Grezzi tab and scrolled to the raw spectra plot",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Scarica CSV (grezzi, gruppo completo)' (got (tutti)_grezzi.csv: a wavelength_nm column plus 10 sample columns, Sal1–Sal9 and Sal7bis)",
+        "screens": [
+         "screens/010.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Review the reference colour values per sample",
+      "specific": "Table of L, a, b per sample, saved to data/demo/LAB_values.csv",
+      "screens": [
+       "screens/015.webp",
+       "screens/016.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the 'Dati L,a,b' tab",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Salva in data/demo/LAB_values.csv'",
+        "screens": [
+         "screens/016.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Quality control of samples",
+    "specific": "Outlier and Duplicati tabs plus the sidebar Preprocessing controls",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Find samples whose spectra differ strongly from the group mean",
+      "specific": "Read the 'Distanza dalla media (SNV)' table ranked by rmse_da_media; Sal5 = 0.391 against ≤0.056 for the rest",
+      "screens": [
+       "screens/017.webp",
+       "screens/018.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Outlier tab",
+        "screens": [
+         "screens/017.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Exclude an outlier sample from the downstream analysis",
+      "specific": "Pick Sal5 in the sidebar 'Escludi campioni (outlier)'. Its help tooltip asks for a known (e.g. biological) reason, but there is no field to record one",
+      "screens": [
+       "screens/031.webp",
+       "screens/032.webp",
+       "screens/033.webp",
+       "screens/058.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the 'Escludi campioni (outlier)' multiselect",
+        "screens": [
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Sal5",
+        "screens": [
+         "screens/032.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the help icon (?) to read the rule on justified exclusion",
+        "screens": [
+         "screens/033.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check that a sample and its repeat measurement agree",
+      "specific": "Duplicati tab: the Sal7/Sal7bis table (r = 0.9997, rmse 0.003), overlaid SNV spectra and a difference spectrum",
+      "screens": [
+       "screens/019.webp",
+       "screens/059.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Duplicati tab",
+        "screens": [
+         "screens/019.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened 'Coppia da visualizzare' (only Sal7/Sal7bis)",
+        "screens": [
+         "screens/059.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Build and preprocess the working dataset",
+    "specific": "Sidebar 'Media i duplicati' toggle and SNV tab: dataset after exclusions and duplicate averaging",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Choose whether repeat measurements are averaged or kept separate",
+      "specific": "Toggle 'Media i duplicati originale/bis': off keeps Sal7 and Sal7bis separate (9 samples with Sal5 excluded); on averages them (8 samples)",
+      "screens": [
+       "screens/053.webp",
+       "screens/055.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "unticked 'Media i duplicati originale/bis'",
+        "screens": [
+         "screens/053.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "ticked it again",
+        "screens": [
+         "screens/055.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Normalise the spectra and export the final dataset",
+      "specific": "View raw and SNV spectra of the final dataset, download the CSV and save it in the output folder",
+      "screens": [
+       "screens/020.webp",
+       "screens/054.webp",
+       "screens/057.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the SNV tab (9 samples, Sal7 averaged)",
+        "screens": [
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Scarica CSV (SNV, dataset finale)'",
+        "screens": [
+         "screens/054.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Salva in data/demo/output/'",
+        "screens": [
+         "screens/054.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Salva in data/demo/Sal/' after choosing the sal group",
+        "screens": [
+         "screens/057.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Explore sample structure without a target",
+    "specific": "PCA and Clustering tabs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Project samples onto principal components and relate them to measured properties",
+      "specific": "PCA scores (coloured by L), scree plot, loadings per PC, Pearson r between PCs and L/a/b, scores table saved as CSV",
+      "screens": [
+       "screens/021.webp",
+       "screens/022.webp",
+       "screens/023.webp",
+       "screens/046.webp",
+       "screens/048.webp",
+       "screens/049.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the PCA tab (with Sal5 present PC1 = 98.9%)",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'L' in 'Colora punti per' (after excluding Sal5; PC1 = 89.9%)",
+        "screens": [
+         "screens/046.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose PC2 in the Loadings 'Componente' selectbox",
+        "screens": [
+         "screens/047.webp",
+         "screens/048.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Salva scores PCA in data/demo/output/'",
+        "screens": [
+         "screens/049.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Group samples hierarchically and pick the number of groups",
+      "specific": "Ward dendrogram and silhouette-vs-k plot; k is chosen automatically, cluster table saved",
+      "screens": [
+       "screens/025.webp",
+       "screens/026.webp",
+       "screens/050.webp",
+       "screens/052.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Clustering tab with all samples (k = 2, silhouette 0.843, Sal5 alone)",
+        "screens": [
+         "screens/025.webp",
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "reopened it with Sal5 excluded (k = 2, silhouette 0.587, 4 + 4 samples)",
+        "screens": [
+         "screens/050.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Salva assegnazioni in data/demo/output/'",
+        "screens": [
+         "screens/052.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Calibrate a predictive model",
+    "specific": "PLS/Regressione tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Regress spectra on a measured property and choose model complexity by cross-validation",
+      "specific": "Choose target L/a/b (Sal9 dropped automatically), set the maximum number of components, read RMSECV(LOO) vs components, set the final number of components, compare R²/RMSE for calibration vs CV",
+      "screens": [
+       "screens/027.webp",
+       "screens/028.webp",
+       "screens/029.webp",
+       "screens/034.webp",
+       "screens/037.webp",
+       "screens/041.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the PLS/Regressione tab with target L (1 component: R² cal 0.007, R² CV −1.751)",
+        "screens": [
+         "screens/028.webp",
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "re-ran it after excluding Sal5 (R² CV −1.356, RMSE CV 7.495)",
+        "screens": [
+         "screens/034.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'b' in 'Variabile target'",
+        "screens": [
+         "screens/035.webp",
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged the 'Numero massimo di componenti da esplorare' slider from 5 to 4",
+        "screens": [
+         "screens/038.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed + on 'Componenti PLS da usare per il modello finale' to set 2 (R² cal 0.155, R² CV −4.414)",
+        "screens": [
+         "screens/040.webp",
+         "screens/041.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export observed vs predicted values",
+      "specific": "Download the PLS results CSV (observed, cal-predicted, CV-predicted) and save it to the output folder",
+      "screens": [
+       "screens/042.webp",
+       "screens/044.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 'Scarica risultati PLS (CSV)' (got (tutti)_PLS_b.csv)",
+        "screens": [
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Salva in data/demo/output/' (got output_PLS_b.csv)",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Project folder with stored raw files",
+   "general": "Create or reopen a named workspace, upload data files into it and choose which stored files to analyse",
+   "specific": "Progetto selectbox ('+ nuovo progetto...' or an existing name), the 'Nome del nuovo progetto' field, the JDX uploader with a 'Salva N file caricati in data/<project>/raw/' button, and the 'File JDX in data/<project>/raw/' multiselect",
+   "steps": [
+    "Choose '+ nuovo progetto...' and type a name",
+    "Upload one or more JDX files",
+    "Press Salva to copy them into data/<project>/raw/",
+    "Choose stored files in the multiselect (and remove the uploaded copy so it is not read twice)",
+    "Reopen the project later from the Progetto selectbox"
+   ],
+   "serves_tasks": [
+    "Create a named project workspace",
+    "Upload a spectra file and store it in the project",
+    "Reopen an existing project later"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/008.webp",
+    "screens/013.webp",
+    "screens/061.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Multi-block spectra import with embedded colour values",
+   "general": "Read a multi-record spectra file in which each record carries its own reference property values, and show those values as a per-sample table",
+   "specific": "Multi-block JCAMP-DX reader behind the uploader and 'File JDX' multiselect (reports 'N spettri trovati in M file'), feeding the 'Dati L,a,b' tab table of L, a, b per sample (samples without values, e.g. Sal9, have no row) and its 'Salva in data/<project>/LAB_values.csv' button",
+   "steps": [
+    "Upload or select the JDX file(s) and read the number of spectra found",
+    "Open the 'Dati L,a,b' tab",
+    "Check which samples have L, a, b values and which are missing",
+    "Save the table to LAB_values.csv"
+   ],
+   "serves_tasks": [
+    "Upload a spectra file and store it in the project",
+    "Review the reference colour values per sample"
+   ],
+   "screens": [
+    "screens/007.webp",
+    "screens/013.webp",
+    "screens/015.webp",
+    "screens/016.webp"
+   ],
+   "id": "f8"
+  },
+  {
+   "name": "Sample grouping by name prefix with replicate detection",
+   "general": "Split samples into groups by a shared name prefix, restrict the analysis to one group, and recognise repeat measurements by a naming suffix",
+   "specific": "Sidebar 'Prefisso campione' selectbox ('(tutti)' or a detected prefix such as 'sal'), which also sets 'Cartella di output' to the group name (e.g. 'Sal'); names ending in 'bis' are paired with their original (Sal7/Sal7bis) for the Duplicati tab",
+   "steps": [
+    "Open 'Prefisso campione' and see the detected prefixes",
+    "Choose a group",
+    "Check that 'Cartella di output' switched to the group name",
+    "See the original/bis pairs listed in the Duplicati tab"
+   ],
+   "serves_tasks": [
+    "Limit the analysis to one sample group"
+   ],
+   "screens": [
+    "screens/055.webp",
+    "screens/056.webp",
+    "screens/019.webp"
+   ],
+   "id": "f9"
+  },
+  {
+   "name": "Distance-from-mean outlier ranking with sidebar exclusion",
+   "general": "Rank items by how far their normalised profile is from the group mean, then drop chosen items from all later analyses",
+   "specific": "Outlier tab table of rmse_da_media from the mean SNV spectrum, linked to the sidebar 'Escludi campioni (outlier)' multiselect; the exclusion is applied in SNV, PCA, Clustering and PLS",
+   "steps": [
+    "Open the Outlier tab and read the ranked RMSE table",
+    "Read the help tooltip on when exclusion is justified",
+    "Pick the sample(s) in 'Escludi campioni'",
+    "Check that the downstream tabs (SNV list, PCA, clusters, PLS) no longer include them"
+   ],
+   "serves_tasks": [
+    "Find samples whose spectra differ strongly from the group mean",
+    "Exclude an outlier sample from the downstream analysis"
+   ],
+   "screens": [
+    "screens/018.webp",
+    "screens/032.webp",
+    "screens/033.webp",
+    "screens/034.webp",
+    "screens/050.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Replicate-pair reproducibility check with optional averaging",
+   "general": "Compare an item with its repeat measurement (correlation, RMSE, maximum difference, overlay and difference curve), then either average the pair or keep both",
+   "specific": "Duplicati tab: original-vs-'bis' table, 'Coppia da visualizzare' selectbox, 'Sal7 vs Sal7bis (SNV)' overlay and 'Spettro differenza (SNV)' plots, plus the sidebar 'Media i duplicati originale/bis' checkbox",
+   "steps": [
+    "Open the Duplicati tab and read r / rmse / max_abs_diff",
+    "Choose a pair in 'Coppia da visualizzare'",
+    "Inspect the overlay and difference spectrum",
+    "Tick or untick 'Media i duplicati' to average the pair or keep both"
+   ],
+   "serves_tasks": [
+    "Check that a sample and its repeat measurement agree",
+    "Choose whether repeat measurements are averaged or kept separate"
+   ],
+   "screens": [
+    "screens/019.webp",
+    "screens/059.webp",
+    "screens/053.webp",
+    "screens/055.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Working-dataset builder with SNV normalisation",
+   "general": "Assemble the final dataset by applying exclusions and then replicate averaging, normalise each profile, and view and export the result",
+   "specific": "SNV tab: raw and SNV plots of the final dataset (after 'Escludi campioni' and 'Media i duplicati'), sample count, 'Scarica CSV (SNV, dataset finale)' and 'Salva in data/<project>/<output>/'",
+   "steps": [
+    "Set exclusions and the duplicate-averaging option in the sidebar",
+    "Open the SNV tab and check the number and names of samples",
+    "Compare the raw and SNV spectra",
+    "Download or save the final SNV dataset"
+   ],
+   "serves_tasks": [
+    "Choose whether repeat measurements are averaged or kept separate",
+    "Normalise the spectra and export the final dataset"
+   ],
+   "screens": [
+    "screens/020.webp",
+    "screens/053.webp",
+    "screens/054.webp",
+    "screens/057.webp"
+   ],
+   "id": "f10"
+  },
+  {
+   "name": "Table export: download or save to project folder",
+   "general": "Each result table can be downloaded or written into a chosen output subfolder of the workspace",
+   "specific": "Paired 'Scarica CSV' / 'Salva in data/<project>/<output>/' buttons on each tab, with the sidebar 'Cartella di output' field (set automatically to the group name, e.g. 'Sal')",
+   "steps": [
+    "Optionally set 'Cartella di output' (or choose a sample-prefix group, which fills it in)",
+    "Press Scarica CSV to download",
+    "Press Salva to write into data/<project>/<folder>/",
+    "Read the green 'Salvato: <path>' confirmation"
+   ],
+   "serves_tasks": [
+    "View and export the raw wavelength x sample matrix",
+    "Normalise the spectra and export the final dataset",
+    "Export observed vs predicted values"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/016.webp",
+    "screens/054.webp",
+    "screens/057.webp",
+    "screens/044.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "PCA explorer with property colouring and loadings selector",
+   "general": "Project samples onto principal components, colour the score plot by a measured property, inspect loadings per component and their correlations with the properties",
+   "specific": "PCA tab: 'Colora punti per' ((nessuno)/L/a/b) on the scores plot, scree plot, Loadings 'Componente' selectbox (PC1–PC5), Pearson r table between PCs and L/a/b, scores+LAB table and 'Salva scores PCA' button",
+   "steps": [
+    "Open the PCA tab",
+    "Choose a colouring variable",
+    "Read the scree plot",
+    "Choose a component to view its loadings",
+    "Read the PC-vs-L/a/b correlation table",
+    "Save the scores"
+   ],
+   "serves_tasks": [
+    "Project samples onto principal components and relate them to measured properties"
+   ],
+   "screens": [
+    "screens/021.webp",
+    "screens/046.webp",
+    "screens/048.webp",
+    "screens/049.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Ward clustering with silhouette-based k selection",
+   "general": "Build a hierarchical dendrogram, score k by silhouette, pick the best k automatically and list each item's cluster",
+   "specific": "Clustering tab: 'Dendrogramma Ward (k scelto = N)', 'Selezione automatica di k (silhouette)' line with a red marker, cluster table, 'Salva assegnazioni' button",
+   "steps": [
+    "Open the Clustering tab",
+    "Read the dendrogram",
+    "Read the silhouette curve and the chosen k",
+    "Review the cluster table",
+    "Save the assignments"
+   ],
+   "serves_tasks": [
+    "Group samples hierarchically and pick the number of groups"
+   ],
+   "screens": [
+    "screens/025.webp",
+    "screens/026.webp",
+    "screens/050.webp",
+    "screens/052.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "PLS regression with LOO-CV component selection",
+   "general": "Regress spectra on a chosen property, plot cross-validated error against model size, choose the number of components and compare calibration with cross-validation metrics, the predicted-vs-observed plot and the coefficient spectrum",
+   "specific": "PLS/Regressione tab: 'Variabile target' (L/a/b) with automatic exclusion of samples missing values, 'Numero massimo di componenti' slider, RMSECV(LOO) plot, 'Componenti PLS da usare' stepper, R²/RMSE cal vs CV metrics, 'Predetto vs osservato' plot (cal vs LOO-CV), 'Coefficienti di regressione' plot, results table and CSV download/save",
+   "steps": [
+    "Choose the target variable",
+    "Set the maximum number of components with the slider",
+    "Read the RMSECV curve (red line = minimum)",
+    "Set the final number of components with the stepper",
+    "Compare calibration and CV R²/RMSE and the predicted-vs-observed plot",
+    "Download or save the results"
+   ],
+   "serves_tasks": [
+    "Regress spectra on a measured property and choose model complexity by cross-validation",
+    "Export observed vs predicted values"
+   ],
+   "screens": [
+    "screens/028.webp",
+    "screens/029.webp",
+    "screens/037.webp",
+    "screens/038.webp",
+    "screens/041.webp",
+    "screens/044.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "A Duplicati view for a second original/bis pair: the demo file has only Sal7/Sal7bis, so 'Coppia da visualizzare' has one option",
+  "A comparison of several sample-prefix groups: the sidebar lists 'confronto diretto multi-gruppo' only as a possible future step, and the demo has one prefix (sal)"
+ ],
+ "not_done": [
+  "Recording a reason for excluding Sal5: the interface only shows a tooltip saying exclusion must be justified; there is no field to store the reason",
+  "Choosing the number of clusters by hand: k is always picked automatically by silhouette and there is no control to override it",
+  "PLS with target 'a': I tried L and b, not a",
+  "Plotly chart tools (zoom, pan, legend toggling, PNG export): I did not test them; they are standard Plotly, not specific to this app",
+  "A bug I hit but did not investigate: after 'Salva file caricati' the saved file is selected automatically while the uploaded copy is still attached, so every spectrum is loaded twice. A save click then crashed the page with a ValueError at app_streamlit.py line 379 ('The truth value of a Series is ambiguous'). Removing the uploaded copy fixed it",
+  "PLS model quality on the demo data: cross-validated R² stayed negative in every run (best was −1.356 for L with 1 component after excluding Sal5), so I could not show a working calibration with this synthetic data",
+  "When I moved the max-components slider, the final-components stepper went back to 1 and had to be set again"
+ ],
+ "applied": [
+  "Moved t11 (average or keep duplicates) ahead of t10 (export the SNV dataset) in the build phase, and named the sidebar toggle in that phase's specific label",
+  "t5 download action now says the raw CSV has a wavelength_nm column plus 10 sample columns (Sal1–Sal9 and Sal7bis)",
+  "Added feature f8: multi-block JDX import with embedded L,a,b values and the Dati L,a,b table",
+  "Added feature f10: working-dataset builder (exclusions, then duplicate averaging, then SNV, shown and exported on the SNV tab)",
+  "Added feature f9: sample grouping by name prefix with 'bis' replicate detection, and removed t4 from f4's serves_tasks",
+  "Fixed the screen name in the data note (012.jpg to 012.webp)"
+ ],
+ "open_fixes": [
+  "New features f8, f9 and f10 have no check value because the second agent did not replay them as features; a new replay is needed to confirm them (their tasks t2, t4, t6, t10 and t11 were replayed)"
+ ],
+ "screens_at": "pilot/public/runs/nirlab-chemometrics/20261031-013905/",
+ "screens_filed": {
+  "screens/005.webp": "screens/005.webp",
+  "screens/009.webp": "screens/009.webp",
+  "screens/017.webp": "screens/017.webp",
+  "screens/053.webp": "screens/053.webp",
+  "screens/021.webp": "screens/021.webp",
+  "screens/027.webp": "screens/027.webp"
+ }
+}

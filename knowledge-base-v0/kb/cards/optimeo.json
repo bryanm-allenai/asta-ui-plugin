@@ -1,0 +1,681 @@
+{
+  "schema": "astaui.card/1",
+  "id": "optimeo",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T05:30:31Z"
+  },
+  "app": {
+    "title": "OPTIMEO: design of experiments, Bayesian optimization and response modelling",
+    "summary": "The person first plans a set of experimental runs: they describe each process parameter by its type and range, pick a design type (a filterable guide helps), and download the run table with an empty response column. Once the runs have results, they load the table, correct cells, choose which columns are parameters and which are outcomes, and set each parameter's type and allowed range. They mark each outcome as maximize, minimize or constraint-only, add fixed parameters, linear constraints and an exploration setting, then fit a surrogate model. The model proposes the next batch of experiments and the best settings so far. They can inspect the model through 2D slices, an optimization trace, a sensitivity analysis and Pareto fronts, predict outcomes at chosen settings, or fit linear and machine-learning regression models to see which factors matter.",
+    "task": {
+      "text": "Choose which experiments to run next, from a planned design and the results so far, so a process reaches its best settings in as few runs as possible.",
+      "verbs": [
+        "plan",
+        "derive",
+        "decide",
+        "explore",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "A tidy table of experimental runs: process parameters (continuous, integer or categorical) in some columns, and one or more measured outcomes in the others.",
+      "item": "one experimental run: a setting of each process parameter, plus its measured outcomes",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "planning and steering rounds of process experiments, between batches of runs",
+      "terms": [
+        "plan",
+        "analyze",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "Three tabbed pages share one tidy-table input. The design page turns a parameter form into a run table that can be downloaded. The optimization page turns an editable results table and goal settings into a fitted model, then shows next-run and best-so-far tables, model slices, trace, sensitivity and Pareto plots. The analysis page runs diagnostic plots and linear or machine-learning fits, each with a what-if prediction form.",
+      "views": [
+        "table view",
+        "form",
+        "heatmap",
+        "line chart",
+        "scatter plot",
+        "bar chart",
+        "summary stats",
+        "small multiples"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "select",
+        "multi-select",
+        "filter",
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "small multiples",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "design of experiments and Bayesian optimization for tuning an experimental process",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "design of experiments",
+        "bayesian optimization",
+        "response surface methodology"
+      ]
+    },
+    "workflow": {
+      "name": "plan the next batch of experiments from a model of the results so far",
+      "steps": [
+        {
+          "step": "lay out an initial set of runs to cover the parameter space",
+          "here": "a filterable guide suggests designs by factor count, factor type, expected relationships and purpose. The person then sets parameter names, types, low/high/intermediate values and design options (Sobol, factorial, Latin hypercube, Box-Behnken, central composite and others), with optional linear constraints. The run table and its pair plots are drawn, and the design downloads as CSV or XLSX with an empty response column",
+          "parts": [
+            "doe-page",
+            "design-guide",
+            "doe-design-table"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "a CSV or Excel results table is uploaded, column names are cleaned, and cells can be edited and rows added or deleted in place. Parameter and outcome columns are picked, and each parameter gets a type and a min/max range, or an allow-list for categorical parameters",
+          "parts": [
+            "bo-data-loading"
+          ]
+        },
+        {
+          "step": "set the goal and the limits of the search",
+          "here": "each outcome is set to maximize, minimize or 'not an objective'. The person also sets the number of new runs, fixed parameters with their values, linear parameter and outcome constraints, and an optional exploit/balanced/explore UCB beta",
+          "parts": [
+            "bo-model-options"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Compute / Update model' fits the Gaussian-process model and lists the next experiments to perform, with predicted outcomes, beside the best parameters found so far. The button stays disabled until a setting changes",
+          "parts": [
+            "bo-model-options"
+          ]
+        },
+        {
+          "step": "check what the model has learned",
+          "here": "optional slice values fix extra parameters for 2D contour plots of each objective. An optimization trace, a per-objective sensitivity analysis and, for several objectives, Pareto fronts with or without error bars are also shown. A predictions tab gives the predicted mean ± standard error at chosen settings",
+          "parts": [
+            "bo-plots",
+            "bo-page"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "on the analysis page: Q-Q plot, box plot, histogram, correlation and pair plots, a Pareto chart of standardized effects at a chosen α, and per-factor polynomial fits. These are followed by an editable statsmodels formula fit and a choice of six scikit-learn models, each with a prediction form",
+          "parts": [
+            "analysis-page"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "each optimization plot downloads as Plotly JSON with a commented Python loader. The design table downloads as CSV/XLSX",
+          "parts": [
+            "bo-plots",
+            "doe-design-table"
+          ]
+        }
+      ],
+      "distinctive": [
+        "up to ten outcomes, any of which can be objectives (maximize or minimize) while the rest act as linear constraints, with Pareto fronts drawn when there are several objectives",
+        "the search can be bounded by fixed parameters (for runs done in parallel at one shared setting) and by linear inequality or equality constraints on parameters",
+        "parameter ranges can be widened beyond the measured values so the optimizer can propose settings outside what has been tried",
+        "an exploration–exploitation control (UCB beta with Exploit/Balanced/Explore presets) switches between single and batch acquisition depending on how many runs are requested",
+        "the planned design is exported with an empty response column, so it comes back as the results table for the optimization step"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "doe-page",
+      "level": "view",
+      "parent": null,
+      "title": "Design of Experiment",
+      "summary": "The sidebar and parameter form where the person picks a design type, the number of parameters and their names, types and ranges, and design options such as run count, seed, reduction, centre points or linear constraints.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "inline edit",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/optimeo/app/pages/1_1._Design_Of_Experiments.py",
+          "start": 26,
+          "end": 73,
+          "role": "markup",
+          "anchor": "6008a900f421",
+          "first": "defaultParNames = [\"Temperature\", \"ConcentrationA\", \"ConcentrationB\", \"Reaction_time\","
+        },
+        {
+          "file": "code/optimeo/app/pages/1_1._Design_Of_Experiments.py",
+          "start": 275,
+          "end": 293,
+          "role": "markup",
+          "anchor": "607d66fd8238",
+          "first": "with tab2:"
+        },
+        {
+          "file": "code/optimeo/app/pages/1_1._Design_Of_Experiments.py",
+          "start": 296,
+          "end": 373,
+          "role": "logic",
+          "anchor": "4c198b0cb972",
+          "first": "if design_type in ['Sobol sequence', 'Space Filling Latin Hypercube',"
+        },
+        {
+          "file": "code/optimeo/doe.py",
+          "start": 366,
+          "end": 521,
+          "role": "logic",
+          "symbol": "create_design",
+          "anchor": "18724362637d",
+          "first": "def create_design(self):"
+        },
+        {
+          "file": "code/optimeo/app/resources/style.css",
+          "start": 3,
+          "end": 6,
+          "role": "style",
+          "symbol": ".block-container",
+          "anchor": "6bcf92c93d75",
+          "first": ".block-container {"
+        }
+      ]
+    },
+    {
+      "id": "design-guide",
+      "level": "component",
+      "parent": "doe-page",
+      "title": "How to choose the proper design",
+      "summary": "Filters the catalogue of design types by number of factors, factor types, expected relationships and primary purpose, and shows each matching design with its description and characteristics.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/optimeo/app/pages/1_1._Design_Of_Experiments.py",
+          "start": 75,
+          "end": 128,
+          "role": "markup",
+          "anchor": "d1583a6005cd",
+          "first": "tab1, tab2, tab3 = st.tabs("
+        },
+        {
+          "file": "code/optimeo/app/pages/1_1._Design_Of_Experiments.py",
+          "start": 130,
+          "end": 212,
+          "role": "data",
+          "anchor": "fba203386991",
+          "first": "# Dictionary of DoE methods and their characteristics"
+        },
+        {
+          "file": "code/optimeo/app/pages/1_1._Design_Of_Experiments.py",
+          "start": 214,
+          "end": 272,
+          "role": "logic",
+          "anchor": "cf0896afd572",
+          "first": "# Apply filters"
+        }
+      ]
+    },
+    {
+      "id": "doe-design-table",
+      "level": "component",
+      "parent": "doe-page",
+      "title": "Experimental Design",
+      "summary": "Shows the generated run table with an empty response column, plots the runs across parameter pairs, and downloads the design as CSV or XLSX.",
+      "views": [
+        "table view",
+        "scatter plot",
+        "small multiples"
+      ],
+      "interactions": [
+        "export",
+        "hover for detail"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/optimeo/app/pages/1_1._Design_Of_Experiments.py",
+          "start": 377,
+          "end": 410,
+          "role": "markup",
+          "anchor": "f760aa9aea22",
+          "first": "with tab3:"
+        },
+        {
+          "file": "code/optimeo/doe.py",
+          "start": 523,
+          "end": 594,
+          "role": "logic",
+          "symbol": "plot",
+          "anchor": "fcf9dff8c974",
+          "first": "def plot(self):"
+        },
+        {
+          "file": "code/optimeo/app/resources/functions.py",
+          "start": 81,
+          "end": 84,
+          "role": "logic",
+          "symbol": "writeout",
+          "anchor": "facf73747f53",
+          "first": "def writeout(df: pd.DataFrame, format='csv'):"
+        }
+      ]
+    },
+    {
+      "id": "bo-page",
+      "level": "view",
+      "parent": null,
+      "title": "Bayesian Optimization",
+      "summary": "The tabbed page that holds data loading, model options and plots, and a Predictions tab that gives the fitted model's predicted outcome ± standard error at settings the person enters.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/optimeo/app/pages/2_2._Bayesian_Optimization.py",
+          "start": 32,
+          "end": 53,
+          "role": "logic",
+          "anchor": "90831fb5d91c",
+          "first": "st.set_page_config(page_title=\"Bayesian Optimization\","
+        },
+        {
+          "file": "code/optimeo/app/pages/2_2._Bayesian_Optimization.py",
+          "start": 135,
+          "end": 140,
+          "role": "markup",
+          "anchor": "9343001d5ef7",
+          "first": "st.write(\"\"\""
+        },
+        {
+          "file": "code/optimeo/app/pages/2_2._Bayesian_Optimization.py",
+          "start": 709,
+          "end": 761,
+          "role": "markup",
+          "anchor": "ce2b5b6b0420",
+          "first": "with tabs[2]:  # Predictions"
+        },
+        {
+          "file": "code/optimeo/bo.py",
+          "start": 863,
+          "end": 901,
+          "role": "logic",
+          "symbol": "predict",
+          "anchor": "1bb70faf8b94",
+          "first": "def predict(self, params):"
+        }
+      ]
+    },
+    {
+      "id": "bo-data-loading",
+      "level": "component",
+      "parent": "bo-page",
+      "title": "Data Loading",
+      "summary": "Loads a results file, lets the person edit cells and rows, choose parameter and outcome columns, and set each parameter's type and min/max range or allowed categories.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/optimeo/app/pages/2_2._Bayesian_Optimization.py",
+          "start": 142,
+          "end": 345,
+          "role": "markup",
+          "anchor": "caf9fcb48ef5",
+          "first": "with tabs[0]:  # Data Loading"
+        },
+        {
+          "file": "code/optimeo/app/pages/2_2._Bayesian_Optimization.py",
+          "start": 78,
+          "end": 83,
+          "role": "logic",
+          "symbol": "data_changed",
+          "anchor": "f3f4fe7cc175",
+          "first": "def data_changed():"
+        },
+        {
+          "file": "code/optimeo/app/pages/2_2._Bayesian_Optimization.py",
+          "start": 26,
+          "end": 29,
+          "role": "logic",
+          "symbol": "dataset_widget_scope",
+          "anchor": "dd7a48d3aaf8",
+          "first": "def dataset_widget_scope() -> str:"
+        },
+        {
+          "file": "code/optimeo/app/resources/functions.py",
+          "start": 316,
+          "end": 368,
+          "role": "logic",
+          "symbol": "load_data_widget",
+          "anchor": "7d4cc6e97234",
+          "first": "def load_data_widget():"
+        },
+        {
+          "file": "code/optimeo/app/resources/functions.py",
+          "start": 119,
+          "end": 202,
+          "role": "logic",
+          "symbol": "encode_data",
+          "anchor": "d5c23a3ec731",
+          "first": "def encode_data(data, factors, response, factor_ranges):"
+        }
+      ]
+    },
+    {
+      "id": "bo-model-options",
+      "level": "component",
+      "parent": "bo-page",
+      "title": "Model options",
+      "summary": "Sets each outcome's direction, the number of new runs, fixed parameters, linear constraints and exploration tuning, then fits the model and lists the next experiments beside the best parameters found so far.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/optimeo/app/pages/2_2._Bayesian_Optimization.py",
+          "start": 348,
+          "end": 558,
+          "role": "markup",
+          "anchor": "2c2c795ba26f",
+          "first": "with tabs[1]:  # Bayesian Optimization"
+        },
+        {
+          "file": "code/optimeo/app/pages/2_2._Bayesian_Optimization.py",
+          "start": 86,
+          "end": 106,
+          "role": "logic",
+          "symbol": "parse_linear_constraints",
+          "anchor": "80a8d0e1a693",
+          "first": "def parse_linear_constraints(raw_constraints: str) -> list[str]:"
+        },
+        {
+          "file": "code/optimeo/app/pages/2_2._Bayesian_Optimization.py",
+          "start": 55,
+          "end": 59,
+          "role": "logic",
+          "symbol": "model_changed",
+          "anchor": "4c9bccaca620",
+          "first": "def model_changed():"
+        },
+        {
+          "file": "code/optimeo/app/resources/functions.py",
+          "start": 256,
+          "end": 300,
+          "role": "logic",
+          "symbol": "update_model",
+          "anchor": "cb6454c842e3",
+          "first": "def update_model(features, outcomes,"
+        },
+        {
+          "file": "code/optimeo/app/resources/functions.py",
+          "start": 218,
+          "end": 232,
+          "role": "logic",
+          "symbol": "check_constraints",
+          "anchor": "8b72bcde724d",
+          "first": "def check_constraints(df, constraints):"
+        },
+        {
+          "file": "code/optimeo/bo.py",
+          "start": 802,
+          "end": 839,
+          "role": "logic",
+          "symbol": "suggest_next_trials",
+          "anchor": "1462015c727b",
+          "first": "def suggest_next_trials(self, with_predicted=True):"
+        },
+        {
+          "file": "code/optimeo/bo.py",
+          "start": 1580,
+          "end": 1608,
+          "role": "logic",
+          "symbol": "get_best_parameters",
+          "anchor": "548a1c2e2bea",
+          "first": "def get_best_parameters(self):"
+        }
+      ]
+    },
+    {
+      "id": "bo-plots",
+      "level": "component",
+      "parent": "bo-page",
+      "title": "Plot options",
+      "summary": "Draws the fitted model as 2D contour slices at chosen fixed values, along with the optimization trace, a sensitivity analysis per objective and Pareto fronts. Each plot downloads as Plotly JSON.",
+      "views": [
+        "heatmap",
+        "line chart",
+        "bar chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/optimeo/app/pages/2_2._Bayesian_Optimization.py",
+          "start": 559,
+          "end": 706,
+          "role": "markup",
+          "anchor": "a3fd12235e48",
+          "first": "figmod = []"
+        },
+        {
+          "file": "code/optimeo/app/pages/2_2._Bayesian_Optimization.py",
+          "start": 109,
+          "end": 111,
+          "role": "logic",
+          "symbol": "add_plot_data_download",
+          "anchor": "3035e2f46ffe",
+          "first": "def add_plot_data_download(fig, filename: str, key: str) -> None:"
+        },
+        {
+          "file": "code/optimeo/bo.py",
+          "start": 935,
+          "end": 1189,
+          "role": "logic",
+          "symbol": "plot_model",
+          "anchor": "a9405b63a2bb",
+          "first": "def plot_model(self, metricname=None, slice_values={}, linear=False):"
+        },
+        {
+          "file": "code/optimeo/bo.py",
+          "start": 1191,
+          "end": 1258,
+          "role": "logic",
+          "symbol": "plot_optimization_trace",
+          "anchor": "8c68ff37195a",
+          "first": "def plot_optimization_trace(self, optimum=None):"
+        },
+        {
+          "file": "code/optimeo/bo.py",
+          "start": 1260,
+          "end": 1386,
+          "role": "logic",
+          "symbol": "plot_feature_importances",
+          "anchor": "c848bb4f4bcb",
+          "first": "def plot_feature_importances(self, relative=False, per_objective=False):"
+        },
+        {
+          "file": "code/optimeo/bo.py",
+          "start": 1388,
+          "end": 1417,
+          "role": "logic",
+          "symbol": "compute_pareto_frontier",
+          "anchor": "a9fbd298b63f",
+          "first": "def compute_pareto_frontier(self):"
+        },
+        {
+          "file": "code/optimeo/bo.py",
+          "start": 1419,
+          "end": 1578,
+          "role": "logic",
+          "symbol": "plot_pareto_frontier",
+          "anchor": "14bc69b11a19",
+          "first": "def plot_pareto_frontier(self, show_error_bars=True):"
+        }
+      ]
+    },
+    {
+      "id": "analysis-page",
+      "level": "view",
+      "parent": null,
+      "title": "Data Analysis and Modeling",
+      "summary": "Loads a results table and shows diagnostic plots, a Pareto chart of standardized effects and per-factor polynomial fits. It also fits an editable linear-model formula or a chosen machine-learning regressor, each with a form that predicts the response ± standard error.",
+      "views": [
+        "table view",
+        "scatter plot",
+        "bar chart",
+        "heatmap",
+        "small multiples",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "multi-select",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "small multiples",
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/optimeo/app/pages/3_3._Data_Analysis_and_Modeling.py",
+          "start": 66,
+          "end": 548,
+          "role": "markup",
+          "anchor": "b47287bd8620",
+          "first": "st.write(\"\"\""
+        },
+        {
+          "file": "code/optimeo/app/pages/3_3._Data_Analysis_and_Modeling.py",
+          "start": 43,
+          "end": 48,
+          "role": "logic",
+          "symbol": "data_changed",
+          "anchor": "1e215e39f93f",
+          "first": "def data_changed():"
+        },
+        {
+          "file": "code/optimeo/analysis.py",
+          "start": 746,
+          "end": 839,
+          "role": "logic",
+          "symbol": "plot_pareto",
+          "anchor": "0cf412175368",
+          "first": "def plot_pareto(self, alpha=0.05, order=1):"
+        },
+        {
+          "file": "code/optimeo/analysis.py",
+          "start": 680,
+          "end": 744,
+          "role": "logic",
+          "symbol": "plot_corr",
+          "anchor": "dcc2533a6248",
+          "first": "def plot_corr(self):"
+        },
+        {
+          "file": "code/optimeo/analysis.py",
+          "start": 493,
+          "end": 678,
+          "role": "logic",
+          "symbol": "plot_pairplot_plotly",
+          "anchor": "54b7dd24a05a",
+          "first": "def plot_pairplot_plotly(self):"
+        },
+        {
+          "file": "code/optimeo/analysis.py",
+          "start": 841,
+          "end": 886,
+          "role": "logic",
+          "symbol": "write_equation",
+          "anchor": "b9a81e93a811",
+          "first": "def write_equation(self, order=1, quadratic=[]):"
+        },
+        {
+          "file": "code/optimeo/analysis.py",
+          "start": 888,
+          "end": 912,
+          "role": "logic",
+          "symbol": "compute_linear_model",
+          "anchor": "b0c3e14fcdb8",
+          "first": "def compute_linear_model(self, order=1, quadratic=[]):"
+        },
+        {
+          "file": "code/optimeo/analysis.py",
+          "start": 1059,
+          "end": 1187,
+          "role": "logic",
+          "symbol": "compute_ML_model",
+          "anchor": "ab8ce625a706",
+          "first": "def compute_ML_model(self, **kwargs):"
+        },
+        {
+          "file": "code/optimeo/analysis.py",
+          "start": 1189,
+          "end": 1342,
+          "role": "logic",
+          "symbol": "plot_ML_model",
+          "anchor": "ce901a086cc8",
+          "first": "def plot_ML_model(self, features_in_log=False):"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,397 @@
+{
+  "schema": "astaui.card/1",
+  "id": "frankneuro-qpcr-primer-fasta",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T07:04:14Z"
+  },
+  "app": {
+    "title": "Multi-Junction RT-PCR Primer Designer",
+    "summary": "A person pastes a genomic sequence with exons in uppercase and introns in lowercase, and sets limits on primer length, melting temperature and product size. One button finds every exon-exon junction and designs candidate primer pairs whose product spans each junction. All pairs from all junctions are ranked in one table. The best pair is shown as a recommendation with dimer-risk flags and can be downloaded as a text report. The person can then open any junction and pair to check its thermodynamics and see where the primers bind on the sequence, and follow a link to check specificity in an external tool.",
+    "task": {
+      "text": "Design and rank PCR primer pairs whose products span exon-exon junctions, and pick the best pair to order.",
+      "verbs": [
+        "plan",
+        "derive",
+        "compare",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "A genomic nucleotide sequence where letter case marks exons and introns, and a table of candidate primer pairs with their computed properties.",
+      "item": "a candidate primer pair designed across one exon-exon junction",
+      "shapes": [
+        "sequence",
+        "spans",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "designing primers for an RT-PCR assay, before ordering and running it",
+      "terms": [
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar constraints and a paste box feed a design run over every junction. The run fills a ranked table of all pairs and a top-recommendation card with a report download. A junction selector and a pair selector open one pair's dimer metrics and a sequence map with its binding sites highlighted.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats",
+        "detail panel",
+        "sequence track"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "sort",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "master-detail"
+      ]
+    },
+    "field": {
+      "text": "exon-junction primer design for RT-PCR in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "primer design",
+        "rt pcr",
+        "molecular biology"
+      ]
+    },
+    "workflow": {
+      "name": "generate candidates under constraints, rank them, and pick the best",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Paste a FASTA sequence with exons in uppercase and introns in lowercase. Header lines are dropped.",
+          "parts": [
+            "sequence-entry"
+          ]
+        },
+        {
+          "step": "set the constraints the result must meet",
+          "here": "Sidebar sliders and number fields set how many pairs to find per junction, the optimal, minimum and maximum primer size and Tm, and the product size range.",
+          "parts": [
+            "primer-settings"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Analyze All Junctions' finds every intron-to-exon boundary in the spliced template. It runs primer3 with each junction as the target and keeps the junctions that return pairs.",
+          "parts": [
+            "sequence-entry"
+          ]
+        },
+        {
+          "step": "rank every candidate and recommend the best",
+          "here": "All pairs are sorted by penalty score, then by cross-dimer ΔG, into a global table. The top pair is shown as a card with Tm, GC and self-dimer ΔG.",
+          "parts": [
+            "ranked-pairs",
+            "top-recommendation"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Choose a junction, then a pair, to see each primer's Tm, GC and self-dimer ΔG, plus product size and cross-dimer ΔG with Low/High Risk flags.",
+          "parts": [
+            "pair-detail"
+          ]
+        },
+        {
+          "step": "see where the item sits in the whole",
+          "here": "The genomic sequence is drawn with the forward primer's binding site in yellow and the reverse complement's site in cyan, mapped back from the spliced transcript.",
+          "parts": [
+            "binding-map"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download a plain-text summary report of the top pair. A sidebar button links out to Primer-BLAST to check specificity.",
+          "parts": [
+            "top-recommendation",
+            "primer-settings"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Letter case in the pasted sequence carries the exon/intron structure, so junctions are found from case changes alone.",
+        "Every candidate must span an exon-exon junction, so genomic DNA cannot be amplified.",
+        "Self- and cross-dimer free energies are computed for each pair and flagged as high risk below a fixed threshold.",
+        "Binding sites found on the spliced transcript are mapped back onto the full genomic sequence, showing the reverse primer as its reverse complement.",
+        "Specificity is checked outside the tool, through a link to an external primer BLAST service."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "primer-settings",
+      "level": "view",
+      "parent": null,
+      "title": "Primer settings sidebar",
+      "summary": "Sets the number of pairs per junction and the size, Tm and product-size limits for the design, and links out to Primer-BLAST for validation.",
+      "views": [
+        "form"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/primer.py",
+          "start": 57,
+          "end": 72,
+          "role": "markup",
+          "anchor": "92001c948a70",
+          "first": "st.sidebar.header(\"🔍 Evaluation Strategy\")"
+        },
+        {
+          "file": "code/primer.py",
+          "start": 359,
+          "end": 360,
+          "role": "markup",
+          "anchor": "2addf46643bc",
+          "first": "st.sidebar.markdown(\"---\")"
+        },
+        {
+          "file": "code/primer.py",
+          "start": 12,
+          "end": 17,
+          "role": "style",
+          "anchor": "68044e6f3dc3",
+          "first": ".blast-button {"
+        }
+      ]
+    },
+    {
+      "id": "design-workspace",
+      "level": "view",
+      "parent": null,
+      "title": "Designer tab",
+      "summary": "The main tab that holds the sequence input, the ranked results, the pair detail and the binding map, next to a help tab.",
+      "views": [],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/primer.py",
+          "start": 74,
+          "end": 78,
+          "role": "markup",
+          "anchor": "2f189ce6b36d",
+          "first": "tab1, tab2 = st.tabs([\"🧬 Multi-Junction RT-PCR Primer Designer\", \"📘 Help & Documentation\"])"
+        },
+        {
+          "file": "code/primer.py",
+          "start": 314,
+          "end": 326,
+          "role": "markup",
+          "anchor": "8ea86c88900b",
+          "first": "with tab2:"
+        }
+      ]
+    },
+    {
+      "id": "sequence-entry",
+      "level": "component",
+      "parent": "design-workspace",
+      "title": "Sequence paste box and junction analysis",
+      "summary": "Takes the case-marked sequence, finds every exon-exon junction and runs primer3 to design pairs across each one.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/primer.py",
+          "start": 37,
+          "end": 40,
+          "role": "logic",
+          "anchor": "27643acc7485",
+          "first": "if 'junction_results' not in st.session_state:"
+        },
+        {
+          "file": "code/primer.py",
+          "start": 80,
+          "end": 114,
+          "role": "logic",
+          "anchor": "29c0bd1f9f3d",
+          "first": "raw_input = st.text_area(\"Paste sequence here with **EXONS** in UPPERCASE and **introns** in lowercase::\", height=200)"
+        }
+      ]
+    },
+    {
+      "id": "ranked-pairs",
+      "level": "component",
+      "parent": "design-workspace",
+      "title": "Global junction evaluation table",
+      "summary": "Lists every candidate pair from every junction, ranked by penalty score and then cross-dimer ΔG, with a guide to the terms.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/primer.py",
+          "start": 116,
+          "end": 158,
+          "role": "logic",
+          "anchor": "817f0676be41",
+          "first": "if st.session_state.junction_results:"
+        },
+        {
+          "file": "code/primer.py",
+          "start": 42,
+          "end": 47,
+          "role": "logic",
+          "symbol": "get_dimer_info",
+          "anchor": "c3d23cf7ea31",
+          "first": "def get_dimer_info(seq1, seq2=None):"
+        },
+        {
+          "file": "code/primer.py",
+          "start": 49,
+          "end": 51,
+          "role": "logic",
+          "symbol": "calculate_gc",
+          "anchor": "3a14d09d2634",
+          "first": "def calculate_gc(seq):"
+        },
+        {
+          "file": "code/primer.py",
+          "start": 204,
+          "end": 221,
+          "role": "markup",
+          "anchor": "65e02aa50b41",
+          "first": "st.subheader(\"📊 Global Junction Evaluation\")"
+        }
+      ]
+    },
+    {
+      "id": "top-recommendation",
+      "level": "component",
+      "parent": "design-workspace",
+      "title": "Top recommendation card and report download",
+      "summary": "Shows the best-ranked pair's sequences, Tm, GC and self-dimer ΔG, and offers it as a downloadable text report with risk statuses.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/primer.py",
+          "start": 158,
+          "end": 202,
+          "role": "logic",
+          "anchor": "04301f122c73",
+          "first": "best = master_data[0]"
+        },
+        {
+          "file": "code/primer.py",
+          "start": 18,
+          "end": 25,
+          "role": "style",
+          "anchor": "5ef8141c60fd",
+          "first": ".summary-card {"
+        }
+      ]
+    },
+    {
+      "id": "pair-detail",
+      "level": "component",
+      "parent": "design-workspace",
+      "title": "Junction-specific pair analysis",
+      "summary": "Lets the person choose a junction and a pair, then shows each primer's Tm, GC, self-dimer ΔG and the pair's product size and cross-dimer risk.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/primer.py",
+          "start": 223,
+          "end": 265,
+          "role": "logic",
+          "anchor": "2afd77244c09",
+          "first": "st.divider()"
+        }
+      ]
+    },
+    {
+      "id": "binding-map",
+      "level": "component",
+      "parent": "design-workspace",
+      "title": "Transcript-level primer binding map",
+      "summary": "Draws the full genomic sequence with the selected pair's forward and reverse binding sites highlighted in two colours, mapped from the spliced transcript.",
+      "views": [
+        "sequence track"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/primer.py",
+          "start": 267,
+          "end": 310,
+          "role": "logic",
+          "anchor": "d277ba82e682",
+          "first": "st.divider()"
+        },
+        {
+          "file": "code/primer.py",
+          "start": 53,
+          "end": 55,
+          "role": "logic",
+          "symbol": "get_rev_comp",
+          "anchor": "7d2408060807",
+          "first": "def get_rev_comp(seq):"
+        },
+        {
+          "file": "code/primer.py",
+          "start": 286,
+          "end": 296,
+          "role": "logic",
+          "symbol": "get_exact_exon_indices",
+          "anchor": "ecba2cd21bed",
+          "first": "def get_exact_exon_indices(query, mrna_str, mapping):"
+        },
+        {
+          "file": "code/primer.py",
+          "start": 26,
+          "end": 33,
+          "role": "style",
+          "anchor": "6f1a64c9e1a8",
+          "first": ".legend-box {"
+        }
+      ]
+    }
+  ]
+}

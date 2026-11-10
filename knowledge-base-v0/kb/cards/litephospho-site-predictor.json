@@ -1,0 +1,378 @@
+{
+  "schema": "astaui.card/1",
+  "id": "litephospho-site-predictor",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T06:33:11Z"
+  },
+  "app": {
+    "title": "LitePhospho — Explainable Phosphosite Predictor",
+    "summary": "A person pastes a protein sequence or loads an example, sets a decision threshold, and runs the trained model to score every candidate acceptor residue. Counts of length, candidate sites and predicted sites appear, along with the sequence with predicted sites shaded by probability and a table listing every site's position, residue, probability and call. The person then picks one site and sees its surrounding window of residues coloured by how much masking each one lowers the prediction. What they get is a set of per-site calls and, for each site they choose, an explanation of which neighbouring residues drove the call.",
+    "task": {
+      "text": "Predict which serine, threonine and tyrosine residues in a protein are phosphorylated, and show which neighbouring residues drove each prediction.",
+      "verbs": [
+        "identify",
+        "derive",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "A protein sequence, with model-scored candidate sites and an importance profile for each site over a fixed window around it.",
+      "item": "a candidate S/T/Y residue in a protein sequence, with its 31-residue context window",
+      "shapes": [
+        "sequence",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "screening a protein sequence for likely modification sites, before experimental follow-up",
+      "terms": [
+        "analyze",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A threshold slider in the sidebar drives both the shaded sequence and the per-site table, and summary counts update to match. A site chosen from a dropdown opens its context window, coloured by occlusion importance, with the site itself outlined.",
+      "views": [
+        "sequence track",
+        "table view",
+        "summary stats",
+        "sidebar list",
+        "detail panel"
+      ],
+      "interactions": [
+        "import",
+        "hover for detail",
+        "select",
+        "filter"
+      ],
+      "patterns": [
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "explainable deep-learning prediction of post-translational modification sites in bioinformatics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "bioinformatics",
+        "phosphorylation site prediction",
+        "explainable ai"
+      ]
+    },
+    "workflow": {
+      "name": "score every candidate position in a sequence with a model and explain one call",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Paste a one-letter amino-acid sequence into the text box, or press 'Load example' to fill it with a seeded protein fragment.",
+          "parts": [
+            "sequence-input"
+          ]
+        },
+        {
+          "step": "set the cut-off that turns a score into a call",
+          "here": "The sidebar 'Decision threshold' slider (0–1, step 0.05) sets which probabilities count as a predicted phosphosite, and changing it re-colours the results without rerunning the model.",
+          "parts": [
+            "model-sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Predict phosphosites' finds every S/T/Y, takes a ±15 X-padded window around each one, and runs the ONNX model to get one probability per site.",
+          "parts": [
+            "sequence-input"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Metrics show sequence length, candidate sites and sites above the threshold. The sequence is redrawn with predicted sites in bold and shaded green by probability, and hovering a site shows its position and score.",
+          "parts": [
+            "summary-metrics",
+            "highlighted-sequence"
+          ]
+        },
+        {
+          "step": "read each item's values in a list",
+          "here": "A table lists each site's position, residue, rounded probability and its 'Phosphosite' or '—' call.",
+          "parts": [
+            "site-table"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Choosing a site from the dropdown computes an occlusion profile: each residue in the 31-residue window is masked in turn, and the window is drawn with residues shaded by the drop in probability and the centre site outlined in purple.",
+          "parts": [
+            "occlusion-explainer"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Only the acceptor residues S, T and Y are candidates. Each one is scored from a fixed 31-residue window padded with X at the sequence ends.",
+        "Explanations come from occlusion (deletion) rather than gradients. Each window position is masked and the drop in probability is taken as its importance, computed lazily and cached for the selected site only.",
+        "The threshold is applied after scoring, so moving the slider changes the calls and counts without running the model again."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "model-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Model info and threshold",
+      "summary": "Describes the model and gives the decision-threshold slider that sets which probabilities count as predicted sites.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 70,
+          "end": 86,
+          "role": "logic",
+          "symbol": "_sidebar",
+          "anchor": "111b262f46ac",
+          "first": "def _sidebar():"
+        }
+      ]
+    },
+    {
+      "id": "sequence-input",
+      "level": "component",
+      "parent": "main-results",
+      "title": "Sequence input and predict",
+      "summary": "Takes a pasted or example protein sequence and runs the model over every S/T/Y site in it.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 97,
+          "end": 120,
+          "role": "markup",
+          "anchor": "0ae85bae3baa",
+          "first": "# Persist results across reruns so changing the threshold/selectbox does not reset."
+        },
+        {
+          "file": "code/app.py",
+          "start": 20,
+          "end": 21,
+          "role": "data",
+          "anchor": "403a07b9cdf0",
+          "first": "# A real human protein fragment (p53 N-terminal region) as a ready example."
+        },
+        {
+          "file": "code/litephospho/predictor.py",
+          "start": 102,
+          "end": 103,
+          "role": "logic",
+          "symbol": "predict_sequence",
+          "anchor": "ba4855cb7a89",
+          "first": "def predict_sequence("
+        },
+        {
+          "file": "code/litephospho/predictor.py",
+          "start": 69,
+          "end": 76,
+          "role": "logic",
+          "symbol": "_windows_for",
+          "anchor": "82ea0b667e8d",
+          "first": "def _windows_for(seq: str) -> list[tuple[int, str, str]]:"
+        },
+        {
+          "file": "code/litephospho/predictor.py",
+          "start": 29,
+          "end": 37,
+          "role": "data",
+          "symbol": "SitePrediction",
+          "anchor": "54db743f96f0",
+          "first": "class SitePrediction:"
+        }
+      ]
+    },
+    {
+      "id": "main-results",
+      "level": "view",
+      "parent": null,
+      "title": "Prediction results",
+      "summary": "The main page, where the input sits above the counts, the shaded sequence, the site table and the explanation.",
+      "views": [
+        "summary stats",
+        "sequence track",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 89,
+          "end": 166,
+          "role": "markup",
+          "symbol": "main",
+          "anchor": "5dce431e7b57",
+          "first": "def main():"
+        }
+      ]
+    },
+    {
+      "id": "summary-metrics",
+      "level": "component",
+      "parent": "main-results",
+      "title": "Site counts",
+      "summary": "Shows sequence length, the number of candidate sites and the number above the threshold.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 130,
+          "end": 135,
+          "role": "logic",
+          "anchor": "0356e57586ba",
+          "first": "pred_seq = st.session_state.pred_seq"
+        }
+      ]
+    },
+    {
+      "id": "highlighted-sequence",
+      "level": "component",
+      "parent": "main-results",
+      "title": "Highlighted sequence",
+      "summary": "Draws the whole sequence with predicted sites in bold and shaded by probability, and shows each site's position and score on hover.",
+      "views": [
+        "sequence track"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 137,
+          "end": 138,
+          "role": "markup",
+          "anchor": "b0fab8ba37fc",
+          "first": "st.markdown(\"#### Sequence (predicted sites highlighted)\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 31,
+          "end": 47,
+          "role": "logic",
+          "symbol": "_render_sequence",
+          "anchor": "efa3b1126a10",
+          "first": "def _render_sequence(seq: str, preds, threshold: float) -> str:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 24,
+          "end": 28,
+          "role": "style",
+          "symbol": "_prob_color",
+          "anchor": "dc2df0a22ba4",
+          "first": "def _prob_color(p: float, threshold: float) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "site-table",
+      "level": "component",
+      "parent": "main-results",
+      "title": "Per-site predictions table",
+      "summary": "Lists every candidate site's position, residue, probability and its call at the current threshold.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 140,
+          "end": 152,
+          "role": "logic",
+          "anchor": "dbb6292b264d",
+          "first": "st.markdown(\"#### Per-site predictions\")"
+        }
+      ]
+    },
+    {
+      "id": "occlusion-explainer",
+      "level": "component",
+      "parent": "main-results",
+      "title": "Occlusion explanation",
+      "summary": "For a site chosen from a dropdown, masks each residue in its window and shades the window by how much each one supported the prediction.",
+      "views": [
+        "sequence track",
+        "detail panel"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 154,
+          "end": 166,
+          "role": "markup",
+          "anchor": "1d7648a84c84",
+          "first": "# --- Explanation ---"
+        },
+        {
+          "file": "code/app.py",
+          "start": 50,
+          "end": 67,
+          "role": "logic",
+          "symbol": "_render_importance",
+          "anchor": "dd412b1807d7",
+          "first": "def _render_importance(window: str, imp: list[float]) -> str:"
+        },
+        {
+          "file": "code/litephospho/predictor.py",
+          "start": 137,
+          "end": 139,
+          "role": "logic",
+          "symbol": "explain",
+          "anchor": "4e904d7381a0",
+          "first": "def explain(pred: SitePrediction) -> list[float]:"
+        },
+        {
+          "file": "code/litephospho/predictor.py",
+          "start": 88,
+          "end": 99,
+          "role": "logic",
+          "symbol": "_occlusion",
+          "anchor": "936ea93225df",
+          "first": "def _occlusion(window: str, base_prob: float) -> list[float]:"
+        }
+      ]
+    }
+  ]
+}

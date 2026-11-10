@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>UglyMol - Agent Viewer</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no">
+  <meta name="theme-color" content="#333333">
+  <style>
+   body { font-family: sans-serif; }
+   canvas { display: block; }
+   #viewer {
+     position: absolute;
+     left: 0;
+     top: 0;
+     width: 100%;
+     height: 100%;
+   }
+   #hud {
+     font-size: 15px;
+     color: #ddd;
+     background-color: rgba(0,0,0,0.6);
+     text-align: center;
+     position: absolute;
+     top: 10px;
+     left: 10%;
+     width: 80%;
+     padding: 2px 8px;
+     border-radius: 5px;
+     z-index: 9;
+     white-space: pre-line;
+   }
+   #hud u { padding: 0 8px; text-decoration: none;
+            border: solid; border-width: 1px 0; }
+   #hud s { padding: 0 8px; text-decoration: none; opacity: 0.5; }
+   #help {
+     display: none;
+     font-size: 16px;
+     color: #eee;
+     background-color: rgba(0,0,0,0.7);
+     position: absolute;
+     left: 20px;
+     top: 50%;
+     transform: translateY(-50%);
+     cursor: default;
+     padding: 5px;
+     border-radius: 5px;
+     z-index: 9;
+     white-space: pre-line;
+   }
+   #inset {
+     width: 200px;
+     height: 200px;
+     background-color: #888;
+     position: absolute;
+     right: 0;
+     bottom: 0;
+     z-index: 2;
+     display: none;
+   }
+   a { color: #59C; }
+   #toolbar {
+     position: absolute;
+     left: 10px;
+     bottom: 10px;
+     z-index: 10;
+     background-color: rgba(0,0,0,0.6);
+     color: #ddd;
+     padding: 6px 10px;
+     border-radius: 5px;
+     font-size: 13px;
+     max-width: 360px;
+   }
+   #toolbar div { margin: 4px 0; }
+   #toolbar button { cursor: pointer; }
+  </style>
+
+  <script src="uglymol.js"></script>
+
+</head>
+<body style="background-color: black">
+  <div id="viewer"></div>
+  <header id="hud" onmousedown="event.stopPropagation();"
+                   ondblclick="event.stopPropagation();"
+                   onkeydown="event.stopPropagation();"></header>
+  <footer id="help"></footer>
+  <div id="inset"></div>
+  <div id="toolbar" onmousedown="event.stopPropagation();" onkeydown="event.stopPropagation();">
+    <div><b>Model:</b>
+      <button onclick="loadOriginal()">1YJP.pdb (original)</button>
+      <button onclick="loadOutlier()">1yjp_outlier.pdb (test case)</button>
+    </div>
+    <div>Upload your own model file:
+      <input type="file" id="modelInput" accept=".pdb,.ent">
+    </div>
+    <div>Upload a density map (adds/replaces it; drop a second one for the diff map):
+      <input type="file" id="mapInput" accept=".map,.ccp4,.mrc,.dsn6,.omap" multiple>
+    </div>
+    <div><b>Real map demo:</b>
+      <button onclick="loadNetworkDemo()">Load 1mru + 2mFo-DFc/Fo-Fc maps (uglymol.github.io)</button>
+    </div>
+    <div>
+      <a href="reciprocal.html?rlp=data/rlp.csv">Open reciprocal-space viewer with data/rlp.csv (two overlapping lattices)</a>
+    </div>
+  </div>
+  <script>
+    V = new UM.Viewer({viewer: "viewer", hud: "hud", help: "help"});
+
+    function loadOriginal() {
+      V.load_pdb("data/1YJP.pdb", {}, function () {
+        V.hud(
+          'Loaded data/1YJP.pdb (GNNQQNY amyloid peptide, 1.8A).\n' +
+          '<a href="#" onclick="V.toggle_help();return false;">H shows help.</a>',
+          'HTML');
+      });
+    }
+
+    function loadOutlier() {
+      V.load_pdb("data/1yjp_outlier.pdb", {}, function () {
+        V.hud(
+          'Loaded data/1yjp_outlier.pdb: ASN 2 OD1 was moved off its expected ' +
+          'position and given B=95; GLN 5 NE2 was deleted to simulate a ' +
+          'missing side-chain tip. Inspect both residues.\n' +
+          '<a href="#" onclick="V.toggle_help();return false;">H shows help.</a>',
+          'HTML');
+      });
+    }
+
+    function loadNetworkDemo() {
+      V.hud('Fetching 1mru model and 2mFo-DFc / mFo-DFc maps from uglymol.github.io ...');
+      V.load_pdb_and_ccp4_maps(
+        'http://uglymol.github.io/data/1mru.pdb',
+        'http://uglymol.github.io/data/1mru.map',
+        'http://uglymol.github.io/data/1mru_diff.map',
+        function () {
+          V.hud(
+            '1mru model and density maps loaded.\n' +
+            'Use "+"/"-" to change the sigma (contour) level of the blue ' +
+            '2mFo-DFc map; hold Shift with "+"/"-" for the green/red mFo-DFc ' +
+            'difference map. H shows help.');
+        });
+    }
+
+    // File inputs reuse the library's own File-reading logic (pick_pdb_and_map),
+    // which is normally wired to drag-and-drop only; here it is wired to
+    // ordinary <input type="file"> elements instead.
+    document.getElementById('modelInput').addEventListener('change', function (evt) {
+      for (const file of evt.target.files) V.pick_pdb_and_map(file);
+      evt.target.value = '';
+    });
+    document.getElementById('mapInput').addEventListener('change', function (evt) {
+      for (const file of evt.target.files) V.pick_pdb_and_map(file);
+      evt.target.value = '';
+    });
+
+    loadOriginal();
+  </script>
+</body>
+</html>

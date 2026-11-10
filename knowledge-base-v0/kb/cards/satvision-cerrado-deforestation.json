@@ -1,0 +1,395 @@
+{
+  "schema": "astaui.card/1",
+  "id": "satvision-cerrado-deforestation",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T18:02:36Z"
+  },
+  "app": {
+    "title": "SatVision Cerrado — vegetation detection and two-date change map",
+    "summary": "A person picks a satellite image, either uploaded or chosen from a folder of processed scenes. They tune colour thresholds or switch to an automatic vegetation index, and see the image beside a vegetation mask overlay with the share of vegetated pixels and a classifier's vegetation-or-deforestation prediction. For one area, they choose a base year and a comparison year. The same thresholds mask both images, and each pixel is classed as lost, gained, stable or never vegetated. A change heatmap shows this, with pixel counts, percentages and, if a pixel size is entered, hectares. The heatmap can be saved as an image file.",
+    "task": {
+      "text": "Measure how much vegetation an area lost or gained between two image dates by thresholding each image into a vegetation mask and differencing the masks.",
+      "verbs": [
+        "derive",
+        "compare",
+        "identify",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "RGB satellite image tiles, organised either by land-cover class or by area with one image per year",
+      "item": "a satellite image tile of one area at one date",
+      "shapes": [
+        "image",
+        "image collection",
+        "versions"
+      ]
+    },
+    "stage": {
+      "text": "measuring vegetation change between two dates once imagery is prepared, before reporting",
+      "terms": [
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls choose the image and set the threshold parameters. The same parameters drive both the single-image mask overlay and the two-date change map. Side-by-side panes show the original against the mask, and base year against comparison year against a change heatmap, with numeric totals below.",
+      "views": [
+        "image viewer",
+        "side-by-side panes",
+        "heatmap",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "adjust parameter",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "linked views",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "vegetation masking and multitemporal change detection in satellite remote sensing",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "remote sensing",
+        "change detection",
+        "land cover"
+      ]
+    },
+    "workflow": {
+      "name": "detect change between two dates of the same scene and quantify it",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "choose a dataset, then upload a JPG/PNG or pick a class/area folder and an image from it; nothing renders until an image is loaded",
+          "parts": [
+            "image-source"
+          ]
+        },
+        {
+          "step": "set how the target is detected",
+          "here": "sliders for hue min/max, saturation min and value min define an HSV vegetation range; a radio switches to an automatic excess-green index thresholded by Otsu",
+          "parts": [
+            "mask-controls"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "the original image is shown beside a coloured mask overlay titled with percent vegetation, with a CNN's vegetation/deforestation prediction and class confidences",
+          "parts": [
+            "single-image-view",
+            "mask-controls"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "choose an area and a base year and comparison year; both images appear with their own prediction next to a heatmap colouring each pixel as stable, lost, gained or never vegetated",
+          "parts": [
+            "change-comparison"
+          ]
+        },
+        {
+          "step": "summarize the change as totals",
+          "here": "pixel counts and percentages for loss, gain, stable and none, vegetation % per year and the difference; entering metres per pixel adds hectares",
+          "parts": [
+            "change-summary"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "a save button writes the change heatmap as a PNG named by area and the two years",
+          "parts": [
+            "save-heatmap"
+          ]
+        }
+      ],
+      "distinctive": [
+        "the same manually tuned colour thresholds are applied to both dates, so the change map depends on one shared definition of the target",
+        "every pixel falls into one of four transition classes (loss, gain, stable, absent in both), each counted and coloured",
+        "an optional ground resolution in metres per pixel converts pixel counts into hectares",
+        "a pretrained two-class image classifier's prediction is shown beside the threshold-based mask as an independent check",
+        "an automatic index-plus-Otsu threshold is offered as an alternative to manual HSV ranges"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "image-source",
+      "level": "view",
+      "parent": null,
+      "title": "Image source sidebar",
+      "summary": "Chooses the dataset and loads one image, either uploaded or picked from a class or area folder.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 20,
+          "end": 26,
+          "role": "logic",
+          "anchor": "42e7ffb0d265",
+          "first": "# Datasets disponíveis"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 93,
+          "end": 119,
+          "role": "logic",
+          "anchor": "17a11f6fef9f",
+          "first": "st.sidebar.header(\"Fonte da Imagem\")"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 31,
+          "end": 32,
+          "role": "logic",
+          "symbol": "to_rgb_array",
+          "anchor": "5a18fa3f2da6",
+          "first": "def to_rgb_array(pil_image):"
+        }
+      ]
+    },
+    {
+      "id": "mask-controls",
+      "level": "component",
+      "parent": "image-source",
+      "title": "Threshold and method controls",
+      "summary": "Sets the HSV range or switches to an automatic excess-green Otsu threshold, then computes the vegetation mask, overlay and percent cover.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "adjust parameter",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 121,
+          "end": 142,
+          "role": "logic",
+          "anchor": "8d46782ca5cb",
+          "first": "# PARÂMETROS HSV"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 34,
+          "end": 39,
+          "role": "logic",
+          "symbol": "compute_mask_hsv",
+          "anchor": "5ba325241f86",
+          "first": "def compute_mask_hsv(img_rgb, hmin, smin, vmin, hmax, smax, vmax):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 41,
+          "end": 49,
+          "role": "logic",
+          "symbol": "exg_mask_from_rgb",
+          "anchor": "1396b8f39382",
+          "first": "def exg_mask_from_rgb(img_rgb):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 51,
+          "end": 54,
+          "role": "logic",
+          "symbol": "overlay_image",
+          "anchor": "34bcc50ed3cb",
+          "first": "def overlay_image(img_rgb, mask, color=(0, 255, 0), alpha=0.6):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 56,
+          "end": 58,
+          "role": "logic",
+          "symbol": "percent_mask",
+          "anchor": "9cf4be49a1f8",
+          "first": "def percent_mask(mask):"
+        }
+      ]
+    },
+    {
+      "id": "single-image-view",
+      "level": "view",
+      "parent": null,
+      "title": "Original vs mask overlay",
+      "summary": "Shows the loaded image beside its vegetation mask overlay with percent cover and the classifier's prediction and confidences.",
+      "views": [
+        "side-by-side panes",
+        "image viewer",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 144,
+          "end": 158,
+          "role": "logic",
+          "anchor": "3cb883c4dded",
+          "first": "# PREDIÇÃO DA IA"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 62,
+          "end": 67,
+          "role": "logic",
+          "symbol": "load_model",
+          "anchor": "dfcec27ed42e",
+          "first": "def load_model(path=\"outputs/model_cerrado_resnet18.pth\"):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 71,
+          "end": 81,
+          "role": "logic",
+          "symbol": "predict_img",
+          "anchor": "7e56dd9a644c",
+          "first": "def predict_img(img_rgb, model=MODEL):"
+        }
+      ]
+    },
+    {
+      "id": "change-comparison",
+      "level": "view",
+      "parent": null,
+      "title": "Two-date comparison and change heatmap",
+      "summary": "For a chosen area and two years, shows both images with predictions next to a heatmap of per-pixel loss, gain, stable and none.",
+      "views": [
+        "side-by-side panes",
+        "heatmap",
+        "image viewer"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 162,
+          "end": 202,
+          "role": "logic",
+          "anchor": "43973b0aaa77",
+          "first": "# COMPARAÇÃO MULTITEMPORAL 2020 x 2024"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 218,
+          "end": 247,
+          "role": "logic",
+          "anchor": "9d59da88ed77",
+          "first": "# predições IA para cada imagem"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 83,
+          "end": 88,
+          "role": "logic",
+          "symbol": "find_area_folders",
+          "anchor": "e05357588b62",
+          "first": "def find_area_folders(root):"
+        }
+      ]
+    },
+    {
+      "id": "change-summary",
+      "level": "component",
+      "parent": "change-comparison",
+      "title": "Quantitative change summary",
+      "summary": "Reports pixel counts and percentages for each change class, per-year vegetation share and its difference, plus hectares when a pixel size is given.",
+      "views": [
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 204,
+          "end": 216,
+          "role": "logic",
+          "anchor": "7aea8a9bc480",
+          "first": "# Pergunta ao usuário (opcional) resolução para converter em área real"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 210,
+          "end": 212,
+          "role": "logic",
+          "symbol": "px_to_ha",
+          "anchor": "131ef18d7567",
+          "first": "def px_to_ha(pixels, mpp):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 249,
+          "end": 262,
+          "role": "logic",
+          "anchor": "893cb531215c",
+          "first": "# resumo numérico"
+        }
+      ]
+    },
+    {
+      "id": "save-heatmap",
+      "level": "component",
+      "parent": "change-comparison",
+      "title": "Save heatmap button",
+      "summary": "Writes the current change heatmap to a PNG named by area and the two years.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 264,
+          "end": 268,
+          "role": "logic",
+          "anchor": "3310d637f9fd",
+          "first": "# botão salvar heatmap"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "interactions",
+      "term": "adjust parameter"
+    }
+  ]
+}

@@ -1,0 +1,635 @@
+{
+  "schema": "astaui.card/1",
+  "id": "echometrics-ultrasound",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T19:05:06Z"
+  },
+  "app": {
+    "title": "EchoMetrics — Carcass Ultrasound Analyzer",
+    "summary": "A person picks individual or batch mode. In batch mode they enter a batch code first. They load an ultrasound image, which opens in a zoomable annotation window. There they click two points on the scale bar to calibrate one centimetre, place control points around the muscle cross-section to trace its outline, and click two points across the fat layer. The interface computes the muscle area and the fat thickness in real units and shows them beside the annotated image. In batch mode each image is saved as a numbered row, and the whole batch can be downloaded as an Excel sheet.",
+    "task": {
+      "text": "Measure an area and a thickness on each ultrasound image by calibrating its scale bar and tracing the structures by hand, and collect the measurements for a batch into a spreadsheet.",
+      "verbs": [
+        "derive",
+        "annotate",
+        "record"
+      ]
+    },
+    "data": {
+      "text": "B-mode ultrasound images that each include a scale bar, measured one at a time, and the table of measurements built up from them.",
+      "item": "one ultrasound image of a cross-section",
+      "shapes": [
+        "image",
+        "image collection",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "measuring traits on ultrasound scans after imaging, before statistical analysis",
+      "terms": [
+        "analyze",
+        "collect"
+      ]
+    },
+    "mechanism": {
+      "text": "Loading an image opens a modal canvas that walks the person through three fixed steps: a two-point calibration, a closed traced outline, and a two-point distance. Points can be zoomed, dragged and undone. Once the last point is placed, the server converts the pixel geometry to cm² and cm, the results panel shows the numbers, and the annotated image appears in the main view. In batch mode each result is added as a row for the Excel export.",
+      "views": [
+        "image viewer",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "drag to arrange",
+        "undo",
+        "keyboard shortcuts",
+        "export",
+        "toggle view"
+      ],
+      "patterns": [
+        "review queue"
+      ]
+    },
+    "field": {
+      "text": "ultrasound carcass trait measurement in animal science",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "animal science",
+        "carcass ultrasound",
+        "morphometry"
+      ]
+    },
+    "workflow": {
+      "name": "calibrate an image's scale and measure traced shapes on it, image by image",
+      "steps": [
+        {
+          "step": "set up the session",
+          "here": "Individual or Batch radio. Batch needs a batch code and Start Batch before you can upload, and each image is then numbered from that code.",
+          "parts": [
+            "controls-panel"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "A file input uploads one image, which is held in server memory, and opens the annotation modal.",
+          "parts": [
+            "controls-panel",
+            "annotation-modal"
+          ]
+        },
+        {
+          "step": "calibrate the image scale",
+          "here": "Two clicks on the scale bar mark exactly 1 cm, which sets pixels per cm.",
+          "parts": [
+            "annotation-modal"
+          ]
+        },
+        {
+          "step": "select a region and outline it",
+          "here": "Clicked control points form a smooth closed contour around the muscle. Points can be dragged, and right-click or Backspace undoes the last one. Enter or Confirm Shape needs at least 3 points.",
+          "parts": [
+            "annotation-modal"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Two clicks across the fat layer. The server then works out the contour area in cm², the distance in cm and the calibration in px/cm.",
+          "parts": [
+            "annotation-modal",
+            "results-panel"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "In batch mode each result is stored as the next coded row, and the instructions show how many images are saved and which code comes next.",
+          "parts": [
+            "controls-panel",
+            "result-image"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download Excel sends the batch rows to the server, which returns <batch>_results.xlsx with columns Image, AOL (cm²) and EGS (cm).",
+          "parts": [
+            "controls-panel"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every image is calibrated on its own from its 1 cm scale bar, so measurements stay in real units even when the image scale changes.",
+        "The annotation follows a fixed order: calibration first, then the area outline, then the thickness line. Each step moves on by itself once its points are placed.",
+        "The outline is drawn as a smooth curve through the control points and densely sampled before the area is computed.",
+        "Images live only in server memory and are discarded after measurement. Batch rows build up in the browser until export."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "controls-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Controls",
+      "summary": "Chooses individual or batch mode, starts a coded batch, loads an image, resets, downloads the batch Excel and shows instructions for the current state.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 33,
+          "end": 71,
+          "role": "markup",
+          "anchor": "f4445e18fee3",
+          "first": "<div class=\"controls-panel\">"
+        },
+        {
+          "file": "code/static/css/style.css",
+          "start": 59,
+          "end": 66,
+          "role": "style",
+          "symbol": ".controls-panel, .results-panel",
+          "anchor": "4dd06ee67299",
+          "first": ".controls-panel, .results-panel {"
+        },
+        {
+          "file": "code/static/css/style.css",
+          "start": 102,
+          "end": 102,
+          "role": "style",
+          "symbol": "#batch-controls input",
+          "anchor": "a0ab6c4b0da5",
+          "first": "#batch-controls input { width: calc(100% - 20px); padding: 8px; margin-bottom: 10px; border: 1px solid var(--border-colo"
+        },
+        {
+          "file": "code/static/css/style.css",
+          "start": 107,
+          "end": 107,
+          "role": "style",
+          "symbol": "#instructions",
+          "anchor": "9242a86e524a",
+          "first": "#instructions { background-color: #e9f5ff; border-left: 4px solid var(--primary-color); padding: 15px; margin-top: 15px;"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 290,
+          "end": 301,
+          "role": "logic",
+          "symbol": "handleModeChange",
+          "anchor": "edbbd2ecd5c8",
+          "first": "function handleModeChange(event) {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 259,
+          "end": 273,
+          "role": "logic",
+          "symbol": "startBatch",
+          "anchor": "884889c5e4f1",
+          "first": "function startBatch() {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 114,
+          "end": 134,
+          "role": "logic",
+          "symbol": "handleImageUpload",
+          "anchor": "5c88abe1dd47",
+          "first": "function handleImageUpload(event) {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 94,
+          "end": 112,
+          "role": "logic",
+          "symbol": "resetApplication",
+          "anchor": "d6e5c0aa431e",
+          "first": "function resetApplication() {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 303,
+          "end": 328,
+          "role": "logic",
+          "symbol": "updateMainInstructions",
+          "anchor": "90acdda2bf20",
+          "first": "function updateMainInstructions() {"
+        },
+        {
+          "file": "code/app.py",
+          "start": 64,
+          "end": 86,
+          "role": "logic",
+          "symbol": "upload_file",
+          "anchor": "f75937268ee8",
+          "first": "def upload_file():"
+        }
+      ]
+    },
+    {
+      "id": "annotation-modal",
+      "level": "view",
+      "parent": null,
+      "title": "Annotation window",
+      "summary": "Shows the uploaded image large and zoomable, and guides the person through the calibration, outline and thickness steps with points that can be dragged and undone.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "drag to arrange",
+        "undo",
+        "keyboard shortcuts"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 107,
+          "end": 126,
+          "role": "markup",
+          "symbol": "#modal",
+          "anchor": "f7e9a3c3d6e6",
+          "first": "<div id=\"modal\" class=\"modal-overlay\">"
+        },
+        {
+          "file": "code/static/css/style.css",
+          "start": 116,
+          "end": 116,
+          "role": "style",
+          "symbol": ".modal-overlay",
+          "anchor": "a8980d3b0869",
+          "first": ".modal-overlay { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-c"
+        },
+        {
+          "file": "code/static/css/style.css",
+          "start": 117,
+          "end": 117,
+          "role": "style",
+          "symbol": ".modal-content",
+          "anchor": "397819efe2b9",
+          "first": ".modal-content { background-color: var(--surface-color); padding: 20px; width: 90%; max-width: 1200px; border-radius: va"
+        },
+        {
+          "file": "code/static/css/style.css",
+          "start": 122,
+          "end": 122,
+          "role": "style",
+          "symbol": ".modal-body",
+          "anchor": "6111ec041e0e",
+          "first": ".modal-body { width: 100%; height: 75vh; overflow: auto; background-color: #343a40; text-align: center; margin: 15px 0; "
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 278,
+          "end": 282,
+          "role": "logic",
+          "symbol": "setStep",
+          "anchor": "5988d63e8c39",
+          "first": "function setStep(newStep) {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 330,
+          "end": 354,
+          "role": "logic",
+          "symbol": "updateModalInstructions",
+          "anchor": "85fa91f6e552",
+          "first": "function updateModalInstructions() {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 359,
+          "end": 364,
+          "role": "logic",
+          "symbol": "openModal",
+          "anchor": "d6537047cd34",
+          "first": "function openModal() {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 397,
+          "end": 416,
+          "role": "logic",
+          "symbol": "draw",
+          "anchor": "42fa584816c0",
+          "first": "function draw() {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 489,
+          "end": 496,
+          "role": "logic",
+          "symbol": "onMouseDown",
+          "anchor": "a7daa7004cfc",
+          "first": "function onMouseDown(event) {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 498,
+          "end": 508,
+          "role": "logic",
+          "symbol": "onMouseMove",
+          "anchor": "bf5bc8c9fc3a",
+          "first": "function onMouseMove(event) {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 510,
+          "end": 522,
+          "role": "logic",
+          "symbol": "onMouseUp",
+          "anchor": "6aad14d651d6",
+          "first": "function onMouseUp(event) {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 524,
+          "end": 524,
+          "role": "logic",
+          "symbol": "onContextMenu",
+          "anchor": "1149801cf76d",
+          "first": "function onContextMenu(event) { event.preventDefault(); undoLastPoint(); }"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 239,
+          "end": 247,
+          "role": "logic",
+          "symbol": "confirmStep",
+          "anchor": "48281352d430",
+          "first": "function confirmStep() {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 540,
+          "end": 548,
+          "role": "logic",
+          "symbol": "onKeyDown",
+          "anchor": "b5fcc06f706f",
+          "first": "function onKeyDown(event) {"
+        }
+      ]
+    },
+    {
+      "id": "zoom-controls",
+      "level": "component",
+      "parent": "annotation-modal",
+      "title": "Zoom controls",
+      "summary": "Zoom out and zoom in buttons with a percentage readout, which rescale the canvas so points can be placed precisely.",
+      "views": [],
+      "interactions": [
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 111,
+          "end": 115,
+          "role": "markup",
+          "anchor": "b6e945c9e8f3",
+          "first": "<div class=\"zoom-controls\">"
+        },
+        {
+          "file": "code/static/css/style.css",
+          "start": 119,
+          "end": 119,
+          "role": "style",
+          "symbol": ".zoom-controls",
+          "anchor": "b25297f83511",
+          "first": ".zoom-controls { display: flex; align-items: center; gap: 10px; }"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 373,
+          "end": 380,
+          "role": "logic",
+          "symbol": "updateZoom",
+          "anchor": "63e0327603d8",
+          "first": "function updateZoom(newZoom) {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 382,
+          "end": 392,
+          "role": "logic",
+          "symbol": "resizeCanvas",
+          "anchor": "cf4a4056db87",
+          "first": "function resizeCanvas() {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 560,
+          "end": 561,
+          "role": "logic",
+          "anchor": "1bf0698f2edb",
+          "first": "zoomInButton.addEventListener('click',  () => updateZoom(state.zoomLevel + 0.2));"
+        }
+      ]
+    },
+    {
+      "id": "contour-tool",
+      "level": "component",
+      "parent": "annotation-modal",
+      "title": "Smooth contour tracer",
+      "summary": "Draws a smooth curve through the control points as they are placed and samples it densely so the enclosed area can be computed.",
+      "views": [],
+      "interactions": [
+        "drag to arrange",
+        "undo"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/static/js/script.js",
+          "start": 437,
+          "end": 458,
+          "role": "logic",
+          "symbol": "drawSmoothPolygon",
+          "anchor": "4bed2d24ff8f",
+          "first": "function drawSmoothPolygon(points, color) {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 526,
+          "end": 535,
+          "role": "logic",
+          "symbol": "getPointOnCurve",
+          "anchor": "742996f2b707",
+          "first": "function getPointOnCurve(points, t) {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 249,
+          "end": 257,
+          "role": "logic",
+          "symbol": "undoLastPoint",
+          "anchor": "4e6ddaa924b1",
+          "first": "function undoLastPoint() {"
+        }
+      ]
+    },
+    {
+      "id": "results-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Results",
+      "summary": "Shows the computed muscle area in cm², the fat thickness in cm and the calibration in px/cm for the image just measured.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 80,
+          "end": 94,
+          "role": "markup",
+          "anchor": "b1864aea0058",
+          "first": "<div class=\"results-panel\">"
+        },
+        {
+          "file": "code/static/css/style.css",
+          "start": 110,
+          "end": 110,
+          "role": "style",
+          "symbol": ".result-item",
+          "anchor": "b3c0d6c68bdf",
+          "first": ".result-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px s"
+        },
+        {
+          "file": "code/static/css/style.css",
+          "start": 112,
+          "end": 112,
+          "role": "style",
+          "symbol": ".result-item strong",
+          "anchor": "118aadac795b",
+          "first": ".result-item strong { font-size: 1.3em; color: var(--success-color); font-weight: 600; }"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 136,
+          "end": 178,
+          "role": "logic",
+          "symbol": "calculateResults",
+          "anchor": "fe74aa4b2226",
+          "first": "function calculateResults() {"
+        },
+        {
+          "file": "code/app.py",
+          "start": 116,
+          "end": 154,
+          "role": "logic",
+          "symbol": "calculate",
+          "anchor": "9150cacea9a0",
+          "first": "def calculate():"
+        }
+      ]
+    },
+    {
+      "id": "result-image",
+      "level": "view",
+      "parent": null,
+      "title": "Annotated image",
+      "summary": "Shows the measured image with its calibration points, outline and thickness line drawn on it after each measurement.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 74,
+          "end": 77,
+          "role": "markup",
+          "anchor": "cbaab0753821",
+          "first": "<div class=\"canvas-container\">"
+        },
+        {
+          "file": "code/static/css/style.css",
+          "start": 132,
+          "end": 132,
+          "role": "style",
+          "symbol": ".canvas-container",
+          "anchor": "8a597403d4a0",
+          "first": ".canvas-container { flex: 3; display: flex; justify-content: center; align-items: center; border: 2px dashed var(--borde"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 284,
+          "end": 288,
+          "role": "logic",
+          "symbol": "drawFinalImage",
+          "anchor": "8618e2c186dd",
+          "first": "function drawFinalImage() {"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 180,
+          "end": 197,
+          "role": "logic",
+          "symbol": "saveBatchRow",
+          "anchor": "2c30ff97c4ad",
+          "first": "function saveBatchRow(aol, egs) {"
+        }
+      ]
+    },
+    {
+      "id": "excel-export",
+      "level": "component",
+      "parent": "controls-panel",
+      "title": "Download Excel",
+      "summary": "Appears once the batch has a saved row, and downloads all batch rows as an xlsx file named after the batch code.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/templates/index.html",
+          "start": 61,
+          "end": 63,
+          "role": "markup",
+          "symbol": "#downloadExcelButton",
+          "anchor": "1268fab7937d",
+          "first": "<button id=\"downloadExcelButton\" class=\"btn btn-success hidden\" style=\"margin-top: 10px;\">"
+        },
+        {
+          "file": "code/static/js/script.js",
+          "start": 206,
+          "end": 237,
+          "role": "logic",
+          "symbol": "downloadExcel",
+          "anchor": "34bf07ef8b90",
+          "first": "function downloadExcel() {"
+        },
+        {
+          "file": "code/app.py",
+          "start": 161,
+          "end": 207,
+          "role": "logic",
+          "symbol": "download_excel",
+          "anchor": "3172ac7d17de",
+          "first": "def download_excel():"
+        }
+      ]
+    }
+  ]
+}

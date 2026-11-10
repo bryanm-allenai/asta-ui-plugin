@@ -1,0 +1,679 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cafe-flow-cytometry",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T11:33:02Z"
+  },
+  "app": {
+    "title": "CAFE – Cell Analyzer for Flow Experiment",
+    "summary": "A person uploads one CSV per sample, checks the detected samples, groups and shared markers, then works through a guided pipeline: outlier filtering on each cell's total signal, optional batch correction on a technical batch they assign, optional PCA, and UMAP with Leiden clustering. Each step's result has to be reviewed before the next opens. The run ends in a ZIP holding the processed AnnData, per-sample clustered CSVs, cluster count, frequency and median tables, and a parameters file with a draft methods paragraph. The person can then reload the AnnData to explore clusters in an interactive embedding and many plot tabs, compare groups statistically, merge clusters, and name clusters as cell types, by hand or with marker-signature gating, before exporting the annotated file.",
+    "task": {
+      "text": "Turn per-sample cytometry exports into quality-filtered, clustered and cell-type-labelled populations, then compare their abundance and marker expression between groups.",
+      "verbs": [
+        "derive",
+        "clean",
+        "annotate",
+        "compare",
+        "explore",
+        "organize",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Per-cell marker intensity tables, one file per sample named by sample and group, pooled into one cells × markers matrix with sample, group, batch and cluster labels.",
+      "item": "a single cell with an intensity value for each marker",
+      "shapes": [
+        "table",
+        "categories",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "cleaning and clustering gated cytometry exports, then labelling and comparing populations",
+      "terms": [
+        "clean",
+        "analyze",
+        "annotate",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A stepper moves the person through upload, QC, batch correction, PCA and clustering. Each step previews its effect, such as % of cells removed or batch distance before and after correction, and waits for review before the next step opens. Downstream pages reload the saved AnnData: a lasso-selectable embedding with tabs of static and statistical plots, a merge builder beside a cluster map, and an annotation form or marker-signature grid that labels clusters or cells.",
+      "views": [
+        "table view",
+        "scatter plot",
+        "heatmap",
+        "bar chart",
+        "form",
+        "summary stats",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "import",
+        "brush",
+        "zoom and pan",
+        "hover for detail",
+        "toggle view",
+        "inline edit",
+        "apply label",
+        "multi-select",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline",
+        "overview and detail",
+        "dashboard",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "high-dimensional clustering of spectral flow cytometry in immunology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "flow cytometry",
+        "immunology",
+        "single cell clustering"
+      ]
+    },
+    "workflow": {
+      "name": "clean, cluster and label a pooled set of measurements, then compare groups",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload one CSV per sample named SampleID_Group. A review table lists samples, groups and cell counts, and blocks Proceed until filenames and marker names match across files.",
+          "parts": [
+            "upload-review"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Drop cells whose total marker signal lies beyond n MADs from the median, either globally or per sample. Per-sample n is auto-set from a target % removed per tail, and summary and sensitivity tables preview the effect before Apply QC.",
+          "parts": [
+            "qc-filter"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Assign each sample to a technical batch, check per-marker batch distance (EMD), and optionally run ComBat while keeping the biological group as a covariate. A before/after EMD table and scatter show the result.",
+          "parts": [
+            "batch-correction"
+          ]
+        },
+        {
+          "step": "group items into clusters",
+          "here": "Optionally run PCA to a cumulative-variance threshold. Then set the Leiden resolution, n_neighbors, min_dist and distance metric to compute UMAP and Leiden clusters, shown as UMAPs coloured by cluster and by group.",
+          "parts": [
+            "clustering-export",
+            "pipeline-stepper"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download a ZIP containing the processed .h5ad, per-sample CSVs with cluster and UMAP columns, count, frequency and median-expression tables, UMAP PNGs, and a parameters file with a draft methods paragraph.",
+          "parts": [
+            "clustering-export"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Reload the .h5ad to lasso cells in an interactive UMAP and read their marker profile. Tabs of heatmaps, dot plots, composition bars and Sankeys show the clusters, and statistics tabs compare groups (effect size, differential abundance, normality).",
+          "parts": [
+            "visualization"
+          ]
+        },
+        {
+          "step": "select a stretch and label it with a category",
+          "here": "Merge Leiden clusters into named metaclusters with a validated builder. Then name every cluster as a cell type, or define cell types by +/− marker signatures that per-sample Gaussian mixtures gate into High, Low or Ambiguous confidence calls. Export the annotated AnnData.",
+          "parts": [
+            "merge-clusters",
+            "cluster-annotation"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every pipeline step stashes its result and waits for review, so the next step opens only after the person has seen what QC, batch correction or PCA did.",
+        "Batch correction is keyed to a technical batch the person assigns per sample, with the biological group kept as a covariate so group differences are not erased. EMD measures the batch effect before and after.",
+        "Outlier thresholds can be set per sample from a target % removed per tail, with a sensitivity table across n_MADs.",
+        "Probabilistic annotation fits a two-component Gaussian mixture per marker per sample, falling back to a pooled or neutral gate. It labels each cell's call as High, Low or Ambiguous confidence and checks purity against the Leiden clusters.",
+        "The export bundles a draft methods paragraph and every parameter used, alongside per-sample CSVs ready to re-import into the gating software."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "pipeline-stepper",
+      "level": "view",
+      "parent": null,
+      "title": "Data Processing pipeline",
+      "summary": "A stepper shows where the person is in upload, QC, batch correction, PCA and clustering, and opens each stage only when the previous one is done.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 637,
+          "end": 649,
+          "role": "logic",
+          "symbol": "_init_state",
+          "anchor": "5c9d3e754858",
+          "first": "def _init_state():"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 658,
+          "end": 667,
+          "role": "logic",
+          "symbol": "_current_step",
+          "anchor": "c6ab9409092f",
+          "first": "def _current_step() -> int:"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 670,
+          "end": 682,
+          "role": "logic",
+          "symbol": "_done_steps",
+          "anchor": "65094b5bced5",
+          "first": "def _done_steps() -> set[int]:"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 240,
+          "end": 255,
+          "role": "logic",
+          "symbol": "_review_gate",
+          "anchor": "0f5fa255f104",
+          "first": "def _review_gate(pending_key, done_key, next_label):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 220,
+          "end": 237,
+          "role": "logic",
+          "symbol": "_render_review_items",
+          "anchor": "5054e4d2e0fc",
+          "first": "def _render_review_items(items):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/theme.py",
+          "start": 649,
+          "end": 672,
+          "role": "markup",
+          "symbol": "stepper",
+          "anchor": "09066513c592",
+          "first": "def stepper(steps: list[str], current_index: int, done_indices: set[int] | None = None):"
+        }
+      ]
+    },
+    {
+      "id": "upload-review",
+      "level": "component",
+      "parent": "pipeline-stepper",
+      "title": "Upload and file check",
+      "summary": "Loads per-sample CSVs, lists samples, groups and cell counts, and blocks proceeding when filenames or marker names don't match.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 687,
+          "end": 821,
+          "role": "logic",
+          "anchor": "8a82ed54920a",
+          "first": "# Step 0: Upload CSVs. Show this step until the user has loaded CSVs into the pipeline this session."
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/utils.py",
+          "start": 168,
+          "end": 222,
+          "role": "logic",
+          "symbol": "inspect_uploaded_csv_files",
+          "anchor": "34de818f971e",
+          "first": "def inspect_uploaded_csv_files(uploaded_files):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/utils.py",
+          "start": 115,
+          "end": 165,
+          "role": "logic",
+          "symbol": "process_uploaded_csv_files",
+          "anchor": "331bb2619519",
+          "first": "def process_uploaded_csv_files(uploaded_files):"
+        }
+      ]
+    },
+    {
+      "id": "qc-filter",
+      "level": "component",
+      "parent": "pipeline-stepper",
+      "title": "MAD quality control",
+      "summary": "Previews and then removes debris and doublet cells beyond n MADs of total signal, globally or per sample, and shows a histogram with the cutoffs and a per-sample removal table.",
+      "views": [
+        "table view",
+        "heatmap",
+        "bar chart"
+      ],
+      "interactions": [
+        "exclude and refit",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 825,
+          "end": 1090,
+          "role": "logic",
+          "anchor": "92a74136c678",
+          "first": "# Step 1: Quality Control"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 50,
+          "end": 60,
+          "role": "logic",
+          "symbol": "mad_outlier_tails",
+          "anchor": "2ce9c2363ec0",
+          "first": "def mad_outlier_tails(values, nmads):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 74,
+          "end": 76,
+          "role": "logic",
+          "symbol": "qc_preview_tables",
+          "anchor": "b0ebadc6bec2",
+          "first": "def qc_preview_tables("
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 128,
+          "end": 136,
+          "role": "logic",
+          "symbol": "_seed_per_sample_nmads",
+          "anchor": "02b7dbc9911a",
+          "first": "def _seed_per_sample_nmads(recs, cap):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/utils.py",
+          "start": 348,
+          "end": 378,
+          "role": "logic",
+          "symbol": "recommend_nmads",
+          "anchor": "6ab7f5959bd7",
+          "first": "def recommend_nmads(values, cap_pct=5.0, use_lower=True, use_upper=True,"
+        }
+      ]
+    },
+    {
+      "id": "batch-correction",
+      "level": "component",
+      "parent": "pipeline-stepper",
+      "title": "Batch check and ComBat",
+      "summary": "The person assigns samples to technical batches, measures the batch effect per marker, and optionally applies ComBat with a before/after comparison.",
+      "views": [
+        "table view",
+        "scatter plot"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 1253,
+          "end": 1445,
+          "role": "logic",
+          "anchor": "dcef2c691998",
+          "first": "# Step 2: Batch correction (optional). Runs before PCA so ComBat corrects X first."
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 518,
+          "end": 633,
+          "role": "logic",
+          "symbol": "render_batch_diagnostics",
+          "anchor": "68bebb2243c1",
+          "first": "def render_batch_diagnostics(adata, batch_map):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/utils.py",
+          "start": 309,
+          "end": 344,
+          "role": "logic",
+          "symbol": "run_combat_correction",
+          "anchor": "c48132db6460",
+          "first": "def run_combat_correction(adata, batch_key='Batch', covariates=('Group',)):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/utils.py",
+          "start": 453,
+          "end": 504,
+          "role": "logic",
+          "symbol": "summarize_batch_effect",
+          "anchor": "503d9b14d98b",
+          "first": "def summarize_batch_effect(emd_df, adata, batch_key=\"Batch\", covariates=(\"Group\",), flag=0.5):"
+        }
+      ]
+    },
+    {
+      "id": "clustering-export",
+      "level": "component",
+      "parent": "pipeline-stepper",
+      "title": "PCA, UMAP + Leiden and download",
+      "summary": "Runs optional PCA to a variance threshold, then UMAP and Leiden with chosen parameters, shows the cluster and group UMAPs, and packages all outputs with a parameters report into a ZIP.",
+      "views": [
+        "scatter plot",
+        "line chart",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 1092,
+          "end": 1251,
+          "role": "logic",
+          "anchor": "7da326df2867",
+          "first": "# Step 3: PCA (optional). Runs after batch correction so X_pca inherits it;"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 1447,
+          "end": 1770,
+          "role": "logic",
+          "anchor": "790a3e80eef3",
+          "first": "# Step 4: UMAP + Leiden. Final step: compute form, then the terminal"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 424,
+          "end": 505,
+          "role": "logic",
+          "symbol": "build_outputs_zip",
+          "anchor": "65ec93ef1b50",
+          "first": "def build_outputs_zip(adata, resolution, umap_pngs=None):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 314,
+          "end": 421,
+          "role": "logic",
+          "symbol": "build_parameters_report",
+          "anchor": "602d47063ad2",
+          "first": "def build_parameters_report(adata):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Data_Processing.py",
+          "start": 274,
+          "end": 311,
+          "role": "logic",
+          "symbol": "_methods_paragraph",
+          "anchor": "72693b513725",
+          "first": "def _methods_paragraph(adata, qc, pca, batch, umap):"
+        }
+      ]
+    },
+    {
+      "id": "visualization",
+      "level": "view",
+      "parent": null,
+      "title": "Visualization and statistics",
+      "summary": "Reloads a processed file and shows summary counts, an interactive lasso-selectable UMAP with a marker profile of the selected cells, and tabs of cluster plots and group-comparison statistics.",
+      "views": [
+        "scatter plot",
+        "heatmap",
+        "bar chart",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "brush",
+        "zoom and pan",
+        "hover for detail",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Visualization.py",
+          "start": 65,
+          "end": 164,
+          "role": "logic",
+          "anchor": "2ebdc0c95b88",
+          "first": "with st.form(key=\"upload_anndata_form\"):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/embedding_explorer.py",
+          "start": 289,
+          "end": 349,
+          "role": "logic",
+          "symbol": "render_embedding_explorer",
+          "anchor": "411dec3715d8",
+          "first": "def render_embedding_explorer(adata, key_prefix=\"umap_explorer\"):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/embedding_explorer.py",
+          "start": 139,
+          "end": 176,
+          "role": "logic",
+          "symbol": "_render_selection_summary",
+          "anchor": "695320d4b4db",
+          "first": "def _render_selection_summary(adata, event, cluster_col):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/embedding_explorer.py",
+          "start": 205,
+          "end": 286,
+          "role": "logic",
+          "symbol": "_render_marker_profile",
+          "anchor": "b3f9adadc350",
+          "first": "def _render_marker_profile(adata, rows):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Visualization.py",
+          "start": 4222,
+          "end": 4305,
+          "role": "logic",
+          "symbol": "render_tab33",
+          "anchor": "3f747a41acd9",
+          "first": "def render_tab33():"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/Visualization.py",
+          "start": 4314,
+          "end": 4419,
+          "role": "logic",
+          "symbol": "render_tab34",
+          "anchor": "5a8276dd22e9",
+          "first": "def render_tab34():"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/utils.py",
+          "start": 544,
+          "end": 587,
+          "role": "logic",
+          "symbol": "differential_abundance_test",
+          "anchor": "2aec3cd34e8b",
+          "first": "def differential_abundance_test(prop_df, sample_group, alpha=0.05, min_samples=2):"
+        }
+      ]
+    },
+    {
+      "id": "merge-clusters",
+      "level": "view",
+      "parent": null,
+      "title": "Merge Clusters",
+      "summary": "Beside a numbered cluster map, the person builds named merge groups from source clusters, sees which clusters remain, and exports the remapped data with a merge log.",
+      "views": [
+        "scatter plot",
+        "form",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "multi-select",
+        "apply label",
+        "export"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/CAFE/src/cafe_app/advanced/Merge_Clusters.py",
+          "start": 203,
+          "end": 403,
+          "role": "logic",
+          "anchor": "cd36df43dcb9",
+          "first": "# ── Phase 1: Upload ───────────────────────────────────────────────────────────"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/advanced/Merge_Clusters.py",
+          "start": 53,
+          "end": 93,
+          "role": "markup",
+          "symbol": "_render_inventory_split",
+          "anchor": "9c14c2e7216a",
+          "first": "def _render_inventory_split(cluster_ids: list[str], claimed: set[str]) -> None:"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/advanced/Merge_Clusters.py",
+          "start": 96,
+          "end": 142,
+          "role": "markup",
+          "symbol": "_render_merge_preview",
+          "anchor": "6e546f22ee3c",
+          "first": "def _render_merge_preview(groups: list[dict]) -> None:"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/advanced/Merge_Clusters.py",
+          "start": 165,
+          "end": 189,
+          "role": "logic",
+          "symbol": "_validate_merge_groups",
+          "anchor": "4dc5851535c0",
+          "first": "def _validate_merge_groups(groups: list[dict], cluster_ids: list[str]) -> list[str]:"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/advanced/Merge_Clusters.py",
+          "start": 145,
+          "end": 162,
+          "role": "logic",
+          "symbol": "_render_umap",
+          "anchor": "ad60f04c0875",
+          "first": "def _render_umap(adata, title: str = \"\") -> None:"
+        }
+      ]
+    },
+    {
+      "id": "cluster-annotation",
+      "level": "view",
+      "parent": null,
+      "title": "Cluster Annotation",
+      "summary": "The person names every cluster as a cell type with a coverage progress bar, or defines +/− marker signatures that per-sample Gaussian mixtures turn into confidence-graded cell calls. Results show as UMAPs, a purity table and gate diagnostics, and can be exported.",
+      "views": [
+        "form",
+        "table view",
+        "scatter plot",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "apply label",
+        "inline edit",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "category palette",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/CAFE/src/cafe_app/advanced/Cluster_Annotation.py",
+          "start": 60,
+          "end": 562,
+          "role": "logic",
+          "anchor": "6783b60229df",
+          "first": "# ── Method selection (first choice on the page) ───────────────────────────────"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/advanced/Cluster_Annotation.py",
+          "start": 44,
+          "end": 57,
+          "role": "logic",
+          "symbol": "_styled_umap",
+          "anchor": "30657c3771ab",
+          "first": "def _styled_umap(adata, color, palette, legend_loc=\"right margin\"):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/celltype_gmm.py",
+          "start": 85,
+          "end": 155,
+          "role": "logic",
+          "symbol": "compute_positive_posteriors",
+          "anchor": "d80b781511a2",
+          "first": "def compute_positive_posteriors(adata, sample_key=\"SampleID\", random_state=0,"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/celltype_gmm.py",
+          "start": 158,
+          "end": 175,
+          "role": "logic",
+          "symbol": "score_cell_types",
+          "anchor": "6def8d165f94",
+          "first": "def score_cell_types(posteriors, definitions):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/celltype_gmm.py",
+          "start": 178,
+          "end": 219,
+          "role": "logic",
+          "symbol": "assign_cell_types",
+          "anchor": "0ba476070806",
+          "first": "def assign_cell_types(scores, min_score=0.5, high_margin=0.5, low_margin=0.15):"
+        },
+        {
+          "file": "code/CAFE/src/cafe_app/tools/celltype_gmm.py",
+          "start": 248,
+          "end": 278,
+          "role": "logic",
+          "symbol": "suggest_thresholds",
+          "anchor": "e162b34e02c1",
+          "first": "def suggest_thresholds(scores):"
+        }
+      ]
+    }
+  ]
+}

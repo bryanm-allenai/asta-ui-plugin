@@ -1,0 +1,843 @@
+{
+  "schema": "astaui.card/1",
+  "id": "pixelmap",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:56:26Z"
+  },
+  "app": {
+    "title": "PixelMap – Neuropixels Channelmap Generator",
+    "summary": "The person picks a probe model and its recording settings: reference, gains and filter. They then build a set of recording sites on a drawing of the probe's shanks. They can apply a preset, type electrode ranges, upload an existing table, click single sites or drag one of five box tools. Each choice instantly marks the sites it blocks through shared hardware wiring. They can lay an activity survey from the rig and a brain-atlas region map over the probe to steer the choice, and undo or redo as they go. When the count reaches the probe's channel budget, they download the channel table, a PDF of the layout and a spike-sorter channel map, or copy a link that rebuilds the layout.",
+    "task": {
+      "text": "Design a valid set of recording sites for a high-density probe under its hardware wiring limits, guided by atlas anatomy and recorded activity, and export it as the acquisition table.",
+      "verbs": [
+        "plan",
+        "locate",
+        "identify",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "A fixed layout of electrode sites on probe shanks with a wiring map that links sites sharing readout lines. It can be overlaid with one activity value per site from a survey file and with brain regions looked up in a 3D atlas volume along the probe's path.",
+      "item": "an electrode site on a probe shank",
+      "shapes": [
+        "per element",
+        "table",
+        "field"
+      ]
+    },
+    "stage": {
+      "text": "planning which probe sites to record before or just after implantation, ahead of recording and spike sorting",
+      "terms": [
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "A tall plot of the probe's shanks colours every site as selected, blocked or available. Clicks and drag-box tools change the selection, and the blocked sites are recomputed from the wiring map each time. A survey heat bar and atlas region bands can be drawn beside the sites, and the locator slices and region legend in the side panel follow the probe position as it is edited. A counter tracks how close the selection is to the channel budget and unlocks the downloads when it is reached.",
+      "views": [
+        "fixed-layout grid",
+        "heatmap",
+        "form",
+        "summary stats",
+        "image viewer",
+        "list"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "brush",
+        "hover for detail",
+        "zoom and pan",
+        "import",
+        "export",
+        "undo",
+        "keyboard shortcuts",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views",
+        "focus and context"
+      ]
+    },
+    "field": {
+      "text": "channel-map design for Neuropixels extracellular electrophysiology in neuroscience",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "neuroscience",
+        "extracellular electrophysiology",
+        "neuropixels"
+      ]
+    },
+    "workflow": {
+      "name": "choose a subset of positions on a fixed layout under hardware limits and export the configuration",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pick a probe group and part number, which loads its site positions and wiring map, then set reference, gains and filter. Optionally upload an existing .imro table to start from.",
+          "parts": [
+            "controls-panel",
+            "selection-methods"
+          ]
+        },
+        {
+          "step": "select positions on the layout, with the conflicts shown",
+          "here": "Use a preset, a typed range like '1-5,7' on a chosen shank, a click on a site, or a drag box (select, deselect, zigzag, interleaved, deselect dependents). Selected sites turn red and the sites they block turn black.",
+          "parts": [
+            "probe-plot",
+            "selection-methods"
+          ]
+        },
+        {
+          "step": "overlay measured activity per position",
+          "here": "Load a survey .txt file (Shank, Xum, Zum, Val) to draw a viridis bar beside each site, with vmin and vmax editable to rescale the colours.",
+          "parts": [
+            "survey-overlay",
+            "probe-plot"
+          ]
+        },
+        {
+          "step": "locate the layout in a reference space",
+          "here": "Choose a brain atlas, enter the tip position (AP/ML/DV, optionally relative to bregma), pitch, yaw and shank orientation, then compute region bands behind the shanks, a three-slice locator, a region legend and the tip depth below the brain surface.",
+          "parts": [
+            "anatomy-overlay",
+            "summary-panel"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "A counter shows selected over budget (384 or 1536) and turns green when the target is reached. Undo, redo and Ctrl/⌘+Z step through selection changes.",
+          "parts": [
+            "counter-undo"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download the .imro table, a PDF of the layout and a Kilosort channel map, optionally in the legacy IMRO format, or copy a shareable URL that encodes the whole configuration.",
+          "parts": [
+            "export-share"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Selecting a site makes other sites unavailable because they share readout lines or ADCs, and the interface works this out from a wiring map on every edit.",
+        "A 'deselect dependents' box frees the blocked sites inside it by deselecting the sites elsewhere on the probe that block them.",
+        "The selection has a fixed channel budget: box selection fills sites from the bottom of the leftmost shank upward and stops when the budget is full, and export unlocks only when the target count is reached.",
+        "The probe is placed in a stereotaxic atlas with pitch, yaw, bregma offset and DV-squish calibration to predict the brain region at each site.",
+        "An activity survey recorded on the same probe after implantation can be overlaid to favour active sites over white matter."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "controls-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Controls panel",
+      "summary": "A fixed left column where the person sets the probe model, reference, gains and filter, and reaches every selection and overlay control.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2917,
+          "end": 3009,
+          "role": "markup",
+          "anchor": "99c89d08120c",
+          "first": "# Controls panel (fixed on left)"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2373,
+          "end": 2411,
+          "role": "markup",
+          "anchor": "07e70bc6d601",
+          "first": "# Probe group selector"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2484,
+          "end": 2505,
+          "role": "markup",
+          "anchor": "9fcf528c8533",
+          "first": "# Reference and gain inputs"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 3086,
+          "end": 3107,
+          "role": "logic",
+          "symbol": "on_probe_type_change",
+          "anchor": "7d7fbbd49bc2",
+          "first": "def on_probe_type_change(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 3110,
+          "end": 3121,
+          "role": "logic",
+          "symbol": "on_probe_subtype_change",
+          "anchor": "ad93d4c1db40",
+          "first": "def on_probe_subtype_change(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 340,
+          "end": 377,
+          "role": "logic",
+          "symbol": "load_probe_data",
+          "anchor": "a6020a11838d",
+          "first": "def load_probe_data(self):"
+        },
+        {
+          "file": "code/pixelmap/wiring_maps/1.0_wiring.csv",
+          "start": 1,
+          "end": 1,
+          "role": "data",
+          "anchor": "fc67cd0064bb",
+          "first": "channel,shank0-bank0,shank0-bank1,shank0-bank2"
+        }
+      ]
+    },
+    {
+      "id": "probe-plot",
+      "level": "view",
+      "parent": null,
+      "title": "Probe site plot",
+      "summary": "Draws every site on the probe shanks coloured as selected, blocked or available. Clicks and the five drag-box tools change the selection, and hovering shows a site's ID, depth and status.",
+      "views": [
+        "fixed-layout grid",
+        "heatmap"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "brush",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 3038,
+          "end": 3053,
+          "role": "markup",
+          "anchor": "d8d969066f52",
+          "first": "# Central plot container: fills remaining width between the two side columns,"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2080,
+          "end": 2201,
+          "role": "logic",
+          "symbol": "setup_bokeh_plot",
+          "anchor": "a41b412f47b7",
+          "first": "def setup_bokeh_plot(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 380,
+          "end": 473,
+          "role": "logic",
+          "symbol": "create_electrode_data",
+          "anchor": "fcb613b114a0",
+          "first": "def create_electrode_data(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 550,
+          "end": 644,
+          "role": "logic",
+          "symbol": "add_shank_outlines",
+          "anchor": "0f94b67f882b",
+          "first": "def add_shank_outlines(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 647,
+          "end": 682,
+          "role": "logic",
+          "symbol": "update_electrode_colors",
+          "anchor": "9ffb8d4eff7a",
+          "first": "def update_electrode_colors(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 689,
+          "end": 784,
+          "role": "logic",
+          "symbol": "on_electrode_selection",
+          "anchor": "1bb4c7a9546d",
+          "first": "def on_electrode_selection(self, _, old, new):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2220,
+          "end": 2287,
+          "role": "logic",
+          "symbol": "setup_tool_monitoring",
+          "anchor": "cb111ef2ef97",
+          "first": "def setup_tool_monitoring(self, select_box_string, deselect_box_string, zigzagselect_box_string, interleavedselect_box_s"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 787,
+          "end": 799,
+          "role": "logic",
+          "symbol": "get_zigzag_subset",
+          "anchor": "78028aba476f",
+          "first": "def get_zigzag_subset(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 801,
+          "end": 824,
+          "role": "logic",
+          "symbol": "get_interleaved_subset",
+          "anchor": "e626b63f759d",
+          "first": "def get_interleaved_subset(self):"
+        },
+        {
+          "file": "code/pixelmap/backend.py",
+          "start": 81,
+          "end": 105,
+          "role": "logic",
+          "symbol": "find_forbidden_electrodes",
+          "anchor": "cdac06b72be4",
+          "first": "def find_forbidden_electrodes(selected_electrodes, wiring_df):"
+        }
+      ]
+    },
+    {
+      "id": "selection-methods",
+      "level": "component",
+      "parent": "controls-panel",
+      "title": "Preset, text and IMRO selection",
+      "summary": "Adds sites to the selection from a named preset, from typed electrode ranges on a chosen shank, or from an uploaded .imro table.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2959,
+          "end": 2969,
+          "role": "markup",
+          "anchor": "a2093af27bcf",
+          "first": "pn.pane.Markdown(\"## Preset Selection\", margin=(10, 0, -5, 10)),"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2413,
+          "end": 2452,
+          "role": "markup",
+          "anchor": "f7ca6f2ada70",
+          "first": "# Preset selector"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2710,
+          "end": 2715,
+          "role": "markup",
+          "anchor": "03ac921a4016",
+          "first": "# IMRO file dropper"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 827,
+          "end": 839,
+          "role": "logic",
+          "symbol": "apply_preset",
+          "anchor": "0811e0a2318c",
+          "first": "def apply_preset(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 842,
+          "end": 872,
+          "role": "logic",
+          "symbol": "parse_electrode_input",
+          "anchor": "2457795d978e",
+          "first": "def parse_electrode_input(self, text):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 875,
+          "end": 893,
+          "role": "logic",
+          "symbol": "apply_electrode_input",
+          "anchor": "b09423138ad1",
+          "first": "def apply_electrode_input(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1070,
+          "end": 1129,
+          "role": "logic",
+          "symbol": "apply_uploaded_imro",
+          "anchor": "af79d722d4a7",
+          "first": "def apply_uploaded_imro(self):"
+        },
+        {
+          "file": "code/pixelmap/backend.py",
+          "start": 269,
+          "end": 556,
+          "role": "logic",
+          "symbol": "get_preset_candidates",
+          "anchor": "d478994e1330",
+          "first": "def get_preset_candidates(preset, probe_type, wiring_df):"
+        },
+        {
+          "file": "code/pixelmap/utils/imro.py",
+          "start": 99,
+          "end": 192,
+          "role": "logic",
+          "symbol": "parse_imro_list",
+          "anchor": "11e38f228d8e",
+          "first": "def parse_imro_list(imro_list):"
+        }
+      ]
+    },
+    {
+      "id": "survey-overlay",
+      "level": "component",
+      "parent": "controls-panel",
+      "title": "Survey activity overlay",
+      "summary": "Loads an activity survey file and draws a colour bar beside each matching site, with an editable colour range.",
+      "views": [
+        "heatmap"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2970,
+          "end": 2978,
+          "role": "markup",
+          "anchor": "a1f713a10c43",
+          "first": "pn.Column("
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2717,
+          "end": 2734,
+          "role": "markup",
+          "anchor": "186ea50ef1a6",
+          "first": "# Survey (.txt) overlay widgets"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1974,
+          "end": 2034,
+          "role": "logic",
+          "symbol": "load_survey_file",
+          "anchor": "5f8a3a4eef55",
+          "first": "def load_survey_file(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2036,
+          "end": 2046,
+          "role": "logic",
+          "symbol": "clear_survey_overlay",
+          "anchor": "fbfe6746801d",
+          "first": "def clear_survey_overlay(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2061,
+          "end": 2074,
+          "role": "logic",
+          "symbol": "_on_survey_range_change",
+          "anchor": "5bfb21598ba7",
+          "first": "def _on_survey_range_change(self, _event=None):"
+        },
+        {
+          "file": "code/pixelmap/utils/survey.py",
+          "start": 61,
+          "end": 89,
+          "role": "logic",
+          "symbol": "parse_survey_file",
+          "anchor": "b2db853a600d",
+          "first": "def parse_survey_file(content: str) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/pixelmap/utils/survey.py",
+          "start": 111,
+          "end": 114,
+          "role": "logic",
+          "symbol": "match_survey_to_electrodes",
+          "anchor": "084d6502c22f",
+          "first": "def match_survey_to_electrodes("
+        }
+      ]
+    },
+    {
+      "id": "anatomy-overlay",
+      "level": "component",
+      "parent": "controls-panel",
+      "title": "Anatomical overlay",
+      "summary": "Places the probe in a chosen brain atlas from the tip coordinates and angles, then draws region bands behind the shanks and updates them live when the pose changes.",
+      "views": [
+        "form",
+        "image viewer"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2979,
+          "end": 2996,
+          "role": "markup",
+          "anchor": "e1fe4d1ded44",
+          "first": "pn.Column("
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2578,
+          "end": 2708,
+          "role": "markup",
+          "anchor": "cf6e2acf7175",
+          "first": "# Anatomy widgets"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1221,
+          "end": 1264,
+          "role": "logic",
+          "symbol": "_on_compute_anatomy_click",
+          "anchor": "490fdf9d701b",
+          "first": "async def _on_compute_anatomy_click(self, event):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1266,
+          "end": 1417,
+          "role": "logic",
+          "symbol": "compute_anatomy_overlay",
+          "anchor": "20a8753ba800",
+          "first": "def compute_anatomy_overlay(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1419,
+          "end": 1449,
+          "role": "logic",
+          "symbol": "clear_anatomy_overlay",
+          "anchor": "6adfa23c1e23",
+          "first": "def clear_anatomy_overlay(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1815,
+          "end": 1821,
+          "role": "logic",
+          "symbol": "_recompute_anatomy_if_active",
+          "anchor": "887ca5764a06",
+          "first": "def _recompute_anatomy_if_active(self, *events):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1796,
+          "end": 1813,
+          "role": "logic",
+          "symbol": "_on_bregma_toggle",
+          "anchor": "39dec479b262",
+          "first": "def _on_bregma_toggle(self, *events):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1638,
+          "end": 1683,
+          "role": "logic",
+          "symbol": "_tip_depth_readout_html",
+          "anchor": "703ed0563720",
+          "first": "def _tip_depth_readout_html(self) -> str:"
+        },
+        {
+          "file": "code/pixelmap/anatomy/transform.py",
+          "start": 113,
+          "end": 118,
+          "role": "logic",
+          "symbol": "probe_to_atlas",
+          "anchor": "7b93eebb409a",
+          "first": "def probe_to_atlas("
+        },
+        {
+          "file": "code/pixelmap/anatomy/visualization.py",
+          "start": 30,
+          "end": 39,
+          "role": "logic",
+          "symbol": "compute_region_bands",
+          "anchor": "a220cf704f9e",
+          "first": "def compute_region_bands("
+        }
+      ]
+    },
+    {
+      "id": "summary-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Right panel: locator and region legend",
+      "summary": "Shows sagittal, coronal and horizontal atlas slices through the probe tip and an alphabetical legend of the regions the probe crosses, next to the counter, export controls and help text.",
+      "views": [
+        "image viewer",
+        "list"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2859,
+          "end": 2915,
+          "role": "markup",
+          "anchor": "ec954c5275d6",
+          "first": "# Counter and Downloader (fixed on the right)"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1823,
+          "end": 1853,
+          "role": "logic",
+          "symbol": "_update_anatomy_legend",
+          "anchor": "5a6d2d24f34b",
+          "first": "def _update_anatomy_legend(self, bands: list):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1451,
+          "end": 1476,
+          "role": "logic",
+          "symbol": "_fig_to_locator_html",
+          "anchor": "f53531d1bb9d",
+          "first": "def _fig_to_locator_html(self, fig) -> str:"
+        },
+        {
+          "file": "code/pixelmap/anatomy/schematic.py",
+          "start": 125,
+          "end": 139,
+          "role": "logic",
+          "symbol": "render_locator",
+          "anchor": "592367d39f3b",
+          "first": "def render_locator("
+        }
+      ]
+    },
+    {
+      "id": "counter-undo",
+      "level": "component",
+      "parent": "summary-panel",
+      "title": "Site counter and undo",
+      "summary": "Counts selected sites against the probe's channel budget, turns green at the target, and offers undo, redo with Ctrl/⌘+Z, and clear.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "undo",
+        "keyboard shortcuts"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2466,
+          "end": 2478,
+          "role": "markup",
+          "anchor": "e11c45c83e10",
+          "first": "# Prominent electrode counter (moved to top)"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2507,
+          "end": 2554,
+          "role": "markup",
+          "anchor": "95e34a7e052c",
+          "first": "# Undo / redo widgets"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 3123,
+          "end": 3153,
+          "role": "logic",
+          "symbol": "update_electrode_counter",
+          "anchor": "921ee337b4af",
+          "first": "def update_electrode_counter(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1931,
+          "end": 1936,
+          "role": "logic",
+          "symbol": "do_undo",
+          "anchor": "a4c2f5526390",
+          "first": "def do_undo(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1938,
+          "end": 1943,
+          "role": "logic",
+          "symbol": "do_redo",
+          "anchor": "11e20d5bbab1",
+          "first": "def do_redo(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1945,
+          "end": 1950,
+          "role": "logic",
+          "symbol": "refresh_undo_buttons",
+          "anchor": "c5774ddb231b",
+          "first": "def refresh_undo_buttons(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 178,
+          "end": 188,
+          "role": "logic",
+          "symbol": "push_undo_snapshot",
+          "anchor": "4408c21d34b8",
+          "first": "def push_undo_snapshot(self):"
+        }
+      ]
+    },
+    {
+      "id": "export-share",
+      "level": "component",
+      "parent": "summary-panel",
+      "title": "Export and share",
+      "summary": "Downloads the channel table as .imro, a PDF of the layout and a Kilosort channel map once the target is reached, and copies a URL that encodes the full configuration.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2454,
+          "end": 2464,
+          "role": "markup",
+          "anchor": "07172f0eb0f8",
+          "first": "# IMRO directory and filename inputs (split into two)"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2556,
+          "end": 2576,
+          "role": "markup",
+          "anchor": "cc19672c034b",
+          "first": "# Share-link widgets"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 2737,
+          "end": 2773,
+          "role": "logic",
+          "symbol": "create_download_buttons",
+          "anchor": "ab46b760d605",
+          "first": "def create_download_buttons(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 912,
+          "end": 922,
+          "role": "logic",
+          "symbol": "ready_to_download",
+          "anchor": "c5fbd8fa4cd9",
+          "first": "def ready_to_download(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 956,
+          "end": 974,
+          "role": "logic",
+          "symbol": "generate_imro_content",
+          "anchor": "d420944081f7",
+          "first": "def generate_imro_content(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 976,
+          "end": 1041,
+          "role": "logic",
+          "symbol": "generate_pdf_content",
+          "anchor": "ba2943d17b1a",
+          "first": "def generate_pdf_content(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1043,
+          "end": 1068,
+          "role": "logic",
+          "symbol": "generate_kilosort_channelmap",
+          "anchor": "fa04604a717d",
+          "first": "def generate_kilosort_channelmap(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1898,
+          "end": 1929,
+          "role": "logic",
+          "symbol": "update_share_link",
+          "anchor": "4f63ae603060",
+          "first": "def update_share_link(self):"
+        },
+        {
+          "file": "code/pixelmap/gui/gui.py",
+          "start": 1855,
+          "end": 1896,
+          "role": "logic",
+          "symbol": "apply_url_state",
+          "anchor": "d73a80d89626",
+          "first": "def apply_url_state(self, encoded: str) -> bool:"
+        },
+        {
+          "file": "code/pixelmap/utils/url_share.py",
+          "start": 27,
+          "end": 34,
+          "role": "logic",
+          "symbol": "encode_state",
+          "anchor": "20177844b414",
+          "first": "def encode_state("
+        }
+      ]
+    }
+  ]
+}

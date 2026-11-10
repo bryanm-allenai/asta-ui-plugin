@@ -1,0 +1,849 @@
+{
+ "interface": {
+  "title": "GeneQuantify: Expression & CNV Analysis",
+  "field": "Molecular biology: relative gene-expression analysis of real-time qPCR data",
+  "stage_of_work": "Data analysis and reporting, after the qPCR run once Cq values are in hand",
+  "what_it_is_for": "Turn replicate Cq values for control and patient/treatment groups into ΔΔCq (Livak) and Pfaffl fold changes, with outlier screening, reference-gene stability checks, automatic choice of statistical test, multiple-testing correction, plots and CSV/PDF export. Despite 'CNV' in the title, no separate copy-number mode was seen; relative CNV would go through the same ΔΔCq path."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "Most work used the sidebar 'Load Validation Scenario' sets: S2 (3 genes, 2 groups, 2 reference genes), S1D (Mann-Whitney), S4 (ANOVA with 3 groups) and S3 (Grubbs outlier). I also typed my own Cq values by hand (6 replicates per group, with one control replicate at 27.90 placed as an outlier). The test file example_qpcr.rdes.txt uploaded and was read (24 reactions found), but pressing 'Apply RDES import to Data Entry' crashed the app with NameError: apply_import_to_session is not defined (screens/044.webp), so no analysis ran on the uploaded file."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Find out how much a gene's expression changes between control and treated/patient samples, and whether the change is statistically significant",
+  "specific": "Compute 2^-ΔΔCq and Pfaffl fold changes from qPCR Cq replicates, check them, test them and export a report",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Get the measurements in and describe the study design",
+    "specific": "Data Entry tab: set the numbers of genes, groups and reference genes, then fill the Cq text areas",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load a ready-made example dataset",
+      "specific": "Choose a validation scenario in the sidebar and press Load Scenario",
+      "branch": "one-of",
+      "screens": [
+       "screens/005.webp",
+       "screens/007.webp",
+       "screens/053.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened 'Select scenario' dropdown",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'S2 — Multi-gene + dual ref (n=4)'",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed ▶ Load Scenario",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "later chose S1D — Mann-Whitney U and pressed Load Scenario",
+        "screens": [
+         "screens/053.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "later chose S4 — ANOVA 3 groups and pressed Load Scenario",
+        "screens": [
+         "screens/057.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Type or paste replicate measurements by hand for each group",
+      "specific": "Paste one Cq per line into Control / Patient Group target-gene and reference-gene text areas",
+      "branch": "one-of",
+      "screens": [
+       "screens/046.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 6 Cq values into 'Control 1 - Target Gene 1 - Cq Value' + Ctrl+Enter"
+       },
+       {
+        "kind": "action",
+        "label": "typed 6 Cq values into 'Control 1 — Reference Gene 1 — Cq Value' + Ctrl+Enter"
+       },
+       {
+        "kind": "action",
+        "label": "typed values into the Patient Group 1 target and reference fields",
+        "screens": [
+         "screens/046.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Read an instrument export file and preview its contents",
+      "specific": "Upload an RDML/RDES file in the sidebar 'Import RDML / RDES File' expander and preview the parsed reactions (the follow-on Apply step crashes; see not_done)",
+      "branch": "one-of",
+      "screens": [
+       "screens/041.webp",
+       "screens/042.webp",
+       "screens/043.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded '📂 Import RDML / RDES File'",
+        "screens": [
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Upload and gave example_qpcr.rdes.txt ('24 reactions found')",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened 'Preview parsed data'",
+        "screens": [
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "left Control label 'Control' and patient group 1 label 'Treatment'",
+        "screens": [
+         "screens/043.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Check measurement quality before trusting the numbers",
+    "specific": "Outlier detection, amplification-efficiency check and reference-gene stability on the Data Entry tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Find and drop aberrant replicate measurements",
+      "specific": "Grubbs or IQR outlier test on raw Cq, then tick 'Exclude Sample N'",
+      "screens": [
+       "screens/046.webp",
+       "screens/047.webp",
+       "screens/049.webp",
+       "screens/050.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "left Detection method = Grubbs; warning flagged Sample 6 (Ct 27.900)",
+        "screens": [
+         "screens/046.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "ticked 'Exclude Sample 6 (Ct = 27.900) from Control Group 1'; fold change went from 5.2234 to 3.3940",
+        "screens": [
+         "screens/047.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "switched Detection method to IQR; same sample flagged",
+        "screens": [
+         "screens/049.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the Results tab; Input Data Table marks the row EXCLUDED / 'Yes (IQR)'",
+        "screens": [
+         "screens/050.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check that the assays amplify with comparable efficiency",
+      "specific": "Enter E for target and reference genes per target gene; the app warns when the difference exceeds the threshold",
+      "screens": [
+       "screens/009.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded '🔬 Target Gene 2 — Efficiency' (E 2.103 vs 1.952 → warning, 15.1% difference)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "task",
+        "general": "Estimate amplification efficiency from a dilution series",
+        "specific": "Standard Curve Calculator: enter mean Cq per dilution, press Calculate Efficiency, read slope / E / R², then copy E into the efficiency inputs",
+        "branch": "optional",
+        "screens": [
+         "screens/013.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "expanded '📐 Standard Curve Calculator'",
+          "screens": [
+           "screens/010.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "pressed 📊 Calculate Efficiency (slope -3.32, E 2.0008, 100.1%, R² 1.0)",
+          "screens": [
+           "screens/013.webp"
+          ]
+         }
+        ],
+        "id": "t6",
+        "check": "replayed"
+       },
+       {
+        "kind": "action",
+        "label": "switched Efficiency Input Method to 'Calculate from slope'",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "switched back to 'Enter E value manually' and typed 2.103 / 1.952 again"
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check that the normalising control genes are stable",
+      "specific": "geNorm M-value and CV% per reference gene for each group, shown when 2 or more reference genes are used",
+      "screens": [
+       "screens/020.webp",
+       "screens/021.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to 'Reference Gene Stability — Control Group 1' (M = 0.015, CV 0.83% / 0.72%, Stable)",
+        "screens": [
+         "screens/020.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Compute and compare the expression change",
+    "specific": "Method Comparison (ΔΔCq vs Pfaffl) and the Results tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Compare two ways of calculating the fold change",
+      "specific": "Read Classic ΔΔCq vs Pfaffl Ratio per gene/group with its Up/Down badge, and toggle the multi-gene chart between methods",
+      "screens": [
+       "screens/022.webp",
+       "screens/026.webp",
+       "screens/029.webp",
+       "screens/030.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "read Method Comparison card (5.1560 vs 5.1560, Upregulated)",
+        "screens": [
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the Results tab; the Results table shows Gene 2 ΔΔCq 0.1206 vs Pfaffl 0.1033",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "Method radio: chose Pfaffl",
+        "screens": [
+         "screens/030.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "ticked 'Show log2 scale'",
+        "screens": [
+         "screens/031.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Look at the spread of individual replicates per group",
+      "specific": "Distribution Plot with Display Mode RQ / ΔCq / ΔΔCq",
+      "screens": [
+       "screens/032.webp",
+       "screens/034.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "viewed RQ (2^-ΔCq) mode",
+        "screens": [
+         "screens/032.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose 'ΔΔCq — relative to control mean'",
+        "screens": [
+         "screens/034.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Test whether the change is statistically significant",
+    "specific": "Automatic test selection (Shapiro-Wilk → Levene → t/Welch/Mann-Whitney, or ANOVA/Welch ANOVA/Kruskal-Wallis), with Bonferroni and FDR correction",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Let the tool pick and run the right two-group test",
+      "specific": "Open 'Statistical decision — Target Gene / Group' to see normality, variance and selected test",
+      "screens": [
+       "screens/022.webp",
+       "screens/051.webp",
+       "screens/055.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded Statistical decision for S2 (Levene p=0.0249 → Welch t-test)",
+        "screens": [
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "manual data: Statistical Results show t-test p=0.0000003",
+        "screens": [
+         "screens/051.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "S1D: expanded Statistical decision (Shapiro-Wilk non-normal → Mann-Whitney U, p=0.0009)",
+        "screens": [
+         "screens/055.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Compare three or more groups with an omnibus test and pairwise follow-ups",
+      "specific": "Multi-Group Comparison Analysis: omnibus test chosen per gene (Welch ANOVA + Games-Howell, or one-way ANOVA + Tukey HSD) with raw / Bonferroni / FDR post-hoc p",
+      "screens": [
+       "screens/023.webp",
+       "screens/024.webp",
+       "screens/058.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Results tab with S2 (Welch ANOVA, significant)",
+        "screens": [
+         "screens/023.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "loaded S4 and opened Results (Control vs Group 3: raw p 0.0422, Bonferroni 0.253, FDR 0.0422)",
+        "screens": [
+         "screens/058.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Correct p-values across many genes",
+      "specific": "Multi-Gene Multiple Comparison Correction table and chart",
+      "screens": [
+       "screens/027.webp",
+       "screens/028.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Multi-Gene correction (6/6 significant after raw, Bonferroni and FDR)",
+        "screens": [
+         "screens/027.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Export results for the notebook or a publication",
+    "specific": "CSV download buttons on the Results tab and the PDF on the Report tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Download result tables",
+      "specific": "Download CSV (input data, statistics), post-hoc results per gene, corrected p-values",
+      "screens": [
+       "screens/024.webp",
+       "screens/026.webp",
+       "screens/027.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 'Download post-hoc results — Gene 1' → posthoc_Gene_1.csv",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download CSV under Input Data Table → giris_verileri.csv",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download CSV under Statistical Results → istatistik_sonuclari.csv",
+        "screens": [
+         "screens/027.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Produce a formatted report document",
+      "specific": "Report tab: Generate PDF, then '⬇️ Gene Expression Report'",
+      "screens": [
+       "screens/036.webp",
+       "screens/039.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Report tab (36 records ready)",
+        "screens": [
+         "screens/036.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 📥 Generate PDF",
+        "screens": [
+         "screens/038.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed ⬇️ Gene Expression Report → gen_ekspresyon_raporu.pdf (4 pages, 253 KB, with images)",
+        "screens": [
+         "screens/039.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Replicate outlier screen with per-sample exclusion",
+   "general": "Run an outlier test on each group's replicate measurements, list the flagged samples, let the user tick which to exclude, and pass the exclusions on to all later calculations and exports",
+   "specific": "Choose Grubbs (α) or IQR (k) and the stage (Raw Cq or ΔCq); a warning lists the flagged sample and its Ct; tick 'Exclude Sample N'; the info box shows remaining n; the Results table marks the row EXCLUDED / 'Yes (IQR)'",
+   "steps": [
+    "Enable outlier detection and pick Grubbs or IQR",
+    "Set α or the IQR multiplier k, and the detection stage",
+    "Enter or paste replicates; read the flagged-sample warning",
+    "Tick 'Exclude Sample N' and watch the fold change update",
+    "Check the excluded row in the Input Data Table and exports"
+   ],
+   "serves_tasks": [
+    "Find and drop aberrant replicate measurements"
+   ],
+   "screens": [
+    "screens/046.webp",
+    "screens/047.webp",
+    "screens/049.webp",
+    "screens/050.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Standard-curve efficiency calculator",
+   "general": "Fit a line to signal vs log dilution for a serial dilution series and report slope, efficiency and R², with a quality verdict",
+   "specific": "📐 Standard Curve Calculator: set gene label, number of dilution points, dilution factor and starting concentration; enter the mean Cq per dilution; press Calculate Efficiency to get slope, E, Efficiency % and R², with a hint to copy E into the efficiency inputs",
+   "steps": [
+    "Expand the calculator",
+    "Set number of points, dilution factor and starting concentration",
+    "Enter the mean Cq for each dilution",
+    "Press Calculate Efficiency",
+    "Read slope / E / % / R² and copy E into the gene efficiency fields"
+   ],
+   "serves_tasks": [
+    "Estimate amplification efficiency from a dilution series",
+    "Check that the assays amplify with comparable efficiency"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/013.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Efficiency-mismatch check per target/reference pair",
+   "general": "Enter efficiency directly or derive it from a slope for each pair of assays, and warn when the two differ by more than a set threshold",
+   "specific": "The Efficiency Input Method radio (Enter E manually / Calculate from slope) and the threshold %; each 'Target Gene N — Efficiency' expander shows E, % and a green or yellow verdict; E values feed the Pfaffl ratio",
+   "steps": [
+    "Choose the input method: E or slope",
+    "Set the acceptable difference threshold",
+    "Enter target and reference values per gene",
+    "Read the acceptable / exceeds-threshold verdict"
+   ],
+   "serves_tasks": [
+    "Check that the assays amplify with comparable efficiency",
+    "Compare two ways of calculating the fold change"
+   ],
+   "screens": [
+    "screens/009.webp",
+    "screens/018.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Reference-gene stability panel (geNorm M / CV)",
+   "general": "When several normalising controls are used, compute a stability score and a variability score for each, chart them against acceptance lines, and give a verdict per group",
+   "specific": "Set 'Number of reference genes per target gene' to 2 or more; each group gets M-value and CV% cards, a geNorm M-value bar chart with M=0.5 and M=1.0 lines, and an 'All stable' status",
+   "steps": [
+    "Set the number of reference genes to 2 or more",
+    "Paste Cq for each reference gene per group",
+    "Read the M and CV cards and the chart against the 0.5 / 1.0 thresholds",
+    "Act on the stable / unstable verdict"
+   ],
+   "serves_tasks": [
+    "Check that the normalising control genes are stable"
+   ],
+   "screens": [
+    "screens/020.webp",
+    "screens/021.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Explained automatic test selection",
+   "general": "Pick a two-group significance test from normality and equal-variance checks, and show each decision step with its statistic and the reason",
+   "specific": "The 'Statistical decision' expander: 1. Shapiro-Wilk per group (skipped if n<8), 2. Levene, 3. Selected test (Student / Welch / Mann-Whitney U) with reason and p",
+   "steps": [
+    "Enter the groups' data",
+    "Expand Statistical decision for a gene/group",
+    "Read the normality and variance results",
+    "Read the selected test, the reason and the p-value"
+   ],
+   "serves_tasks": [
+    "Let the tool pick and run the right two-group test"
+   ],
+   "screens": [
+    "screens/022.webp",
+    "screens/055.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Omnibus test + post-hoc table with Bonferroni/FDR (3 or more groups)",
+   "general": "For three or more groups, choose an omnibus test from the assumption checks, run pairwise comparisons, and show raw, Bonferroni and FDR p-values side by side in a table, a chart and a CSV",
+   "specific": "Multi-Group Comparison Analysis: assumption banner (Welch ANOVA + Games-Howell, or One-way ANOVA + Tukey HSD per gene), Omnibus / p / Result cards, post-hoc table with Sig marks per correction, grouped bar chart with an α=0.05 line, and 'Download post-hoc results — Gene N' CSV",
+   "steps": [
+    "Set 2 or more patient groups (3 or more groups in total)",
+    "Open the Results tab and read the assumption banner and omnibus result",
+    "Compare raw, Bonferroni and FDR significance per pair",
+    "Download the post-hoc CSV"
+   ],
+   "serves_tasks": [
+    "Compare three or more groups with an omnibus test and pairwise follow-ups"
+   ],
+   "screens": [
+    "screens/024.webp",
+    "screens/058.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Multi-gene multiple-comparison correction",
+   "general": "When several genes are tested, adjust their p-values together with Bonferroni and FDR, and show how many stay significant under each, in a table and a chart",
+   "specific": "Multi-Gene Multiple Comparison Correction: table of raw / Bonferroni / FDR p per gene and group with an 'N/N significant' count, a robustness message, a Raw vs Bonferroni vs FDR chart, and multi_gene_correction.csv; with 1 gene it says correction is not applicable",
+   "steps": [
+    "Set 2 or more target genes",
+    "Open the Results tab and scroll to the Multi-Gene correction section",
+    "Read the significant counts under raw, Bonferroni and FDR",
+    "Read the comparison chart and download the CSV"
+   ],
+   "serves_tasks": [
+    "Correct p-values across many genes"
+   ],
+   "screens": [
+    "screens/027.webp",
+    "screens/028.webp"
+   ],
+   "id": "f11",
+   "check": "replayed"
+  },
+  {
+   "name": "Fold-change chart with method and log2 toggles",
+   "general": "Grouped bar chart of fold change per gene and group, switchable between two calculation methods and between linear and log2 scale, with a no-change reference line",
+   "specific": "Multi-Gene Expression Comparison: Method radio 2^(-ΔΔCq) / Pfaffl and a 'Show log2 scale' checkbox that adds a log2(Fold Change) chart",
+   "steps": [
+    "Pick the method (ΔΔCq or Pfaffl)",
+    "Read the bars against the 'No change (1.0)' line",
+    "Tick log2 scale to see up- and down-regulation symmetrically"
+   ],
+   "serves_tasks": [
+    "Compare two ways of calculating the fold change"
+   ],
+   "screens": [
+    "screens/029.webp",
+    "screens/030.webp",
+    "screens/031.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Method-comparison card (ΔΔCq vs Pfaffl) with regulation badge",
+   "general": "For each gene and group, show the fold change from the equal-efficiency method and from the efficiency-corrected method side by side, with an up/down regulation call",
+   "specific": "Method Comparison card: 'Classic ΔΔCq' and 'Pfaffl Ratio' values per Target Gene / Group with an Upregulated / Downregulated badge; the same pair appears as columns in the Results table. Only the Up/Down/No change call was seen, not the README's graded strong/moderate/weak categories",
+   "steps": [
+    "Enter or load Cq data and efficiencies",
+    "Read the ΔΔCq and Pfaffl values for each gene and group",
+    "Read the regulation badge",
+    "Compare the two values where efficiencies differ (Results table)"
+   ],
+   "serves_tasks": [
+    "Compare two ways of calculating the fold change"
+   ],
+   "screens": [
+    "screens/022.webp",
+    "screens/026.webp"
+   ],
+   "id": "f12"
+  },
+  {
+   "name": "Result tables with CSV export",
+   "general": "Tables of the input measurements and the test results, with excluded replicates marked and the method that excluded them, each downloadable as CSV",
+   "specific": "Results tab: Input Data Table (excluded rows marked EXCLUDED / 'Yes (IQR)' or 'Yes (Grubbs)') and Statistical Results table, each with a Download CSV button (giris_verileri.csv, istatistik_sonuclari.csv)",
+   "steps": [
+    "Open the Results tab",
+    "Read the Input Data Table and check excluded rows",
+    "Read the Statistical Results table",
+    "Press Download CSV under each table"
+   ],
+   "serves_tasks": [
+    "Download result tables",
+    "Find and drop aberrant replicate measurements"
+   ],
+   "screens": [
+    "screens/026.webp",
+    "screens/027.webp",
+    "screens/050.webp"
+   ],
+   "id": "f13"
+  },
+  {
+   "name": "PDF report builder",
+   "general": "Gather the analysed records into a formatted report document and download it",
+   "specific": "Report tab: shows 'N records ready', 📥 Generate PDF builds a ReportLab PDF, then '⬇️ Gene Expression Report' downloads gen_ekspresyon_raporu.pdf (contents not inspected in this run)",
+   "steps": [
+    "Run an analysis so records are ready",
+    "Open the Report tab and check the record count",
+    "Press Generate PDF",
+    "Press Gene Expression Report to download"
+   ],
+   "serves_tasks": [
+    "Produce a formatted report document"
+   ],
+   "screens": [
+    "screens/036.webp",
+    "screens/038.webp",
+    "screens/039.webp"
+   ],
+   "id": "f14"
+  },
+  {
+   "name": "Per-replicate distribution plot with display modes",
+   "general": "Strip plot of every replicate per group with a group-mean bar, switchable between relative quantity, normalised value and value relative to the control mean",
+   "specific": "Distribution Plot — Display Mode radio: RQ (2^-ΔCq) / ΔCq / ΔΔCq; one plot per target gene. The title and y-axis read 'ΔCq Distribution' / 'ΔCq' in every mode, and in ΔΔCq mode the replay saw Gene 2 / Gene 3 axes (0–5, 0–0.1) that do not look centred on the control mean",
+   "steps": [
+    "Pick a display mode",
+    "Inspect the replicate scatter and group means per gene"
+   ],
+   "serves_tasks": [
+    "Look at the spread of individual replicates per group"
+   ],
+   "screens": [
+    "screens/032.webp",
+    "screens/034.webp"
+   ],
+   "id": "f8",
+   "check": "replayed"
+  },
+  {
+   "name": "Demo-scenario loader",
+   "general": "Pick a named example dataset, each built to trigger one branch of the analysis, read its description, and load it into all input fields",
+   "specific": "Load Validation Scenario dropdown (S1, S2, S3, S4, S1B, S1C, S1D…), a description line, then ▶ Load Scenario fills the design counts, outlier settings, E values and Cq text areas",
+   "steps": [
+    "Open the scenario dropdown",
+    "Choose a scenario and read its description",
+    "Press Load Scenario",
+    "Go to Data Entry or Results"
+   ],
+   "serves_tasks": [
+    "Load a ready-made example dataset"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/006.webp",
+    "screens/007.webp"
+   ],
+   "id": "f9",
+   "check": "replayed"
+  },
+  {
+   "name": "Instrument-file import with group labelling",
+   "general": "Upload an exchange-format file of instrument results, preview the parsed table, map sample names to control and treatment groups by substring, and push the values into the manual entry form",
+   "specific": "Import RDML / RDES File expander: Upload, 'RDES file loaded — 24 reactions found', Preview parsed data, Step 1 Control sample names, Step 2 number of patient groups and their names; the final 'Apply RDES import to Data Entry' crashes with NameError in this build",
+   "steps": [
+    "Upload the .rdml / .tsv / .csv / .txt file",
+    "Preview the parsed reactions",
+    "Enter the control-name substrings",
+    "Set the patient-group count and name substrings"
+   ],
+   "serves_tasks": [
+    "Read an instrument export file and preview its contents"
+   ],
+   "screens": [
+    "screens/041.webp",
+    "screens/042.webp",
+    "screens/043.webp",
+    "screens/044.webp"
+   ],
+   "id": "f10",
+   "check": "not_confirmed"
+  }
+ ],
+ "screens_never_reached": [
+  "Data Entry fields filled from the RDES import: 'Apply RDES import to Data Entry' raised NameError: name 'apply_import_to_session' is not defined (app.py line 2836), screens/044.webp",
+  "Kruskal-Wallis + Dunn branch: named in the User Guide (screens/060.webp) but never triggered. (One-way ANOVA + Tukey HSD was seen by the replay for S2 Gene 3, check/screens/018.webp; however S4, whose description promises 'One-way ANOVA + Tukey HSD', went to Welch ANOVA + Games-Howell in this run, screens/058.webp)",
+  "Outlier warning in ΔCq-stage mode: I switched the stage to ΔCq on S3 but did not find where the flag appears before I ran out of actions"
+ ],
+ "not_done": [
+  "Running the analysis on the uploaded example_qpcr.rdes.txt: it parsed, but pressing '✅ Apply RDES import to Data Entry' crashed with NameError (screens/044.webp), so the README's RDES quick path cannot be completed in this build",
+  "Opening the PDF's contents: I could only confirm that a 4-page, 253 KB ReportLab PDF with embedded images downloaded (gen_ekspresyon_raporu.pdf); whether it holds fold changes, statistics, the exclusion log and the regulation call is unknown",
+  "Graded regulation categories: the UI cards showed only an Up/Down (No change) badge (screens/022.webp); the README's strong/moderate/weak thresholds (1.5/0.67 and 2/0.5) were not seen in the analysis screens",
+  "Copy-number (CNV) analysis: no separate CNV mode was found despite the title; relative CNV would use the same ΔΔCq path. The reviewer reports the sidebar points to the AbsoluteGene companion tool for dPCR CNV; that link was not opened",
+  "Plotly chart tools (zoom, pan, PNG download) and the remaining User Guide tabs (Calculations, Settings, Disclaimer) were not tried",
+  "Turkish, French, Spanish and Arabic UIs: only German was tried (screens/062.webp). Even in English, the Shapiro-Wilk-skipped note appears in Turkish (screens/022.webp)",
+  "Side effects seen: switching the efficiency method to 'Calculate from slope' and back reset the scenario's Gene 2 E values (2.103/1.952) to 2.0, so I typed them in again; downloaded file names are Turkish (giris_verileri.csv, istatistik_sonuclari.csv); the Grubbs warning shows raw 'np.float64(27.9)' text; loading S3 after S4 seemed to keep extra patient groups even though S3 is described as 1 group; the Distribution Plot keeps the 'ΔCq' title and axis in ΔΔCq mode, with odd axis ranges for Genes 2 and 3"
+ ],
+ "applied": [
+  "Split f6 into f6 (omnibus + post-hoc with Bonferroni/FDR) and f11 (multi-gene p-value correction)",
+  "Added f12 method-comparison card (ΔΔCq vs Pfaffl) with regulation badge",
+  "Added f13 result tables with CSV export and f14 PDF report builder",
+  "Corrected screens_never_reached: only Kruskal-Wallis + Dunn is unseen; ANOVA + Tukey was seen for S2 Gene 3",
+  "Updated t11 and f6 specific labels to name both omnibus branches seen",
+  "Nested t6 as an optional subtask under t5",
+  "Added the CNV note to interface and not_done",
+  "Stated that the UI shows only the Up/Down badge, not graded regulation categories (f12, not_done)",
+  "Moved the crashing RDES Apply action out of t3 and f10 steps into not_done",
+  "Recorded f8's ΔCq title/axis and odd axis range in f8 and not_done"
+ ],
+ "open_fixes": [
+  "New features f12, f13 and f14 carry no check because no feature-level replay was run on them; a second agent should replay each",
+  "Kruskal-Wallis + Dunn branch needs a dataset with non-normal data in 3 or more groups, which this run never loaded",
+  "The ΔCq-stage outlier flag needs a new run on S3 to find where it appears",
+  "PDF contents (fold change, statistics, exclusion log, regulation call) need the PDF rendered and read",
+  "Graded regulation categories need checking in the User Guide tabs and the PDF, which were not opened",
+  "The AbsoluteGene sidebar link for dPCR CNV needs a kept screen in a new run before it can be cited",
+  "The RDES import end to end can only be finished once the NameError at app.py:2836 is fixed",
+  "f8's ΔΔCq-mode axis ranges for Genes 2 and 3 need a closer look to tell whether the values are wrong"
+ ],
+ "screens_at": "pilot/public/runs/genequantify-qpcr-expression/20261031-000804/",
+ "screens_filed": {
+  "screens/005.webp": "screens/005.webp",
+  "screens/046.webp": "screens/046.webp",
+  "screens/022.webp": "screens/022.webp",
+  "screens/024.webp": "screens/024.webp"
+ }
+}

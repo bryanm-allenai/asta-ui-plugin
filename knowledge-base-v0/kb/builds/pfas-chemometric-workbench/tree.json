@@ -1,0 +1,855 @@
+{
+ "interface": {
+  "title": "Chemometric Workbench (RUO)",
+  "field": "Analytical chemistry / chemometrics (NIR-like spectra, PFAS concentration panels)",
+  "stage_of_work": "Exploratory data analysis, quality control and calibration modelling of measured analytical data",
+  "what_it_is_for": "A Streamlit app for research and training use. A chemist loads a sample-by-feature table, picks a preprocessing method and explores it with PCA. They flag outlier samples with Hotelling's T² and Q-residual limits, fit a cross-validated PLS regression to a numeric target, and check feature influence, applicability domain and uncertainty before exporting CSVs and the fitted model.",
+  "note": "The About tab (screens/042.webp) lists the methods (T² limits from the F-distribution, Q limits from Jackson-Mudholkar), a roadmap (SHAP panel, batch anomaly detection, LC-MS/MS QA module) and a governance line: research-use-only, not EPA/ISO certified."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "Most of the work used the built-in 'Synthetic spectral demo' (120 samples × 200 wavelength columns 1000–2500 nm, plus group, target and a hidden _injected_outlier column). I also regenerated it once with 180 samples and seed 8. I uploaded the test file example_pfas_panel.csv (20 samples, groups A/B, about 10 PFAS analyte columns, a missing PFOS value in S008). With the default column set it crashed (see not_done). It ran only after I cut the feature list down to PFOA, PFHxS, PFNA, PFBS and PFOS. With those, S015 was flagged as a T² outlier and S008 as a Q outlier (screens/056.webp)."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Understand the structure of a multivariate measurement dataset, find unusual samples, and build a trustworthy calibration model for a quantitative property",
+  "specific": "Run PCA, T²/Q outlier detection and PLS regression on NIR-like spectra or a PFAS panel, then export the diagnostics, predictions and model",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Bring in data and choose variables",
+    "specific": "Sidebar sections 1. Data and 2. Columns, plus the Data tab preview",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Generate a demonstration dataset with known anomalies",
+      "specific": "Use the Synthetic spectral demo, setting sample count and random seed",
+      "screens": [
+       "screens/003.webp",
+       "screens/005.webp",
+       "screens/044.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the app with 'Synthetic spectral demo' selected (default)",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Random seed + (7→8)",
+        "screens": [
+         "screens/043.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Samples slider 120→180",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Load your own measurement table",
+      "specific": "Switch Data source to Upload CSV and upload example_pfas_panel.csv",
+      "branch": "one-of",
+      "screens": [
+       "screens/045.webp",
+       "screens/054.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 'Upload CSV' radio",
+        "screens": [
+         "screens/045.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Upload and gave example_pfas_panel.csv (the default feature set then crashed; see not_done)",
+        "screens": [
+         "screens/046.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Check the loaded table before analysis",
+      "specific": "Data tab preview: first 50 rows plus Samples / Feature columns / Preprocessing metrics",
+      "screens": [
+       "screens/005.webp",
+       "screens/044.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "resized window to 1400×1600 to see the Data tab table and metrics",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "re-read the Data tab after regenerating (180 samples, seed 8)",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "n1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Choose which variables enter the analysis",
+      "specific": "Edit the Feature columns (X) multiselect (Clear all, then type or pick columns). For the uploaded panel the default set crashed; PFOA, PFHxS, PFNA, PFBS and PFOS ran. At least 3 columns are needed",
+      "screens": [
+       "screens/054.webp",
+       "screens/055.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Clear all and typed PFOA + Enter",
+        "screens": [
+         "screens/052.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "added PFHxS_ng_L and PFNA_ng_L from the dropdown",
+        "screens": [
+         "screens/053.webp",
+         "screens/054.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "added PFBS_ng_L and PFOS_ng_L",
+        "screens": [
+         "screens/055.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Choose and compare signal pretreatment",
+    "specific": "Sidebar Preprocessing select; it feeds the PCA plots, T²/Q limits and the PLS fit",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Compare how signal pretreatment changes structure and flags",
+      "specific": "Switch Preprocessing between autoscale, SNV, MSC and Savitzky-Golay 1st derivative and re-read the influence plot (Confidence limit 0.99) and score plot",
+      "branch": "repeat",
+      "screens": [
+       "screens/024.webp",
+       "screens/026.webp",
+       "screens/028.webp",
+       "screens/029.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose Preprocessing = SNV (7 flagged)",
+        "screens": [
+         "screens/022.webp",
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Preprocessing = MSC (94 flagged; implausibly high, see Q-limit caveat)",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Preprocessing = Savitzky-Golay (1st derivative) (5 flagged, all Q outliers, at 0.99 confidence)",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "returned to PCA explorer to see the SG-derivative score plot",
+        "screens": [
+         "screens/029.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Explore the structure of the data",
+    "specific": "PCA explorer tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Decide how many latent components capture the variation",
+      "specific": "Set PCA components and read the scree plot of explained and cumulative variance",
+      "screens": [
+       "screens/006.webp",
+       "screens/008.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked PCA explorer tab",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged PCA components slider 2→4",
+        "screens": [
+         "screens/008.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "See how samples group in the reduced space",
+      "specific": "Score plot with chosen X/Y components, coloured by a metadata column. Outliers get a different marker symbol from in-model points, but the symbols are not fixed: Plotly assigns them by order of appearance (in screens/013.webp outliers are circles and in-model points diamonds)",
+      "screens": [
+       "screens/010.webp",
+       "screens/014.webp",
+       "screens/031.webp",
+       "screens/059.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose Y axis = PC3",
+        "screens": [
+         "screens/009.webp",
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered an extreme score point (tooltip shows group, outlier, PC values)",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "set 'Colour points by' = _injected_outlier",
+        "screens": [
+         "screens/030.webp",
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked legend entry 'B, in-model' to hide that trace",
+        "screens": [
+         "screens/062.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "See which variables drive each component",
+      "specific": "Loading plot of chosen PCs across the feature index",
+      "screens": [
+       "screens/013.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened 'Components to show' and added PC2 (alongside PC1, PC3)",
+        "screens": [
+         "screens/011.webp",
+         "screens/013.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Find samples that need analyst review",
+    "specific": "Outlier detection tab: Hotelling's T² vs Q-residual influence plot",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Flag unusual samples against statistical control limits",
+      "specific": "Read the T²/Q plot with dashed limits, the flagged-samples count and the verdict table. Caveat: autoscale with 4 PCs flagged 116/120 demo samples (screens/016.webp) and MSC with 2 PCs 94/120 (screens/026.webp), implausible at 95%/99% confidence; the Q limit may be miscalibrated in some settings (not verified)",
+      "screens": [
+       "screens/016.webp",
+       "screens/018.webp",
+       "screens/056.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Outlier detection tab (4 PCs: 116/120 flagged, suspect)",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged PCA components back to 2 (8/120 flagged)",
+        "screens": [
+         "screens/018.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Make the flagging stricter or looser",
+      "specific": "Move the Confidence limit slider 0.95→0.99",
+      "branch": "optional",
+      "screens": [
+       "screens/020.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged Confidence limit to 0.99 (4 flagged: S061, S069, S095, S109)",
+        "screens": [
+         "screens/020.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the per-sample outlier diagnostics",
+      "specific": "Download diagnostics (CSV) → pca_outlier_diagnostics.csv (T2, T2_limit, Q, Q_limit, verdict, label)",
+      "screens": [
+       "screens/021.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Download diagnostics (CSV)",
+        "screens": [
+         "screens/021.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Build and validate a quantitative prediction model",
+    "specific": "PLS regression tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Fit a calibration model and judge its accuracy",
+      "specific": "PLS on 'target'. Shows Test RMSE/R², CV RMSE/R², train RMSE and MAE, predicted-vs-actual and residual plots",
+      "screens": [
+       "screens/032.webp",
+       "screens/057.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked PLS regression tab",
+        "screens": [
+         "screens/032.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Target column (y) dropdown (only 'target' offered)",
+        "screens": [
+         "screens/039.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Choose model complexity by cross-validation",
+      "specific": "Read the CV RMSE vs PLS components sweep and set the PLS components slider to the minimum",
+      "screens": [
+       "screens/033.webp",
+       "screens/036.webp",
+       "screens/040.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to the CV RMSE component sweep (minimum at 2)",
+        "screens": [
+         "screens/033.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged PLS components 3→2 (CV RMSE 0.978→0.773)",
+        "screens": [
+         "screens/036.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Change the validation scheme",
+      "specific": "Move Test fraction 0.20→0.30 and CV folds 5→10",
+      "branch": "optional",
+      "screens": [
+       "screens/038.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged Test fraction to 0.30",
+        "screens": [
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged CV folds to 10",
+        "screens": [
+         "screens/038.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Identify which measured variables drive the prediction",
+      "specific": "Bar chart of standardized |PLS coefficient| with a 'Top influential features' slider, plus a CSV export",
+      "screens": [
+       "screens/033.webp",
+       "screens/041.webp",
+       "screens/058.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged Top influential features 20→10",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download feature influence (CSV)",
+        "screens": [
+         "screens/034.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Decide which predictions can be trusted",
+      "specific": "Applicability domain (Mahalanobis vs leverage with limits, in/out-of-domain counts) and uncertainty levels LOW/MEDIUM/HIGH with Review required count",
+      "screens": [
+       "screens/034.webp",
+       "screens/058.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Applicability domain and Uncertainty sections (114 in, 6 out; 6 review required)",
+        "screens": [
+         "screens/034.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled the same sections for the uploaded PFAS panel (18 in, 2 out, 2 HIGH)",
+        "screens": [
+         "screens/058.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Export predictions and the fitted model",
+      "specific": "Download PLS predictions (CSV), PLS model (PKL), and the consolidated predictions + AD + uncertainty CSV",
+      "screens": [
+       "screens/034.webp",
+       "screens/040.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Download PLS predictions + AD + uncertainty (CSV)",
+        "screens": [
+         "screens/034.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download PLS model (PKL)",
+        "screens": [
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download PLS predictions (CSV)",
+        "screens": [
+         "screens/040.webp"
+        ]
+       }
+      ],
+      "id": "t16",
+      "check": "not_confirmed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Preprocessing selector that drives the whole analysis",
+   "general": "Pick a signal pretreatment from a list and see every downstream plot, flag and model metric recomputed, so methods can be compared side by side",
+   "specific": "Sidebar 'Preprocessing' select (none, mean-center, autoscale, SNV, MSC, Savitzky-Golay smooth, Savitzky-Golay 1st derivative). It feeds the scree, score and loading plots, the T²/Q limits and the PLS fit",
+   "steps": [
+    "open the Preprocessing dropdown",
+    "choose a method (e.g. SNV)",
+    "read the flagged-sample count and influence plot",
+    "switch to another method (MSC, SG derivative) and compare"
+   ],
+   "serves_tasks": [
+    "Compare how signal pretreatment changes structure and flags",
+    "Flag unusual samples against statistical control limits",
+    "Fit a calibration model and judge its accuracy"
+   ],
+   "screens": [
+    "screens/022.webp",
+    "screens/024.webp",
+    "screens/026.webp",
+    "screens/028.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Scree plot with component-count slider",
+   "general": "Choose how many components to keep and see explained and cumulative variance per component",
+   "specific": "'PCA components' slider (2–10) plus the 'Explained variance (scree)' bar+line chart. The component count also sets the T²/Q limits and the score-axis choices",
+   "steps": [
+    "drag PCA components slider",
+    "read explained bars and cumulative line",
+    "watch the effect on the outlier tab"
+   ],
+   "serves_tasks": [
+    "Decide how many latent components capture the variation",
+    "Flag unusual samples against statistical control limits"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/008.webp",
+    "screens/016.webp",
+    "screens/018.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Interactive score plot with axis pickers, colour-by and outlier markers",
+   "general": "Scatter samples on any two latent components, colour them by a metadata column, mark flagged samples with a distinct symbol, hover for details and toggle groups via the legend",
+   "specific": "Score plot with X axis/Y axis selects, sidebar 'Colour points by' ((none), sample_id, group, target, _injected_outlier). Outliers and in-model points get different marker symbols, assigned by Plotly in order of appearance rather than fixed (in screens/013.webp outliers are circles, in-model points diamonds); check the legend. Plotly legend toggles hide groups",
+   "steps": [
+    "choose X and Y components",
+    "choose a colour-by column",
+    "hover a point to see group, outlier status and scores",
+    "click a legend entry to hide that group"
+   ],
+   "serves_tasks": [
+    "See how samples group in the reduced space"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/013.webp",
+    "screens/014.webp",
+    "screens/031.webp",
+    "screens/062.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Multi-component loading line plot",
+   "general": "Overlay the loadings of selected components across all variables to see which regions of the signal drive each component",
+   "specific": "Loading plot with 'Components to show' multiselect (defaults to the score-plot axes). Lines of loading against feature index",
+   "steps": [
+    "open Components to show",
+    "add or remove PCs (Select all available)",
+    "compare loading profiles"
+   ],
+   "serves_tasks": [
+    "See which variables drive each component"
+   ],
+   "screens": [
+    "screens/011.webp",
+    "screens/013.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "T² vs Q influence plot with control limits and flagged table",
+   "general": "Plot each sample's distance within the model against its distance from the model, draw statistical limits at a chosen confidence, list the flagged samples with a verdict and export them",
+   "specific": "Hotelling's T² vs Q-residual (SPE) scatter with red dashed limits (F-distribution / Jackson-Mudholkar). Points coloured by verdict (in-model, Q outlier, T2 outlier, T2+Q outlier). Shows Flagged/Total metrics, a 'Flagged samples (suggested review)' table and 'Download diagnostics (CSV)'. Caveat: some settings flag most samples (116/120 with autoscale and 4 PCs, 94/120 with MSC and 2 PCs), so the Q limit may be miscalibrated; treat such counts with suspicion",
+   "steps": [
+    "open Outlier detection tab",
+    "set the Confidence limit slider (0.90–0.99)",
+    "read the verdict colours and flagged table",
+    "download pca_outlier_diagnostics.csv"
+   ],
+   "serves_tasks": [
+    "Flag unusual samples against statistical control limits",
+    "Make the flagging stricter or looser",
+    "Export the per-sample outlier diagnostics"
+   ],
+   "screens": [
+    "screens/018.webp",
+    "screens/020.webp",
+    "screens/021.webp",
+    "screens/056.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "PLS calibration panel with train/test/CV metrics",
+   "general": "Fit a latent-variable regression with a held-out test set and k-fold cross-validation, then inspect predicted vs actual and residuals",
+   "specific": "PLS regression tab with Target column (y), Test fraction, CV folds, Random state and PLS components controls. Test RMSE/R², CV RMSE/R² metrics, predicted-vs-actual and residual plots (train/test coloured), predictions table with cv_oof rows",
+   "steps": [
+    "choose the target column",
+    "set test fraction and CV folds",
+    "set the number of PLS components",
+    "read the metrics and the parity and residual plots"
+   ],
+   "serves_tasks": [
+    "Fit a calibration model and judge its accuracy",
+    "Change the validation scheme"
+   ],
+   "screens": [
+    "screens/032.webp",
+    "screens/036.webp",
+    "screens/038.webp",
+    "screens/057.webp"
+   ],
+   "id": "f6",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Cross-validated component sweep",
+   "general": "Plot cross-validation error against model complexity and mark the current choice, to pick the number of components",
+   "specific": "CV RMSE vs PLS components (1–20) line chart with a dotted marker at the slider value",
+   "steps": [
+    "read where CV RMSE is lowest",
+    "drag PLS components to that value",
+    "check that the marker moves and CV metrics improve"
+   ],
+   "serves_tasks": [
+    "Choose model complexity by cross-validation"
+   ],
+   "screens": [
+    "screens/033.webp",
+    "screens/040.webp"
+   ],
+   "id": "f7",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Coefficient-based feature influence ranking",
+   "general": "Rank input variables by the size of their standardized model coefficients, show the top N as bars and export the full ranking",
+   "specific": "'Model explainability (PLS coefficient influence)' horizontal bar chart with a 'Top influential features' slider (5–40) and 'Download feature influence (CSV)' (feature, coef, abs_coef, std_abs_coef, rank)",
+   "steps": [
+    "drag the Top influential features slider",
+    "read the ranked bars",
+    "download pls_feature_influence.csv"
+   ],
+   "serves_tasks": [
+    "Identify which measured variables drive the prediction"
+   ],
+   "screens": [
+    "screens/033.webp",
+    "screens/041.webp",
+    "screens/058.webp"
+   ],
+   "id": "f8",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Applicability domain and uncertainty review flags with consolidated export",
+   "general": "Mark each prediction as inside or outside the model's training domain (distance and leverage limits), give it an uncertainty level, count those needing review and export everything in one table",
+   "specific": "Applicability domain (Mahalanobis vs leverage scatter with limits, In-domain/Out-of-domain metrics) and 'Uncertainty and review flags' (LOW/MEDIUM/HIGH counts, bar chart, Review required). 'Download PLS predictions + AD + uncertainty (CSV)' writes pls_predictions_with_ad_uncertainty.csv",
+   "steps": [
+    "read in/out-of-domain counts and scatter",
+    "read the uncertainty level counts and Review required",
+    "download the consolidated CSV"
+   ],
+   "serves_tasks": [
+    "Decide which predictions can be trusted",
+    "Export predictions and the fitted model"
+   ],
+   "screens": [
+    "screens/034.webp",
+    "screens/058.webp"
+   ],
+   "id": "f9",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Data source switch with synthetic generator or CSV upload",
+   "general": "Start from either a reproducible synthetic dataset with planted anomalies (size and seed adjustable) or your own uploaded table, and preview it before analysis",
+   "specific": "'Data source' radio (Synthetic spectral demo / Upload CSV), Samples slider (40–300), Random seed stepper, CSV uploader, Data tab preview (first 50 rows plus Samples/Feature columns/Preprocessing metrics)",
+   "steps": [
+    "choose a data source",
+    "set samples/seed or upload a CSV",
+    "check the Data tab preview"
+   ],
+   "serves_tasks": [
+    "Generate a demonstration dataset with known anomalies",
+    "Load your own measurement table",
+    "Check the loaded table before analysis"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/044.webp",
+    "screens/045.webp"
+   ],
+   "id": "f10",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Feature column picker",
+   "general": "Choose which measured variables enter the analysis by clearing the list and typing or picking column names",
+   "specific": "Sidebar 'Feature columns (X)' multiselect with chips, Clear all and type-to-filter dropdown. Needs at least 3 columns; also lists 'target', which would leak y into X",
+   "steps": [
+    "press Clear all (or remove chips)",
+    "type a column name and press Enter",
+    "add further columns from the dropdown"
+   ],
+   "serves_tasks": [
+    "Choose which variables enter the analysis"
+   ],
+   "screens": [
+    "screens/052.webp",
+    "screens/053.webp",
+    "screens/054.webp",
+    "screens/055.webp"
+   ],
+   "id": "f11",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Prediction and fitted-model export",
+   "general": "Save the model's predictions as a table and the fitted model itself as a file for reuse elsewhere",
+   "specific": "'Download PLS predictions (CSV)' and 'Download PLS model (PKL)' buttons on the PLS regression tab",
+   "steps": [
+    "fit the PLS model with the chosen settings",
+    "press Download PLS predictions (CSV)",
+    "press Download PLS model (PKL)"
+   ],
+   "serves_tasks": [
+    "Export predictions and the fitted model"
+   ],
+   "screens": [
+    "screens/040.webp"
+   ],
+   "id": "f12",
+   "check": "not_confirmed"
+  }
+ ],
+ "screens_never_reached": [
+  "Uploaded-panel analysis with all default feature columns: every run ended in a ValueError traceback (screens/046.webp, screens/049.webp, screens/051.webp) despite the 'filling with column means' warning",
+  "Score-plot box zoom: a drag on the Plotly score plot did not zoom (screens/060.webp). The legend toggle did work"
+ ],
+ "not_done": [
+  "Upload path with the default features crashed. After uploading example_pfas_panel.csv the app warned 'filling with column means' but raised 'array must not contain infs or NaNs' (Savitzky-Golay) and then 'Input X contains NaN' (PCA, mean-center). Removing PFOS_ng_L alone did not fix it (screens/051.webp). A reduced set (PFOA, PFHxS, PFNA, PFBS, PFOS) ran, which suggests a different column also holds missing or non-numeric values that the mean-fill does not handle",
+  "After switching to Upload CSV, the sidebar Preprocessing box showed 'autoscale', but the traceback shows the run used Savitzky-Golay 1st derivative carried over from the demo session (screens/046.webp)",
+  "With fewer than 3 feature columns the app crashes with StreamlitInvalidMinMaxError, because the PCA components slider gets min=max=2 (screens/052.webp, screens/053.webp)",
+  "The Q-residual limit looks miscalibrated in some settings. Autoscale with 4 PCs flagged 116 of 120 demo samples (screens/016.webp) and MSC with 2 PCs flagged 94 of 120 (screens/026.webp). Both are implausible at the stated 95%/99% confidence. I did not check whether the limit formula is at fault (also shown as a caveat on t7 and f5)",
+  "'target' is offered as a selectable feature column for the uploaded panel (screens/052.webp), which would leak y into X. I did not try fitting with it",
+  "In the consolidated CSV, pi_half_width is the same value (1.92) for every sample, so 'per-sample uncertainty' seems to come from residual size rather than a sample-specific interval. Seen only in the download text",
+  "Target column (y) offered only 'target' for both datasets, so I could not try a second target",
+  "I did not read the downloaded PKL model (binary), and did not load it back anywhere",
+  "I did not try 'none', 'mean-center' or 'Savitzky-Golay (smooth)' preprocessing on the synthetic data, or the Random state stepper on the PLS tab",
+  "I did not check whether the 5 Q outliers flagged under Savitzky-Golay 1st derivative (screens/028.webp) match the _injected_outlier samples",
+  "The help (?) tooltips for Data source and Feature columns returned no text on hover"
+ ],
+ "applied": [
+  "t5 and f3: replaced 'outliers drawn as diamonds' with 'distinct, non-fixed marker symbol', citing screens/013.webp (added to f3 screens)",
+  "t9 SG-derivative action relabelled to '5 flagged, all Q outliers, at 0.99 confidence'; dropped the unverified 'injected Q/T² samples' claim and logged it in not_done",
+  "Moved t9 (preprocessing comparison) into a new phase 'Choose and compare signal pretreatment' after the data phase",
+  "Dropped the About-tab phase (t17) and moved its content into an interface note",
+  "Added task n1 'Check the loaded table before analysis' (screens/005.webp, screens/044.webp), moving the resize/Data-tab action out of t1; check set to replayed because the replay of t1 read the Data tab preview",
+  "Removed the dead-end 'removed PFOS_ng_L chip (still crashed)' action from t3 and stripped crash outcomes from t3 action labels (crashes already in not_done); clarified the t2 upload action",
+  "Split the feature-column picker out of f10 into new feature f11; trimmed f10 to the data source, generator, upload and preview",
+  "Added feature f12 for prediction CSV + PKL model export",
+  "Added a Q-limit miscalibration caveat (116/120, 94/120) to t7 and f5 specifics and flagged the MSC count in t9"
+ ],
+ "open_fixes": [
+  "Add a task for reading the per-sample predictions/residuals table (train/test/cv_oof rows): no kept screen is confirmed to show that table, so a new run should scroll to it and keep a screenshot",
+  "Compare how preprocessing changes the PLS fit: the run never compared PLS metrics across preprocessing methods",
+  "Record missing-value mean-fill as a step or feature: on the only upload the mean-fill warning appeared but the run crashed, so a new run needs a dataset where the fill works and should find which column defeats it",
+  "Verify whether the SG-derivative flags in screens/028.webp match _injected_outlier: needs reading the diagnostics CSV or colouring by _injected_outlier under that setting",
+  "Verify the Q-limit calibration (116/120 and 94/120 flagged): needs targeted tests or a look at the limit formula, which this run did not do"
+ ],
+ "screens_at": "pilot/public/runs/pfas-chemometric-workbench/20261101-093046/",
+ "screens_filed": {
+  "screens/003.webp": "screens/003.webp",
+  "screens/024.webp": "screens/024.webp",
+  "screens/006.webp": "screens/006.webp",
+  "screens/016.webp": "screens/016.webp",
+  "screens/032.webp": "screens/032.webp"
+ }
+}

@@ -1,0 +1,696 @@
+{
+ "interface": {
+  "title": "ATP Fatigue Forecaster",
+  "field": "Sports science / sports analytics (professional tennis, fatigue and performance prediction)",
+  "stage_of_work": "Testing a hypothesis and validating the model: checking whether fatigue features from match scheduling add predictive signal beyond ranking, and exploring single-match predictions",
+  "what_it_is_for": "Test whether court-time load (rolling 7/14/28-day minutes, rest days) improves ATP match-outcome prediction over ranking alone, using a calibrated gradient-boosting model with baselines, a staged ablation, per-matchup what-if curves and a separate in-match score-state win-probability model."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "UNVERIFIED BY REPLAY: a second agent tried to repeat every task and feature and confirmed none of them. Its server never finished training and stayed on 'Engineering real rolling physiological features...' / 'Training calibrated Gradient Boosting model...' for its whole run (check/screens/002.webp, check/screens/003.webp, check/screens/006.webp). Everything below rests on one exploration only. START-UP: there is no upload. The dataset loads and the models train on page load. In this run that took about 5 minutes, not seconds. The explorer opened http://127.0.0.1:8501/ and waited through 'Loading ATP match history', 'Engineering real rolling physiological features', 'Training calibrated Gradient Boosting model', 'Running baseline comparisons and ablation study' and 'Building player stats index' (screens/005.webp, screens/007.webp, screens/015.webp). It then reopened http://localhost:8501/ and waited until the six tabs rendered (screens/016.webp, screens/020.webp, screens/023.webp). DATA MISMATCH: the plan describes a small synthetic set (about 560 matches, 24 players). The pre-match data in this run did not match that. It showed real ATP names (Jannik Sinner #1, Carlos Alcaraz #2), 414 players in the selector, 'Data current through December 18, 2024', and a test set large enough for a 5-step ablation. The in-match tab did use the tiny seed: 'Matches Trained On 8', 'Points Trained On 51', Model AUC 0.990. The reviewer's likely explanation is that run_local.py replaces local files only for 2019–2023 and fetches other years over the network, so the pre-match data was probably downloaded live while the in-match model used the 8-match seed. The browser could not show which CSVs were actually loaded, so this explanation is unconfirmed. Every number quoted in this tree (probabilities, AUCs, accuracies, feature gains, ablation deltas) is an output of this one run on this uncertain data. None of them is a reported result of the tool or of the study."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Find out whether accumulated workload predicts competitive outcomes better than a static strength rating, and probe single-match predictions",
+  "specific": "Test whether rolling court-time load and rest add AUC over ATP ranking, then use the pre-match and in-match models on specific matchups and score lines (the leak-check goal stays open: its diagnostic goes only to the server log)",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Predict one contest and test what-if changes",
+    "specific": "Match Inference tab with the MATCH SETUP sidebar",
+    "children": [
+     {
+      "kind": "phase",
+      "general": "Supply the two competitors' inputs, either from records or as a hand-built hypothetical case",
+      "specific": "Input mode radio: Player Lookup or Manual Entry",
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "phase",
+        "general": "Draw both competitors from the records",
+        "specific": "Player Lookup mode",
+        "children": [
+         {
+          "kind": "task",
+          "general": "Pick two competitors from the records and get a predicted winner with an explanation",
+          "specific": "Player Lookup: select Player 1 and Player 2, press Run Inference, read the win probability, confidence and narrative (this run: Sinner 69.8% on Hard)",
+          "screens": [
+           "screens/026.webp",
+           "screens/028.webp"
+          ],
+          "children": [
+           {
+            "kind": "action",
+            "label": "typed 'Sinner' into Select Player 1 and pressed Enter",
+            "screens": [
+             "screens/025.webp"
+            ]
+           },
+           {
+            "kind": "action",
+            "label": "typed 'Alcaraz' into Select Player 2 and pressed Enter",
+            "screens": [
+             "screens/026.webp"
+            ]
+           },
+           {
+            "kind": "task",
+            "general": "Read the pair's shared record and each competitor's current strength, freshness, form and recovery profile",
+            "specific": "All-time H2H box (0–3, Alcaraz leads) after both players are chosen. Pre-Match Analysis cards and the radar of Ranking Power, Physical Freshness, Current Form and Recovery. The radar is recorded on screens/028.webp, after Run Inference; no kept screen shows the cards on their own before inference.",
+            "screens": [
+             "screens/026.webp",
+             "screens/028.webp"
+            ],
+            "children": [
+             {
+              "kind": "action",
+              "label": "read the H2H box that appeared after Player 2 was chosen",
+              "screens": [
+               "screens/026.webp"
+              ]
+             },
+             {
+              "kind": "action",
+              "label": "read the Pre-Match Analysis cards and the radar chart",
+              "screens": [
+               "screens/028.webp"
+              ]
+             }
+            ],
+            "id": "n1"
+           },
+           {
+            "kind": "action",
+            "label": "pressed Run Inference",
+            "screens": [
+             "screens/028.webp"
+            ]
+           }
+          ],
+          "id": "t2",
+          "check": "not_confirmed"
+         },
+         {
+          "kind": "task",
+          "general": "Repeat the prediction under a different condition",
+          "specific": "Change Surface from Hard to Clay and run again (this run: Sinner 69.8% on Hard → 68.5% on Clay, with an added surface-factor note)",
+          "screens": [
+           "screens/031.webp"
+          ],
+          "branch": "repeat",
+          "children": [
+           {
+            "kind": "action",
+            "label": "chose Clay in the Surface dropdown",
+            "screens": [
+             "screens/030.webp"
+            ]
+           },
+           {
+            "kind": "action",
+            "label": "pressed Run Inference",
+            "screens": [
+             "screens/031.webp"
+            ]
+           }
+          ],
+          "id": "t3",
+          "check": "not_confirmed"
+         }
+        ]
+       },
+       {
+        "kind": "task",
+        "general": "Enter hypothetical competitor profiles by hand and change one fatigue variable",
+        "specific": "Manual Entry: set ranks and the load/rest/form/H2H sliders for P1 and P2, run inference, then move P2 Rest Days and run again (this run: P1 went from 56.5% to 60.9% when P2 Rest Days went from 1 to 15)",
+        "screens": [
+         "screens/033.webp",
+         "screens/035.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "selected the Manual Entry radio",
+          "screens": [
+           "screens/032.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "pressed Run Inference with the default manual values",
+          "screens": [
+           "screens/033.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "dragged the P2 Rest Days slider from 1 to 15",
+          "screens": [
+           "screens/034.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "pressed Run Inference",
+          "screens": [
+           "screens/035.webp"
+          ]
+         }
+        ],
+        "id": "t5",
+        "check": "not_confirmed"
+       }
+      ]
+     },
+     {
+      "kind": "task",
+      "general": "Read automatic what-if curves for recovery and workload",
+      "specific": "Counterfactual Analysis · What-If Simulator: P(Player 1 wins) against additional rest days (0–14) and against the opponent's 28-day court minutes (0–1200) (this run: flat rest curve, +0.00% recovery upside, 10.33% load swing)",
+      "screens": [
+       "screens/029.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to the Counterfactual Analysis section after Run Inference",
+        "screens": [
+         "screens/029.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Validate the model against simpler alternatives",
+    "specific": "Model Performance and Ablation Study tabs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Compare the full model with naive baselines on held-out data",
+      "specific": "Model Performance (this run): test accuracy 62.54%, ROC-AUC 0.676, Brier 0.225, log loss 0.640; head-to-head table against Higher-Rank Wins, Rank-Only Logistic and Elo-Style; lift +0.035 AUC (+5.4%)",
+      "screens": [
+       "screens/037.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the MODEL PERFORMANCE tab",
+        "screens": [
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the Brier Score help icon",
+        "screens": [
+         "screens/037.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Check discrimination and calibration plots",
+      "specific": "ROC curves for the full model against the baselines, and the Model Calibration reliability diagram",
+      "screens": [
+       "screens/038.webp",
+       "screens/039.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to the ROC Curves and Model Calibration charts",
+        "screens": [
+         "screens/038.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the 'Full Model' legend entry on the ROC chart (a hint appeared: 'Double-click on legend to isolate one trace')",
+        "screens": [
+         "screens/039.webp",
+         "screens/040.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "See which inputs drive the predictions",
+      "specific": "Feature Importance, top 10 by GBM gain (this run): P2 Rank 0.133, P1 Rank 0.117, opponent quality, H2H, then the load features (P2 Load 14d 0.043, P1 Load 28d 0.043, P2 Load 7d 0.037)",
+      "screens": [
+       "screens/040.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Feature Importance",
+        "screens": [
+         "screens/040.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Measure how much each added group of inputs improves the model",
+      "specific": "Ablation Study: bar chart and table of test AUC as groups are added (this run: Ranking only 0.6549 → +Physiological Load 0.6691 (+0.0142) → +Form 0.6854 → +H2H+Quality 0.6866 → Full 0.6835), then the HYPOTHESIS RESULT panel. The +0.0142 load lift comes from a single train/test run and is not a significance test. The README warns that one AUC run cannot test the hypothesis and uses 21 seeds and a bootstrap in stability_test.py, which this run did not do.",
+      "screens": [
+       "screens/042.webp",
+       "screens/043.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the ABLATION STUDY tab",
+        "screens": [
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the step table and the Hypothesis Result panel",
+        "screens": [
+         "screens/043.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Read the background and methods",
+    "specific": "Key Findings and Methodology tabs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Read the literature findings behind the features",
+      "specific": "Key Findings: review abstract, the Velocity-Accuracy Paradox chart and the 5-stage Precision Degradation Cascade",
+      "screens": [
+       "screens/044.webp",
+       "screens/045.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the KEY FINDINGS tab",
+        "screens": [
+         "screens/044.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the cascade stages",
+        "screens": [
+         "screens/045.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Check how features were built and how the model was validated",
+      "specific": "Methodology: feature definitions (load, surface-weighted load, round-weighted load, H2H, opponent quality, recovery, form, surface); chronological 80/20 hold-out, 5-fold CV, baselines, ablation; data source (Sackmann fork pinned at commit 6b9482f)",
+      "screens": [
+       "screens/046.webp",
+       "screens/047.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the METHODOLOGY tab",
+        "screens": [
+         "screens/046.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to Validation and Data Source",
+        "screens": [
+         "screens/047.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Estimate win probability from the current score state",
+    "specific": "In-Match Win Probability tab (trained on the 8-match seed in this run, so its outputs are degenerate)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Check how reliable the score-state model is",
+      "specific": "Read Model AUC 0.990, Matches Trained On 8, Points Trained On 51. With 8 matches and 51 points, the model is degenerate and overfit. Its AUC is not comparable with the README's real-data figure of about 0.81.",
+      "screens": [
+       "screens/048.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the IN-MATCH WIN PROBABILITY tab",
+        "screens": [
+         "screens/048.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Enter the current score state of a contest and read the win probability",
+      "specific": "Set match format, server, sets and games, and the approx. point-number slider, then read Current Win Probability. Across five states in this run, the leading side was always given 98–99.9%. This shows the controls respond, not that the probabilities mean anything.",
+      "screens": [
+       "screens/049.webp",
+       "screens/050.webp",
+       "screens/051.webp",
+       "screens/052.webp",
+       "screens/055.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed + on P2 Sets won",
+        "screens": [
+         "screens/050.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected the 'Player 2' serving radio and pressed − on P2 Games",
+        "screens": [
+         "screens/051.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed − on P1 Sets won and selected Best of 5",
+        "screens": [
+         "screens/052.webp",
+         "screens/054.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed + on P1 Sets won and dragged 'Approx. point number in match' from 80 to 241",
+        "screens": [
+         "screens/055.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "See how the probability changes across one progress variable",
+      "specific": "'How Win Probability Shifts as P1 Wins More Games': P(P1 wins) for 0–6 games in the current set, with sets and server held fixed and the current game count marked. On the 8-match seed the reviewer found the trajectory near-zero and degenerate, so this shows the chart works, not a real effect.",
+      "screens": [
+       "screens/053.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to the trajectory chart",
+        "screens": [
+         "screens/053.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "not_confirmed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Two-entity comparison picker with history badge and radar profile",
+   "general": "Pick two items from a searchable list, see a summary of their shared history and a radar chart comparing their normalised attributes, then run a prediction on the pair",
+   "specific": "Choose Player 1 and Player 2 in the searchable selectboxes; an all-time H2H box appears (e.g. 0–3 Alcaraz leads); the Pre-Match Analysis cards and the radar of Ranking Power, Physical Freshness, Current Form and Recovery show the pair; press Run Inference",
+   "steps": [
+    "type part of a name into Select Player 1 and press Enter",
+    "type the second name into Select Player 2",
+    "read the H2H badge and the radar chart",
+    "optionally change Surface",
+    "press Run Inference"
+   ],
+   "serves_tasks": [
+    "Pick two competitors from the records and get a predicted winner with an explanation",
+    "Read the pair's shared record and each competitor's current strength, freshness, form and recovery profile",
+    "Repeat the prediction under a different condition"
+   ],
+   "screens": [
+    "screens/025.webp",
+    "screens/026.webp",
+    "screens/028.webp",
+    "screens/031.webp"
+   ],
+   "id": "f1",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Plain-language prediction explanation",
+   "general": "Turn one prediction's inputs into a short paragraph of reasons for the predicted winner, which updates when a condition changes",
+   "specific": "Narrative under the win probability and confidence after Run Inference: reasons such as load gap, rest advantage, H2H and strength of schedule; a surface-factor note is added when Surface changes (Hard → Clay)",
+   "steps": [
+    "run an inference",
+    "read the narrative paragraph under the probability",
+    "change one condition (e.g. Surface)",
+    "run again and compare the reasons"
+   ],
+   "serves_tasks": [
+    "Pick two competitors from the records and get a predicted winner with an explanation",
+    "Repeat the prediction under a different condition"
+   ],
+   "screens": [
+    "screens/028.webp",
+    "screens/031.webp"
+   ],
+   "id": "f7",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Lookup / manual-entry input mode switch with parameter sliders",
+   "general": "Switch between drawing a case's inputs from records and typing in a hypothetical case with sliders, then predict and adjust one input at a time",
+   "specific": "Choose Player Lookup or Manual Entry; Manual Entry shows name boxes, rank number fields and sliders per player (28d/7d/14d load, matches in 7d, rest days, Win% over 10 and 20, tourney matches and minutes, H2H win %, avg opponent rank beaten); press Run Inference, move a slider, run again",
+   "steps": [
+    "select the Manual Entry radio",
+    "set ranks and drag the load/rest/form sliders",
+    "press Run Inference",
+    "change one slider (e.g. P2 Rest Days 1→15)",
+    "press Run Inference again and compare"
+   ],
+   "serves_tasks": [
+    "Enter hypothetical competitor profiles by hand and change one fatigue variable"
+   ],
+   "screens": [
+    "screens/032.webp",
+    "screens/033.webp",
+    "screens/034.webp",
+    "screens/035.webp"
+   ],
+   "id": "f2",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "One-variable sensitivity sweep curves",
+   "general": "Hold everything else fixed, sweep one input across a range, and plot the model's output with the current value marked and a summary of the swing",
+   "specific": "Counterfactual Analysis · What-If Simulator: P(Player 1 wins) against 0–14 extra rest days, and against the opponent's 28-day court minutes (0–1200) with the actual value marked; text gives the maximum recovery upside and the load swing (this run: +0.00% and 10.33%)",
+   "steps": [
+    "run an inference",
+    "scroll to the What-If Simulator",
+    "read the rest-day curve against the 'Current' dashed line",
+    "read the load curve and the 'Actual' marker",
+    "read the swing summary below each chart"
+   ],
+   "serves_tasks": [
+    "Read automatic what-if curves for recovery and workload",
+    "Enter hypothetical competitor profiles by hand and change one fatigue variable"
+   ],
+   "screens": [
+    "screens/029.webp",
+    "screens/033.webp",
+    "screens/035.webp"
+   ],
+   "id": "f3",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Model vs baselines scorecard with ROC overlay and reliability diagram",
+   "general": "Compare a trained model with simple rules on the same held-out data: a metric strip, a comparison table, a lift callout, overlaid ROC curves with toggleable legend, and a calibration plot",
+   "specific": "Model Performance tab: accuracy, ROC-AUC, CV AUC, Brier and log loss tiles; Head-to-Head Comparison table (Full GBM, Higher-Rank Wins, Rank-Only Logistic, Elo-Style); 'Lift over best baseline' callout; ROC chart whose legend entries hide or isolate traces; Model Calibration chart",
+   "steps": [
+    "open the Model Performance tab",
+    "read the metric tiles and the help tooltips",
+    "compare rows in the head-to-head table",
+    "click legend entries on the ROC chart to hide or isolate models",
+    "check the calibration curve against the diagonal"
+   ],
+   "serves_tasks": [
+    "Compare the full model with naive baselines on held-out data",
+    "Check discrimination and calibration plots"
+   ],
+   "screens": [
+    "screens/037.webp",
+    "screens/038.webp",
+    "screens/039.webp"
+   ],
+   "id": "f4",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Ranked input-importance list",
+   "general": "List the model's top inputs, one row each, ranked by their contribution score, so the weight of the inputs under test can be set against the weight of the baseline inputs",
+   "specific": "Feature Importance chart on the Model Performance tab: top 10 features by GBM gain (rank features first, then opponent quality, H2H and the 7/14/28-day load features)",
+   "steps": [
+    "open the Model Performance tab",
+    "scroll to Feature Importance",
+    "read the bars in order of gain",
+    "compare the load features' gain with the rank features' gain"
+   ],
+   "serves_tasks": [
+    "See which inputs drive the predictions"
+   ],
+   "screens": [
+    "screens/040.webp"
+   ],
+   "id": "f8",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Staged feature-group ablation chart with verdict",
+   "general": "Add input groups one at a time, retrain, and show the held-out score at each step as bars against a baseline line, with a table of deltas and a pass/fail statement for the hypothesis",
+   "specific": "Ablation Study tab: Test AUC bars for Ranking only → +Physiological Load → +Form → +H2H+Quality → Full, a dashed ranking-only line, a step table (Features, AUC, Δ vs Prev, Accuracy, What Was Added) and a HYPOTHESIS RESULT box (single run, no significance test)",
+   "steps": [
+    "open the Ablation Study tab",
+    "read the bars against the ranking-only line",
+    "read Δ vs Prev in the table",
+    "read the Hypothesis Result verdict"
+   ],
+   "serves_tasks": [
+    "Measure how much each added group of inputs improves the model"
+   ],
+   "screens": [
+    "screens/042.webp",
+    "screens/043.webp"
+   ],
+   "id": "f5",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Literature effect-size comparison chart",
+   "general": "Set effects reported in the background literature against each other in one chart, next to a staged account of how the effect develops, as motivation for the model's inputs",
+   "specific": "Key Findings tab: the Velocity-Accuracy Paradox chart and the 5-stage Precision Degradation Cascade below it",
+   "steps": [
+    "open the Key Findings tab",
+    "read the Velocity-Accuracy Paradox chart",
+    "scroll to the cascade stages"
+   ],
+   "serves_tasks": [
+    "Read the literature findings behind the features"
+   ],
+   "screens": [
+    "screens/044.webp",
+    "screens/045.webp"
+   ],
+   "id": "f9",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Contest-progress probability calculator with progress trace",
+   "general": "Enter the current state of a contest's progress with steppers, radios and a slider, get the win probability at that point with a sentence explaining it, and see a curve of how it moves along one progress variable",
+   "specific": "In-Match Win Probability tab: Match format (Best of 3/5), Who is serving, P1/P2 Sets won and Games steppers, Approx. point number slider; Current Win Probability bar and sentence; 'How Win Probability Shifts as P1 Wins More Games' chart over 0–6 games",
+   "steps": [
+    "choose the match format and the server",
+    "set sets and games with the +/− steppers",
+    "drag the point-number slider",
+    "read the current win probability and sentence",
+    "read the trajectory chart with the 'Current' marker"
+   ],
+   "serves_tasks": [
+    "Enter the current score state of a contest and read the win probability",
+    "See how the probability changes across one progress variable"
+   ],
+   "screens": [
+    "screens/049.webp",
+    "screens/050.webp",
+    "screens/052.webp",
+    "screens/053.webp",
+    "screens/055.webp"
+   ],
+   "id": "f6",
+   "check": "not_confirmed"
+  }
+ ],
+ "screens_never_reached": [
+  "Leak-check diagnostic (mean feature values by outcome): the notes say it is written to the server console log. Nothing in the web UI shows it, so a browser cannot reach it.",
+  "How the app handled the seeded edge-case rows (the 340-minute outlier, the missing winner_rank, the 15-minute retirement, the rank-450 qualifier upset): no view lists individual matches or dropped rows, and the loaded pre-match data did not look like the small synthetic set those rows belong to."
+ ],
+ "not_done": [
+  "No replay confirmation: the second agent's server stalled in training (check/screens/006.webp), so all tasks and features are not_confirmed and the tree is filed as unverified by replay.",
+  "Did not press 'Clear Cache & Retrain', which rebuilds the model on fresh data. The first training took about 5 minutes and tied up the server, so it was not repeated within the action budget.",
+  "Leak-check goal left open: whether pre-match features encode the result cannot be checked from a browser, because the diagnostic goes only to the server log. The only related evidence in the UI is the chronological 80/20 hold-out description in Methodology (screens/047.webp).",
+  "No verdict on the hypothesis: the ablation's +0.0142 AUC from adding load is one train/test split on uncertain data, not a significance test. The README's 21-seed and bootstrap stability check (stability_test.py) was not run, and its results were not compared.",
+  "Did not try the Grass or Carpet surfaces, or the plot toolbars (PNG download, zoom, fullscreen) on the charts.",
+  "Dead ends during player selection: a click on the Player 2 box and typing 'Alcaraz' timed out (trace steps 63–64) before a second attempt worked. A snapshot ref went stale in Manual Entry (step 90).",
+  "Display problem: the In-Match 'Current Win Probability' bar draws its labels one character per line ('P L A Y E R 2'), though the percentages and the sentence below are readable (screens/049.webp). Separately, the HYPOTHESIS RESULT text on the Ablation tab is very low-contrast and hard to read (screens/043.webp).",
+  "Unexpected model behaviour: in Manual Entry, giving Player 2 more rest (1→15 days) raised Player 1's win probability (56.5%→60.9%), and Player 1's rest-day curve is flat or falls. The model does not show a clear recovery benefit. This is reported as observed, not judged right or wrong.",
+  "The in-match model's AUC of 0.990 comes from 8 matches and 51 points, so it is overfit and degenerate (99–100% outputs). It is not comparable with the README's real-data figure of about 0.81."
+ ],
+ "applied": [
+  "flagged the whole tree as unverified by replay in data.note and not_done, citing the checker's stalled screens",
+  "explained the pre-match vs in-match data mismatch in data.note, with the reviewer's likely run_local.py cause marked as unconfirmed",
+  "labelled every quoted number as coming from this one run",
+  "removed the 'Wait for data' phase and task t1, and moved its start-up account and screens into data.note",
+  "dropped the wrong 'one-of' on t2 and t5, and put 'one-of' on a new parent phase holding the Player Lookup and Manual Entry modes",
+  "added task n1 inside t2 for reading the H2H box, Pre-Match Analysis cards and radar (screens 026, 028)",
+  "added the single-run, no-significance caveat and the pointer to stability_test.py to t9 and not_done instead of inventing a new verdict step",
+  "marked the in-match model as degenerate on the 8-match seed in the phase, t12, t13 and t14",
+  "shortened t13's specific label to the task and its finding",
+  "replaced game wording in t13 and f6 general labels with score-state / contest-progress wording",
+  "stated outright that the leak-check goal is unreachable from a browser and left it open",
+  "split the explanation generator out of f1 into f7",
+  "added a ranked feature-importance feature (f8) and a Key Findings effect-size chart feature (f9)",
+  "removed 'Check how reliable the live-state model is' from f6's serves_tasks",
+  "moved the timed-out selection clicks and the stale snapshot ref into not_done",
+  "updated serves_tasks to the new task labels"
+ ],
+ "open_fixes": [
+  "Get a successful replay: fix start-up first (run_local.py replaces local files only for 2019–2023 and falls back to the network), then rerun the checker so tasks and features can be confirmed.",
+  "Find out which CSVs the pre-match model actually loaded (server logs or code), because the browser cannot show it and the reported numbers depend on it.",
+  "Run stability_test.py, or compare the README's 21-seed bootstrap results, to give a real verdict on whether load adds AUC beyond ranking.",
+  "Read the leak-check diagnostic in the server console log to close the leak-check goal; this needs access beyond the browser.",
+  "Press 'Clear Cache & Retrain' in a run with enough time budget to see whether a rebuild on fresh data changes the results.",
+  "Capture a screen of the Pre-Match Analysis cards and radar before Run Inference, so n1 has evidence of its own rather than one shared with t2.",
+  "Retrain the in-match model on more than the 8-match seed before reading any of its probabilities as meaningful."
+ ],
+ "screens_at": "pilot/public/runs/atp-fatigue-forecaster/20261030-001029/",
+ "screens_filed": {
+  "screens/026.webp": "screens/026.webp",
+  "screens/037.webp": "screens/037.webp",
+  "screens/044.webp": "screens/044.webp",
+  "screens/048.webp": "screens/048.webp"
+ }
+}

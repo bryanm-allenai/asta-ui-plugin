@@ -1,0 +1,605 @@
+{
+  "schema": "astaui.card/1",
+  "id": "ndt-lens-xray-inspection",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T16:49:30Z"
+  },
+  "app": {
+    "title": "NDT Lens · X-ray inspection with human-reviewed auto-labelling",
+    "summary": "A person imports a batch of radiographs, tagging each batch with a workpiece group and a train, val or test split. Duplicate images are skipped. They pick one image, draw rectangles on it with a chosen defect class, and fix the coordinates or classes in a table. They then either save it as a draft or confirm it as ground truth; a confirmed image with no boxes counts as a defect-free sample. From the confirmed images they start a detector training run in the background and watch its validation curve and log. They then use the trained model to auto-label the images still waiting for review, correct and confirm those proposals, and export a ZIP of the confirmed dataset. A separate page runs a single image through either a heuristic candidate finder or a trained model and downloads the annotated image, a JSON report and a CSV of the boxes.",
+    "task": {
+      "text": "Build a reviewed set of bounding-box labels on radiographs, train an object detector on the confirmed labels, and use it to propose labels on new images for a person to correct and confirm.",
+      "verbs": [
+        "annotate",
+        "review",
+        "derive",
+        "curate",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "A collection of grayscale X-ray images. Each image belongs to a workpiece group and a split, and carries rectangular boxes from a fixed set of defect classes plus a review status, a revision number and the model that proposed its boxes.",
+      "item": "a radiograph image with its labelled bounding boxes",
+      "shapes": [
+        "image collection",
+        "image",
+        "categories",
+        "judgements",
+        "table",
+        "versions"
+      ]
+    },
+    "stage": {
+      "text": "labelling and reviewing defect boxes on radiographs to build training data for a detector",
+      "terms": [
+        "annotate",
+        "review"
+      ]
+    },
+    "mechanism": {
+      "text": "On the annotation page, a status filter and an image picker choose one image. A canvas editor draws class-coloured boxes on that image, and an editable table below mirrors the boxes; confirm and draft buttons save them with a revision check. Further pages start background training from confirmed images only, auto-label the pending images with the chosen model, and export a ZIP; counters at the top track images, confirmations and boxes waiting for review.",
+      "views": [
+        "image viewer",
+        "table view",
+        "form",
+        "summary stats",
+        "line chart",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "filter",
+        "apply label",
+        "inline edit",
+        "undo",
+        "zoom and pan",
+        "accept or reject",
+        "export",
+        "toggle view"
+      ],
+      "patterns": [
+        "master-detail",
+        "category palette",
+        "status pipeline",
+        "dashboard",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "object detection on industrial radiographs for non-destructive testing",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "non destructive testing",
+        "weld radiography",
+        "object detection"
+      ]
+    },
+    "workflow": {
+      "name": "label regions in images, train a detector on confirmed labels, and review its proposals",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Multi-file upload of PNG, JPEG, TIFF or BMP images with a workpiece/film group number and a train, val or test split. Images with identical pixels are skipped, and the new images can optionally be auto-labelled with the selected model.",
+          "parts": [
+            "import-batch"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "A scope radio (all, pending review, confirmed) narrows the image picker, which marks each image confirmed (✓) or pending (○) and shows its group, split and the model that proposed its boxes.",
+          "parts": [
+            "annotation-page"
+          ]
+        },
+        {
+          "step": "select a stretch and label it with a category",
+          "here": "Pick a defect class (porosity, crack or inclusion), then drag rectangles on a zoomable canvas. Undo removes the last box and clear removes them all. A table beside it lets the person change a box's class or coordinates, or delete it.",
+          "parts": [
+            "box-editor",
+            "box-table"
+          ]
+        },
+        {
+          "step": "decide keep or drop for each item, with a reason",
+          "here": "'Save and confirm' makes the boxes ground truth. 'Save draft' keeps them out of training. Confirming an image with no boxes records it as a reviewed normal sample. A save is refused if the image's revision has changed since it was opened.",
+          "parts": [
+            "box-table"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "Counters show total images, confirmed images, model labels waiting for review and confirmed boxes. A readiness table counts images, confirmed images and workpiece groups in each split.",
+          "parts": [
+            "readiness-summary"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A detector training run is started in a background process on a snapshot of confirmed images only, with a chosen number of epochs, image size, batch size, device and starting weights. Each run's record shows its status, a validation mAP curve and the tail of its log.",
+          "parts": [
+            "training-center"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The selected model auto-labels every pending image, and the person corrects and confirms those labels on the annotation page. A ZIP holds the original images, annotated previews, YOLO labels, a dataset.yaml and a review manifest, and by default contains confirmed images only.",
+          "parts": [
+            "batch-review-export",
+            "detection-workbench"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Model predictions never become ground truth until a person confirms them: training snapshots copy confirmed images only, and batch auto-labelling skips images that are already confirmed.",
+        "Each image belongs to a workpiece group that can sit in only one of train, val or test, and identical-pixel images are rejected on import, so near-copies cannot leak across splits.",
+        "An empty box list means two different things: an image not yet reviewed, or a confirmed defect-free sample.",
+        "Saves check a revision number, so an older page cannot silently overwrite newer labels.",
+        "A separate single-image page compares the original radiograph side by side with the detections, from either a morphology heuristic (grey-level difference threshold and minimum area) or a trained model with a confidence threshold."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "annotation-page",
+      "level": "view",
+      "parent": null,
+      "title": "Images and annotation",
+      "summary": "Filters the image library by review status and opens one image for labelling, showing its size, status and the model that proposed its boxes.",
+      "views": [
+        "image viewer",
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "select"
+      ],
+      "patterns": [
+        "master-detail",
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/src/ndt/workbench_ui.py",
+          "start": 150,
+          "end": 175,
+          "role": "logic",
+          "anchor": "df91aa6a197f",
+          "first": "rows = workspace.images()"
+        }
+      ]
+    },
+    {
+      "id": "import-batch",
+      "level": "component",
+      "parent": "annotation-page",
+      "title": "Import a batch of radiographs",
+      "summary": "Uploads many images under a workpiece group and a split, skips duplicate images, and can auto-label the new images with the selected model.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/ndt/workbench_ui.py",
+          "start": 109,
+          "end": 149,
+          "role": "logic",
+          "anchor": "3535dae5dafe",
+          "first": "with st.expander(\"导入一批射线图片\", expanded=not workspace.images()):"
+        },
+        {
+          "file": "code/src/ndt/workspace.py",
+          "start": 55,
+          "end": 78,
+          "role": "logic",
+          "symbol": "import_image",
+          "anchor": "2f39a7fb16b5",
+          "first": "def import_image(self, name: str, content: bytes, group: str, split: str):"
+        },
+        {
+          "file": "code/src/ndt/workspace.py",
+          "start": 108,
+          "end": 126,
+          "role": "logic",
+          "symbol": "auto_label",
+          "anchor": "00c0a558c9d5",
+          "first": "def auto_label(self, image_ids, model, model_path, confidence=0.25, progress=None):"
+        },
+        {
+          "file": "code/src/ndt/imaging.py",
+          "start": 10,
+          "end": 27,
+          "role": "logic",
+          "symbol": "load_image",
+          "anchor": "cf3bac5955e1",
+          "first": "def load_image(source: str | Path | BinaryIO) -> Image.Image:"
+        }
+      ]
+    },
+    {
+      "id": "box-editor",
+      "level": "component",
+      "parent": "annotation-page",
+      "title": "Canvas box editor",
+      "summary": "Lets the person drag rectangles on the zoomable image with the chosen defect class, with undo and clear, and stores the coordinates in original-image pixels.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "apply label",
+        "undo",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/src/ndt/box_editor/index.html",
+          "start": 8,
+          "end": 8,
+          "role": "markup",
+          "symbol": "#canvas",
+          "anchor": "06940e667233",
+          "first": "<div class=\"tools\"><button id=\"undo\">撤销上一个框</button><button id=\"clear\">清空所有框</button><span id=\"hint\">在图像上拖动绘制矩形；坐标按原图保存<"
+        },
+        {
+          "file": "code/src/ndt/box_editor/index.html",
+          "start": 8,
+          "end": 8,
+          "role": "markup",
+          "symbol": "#undo",
+          "anchor": "06940e667233",
+          "first": "<div class=\"tools\"><button id=\"undo\">撤销上一个框</button><button id=\"clear\">清空所有框</button><span id=\"hint\">在图像上拖动绘制矩形；坐标按原图保存<"
+        },
+        {
+          "file": "code/src/ndt/box_editor/index.html",
+          "start": 8,
+          "end": 8,
+          "role": "markup",
+          "symbol": "#clear",
+          "anchor": "06940e667233",
+          "first": "<div class=\"tools\"><button id=\"undo\">撤销上一个框</button><button id=\"clear\">清空所有框</button><span id=\"hint\">在图像上拖动绘制矩形；坐标按原图保存<"
+        },
+        {
+          "file": "code/src/ndt/box_editor/index.html",
+          "start": 8,
+          "end": 8,
+          "role": "markup",
+          "symbol": "#hint",
+          "anchor": "06940e667233",
+          "first": "<div class=\"tools\"><button id=\"undo\">撤销上一个框</button><button id=\"clear\">清空所有框</button><span id=\"hint\">在图像上拖动绘制矩形；坐标按原图保存<"
+        },
+        {
+          "file": "code/src/ndt/box_editor/index.html",
+          "start": 5,
+          "end": 5,
+          "role": "style",
+          "symbol": ".tools",
+          "anchor": "fbf2c5e13389",
+          "first": ".tools{display:flex;gap:8px;align-items:center;padding:10px;flex-wrap:wrap}button{background:#20334b;color:#e2efff;borde"
+        },
+        {
+          "file": "code/src/ndt/box_editor/index.html",
+          "start": 6,
+          "end": 6,
+          "role": "style",
+          "symbol": "#wrap",
+          "anchor": "b68fbc7bf7a9",
+          "first": "#wrap{overflow:auto;max-height:650px;padding:8px;background:#080e19}canvas{display:block;touch-action:none;cursor:crossh"
+        },
+        {
+          "file": "code/src/ndt/box_editor/index.html",
+          "start": 12,
+          "end": 12,
+          "role": "data",
+          "symbol": "colors",
+          "anchor": "daf1402d3284",
+          "first": "const colors={porosity:'#20d6ad',crack:'#ffb454',inclusion:'#93b7ff'};"
+        },
+        {
+          "file": "code/src/ndt/box_editor/index.html",
+          "start": 15,
+          "end": 15,
+          "role": "logic",
+          "symbol": "draw",
+          "anchor": "029ae7f0d294",
+          "first": "function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);[...bo"
+        },
+        {
+          "file": "code/src/ndt/box_editor/index.html",
+          "start": 16,
+          "end": 16,
+          "role": "logic",
+          "symbol": "fit",
+          "anchor": "3faf6f8574d3",
+          "first": "function fit(){if(!image.naturalWidth)return;scale=Math.min(1,Math.max(250,innerWidth-16)/image.naturalWidth)*(args.zoom"
+        },
+        {
+          "file": "code/src/ndt/box_editor/index.html",
+          "start": 17,
+          "end": 17,
+          "role": "logic",
+          "symbol": "emit",
+          "anchor": "6f3d2d7d6e3c",
+          "first": "function emit(){send('streamlit:setComponentValue',{value:{image_id:args.image_id,revision:args.revision,boxes,seq:++seq"
+        },
+        {
+          "file": "code/src/ndt/box_editor/index.html",
+          "start": 18,
+          "end": 18,
+          "role": "logic",
+          "symbol": "point",
+          "anchor": "2741cc708a72",
+          "first": "function point(e){const r=canvas.getBoundingClientRect();return [Math.max(0,Math.min(image.naturalWidth,(e.clientX-r.lef"
+        },
+        {
+          "file": "code/src/ndt/box_editor/index.html",
+          "start": 19,
+          "end": 25,
+          "role": "logic",
+          "anchor": "557b53cdf0ce",
+          "first": "canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;start=point(e);canvas.setPointerCapture(e.pointerId)});"
+        },
+        {
+          "file": "code/src/ndt/workbench_ui.py",
+          "start": 176,
+          "end": 199,
+          "role": "logic",
+          "anchor": "76ebd64f0e79",
+          "first": "label = st.selectbox(\"绘制类别\", CLASSES, format_func=CLASS_NAMES.get)"
+        }
+      ]
+    },
+    {
+      "id": "box-table",
+      "level": "component",
+      "parent": "annotation-page",
+      "title": "Box table with confirm or draft",
+      "summary": "Mirrors the drawn boxes as editable rows (class, x1, y1, x2, y2) and saves them either as confirmed ground truth or as a draft, with a revision check.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "accept or reject"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/src/ndt/workbench_ui.py",
+          "start": 200,
+          "end": 228,
+          "role": "logic",
+          "anchor": "27f9ec43c55f",
+          "first": "frame = pd.DataFrame("
+        },
+        {
+          "file": "code/src/ndt/workspace.py",
+          "start": 80,
+          "end": 106,
+          "role": "logic",
+          "symbol": "save_boxes",
+          "anchor": "437ab35f58da",
+          "first": "def save_boxes(self, image_id, boxes, *, reviewed=False, model=None, expected_revision=None):"
+        }
+      ]
+    },
+    {
+      "id": "readiness-summary",
+      "level": "view",
+      "parent": null,
+      "title": "Workspace counters and split readiness",
+      "summary": "Shows totals of images, confirmations, pending model labels and confirmed boxes, and a per-split table of images, confirmed images and workpiece groups.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/ndt/workbench_ui.py",
+          "start": 76,
+          "end": 97,
+          "role": "logic",
+          "anchor": "325fd5be5f10",
+          "first": "a, b, c, d = st.columns(4)"
+        }
+      ]
+    },
+    {
+      "id": "training-center",
+      "level": "view",
+      "parent": null,
+      "title": "Training center",
+      "summary": "Starts a background detector training run on a snapshot of confirmed images and lists past runs with their status, validation mAP curve, weights path and log.",
+      "views": [
+        "form",
+        "line chart",
+        "list"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/src/ndt/workbench_ui.py",
+          "start": 231,
+          "end": 287,
+          "role": "logic",
+          "symbol": "training_page",
+          "anchor": "81d4f697a7ec",
+          "first": "def training_page(workspace, weights):"
+        },
+        {
+          "file": "code/src/ndt/workspace.py",
+          "start": 128,
+          "end": 171,
+          "role": "logic",
+          "symbol": "snapshot",
+          "anchor": "91987e8ea8d2",
+          "first": "def snapshot(self):"
+        },
+        {
+          "file": "code/src/ndt/jobs.py",
+          "start": 55,
+          "end": 110,
+          "role": "logic",
+          "symbol": "start_training",
+          "anchor": "bd841b66f36d",
+          "first": "def start_training(root, data, *, epochs=100, imgsz=640, batch=8, device=\"cpu\", model=\"yolo11n.pt\"):"
+        },
+        {
+          "file": "code/src/ndt/jobs.py",
+          "start": 50,
+          "end": 52,
+          "role": "logic",
+          "symbol": "list_jobs",
+          "anchor": "df6cdc0816f2",
+          "first": "def list_jobs(root):"
+        }
+      ]
+    },
+    {
+      "id": "batch-review-export",
+      "level": "view",
+      "parent": null,
+      "title": "Batch auto-label and export",
+      "summary": "Auto-labels every pending image with the model chosen in the sidebar, leaving the proposals for review, and packages confirmed (or all) images into a portable YOLO dataset ZIP.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/src/ndt/workbench_ui.py",
+          "start": 290,
+          "end": 322,
+          "role": "logic",
+          "symbol": "batch_page",
+          "anchor": "21961c0153d6",
+          "first": "def batch_page(workspace, weights, confidence):"
+        },
+        {
+          "file": "code/src/ndt/workbench_ui.py",
+          "start": 36,
+          "end": 45,
+          "role": "logic",
+          "symbol": "model_selector",
+          "anchor": "a6578c8fe257",
+          "first": "def model_selector(workspace):"
+        },
+        {
+          "file": "code/src/ndt/export.py",
+          "start": 25,
+          "end": 68,
+          "role": "logic",
+          "symbol": "export_workspace",
+          "anchor": "e241b70159db",
+          "first": "def export_workspace(workspace, *, reviewed_only=True):"
+        },
+        {
+          "file": "code/src/ndt/export.py",
+          "start": 14,
+          "end": 22,
+          "role": "logic",
+          "symbol": "yolo_labels",
+          "anchor": "84dec2b03b54",
+          "first": "def yolo_labels(boxes, width, height):"
+        }
+      ]
+    },
+    {
+      "id": "detection-workbench",
+      "level": "view",
+      "parent": null,
+      "title": "Single-image detection workbench",
+      "summary": "Runs one uploaded or sample radiograph through a heuristic candidate finder or a trained model, shows the original and the boxed result side by side with a table of regions, and downloads PNG, JSON and CSV.",
+      "views": [
+        "side-by-side panes",
+        "image viewer",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 42,
+          "end": 130,
+          "role": "logic",
+          "anchor": "7dd95662c8b1",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/src/ndt/detection.py",
+          "start": 25,
+          "end": 49,
+          "role": "logic",
+          "symbol": "candidates",
+          "anchor": "dd43b630ab82",
+          "first": "def candidates(image: Image.Image, sensitivity: int = 22, min_area: int = 18) -> list[Detection]:"
+        },
+        {
+          "file": "code/src/ndt/detection.py",
+          "start": 64,
+          "end": 83,
+          "role": "logic",
+          "symbol": "predict",
+          "anchor": "6a92db224fde",
+          "first": "def predict(model, image: Image.Image, confidence: float = 0.25, imgsz: int = 640) -> list[Detection]:"
+        },
+        {
+          "file": "code/src/ndt/detection.py",
+          "start": 86,
+          "end": 98,
+          "role": "logic",
+          "symbol": "annotate",
+          "anchor": "d232b645f9fb",
+          "first": "def annotate(image: Image.Image, detections: list[Detection], *, demo: bool = False) -> Image.Image:"
+        },
+        {
+          "file": "code/src/ndt/detection.py",
+          "start": 101,
+          "end": 111,
+          "role": "logic",
+          "symbol": "report",
+          "anchor": "61fb5947d22b",
+          "first": "def report(detections: list[Detection], image: Image.Image, *, engine: str, source: str) -> dict:"
+        }
+      ]
+    }
+  ]
+}

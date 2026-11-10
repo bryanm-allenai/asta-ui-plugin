@@ -1,0 +1,544 @@
+{
+  "schema": "astaui.card/1",
+  "id": "nirlab-chemometrics",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T08:51:19Z"
+  },
+  "app": {
+    "title": "NIR Spectrum Manager",
+    "summary": "The person picks or creates a project, then loads multi-block JCAMP-DX spectrum files from the project folder or by upload. Each block becomes one sample with a spectrum and optional colour values. They narrow the work to one sample group by name prefix, check each spectrum's distance from the mean and how well replicate pairs agree, then drop the samples they have reasons to exclude and average the replicates. The cleaned spectra are SNV-normalised and explored with PCA and Ward clustering. Finally a PLS regression predicts a chosen colour variable, with leave-one-out cross-validation used to pick the number of components, and each table can be downloaded or saved to the project folder as CSV.",
+    "task": {
+      "text": "Take raw NIR spectra through outlier and replicate checks, SNV preprocessing, PCA, clustering and a cross-validated PLS model that predicts a measured property.",
+      "verbs": [
+        "derive",
+        "clean",
+        "explore",
+        "organize",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Spectra from an instrument, one absorbance value per wavelength on a shared wavelength grid, with optional reference colour values (L, a, b) stored for each sample. Samples are grouped by name prefix and paired as original and replicate.",
+      "item": "the spectrum of one sample, with its reference values",
+      "shapes": [
+        "grid of series",
+        "table",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "preprocessing and modelling instrument spectra, from raw export to a calibration model",
+      "terms": [
+        "analyze",
+        "clean",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls choose the project, the sample group, the excluded samples and whether replicates are averaged, and every tab recomputes from that working set. The tabs run in pipeline order (raw spectra, colour values, outliers, replicates, SNV, PCA, clustering, PLS), each with its own charts, tables and CSV export.",
+      "views": [
+        "sidebar list",
+        "line chart",
+        "scatter plot",
+        "table view",
+        "summary stats",
+        "side-by-side panes",
+        "tree view"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "exclude and refit",
+        "toggle view",
+        "select",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "NIR spectroscopy chemometrics: SNV preprocessing, PCA, Ward clustering and PLS calibration",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "chemometrics",
+        "nir spectroscopy",
+        "pls regression"
+      ]
+    },
+    "workflow": {
+      "name": "preprocess instrument spectra and calibrate a model that predicts a reference property",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Choose or create a project, then multiselect the .jdx files already in its raw folder or upload new ones, which can be saved into that folder. Each JCAMP block is parsed into one sample with its L, a, b values.",
+          "parts": [
+            "project-sidebar",
+            "file-input"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "A sidebar selectbox narrows the work to one sample group, detected from the alphabetic prefix of sample names. The raw tab overlays every spectrum and the L,a,b tab lists the colour values.",
+          "parts": [
+            "project-sidebar",
+            "raw-tab"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "The outlier tab ranks samples by RMSE from the mean SNV spectrum, and the replicate tab shows r, RMSE and maximum difference for each original/bis pair, with overlay and difference plots. Excluding samples in the sidebar, and choosing whether to average replicates, recomputes every later tab.",
+          "parts": [
+            "outlier-duplicates-tabs",
+            "project-sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The final dataset is SNV-normalised and shown next to the raw absorbance, then explored with PCA (scores coloured by L, a or b, a scree plot, loadings per component and the correlation of each PC with L, a, b) and with Ward clustering (a dendrogram, and k chosen by silhouette score).",
+          "parts": [
+            "snv-tab",
+            "pca-tab",
+            "cluster-tab"
+          ]
+        },
+        {
+          "step": "fit a predictive model and choose its complexity by cross-validation",
+          "here": "Pick a target among L, a and b, and set the maximum number of components. The RMSECV curve marks the best number, which can be overridden. The tab shows R² and RMSE for calibration and for LOO-CV, a predicted-vs-observed plot and the regression coefficients across wavelengths.",
+          "parts": [
+            "pls-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Each tab's table (raw matrix, L,a,b values, final SNV, PCA scores with Lab, cluster assignments, PLS predictions) can be downloaded as CSV or saved to an output folder inside the project.",
+          "parts": [
+            "project-sidebar",
+            "raw-tab",
+            "snv-tab",
+            "pca-tab",
+            "cluster-tab",
+            "pls-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Replicates are recognised from a 'bis' suffix on sample names. Their agreement is measured, and the pair is averaged in both the spectra and the reference values before modelling.",
+        "Calibration and leave-one-out cross-validation scores are shown side by side, and the interface warns that with few samples the calibration figures are optimistic.",
+        "The guidance tells the person to exclude a sample only for a known cause, not just because its distance from the mean is high.",
+        "Analyses are kept as separate projects on disk, each with a raw folder and per-group output folders.",
+        "Samples are grouped automatically by the alphabetic prefix of their names, and the number of clusters is chosen by silhouette score."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "project-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Project, group and preprocessing sidebar",
+      "summary": "Chooses the project, the sample group, the output folder, the samples to exclude and whether to average replicates, which together set the working set every tab uses.",
+      "views": [
+        "sidebar list",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "filter",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 39,
+          "end": 53,
+          "role": "markup",
+          "anchor": "fc9261787940",
+          "first": "st.sidebar.header(\"Progetto\")"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 92,
+          "end": 152,
+          "role": "logic",
+          "anchor": "b1f6a5fa95a8",
+          "first": "sample_names = [s.sample_name for s in all_spectra]"
+        },
+        {
+          "file": "code/app_streamlit.py",
+          "start": 123,
+          "end": 127,
+          "role": "logic",
+          "symbol": "save_csv_button",
+          "anchor": "49c2b5a864f8",
+          "first": "def save_csv_button(label: str, df: pd.DataFrame, filename: str, key: str):"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 30,
+          "end": 32,
+          "role": "logic",
+          "symbol": "list_projects",
+          "anchor": "6e6b087caf6f",
+          "first": "def list_projects() -> list[str]:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 114,
+          "end": 121,
+          "role": "logic",
+          "symbol": "detect_groups",
+          "anchor": "151f19a45f8e",
+          "first": "def detect_groups(sample_names: list[str]) -> dict[str, list[str]]:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 195,
+          "end": 203,
+          "role": "logic",
+          "symbol": "average_duplicates",
+          "anchor": "1cd8ca39b683",
+          "first": "def average_duplicates(df: pd.DataFrame, sample_cols: list[str], pairs: list[tuple[str, str]]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 206,
+          "end": 218,
+          "role": "logic",
+          "symbol": "average_lab_duplicates",
+          "anchor": "f964850277f6",
+          "first": "def average_lab_duplicates(lab_df: pd.DataFrame, pairs: list[tuple[str, str]]) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "file-input",
+      "level": "component",
+      "parent": null,
+      "title": "JCAMP-DX file loader",
+      "summary": "Picks .jdx files from the project's raw folder or uploads new ones, saves the uploads, and parses each block into a sample spectrum with its colour values.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 59,
+          "end": 90,
+          "role": "logic",
+          "anchor": "51a9120c4eeb",
+          "first": "raw_files_on_disk = core.list_raw_files(project)"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 82,
+          "end": 111,
+          "role": "logic",
+          "symbol": "parse_jdx",
+          "anchor": "a721f7f24d62",
+          "first": "def parse_jdx(text: str) -> list[Spectrum]:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 75,
+          "end": 79,
+          "role": "data",
+          "symbol": "Spectrum",
+          "anchor": "7004a895913c",
+          "first": "class Spectrum:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 53,
+          "end": 54,
+          "role": "logic",
+          "symbol": "list_raw_files",
+          "anchor": "e8341fd01444",
+          "first": "def list_raw_files(project: str) -> list[Path]:"
+        }
+      ]
+    },
+    {
+      "id": "raw-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Raw spectra and L,a,b values",
+      "summary": "Overlays every raw spectrum in the group and lists the colour values sorted by sample, each with a CSV download and save.",
+      "views": [
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 154,
+          "end": 200,
+          "role": "markup",
+          "anchor": "cac81df33f6c",
+          "first": "tab_raw, tab_lab, tab_outlier, tab_dup, tab_snv, tab_pca, tab_cluster, tab_pls = st.tabs("
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 124,
+          "end": 135,
+          "role": "logic",
+          "symbol": "spectra_to_dataframe",
+          "anchor": "d3f940cb3065",
+          "first": "def spectra_to_dataframe(spectra: list[Spectrum]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 138,
+          "end": 147,
+          "role": "logic",
+          "symbol": "lab_dataframe",
+          "anchor": "dd95de55f652",
+          "first": "def lab_dataframe(spectra: list[Spectrum]) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "outlier-duplicates-tabs",
+      "level": "view",
+      "parent": null,
+      "title": "Outlier and replicate checks",
+      "summary": "Ranks samples by RMSE from the mean SNV spectrum, and measures each original/bis pair's agreement, with overlay and difference plots for the chosen pair.",
+      "views": [
+        "table view",
+        "line chart",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 206,
+          "end": 249,
+          "role": "markup",
+          "anchor": "f058e6542f24",
+          "first": "with tab_outlier:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 221,
+          "end": 228,
+          "role": "logic",
+          "symbol": "outlier_scores",
+          "anchor": "10a26169bf72",
+          "first": "def outlier_scores(df: pd.DataFrame, sample_cols: list[str]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 169,
+          "end": 178,
+          "role": "logic",
+          "symbol": "find_duplicate_pairs",
+          "anchor": "338dff668965",
+          "first": "def find_duplicate_pairs(sample_cols: list[str]) -> list[tuple[str, str]]:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 181,
+          "end": 192,
+          "role": "logic",
+          "symbol": "duplicate_metrics",
+          "anchor": "8f377b1760c1",
+          "first": "def duplicate_metrics(df: pd.DataFrame, pairs: list[tuple[str, str]]) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "snv-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Final dataset and SNV",
+      "summary": "Shows the working set's raw absorbance next to its SNV-normalised spectra and exports the final SNV matrix.",
+      "views": [
+        "line chart",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 255,
+          "end": 282,
+          "role": "markup",
+          "anchor": "daf7e42ab7a9",
+          "first": "with tab_snv:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 161,
+          "end": 166,
+          "role": "logic",
+          "symbol": "compute_snv",
+          "anchor": "be5a3695f254",
+          "first": "def compute_snv(df: pd.DataFrame, sample_cols: list[str]) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "pca-tab",
+      "level": "view",
+      "parent": null,
+      "title": "PCA",
+      "summary": "Plots PCA scores coloured by L, a or b, a scree plot and per-component loadings, plus a table correlating each PC with the colour values, and saves the scores.",
+      "views": [
+        "scatter plot",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view",
+        "select",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 288,
+          "end": 333,
+          "role": "markup",
+          "anchor": "49432bada380",
+          "first": "with tab_pca:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 231,
+          "end": 243,
+          "role": "logic",
+          "symbol": "run_pca",
+          "anchor": "2ae0a1bda1f1",
+          "first": "def run_pca(df: pd.DataFrame, sample_cols: list[str], n_components: int = 5):"
+        }
+      ]
+    },
+    {
+      "id": "cluster-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Ward clustering",
+      "summary": "Draws a Ward dendrogram and a silhouette-by-k curve, picks k automatically, and lists and saves each sample's cluster.",
+      "views": [
+        "tree view",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 339,
+          "end": 367,
+          "role": "markup",
+          "anchor": "fbc496991aec",
+          "first": "with tab_cluster:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 278,
+          "end": 292,
+          "role": "logic",
+          "symbol": "run_ward_clustering",
+          "anchor": "138181a291c5",
+          "first": "def run_ward_clustering(df: pd.DataFrame, sample_cols: list[str], k_max: int | None = None):"
+        }
+      ]
+    },
+    {
+      "id": "pls-tab",
+      "level": "view",
+      "parent": null,
+      "title": "PLS regression",
+      "summary": "Regresses the SNV spectra on a chosen target, picks the number of components from a leave-one-out RMSECV curve (which the person can override), and shows calibration and CV metrics, a predicted-vs-observed plot, the coefficients and an exportable predictions table.",
+      "views": [
+        "line chart",
+        "scatter plot",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "inline edit",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app_streamlit.py",
+          "start": 369,
+          "end": 451,
+          "role": "markup",
+          "anchor": "35cec653683d",
+          "first": "with tab_pls:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 246,
+          "end": 257,
+          "role": "logic",
+          "symbol": "pls_cross_validate",
+          "anchor": "ff2c3f19cc9c",
+          "first": "def pls_cross_validate(X: np.ndarray, y: np.ndarray, max_components: int = 10) -> tuple[dict, int]:"
+        },
+        {
+          "file": "code/nir_core.py",
+          "start": 260,
+          "end": 275,
+          "role": "logic",
+          "symbol": "fit_pls",
+          "anchor": "730438ed436b",
+          "first": "def fit_pls(X: np.ndarray, y: np.ndarray, n_components: int):"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,703 @@
+{
+  "schema": "astaui.card/1",
+  "id": "neurocarto-channelmap-editor",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T07:39:54Z"
+  },
+  "app": {
+    "title": "NeuroCarto: a channel-map editor for Neuropixels probes",
+    "summary": "A person starts a new probe of a chosen type, or loads an existing channel-map or meta file from a list. The probe's electrodes appear as dots on its shanks, in micrometres. The person box-selects stretches of electrodes and either turns them on or off directly, or gives them a density category, which builds a blueprint. An automatic selection then picks electrodes that satisfy the blueprint and the probe's wiring rules. A density curve and a channel-efficiency table show how well the result matches, and a brain-atlas slice behind the probe helps aim the selection at anatomy. Once the map is complete, they save it as a readout file, together with its blueprint and view settings.",
+    "task": {
+      "text": "Design which electrodes on a high-density neural probe are read out, by marking regions with the density wanted and letting a constrained selection produce a valid channel map to save.",
+      "verbs": [
+        "plan",
+        "annotate",
+        "derive",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "A probe's fixed layout of electrodes on shanks. Each electrode has a position, a readout channel, an on/off state and a category from a blueprint. An optional brain-atlas image sits behind it.",
+      "item": "an electrode at a shank, column and row position on the probe",
+      "shapes": [
+        "per element",
+        "categories",
+        "image"
+      ]
+    },
+    "stage": {
+      "text": "planning a recording's electrode readout before implanting the probe",
+      "terms": [
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "A central figure draws every electrode on the probe's shanks, coloured by state. A box selection there, followed by a state or category button in the left panel, changes the blueprint and re-runs the selection. Side views linked to the same probe then redraw the blueprint colours, the density curve along each shank, the efficiency statistics and the atlas slice behind the probe.",
+      "views": [
+        "map",
+        "summary stats",
+        "line chart",
+        "image viewer",
+        "form"
+      ],
+      "interactions": [
+        "brush",
+        "apply label",
+        "zoom and pan",
+        "hover for detail",
+        "import",
+        "export",
+        "toggle view",
+        "inline edit"
+      ],
+      "patterns": [
+        "category palette",
+        "linked views",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "designing electrode readout maps for high-density probes in extracellular electrophysiology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "neuroscience",
+        "extracellular electrophysiology",
+        "neuropixels"
+      ]
+    },
+    "workflow": {
+      "name": "lay out a constrained selection over a fixed layout and export it as a configuration",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "The 'New' dropdown starts a blank map for a chosen probe type. The 'Input file' list loads an existing .imro, SpikeGLX .meta or saved .config.json, and its blueprint comes with it.",
+          "parts": [
+            "file-io",
+            "control-panel"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Every electrode is a dot on its shank in micrometre coordinates, coloured as used, unused, disabled or highlighted. Pan, wheel-zoom and hover show the channel and position.",
+          "parts": [
+            "probe-figure"
+          ]
+        },
+        {
+          "step": "select a stretch and label it with a category",
+          "here": "Box-select electrodes on the shanks, then click a category: Pre Selected, Full, Half or Quarter Density, Low priority, Excluded or Unset. Enable and Disable set electrodes directly instead.",
+          "parts": [
+            "state-category-palette",
+            "probe-figure",
+            "blueprint-overlay"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "With 'Auto' on, or on 'Refresh', the selection is re-run. It picks electrodes that satisfy the blueprint and disables those whose shared channel is already taken.",
+          "parts": [
+            "state-category-palette",
+            "probe-figure"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "An electrode density curve is drawn beside each shank, and a 'Channel Efficiency' table reports statistics comparing the channel map with the blueprint.",
+          "parts": [
+            "stats-panel"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "A brain-atlas slice can be placed behind the probe. Choose the projection, move the plane slider, rotate and pick regions, then drag or scale the boundary box to line it up with the shanks.",
+          "parts": [
+            "atlas-overlay"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Save' writes the map to the 'Save filename' as .imro, but only when it is complete. The blueprint and a .config.json of the view states are saved alongside, and any problems are reported in the Log area.",
+          "parts": [
+            "file-io"
+          ]
+        }
+      ],
+      "distinctive": [
+        "A hardware rule ties each readout channel to one electrode, so choosing one electrode disables the others that share its channel. The map is only valid when every channel is used.",
+        "The labels are target densities (full, half, quarter, low priority, excluded). They feed an automatic selector rather than being the final answer.",
+        "A brain-atlas slice can be rotated and positioned behind the probe, so the person can aim density at anatomical regions.",
+        "A density curve along each shank and a channel-efficiency summary show how closely the selection meets the blueprint.",
+        "The blueprint and view state are saved next to the channel map, so a design can be reopened and changed later."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "control-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Left control panel",
+      "summary": "Holds the file controls, the electrode state and category buttons, the Auto/Refresh toggle and the log area.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 528,
+          "end": 596,
+          "role": "markup",
+          "symbol": "_index_left_panel",
+          "anchor": "edd87e2748e1",
+          "first": "def _index_left_panel(self) -> list[UIElement]:"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 1038,
+          "end": 1052,
+          "role": "logic",
+          "symbol": "log_message",
+          "anchor": "89412c3d887e",
+          "first": "def log_message(self, *message, reset=False):"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 1054,
+          "end": 1058,
+          "role": "logic",
+          "symbol": "log_clear",
+          "anchor": "3fc156bb7031",
+          "first": "def log_clear(self):"
+        }
+      ]
+    },
+    {
+      "id": "file-io",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Channel-map file input and save",
+      "summary": "Starts a new probe of a chosen type or loads a channel-map or config file. Saves the finished map with its blueprint and view config.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 536,
+          "end": 545,
+          "role": "markup",
+          "anchor": "4e2872f0b7b3",
+          "first": "self.input_imro = Select("
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 559,
+          "end": 569,
+          "role": "markup",
+          "anchor": "57d89c96a11b",
+          "first": "# channelmap IO buttons"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 668,
+          "end": 697,
+          "role": "logic",
+          "symbol": "on_new",
+          "anchor": "4818abb46dbe",
+          "first": "def on_new(self, e: int | str | MenuItemClick):"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 699,
+          "end": 707,
+          "role": "logic",
+          "symbol": "on_load",
+          "anchor": "24eda035091b",
+          "first": "def on_load(self):"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 709,
+          "end": 728,
+          "role": "logic",
+          "symbol": "load_file",
+          "anchor": "1c4277ed0192",
+          "first": "def load_file(self, name: str | Path):"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 730,
+          "end": 751,
+          "role": "logic",
+          "symbol": "_load_channelmap_file",
+          "anchor": "4bc940650854",
+          "first": "def _load_channelmap_file(self, file: Path):"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 753,
+          "end": 814,
+          "role": "logic",
+          "symbol": "_load_view_config_file",
+          "anchor": "1c277124b80a",
+          "first": "def _load_view_config_file(self, file: Path):"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 849,
+          "end": 880,
+          "role": "logic",
+          "symbol": "reload_input_file_list",
+          "anchor": "40f8176c17ba",
+          "first": "def reload_input_file_list(self, preselect: str = None):"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 882,
+          "end": 921,
+          "role": "logic",
+          "symbol": "on_save",
+          "anchor": "5ed58b577960",
+          "first": "def on_save(self):"
+        },
+        {
+          "file": "code/src/neurocarto/probe_npx/io.py",
+          "start": 40,
+          "end": 94,
+          "role": "logic",
+          "symbol": "parse_imro",
+          "anchor": "a54dabd03a96",
+          "first": "def parse_imro(source: str) -> ChannelMap:"
+        },
+        {
+          "file": "code/src/neurocarto/probe_npx/io.py",
+          "start": 98,
+          "end": 117,
+          "role": "logic",
+          "symbol": "string_imro",
+          "anchor": "ecb4ae1dfd36",
+          "first": "def string_imro(chmap: ChannelMap) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "state-category-palette",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Electrode state and category buttons",
+      "summary": "Applies Enable/Disable or a density category to the box-selected electrodes, then re-runs the constrained selection automatically or on Refresh.",
+      "views": [],
+      "interactions": [
+        "apply label"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 547,
+          "end": 557,
+          "role": "markup",
+          "anchor": "047a45041460",
+          "first": "# electrode states buttons"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 571,
+          "end": 574,
+          "role": "markup",
+          "anchor": "3d14434c2c7e",
+          "first": "# electrode selecting helping buttons"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 939,
+          "end": 960,
+          "role": "logic",
+          "symbol": "on_state_change",
+          "anchor": "9e3a106afd94",
+          "first": "def on_state_change(self, state: int):"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 962,
+          "end": 994,
+          "role": "logic",
+          "symbol": "on_category_change",
+          "anchor": "b22b29e9d5ff",
+          "first": "def on_category_change(self, category: int):"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 1017,
+          "end": 1025,
+          "role": "logic",
+          "symbol": "on_autoupdate",
+          "anchor": "6cbd9c3798d9",
+          "first": "def on_autoupdate(self, active: bool):"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 1027,
+          "end": 1036,
+          "role": "logic",
+          "symbol": "on_refresh",
+          "anchor": "d799f1eabec7",
+          "first": "def on_refresh(self):"
+        },
+        {
+          "file": "code/src/neurocarto/probe_npx/desp.py",
+          "start": 79,
+          "end": 83,
+          "role": "data",
+          "symbol": "possible_states",
+          "anchor": "40d6b2c94449",
+          "first": "def possible_states(self) -> dict[str, int]:"
+        },
+        {
+          "file": "code/src/neurocarto/probe_npx/desp.py",
+          "start": 86,
+          "end": 97,
+          "role": "data",
+          "symbol": "possible_categories",
+          "anchor": "7fbbab947d98",
+          "first": "def possible_categories(self) -> dict[str, int]:"
+        },
+        {
+          "file": "code/src/neurocarto/probe_npx/select_default.py",
+          "start": 13,
+          "end": 35,
+          "role": "logic",
+          "symbol": "electrode_select",
+          "anchor": "b8b9d7526a53",
+          "first": "def electrode_select(desp: NpxProbeDesp, chmap: ChannelMap, blueprint: list[NpxElectrodeDesp], **kwargs) -> ChannelMap:"
+        }
+      ]
+    },
+    {
+      "id": "probe-figure",
+      "level": "view",
+      "parent": null,
+      "title": "Probe electrode figure",
+      "summary": "Draws every electrode on the probe's shanks by state. The person box-selects, pans, zooms and hovers here to pick electrodes.",
+      "views": [
+        "map"
+      ],
+      "interactions": [
+        "brush",
+        "zoom and pan",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 477,
+          "end": 507,
+          "role": "markup",
+          "anchor": "c717262380e3",
+          "first": "self.probe_fig = Figure("
+        },
+        {
+          "file": "code/src/neurocarto/views/probe.py",
+          "start": 95,
+          "end": 125,
+          "role": "logic",
+          "anchor": "31cafe78deea",
+          "first": "def _setup_render(self, f: Figure, **kwargs):"
+        },
+        {
+          "file": "code/src/neurocarto/views/probe.py",
+          "start": 145,
+          "end": 177,
+          "role": "logic",
+          "symbol": "reset",
+          "anchor": "220c72813611",
+          "first": "def reset(self, chmap: int | M | None = None):"
+        },
+        {
+          "file": "code/src/neurocarto/views/probe.py",
+          "start": 179,
+          "end": 189,
+          "role": "logic",
+          "symbol": "_reset_electrode_state",
+          "anchor": "25504d82e7c7",
+          "first": "def _reset_electrode_state(self):"
+        },
+        {
+          "file": "code/src/neurocarto/views/probe.py",
+          "start": 198,
+          "end": 229,
+          "role": "logic",
+          "symbol": "refresh_selection",
+          "anchor": "530b0ff16224",
+          "first": "def refresh_selection(self):"
+        },
+        {
+          "file": "code/src/neurocarto/views/probe.py",
+          "start": 367,
+          "end": 422,
+          "role": "logic",
+          "symbol": "set_state_for_captured",
+          "anchor": "6accb32b3a15",
+          "first": "def set_state_for_captured(self, state: int, electrodes: list[int | E] = None):"
+        },
+        {
+          "file": "code/src/neurocarto/views/probe.py",
+          "start": 425,
+          "end": 455,
+          "role": "logic",
+          "symbol": "set_category_for_captured",
+          "anchor": "09a59beb4d18",
+          "first": "def set_category_for_captured(self, category: int, electrodes: list[int | E] = None):"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 996,
+          "end": 1015,
+          "role": "logic",
+          "symbol": "on_probe_update",
+          "anchor": "38566c0bfbca",
+          "first": "def on_probe_update(self):"
+        }
+      ]
+    },
+    {
+      "id": "side-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Right panel of linked views",
+      "summary": "Collects the views that redraw whenever the probe changes: the probe reference control, density, efficiency, blueprint and atlas.",
+      "views": [],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 598,
+          "end": 614,
+          "role": "markup",
+          "symbol": "_index_right_panel",
+          "anchor": "7ce3f9b445b1",
+          "first": "def _index_right_panel(self) -> list[UIElement]:"
+        },
+        {
+          "file": "code/src/neurocarto/main_app.py",
+          "start": 617,
+          "end": 637,
+          "role": "logic",
+          "symbol": "install_right_panel_views",
+          "anchor": "e8beedbdf225",
+          "first": "def install_right_panel_views(self, config: CartoConfig) -> list:"
+        }
+      ]
+    },
+    {
+      "id": "blueprint-overlay",
+      "level": "component",
+      "parent": "side-panel",
+      "title": "Blueprint category overlay",
+      "summary": "Colours the areas beside each shank by the density category assigned to them, so the person can see the plan behind the selection.",
+      "views": [
+        "map"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/neurocarto/views/blueprint.py",
+          "start": 87,
+          "end": 253,
+          "role": "logic",
+          "anchor": "5f283f64fd5b",
+          "first": "class BlueprintView(ViewBase, InvisibleView, DynamicView):"
+        },
+        {
+          "file": "code/src/neurocarto/probe_npx/desp.py",
+          "start": 324,
+          "end": 355,
+          "role": "logic",
+          "symbol": "view_ext_plot_blueprint",
+          "anchor": "2c0f53a3df54",
+          "first": "def view_ext_plot_blueprint(self, callback: ProbePlotBlueprintCallback, chmap: ChannelMap):"
+        }
+      ]
+    },
+    {
+      "id": "stats-panel",
+      "level": "component",
+      "parent": "side-panel",
+      "title": "Density curve and channel efficiency",
+      "summary": "Draws a density curve of selected electrodes beside each shank and lists statistics comparing the channel map with the blueprint.",
+      "views": [
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/neurocarto/views/data_density.py",
+          "start": 40,
+          "end": 70,
+          "role": "logic",
+          "anchor": "e9d13c2c46f6",
+          "first": "class ElectrodeDensityDataView(Data1DView, ExtensionView):"
+        },
+        {
+          "file": "code/src/neurocarto/views/view_efficient.py",
+          "start": 52,
+          "end": 69,
+          "role": "markup",
+          "symbol": "_setup_content",
+          "anchor": "9cf3690ec76f",
+          "first": "def _setup_content(self, **kwargs) -> UIElement:"
+        },
+        {
+          "file": "code/src/neurocarto/views/view_efficient.py",
+          "start": 71,
+          "end": 96,
+          "role": "logic",
+          "symbol": "on_probe_update",
+          "anchor": "d3ad5f2aac27",
+          "first": "def on_probe_update(self, probe: ProbeDesp, chmap, electrodes):"
+        },
+        {
+          "file": "code/src/neurocarto/probe_npx/desp.py",
+          "start": 284,
+          "end": 293,
+          "role": "logic",
+          "symbol": "view_ext_electrode_density",
+          "anchor": "a44ad41c43fd",
+          "first": "def view_ext_electrode_density(self, chmap: ChannelMap) -> NDArray[np.float64]:"
+        },
+        {
+          "file": "code/src/neurocarto/probe_npx/desp.py",
+          "start": 296,
+          "end": 321,
+          "role": "logic",
+          "symbol": "view_ext_statistics_info",
+          "anchor": "6099cf3604ec",
+          "first": "def view_ext_statistics_info(self, bp: BlueprintFunctions) -> dict[str, str]:"
+        },
+        {
+          "file": "code/src/neurocarto/probe_npx/stat.py",
+          "start": 70,
+          "end": 104,
+          "role": "logic",
+          "symbol": "npx_channel_efficiency",
+          "anchor": "8d1add6475d9",
+          "first": "def npx_channel_efficiency(bp: BlueprintFunctions,"
+        }
+      ]
+    },
+    {
+      "id": "atlas-overlay",
+      "level": "component",
+      "parent": "side-panel",
+      "title": "Atlas brain slice",
+      "summary": "Shows a mouse brain-atlas slice behind the probe. The person can change the projection and plane, rotate it, highlight regions and drag its boundary to line it up with the shanks.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "drag to arrange",
+        "filter"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/neurocarto/views/atlas.py",
+          "start": 175,
+          "end": 210,
+          "role": "logic",
+          "symbol": "_setup_render",
+          "anchor": "7eed8fc7693f",
+          "first": "def _setup_render(self, f: Figure,"
+        },
+        {
+          "file": "code/src/neurocarto/views/atlas.py",
+          "start": 221,
+          "end": 275,
+          "role": "markup",
+          "symbol": "_setup_content",
+          "anchor": "856b2956ec14",
+          "first": "def _setup_content(self, slider_width: int = 300,"
+        },
+        {
+          "file": "code/src/neurocarto/views/atlas.py",
+          "start": 292,
+          "end": 298,
+          "role": "logic",
+          "symbol": "_on_rotate_changed",
+          "anchor": "66ad4bd0694e",
+          "first": "def _on_rotate_changed(self):"
+        },
+        {
+          "file": "code/src/neurocarto/views/atlas.py",
+          "start": 312,
+          "end": 320,
+          "role": "logic",
+          "symbol": "_on_region_choose",
+          "anchor": "4c0e3ba83799",
+          "first": "def _on_region_choose(self, value: list[str]):"
+        },
+        {
+          "file": "code/src/neurocarto/views/atlas.py",
+          "start": 652,
+          "end": 687,
+          "role": "logic",
+          "symbol": "update_brain_slice",
+          "anchor": "680787bf4280",
+          "first": "def update_brain_slice(self, plane: int | SlicePlane, *,"
+        },
+        {
+          "file": "code/src/neurocarto/views/atlas.py",
+          "start": 732,
+          "end": 736,
+          "role": "logic",
+          "symbol": "on_boundary_transform",
+          "anchor": "f4d9918acad2",
+          "first": "def on_boundary_transform(self, state: BoundaryState):"
+        }
+      ]
+    }
+  ]
+}

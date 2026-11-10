@@ -20,11 +20,11 @@ from .cards import part_spans
 from .index import Index
 from .kb import KB
 from .ontology import FACETS
-from .vec import dot, place_by_neighbours, project_2d
+from .vec import VecSet, dot, place_by_neighbours, project_2d
 from .workflows import StepSpace, families
 
 CHANNELS = [
-    ("card", "Card", "The whole card: summary, workflow and all five facets"),
+    ("card", "All", "Every part of the card together, its summary, workflow and five facets"),
     ("workflow", "Workflow", "The general workflow: its name and steps, in words any science could use"),
     ("structure", "Structure", "Task, data, stage and mechanism words only, with nothing from the field"),
     ("raw", "Prompts and code", "The prompts and code as they are, before any describing"),
@@ -88,8 +88,10 @@ def map_data(kb: KB, index: Index, method: str = "pca", queries: Sequence[str] =
             continue
         pts, used_method = project_2d([vecs[i] for i in ids], method=method)
         neigh = {}
+        gram = dict(zip(ids, VecSet([vecs[i] for i in ids]).gram()))
+        row_of = {i: k for k, i in enumerate(ids)}
         for i in ids:
-            sims = sorted(((dot(vecs[i], vecs[j]), j) for j in ids if j != i), reverse=True)[:5]
+            sims = sorted(((gram[i][row_of[j]], j) for j in ids if j != i), reverse=True)[:5]
             neigh[i] = [[j, round(s, 3)] for s, j in sims]
         placed = []
         # A request is plain words, so it is only placed where builds are words too.
@@ -283,7 +285,7 @@ function palette() {
 function draw() {
   const ch = DATA.channels[channel];
   document.querySelectorAll("#channels button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.k === channel)));
-  $("#says").textContent = `Placed by: ${ch.says.toLowerCase()}. Closer means more alike.`;
+  $("#says").textContent = `Dimension: ${ch.says[0].toLowerCase() + ch.says.slice(1)}. Closer means more alike.`;
   const pal = palette();
   $("#legend").innerHTML = pal.top.map((v, i) => `<span><i style="background:var(--c${i + 1})"></i>${esc(v)}</span>`).join("")
     + (pal.other ? `<span><i style="background:var(--other)"></i>Other</span>` : "");

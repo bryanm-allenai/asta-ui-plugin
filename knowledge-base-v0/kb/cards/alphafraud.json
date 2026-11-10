@@ -1,0 +1,747 @@
+{
+  "schema": "astaui.card/1",
+  "id": "alphafraud",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T00:00:20Z"
+  },
+  "app": {
+    "title": "AlphaFraud",
+    "summary": "A person opens a dashboard of experimental structures, each already matched to its blind prediction and scored, and picks either the whole archive or one release period. They read the headline counts, scan a scatter of predicted confidence against measured agreement where a shaded zone marks the confident misses, and hover a point to preview its deviation ribbon or click it to open that structure. A searchable, sortable table can be narrowed to the confident misses or the novel sequences and exported as CSV. One structure opens into per-residue error tracks, a calibration plot, error heatmaps, a per-domain table and a 3D viewer with the prediction overlaid. A ranked leaderboard groups repeat structures by protein, and any new identifier can be scored on demand.",
+    "task": {
+      "text": "Find where blind structure predictions disagree with experimental structures, and flag the cases where the predictor was confident but wrong.",
+      "verbs": [
+        "compare",
+        "identify",
+        "derive",
+        "summarize",
+        "monitor",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "Experimental structures, each paired with its blind prediction and scored on global, local, per-residue, per-domain and confidence-calibration metrics, grouped by release period and by protein.",
+      "item": "one protein chain from an experimental structure, paired with its predicted model",
+      "shapes": [
+        "table",
+        "sequence",
+        "field",
+        "time series",
+        "categories",
+        "versions"
+      ]
+    },
+    "stage": {
+      "text": "auditing predicted models against newly released experimental structures, after both exist",
+      "terms": [
+        "compare",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "An overview scatter and a filterable table of every scored structure link through to a detail page per structure, where per-residue tracks, heatmaps and a 3D overlay show where the prediction departs from the experiment. A period picker scopes the overview, a grouped leaderboard collapses repeat structures of the same protein, and a lookup box runs the same scoring on demand.",
+      "views": [
+        "scatter plot",
+        "table view",
+        "summary stats",
+        "line chart",
+        "bar chart",
+        "heatmap",
+        "image viewer",
+        "detail panel",
+        "list"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select",
+        "filter",
+        "search",
+        "sort",
+        "toggle view",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "dashboard",
+        "linked views",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "assessing protein structure predictions against experiment in structural biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "structural biology",
+        "structure prediction assessment",
+        "protein structure"
+      ]
+    },
+    "workflow": {
+      "name": "check computed predictions against measured ground truth and flag confident misses",
+      "steps": [
+        {
+          "step": "choose the batch to look at",
+          "here": "A 'Jump to' menu switches between all structures, one release week or one archive deposit month, and the summary counts at the top update to match",
+          "parts": [
+            "period-dashboard"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A scatter plots mean predicted confidence (pLDDT) against measured agreement (TM-score), with a shaded confidently-wrong box. Hovering a point previews its Cα-deviation ribbon and clicking it opens the structure. Next to it are metric histograms and a monthly trend",
+          "parts": [
+            "fraud-scatter"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "A text filter matches PDB id, UniProt, gene or description, two checkboxes keep only confidently-wrong or novel rows, and clicking a column header sorts by any metric",
+          "parts": [
+            "structures-table"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The entry page shows per-residue deviation, lDDT and pLDDT tracks, a pLDDT-vs-lDDT calibration scatter, distance-difference and predicted-vs-observed error heatmaps, and a per-domain TM/RMSD table. The flat ribbon can be swapped for a rotatable 3D view with the predicted backbone overlaid as a 'ghost'",
+          "parts": [
+            "entry-detail",
+            "ribbon-3d-viewer"
+          ]
+        },
+        {
+          "step": "summarize by group",
+          "here": "A leaderboard puts the worst offenders first, one row per protein with a ×N count of its structures. Each row expands to show the individual depositions, and the list can be filtered",
+          "parts": [
+            "offender-leaderboard"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A Calculate box autocompletes only to qualifying human entries, runs the full scoring for the chosen ID in the background, polls until it finishes, then injects the result panel",
+          "parts": [
+            "calculate-lookup"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Every plot and table has a Download CSV button. Table exports keep only the rows the current filter shows",
+          "parts": [
+            "structures-table",
+            "fraud-scatter"
+          ]
+        }
+      ],
+      "distinctive": [
+        "A confidently-wrong flag combines the predictor's own confidence with measured error (mean pLDDT above 70 yet TM-score below 0.5), so honest low-confidence misses are kept apart from confident ones",
+        "A confidence-weighted error score caps per-residue deviation and weights it by the predictor's per-residue confidence",
+        "Only structures released after the predictor's training cutoff count, and a sequence-novelty score marks chains with no close pre-cutoff homolog",
+        "Repeat structures of the same protein all share one prediction, so summaries collapse them per protein with a ×N count",
+        "The predictor's self-reported pairwise error is set beside the observed error to check whether its confidence is honest"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "period-dashboard",
+      "level": "view",
+      "parent": null,
+      "title": "Release-period dashboard",
+      "summary": "Scopes the overview to all structures or to one release week or month, and shows headline counts of analysed, confidently-wrong and novel structures plus the median TM-score.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/alphafraud/templates/week.html",
+          "start": 32,
+          "end": 48,
+          "role": "markup",
+          "symbol": "#weekpick",
+          "anchor": "dce5e77db86a",
+          "first": "<select id=\"weekpick\" onchange=\"if(this.value)window.location=this.value\">"
+        },
+        {
+          "file": "code/alphafraud/templates/week.html",
+          "start": 51,
+          "end": 57,
+          "role": "markup",
+          "anchor": "7a8ad46ef980",
+          "first": "<div class=\"kpis\">"
+        },
+        {
+          "file": "code/alphafraud/static/brand.css",
+          "start": 104,
+          "end": 104,
+          "role": "style",
+          "symbol": ".kpis",
+          "anchor": "ffb1e8f5f48c",
+          "first": ".kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 8px 0 6px; }"
+        },
+        {
+          "file": "code/alphafraud/static/brand.css",
+          "start": 105,
+          "end": 105,
+          "role": "style",
+          "symbol": ".kpi",
+          "anchor": "f9de3edec19f",
+          "first": ".kpi { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow"
+        },
+        {
+          "file": "code/alphafraud/report.py",
+          "start": 59,
+          "end": 81,
+          "role": "logic",
+          "symbol": "kpis",
+          "anchor": "8651165de5c5",
+          "first": "def kpis(entities: list[dict]) -> dict:"
+        },
+        {
+          "file": "code/alphafraud/webapp.py",
+          "start": 730,
+          "end": 759,
+          "role": "logic",
+          "symbol": "_render_week",
+          "anchor": "f1300d8da604",
+          "first": "def _render_week(label):"
+        }
+      ]
+    },
+    {
+      "id": "fraud-scatter",
+      "level": "component",
+      "parent": "period-dashboard",
+      "title": "Confidence-vs-agreement scatter",
+      "summary": "Plots each structure by predicted confidence against measured agreement, with a shaded confidently-wrong zone. Hovering a point previews its deviation ribbon and clicking opens it.",
+      "views": [
+        "scatter plot",
+        "bar chart",
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/alphafraud/templates/week.html",
+          "start": 88,
+          "end": 90,
+          "role": "markup",
+          "anchor": "e9729384df48",
+          "first": "{{ figure(figures.scatter, 'scatter', scatter_note) }}"
+        },
+        {
+          "file": "code/alphafraud/templates/week.html",
+          "start": 5,
+          "end": 14,
+          "role": "markup",
+          "anchor": "2ea444f10a73",
+          "first": "{% macro figure(fig_json, dom_id, caption='') %}"
+        },
+        {
+          "file": "code/alphafraud/report.py",
+          "start": 188,
+          "end": 303,
+          "role": "logic",
+          "symbol": "fraud_scatter",
+          "anchor": "e1b111dd0730",
+          "first": "def fraud_scatter(entities: list[dict], zoom: bool = False, highlights: list[dict] = None) -> str:"
+        },
+        {
+          "file": "code/alphafraud/report.py",
+          "start": 306,
+          "end": 406,
+          "role": "logic",
+          "symbol": "fraud_dumbbell",
+          "anchor": "65de827cc72a",
+          "first": "def fraud_dumbbell(entities: list[dict], top: int = 50) -> Optional[str]:"
+        },
+        {
+          "file": "code/alphafraud/report.py",
+          "start": 418,
+          "end": 438,
+          "role": "logic",
+          "symbol": "metric_histograms",
+          "anchor": "2969d2e86c8e",
+          "first": "def metric_histograms(entities: list[dict]) -> str:"
+        },
+        {
+          "file": "code/alphafraud/static/app.js",
+          "start": 26,
+          "end": 121,
+          "role": "logic",
+          "symbol": "renderPlots",
+          "anchor": "538fceab341e",
+          "first": "function renderPlots() {"
+        },
+        {
+          "file": "code/alphafraud/static/app.js",
+          "start": 693,
+          "end": 723,
+          "role": "logic",
+          "anchor": "00c669d82244",
+          "first": "window.wireScatterPreview = function (el) {"
+        },
+        {
+          "file": "code/alphafraud/static/app.js",
+          "start": 209,
+          "end": 229,
+          "role": "logic",
+          "anchor": "f09b6092f94b",
+          "first": "window.downloadPlotCsv = function (plotId, filename) {"
+        }
+      ]
+    },
+    {
+      "id": "structures-table",
+      "level": "component",
+      "parent": "period-dashboard",
+      "title": "Matched structures table",
+      "summary": "Lists every matched structure with its metrics and supports text search, confidently-wrong and novel-only filters, column sorting and CSV export of the visible rows.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "search",
+        "filter",
+        "sort",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/alphafraud/templates/week.html",
+          "start": 183,
+          "end": 183,
+          "role": "markup",
+          "symbol": "#tableSearch",
+          "anchor": "57156026ebc7",
+          "first": "<input type=\"search\" id=\"tableSearch\" placeholder=\"filter by PDB id, UniProt, gene, description…\">"
+        },
+        {
+          "file": "code/alphafraud/templates/week.html",
+          "start": 184,
+          "end": 184,
+          "role": "markup",
+          "symbol": "#wrongOnly",
+          "anchor": "27937ba513d7",
+          "first": "<label><input type=\"checkbox\" id=\"wrongOnly\"> confidently wrong only</label>"
+        },
+        {
+          "file": "code/alphafraud/templates/week.html",
+          "start": 185,
+          "end": 185,
+          "role": "markup",
+          "symbol": "#novelOnly",
+          "anchor": "cafbb98d4d15",
+          "first": "<label><input type=\"checkbox\" id=\"novelOnly\"> novel only</label>"
+        },
+        {
+          "file": "code/alphafraud/templates/week.html",
+          "start": 188,
+          "end": 215,
+          "role": "markup",
+          "symbol": "#dataTable",
+          "anchor": "eacc0d18f84b",
+          "first": "<table id=\"dataTable\" class=\"sortable\">"
+        },
+        {
+          "file": "code/alphafraud/static/brand.css",
+          "start": 119,
+          "end": 119,
+          "role": "style",
+          "symbol": ".toolbar",
+          "anchor": "c2e4293c3f73",
+          "first": ".toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0; }"
+        },
+        {
+          "file": "code/alphafraud/static/brand.css",
+          "start": 132,
+          "end": 132,
+          "role": "style",
+          "symbol": "tr.wrong",
+          "anchor": "dc1cae29fc01",
+          "first": "tr.wrong { background: rgba(214,39,40,.06); }"
+        },
+        {
+          "file": "code/alphafraud/static/app.js",
+          "start": 138,
+          "end": 158,
+          "role": "logic",
+          "symbol": "initTable",
+          "anchor": "b41ed1c8d76a",
+          "first": "function initTable(table) {"
+        },
+        {
+          "file": "code/alphafraud/static/app.js",
+          "start": 160,
+          "end": 181,
+          "role": "logic",
+          "symbol": "initFilters",
+          "anchor": "e66c224b3062",
+          "first": "function initFilters() {"
+        },
+        {
+          "file": "code/alphafraud/static/app.js",
+          "start": 196,
+          "end": 208,
+          "role": "logic",
+          "anchor": "de78cf77dfe7",
+          "first": "window.downloadTableCsv = function (tableId, filename) {"
+        }
+      ]
+    },
+    {
+      "id": "entry-detail",
+      "level": "view",
+      "parent": null,
+      "title": "Structure detail page",
+      "summary": "Shows everything about one structure: headline metrics, per-residue error and confidence tracks, a calibration scatter, distance and error heatmaps, and a per-domain breakdown.",
+      "views": [
+        "detail panel",
+        "line chart",
+        "scatter plot",
+        "heatmap",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail",
+        "sort",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/alphafraud/templates/entry.html",
+          "start": 68,
+          "end": 192,
+          "role": "markup",
+          "anchor": "ed11128666fe",
+          "first": "<div class=\"kpis\">"
+        },
+        {
+          "file": "code/alphafraud/templates/entry.html",
+          "start": 159,
+          "end": 171,
+          "role": "markup",
+          "symbol": "#domainsTable",
+          "anchor": "b45cb0ddd6af",
+          "first": "<table id=\"domainsTable\" class=\"sortable\">"
+        },
+        {
+          "file": "code/alphafraud/report.py",
+          "start": 539,
+          "end": 556,
+          "role": "logic",
+          "symbol": "per_residue_tracks",
+          "anchor": "5b94b1df2242",
+          "first": "def per_residue_tracks(per_res: dict) -> str:"
+        },
+        {
+          "file": "code/alphafraud/report.py",
+          "start": 733,
+          "end": 748,
+          "role": "logic",
+          "symbol": "calibration_scatter",
+          "anchor": "7161405f840d",
+          "first": "def calibration_scatter(per_res: dict) -> str:"
+        },
+        {
+          "file": "code/alphafraud/report.py",
+          "start": 559,
+          "end": 562,
+          "role": "logic",
+          "symbol": "heatmap",
+          "anchor": "e7ea855304ab",
+          "first": "def heatmap(matrix: list, title: str, colorscale: Optional[list] = None) -> str:"
+        },
+        {
+          "file": "code/alphafraud/report.py",
+          "start": 565,
+          "end": 575,
+          "role": "logic",
+          "symbol": "pae_honesty_pair",
+          "anchor": "b4f8797048fa",
+          "first": "def pae_honesty_pair(pae: list, observed: list) -> str:"
+        },
+        {
+          "file": "code/alphafraud/webapp.py",
+          "start": 762,
+          "end": 784,
+          "role": "logic",
+          "symbol": "_render_entry",
+          "anchor": "8daaec349b9d",
+          "first": "def _render_entry(e):"
+        },
+        {
+          "file": "code/alphafraud/compare.py",
+          "start": 372,
+          "end": 466,
+          "role": "logic",
+          "symbol": "compare",
+          "anchor": "26841fabadd4",
+          "first": "def compare(exp: Chain, af: Chain, pae: Optional[np.ndarray] = None,"
+        }
+      ]
+    },
+    {
+      "id": "ribbon-3d-viewer",
+      "level": "component",
+      "parent": "entry-detail",
+      "title": "Deviation ribbon and 3D overlay",
+      "summary": "Draws the experimental chain coloured by per-residue deviation from the prediction, and toggles to a rotatable 3D view that can overlay the predicted backbone.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "toggle view",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/alphafraud/templates/entry.html",
+          "start": 40,
+          "end": 66,
+          "role": "markup",
+          "anchor": "cd87359a9cf2",
+          "first": "{% set ru = ribbon_url(e.entity_id) %}"
+        },
+        {
+          "file": "code/alphafraud/static/app.js",
+          "start": 412,
+          "end": 470,
+          "role": "logic",
+          "anchor": "1a15c619463d",
+          "first": "var ghostModel = null, ghostOn = false, ghostUrlSaved = \"\", expModel = null;"
+        },
+        {
+          "file": "code/alphafraud/static/app.js",
+          "start": 363,
+          "end": 410,
+          "role": "logic",
+          "anchor": "9aa155eceab3",
+          "first": "function devColor(b) {                       // deviation (Å in B-factor) -> hex int"
+        },
+        {
+          "file": "code/alphafraud/ribbon.py",
+          "start": 119,
+          "end": 198,
+          "role": "logic",
+          "symbol": "build_svg",
+          "anchor": "a6f47f82c76d",
+          "first": "def build_svg(P: np.ndarray, dev, sse, width: int = 520, height: int = 440,"
+        },
+        {
+          "file": "code/alphafraud/ribbon.py",
+          "start": 305,
+          "end": 326,
+          "role": "logic",
+          "symbol": "build_af_ghost_pdb",
+          "anchor": "524b9a6c7e9e",
+          "first": "def build_af_ghost_pdb(exp_chain, af_chain) -> Optional[str]:"
+        }
+      ]
+    },
+    {
+      "id": "offender-leaderboard",
+      "level": "view",
+      "parent": null,
+      "title": "Worst-offenders leaderboard",
+      "summary": "Ranks proteins worst first, one collapsible row per protein with its structure count, which expands to list each deposition. It can be filtered by text.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "search",
+        "filter",
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/alphafraud/templates/leaderboard.html",
+          "start": 22,
+          "end": 22,
+          "role": "markup",
+          "symbol": "#lbSearch",
+          "anchor": "45853d21c045",
+          "first": "<input type=\"search\" id=\"lbSearch\" placeholder=\"filter by protein, UniProt, PDB…\">"
+        },
+        {
+          "file": "code/alphafraud/templates/leaderboard.html",
+          "start": 23,
+          "end": 23,
+          "role": "markup",
+          "symbol": "#lbExpandAll",
+          "anchor": "3350dc44c3b3",
+          "first": "<button class=\"dl\" type=\"button\" id=\"lbExpandAll\">Expand all</button>"
+        },
+        {
+          "file": "code/alphafraud/templates/leaderboard.html",
+          "start": 26,
+          "end": 74,
+          "role": "markup",
+          "symbol": "#lbTable",
+          "anchor": "64d7dbb006cf",
+          "first": "<table class=\"lbgroups\" id=\"lbTable\">"
+        },
+        {
+          "file": "code/alphafraud/static/brand.css",
+          "start": 155,
+          "end": 156,
+          "role": "style",
+          "symbol": ".lbgroups",
+          "anchor": "2360e3d6d3d7",
+          "first": ".lbgroups { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px;"
+        },
+        {
+          "file": "code/alphafraud/static/brand.css",
+          "start": 165,
+          "end": 165,
+          "role": "style",
+          "symbol": ".lb-group",
+          "anchor": "e3157746edf6",
+          "first": ".lb-group { cursor: pointer; border-top: 1px solid var(--border); }"
+        },
+        {
+          "file": "code/alphafraud/static/brand.css",
+          "start": 172,
+          "end": 172,
+          "role": "style",
+          "symbol": ".lb-member",
+          "anchor": "6dae9f4753ef",
+          "first": ".lb-member { background: rgba(120,140,160,.035); font-size: 13px; }"
+        },
+        {
+          "file": "code/alphafraud/static/app.js",
+          "start": 251,
+          "end": 295,
+          "role": "logic",
+          "symbol": "initLeaderboardGroups",
+          "anchor": "efee6198e052",
+          "first": "function initLeaderboardGroups() {"
+        },
+        {
+          "file": "code/alphafraud/db.py",
+          "start": 803,
+          "end": 836,
+          "role": "data",
+          "symbol": "leaderboard_grouped",
+          "anchor": "ea9a37ecf688",
+          "first": "def leaderboard_grouped(max_proteins: int = 80, max_members: int = 40) -> list[dict]:"
+        }
+      ]
+    },
+    {
+      "id": "calculate-lookup",
+      "level": "view",
+      "parent": null,
+      "title": "On-demand Calculate box",
+      "summary": "Autocompletes an identifier to qualifying structures only, runs the full comparison in the background, polls for progress and then shows the result panel.",
+      "views": [
+        "form",
+        "detail panel"
+      ],
+      "interactions": [
+        "search",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/alphafraud/templates/calculate.html",
+          "start": 12,
+          "end": 23,
+          "role": "markup",
+          "anchor": "be3c0d1d3ea4",
+          "first": "<div class=\"calc-box card\">"
+        },
+        {
+          "file": "code/alphafraud/static/brand.css",
+          "start": 217,
+          "end": 218,
+          "role": "style",
+          "symbol": ".calc-input",
+          "anchor": "776f93a51e03",
+          "first": ".calc-input { flex: 1; min-width: 240px; padding: 12px 14px; font-size: 16px; border: 1px solid var(--border);"
+        },
+        {
+          "file": "code/alphafraud/static/brand.css",
+          "start": 220,
+          "end": 222,
+          "role": "style",
+          "symbol": ".calc-suggest",
+          "anchor": "6cbd799cf77c",
+          "first": ".calc-suggest { position: absolute; top: 100%; left: 0; right: 0; margin: 4px 0 0; padding: 4px; list-style: none;"
+        },
+        {
+          "file": "code/alphafraud/static/app.js",
+          "start": 560,
+          "end": 660,
+          "role": "logic",
+          "anchor": "9f2ebd870eec",
+          "first": "/* ---- Calculate tab: autocomplete + on-demand compute ---- */"
+        },
+        {
+          "file": "code/alphafraud/webapp.py",
+          "start": 356,
+          "end": 382,
+          "role": "logic",
+          "symbol": "calculate_run",
+          "anchor": "e03d5f8a4405",
+          "first": "def calculate_run():"
+        },
+        {
+          "file": "code/alphafraud/calculate.py",
+          "start": 14,
+          "end": 50,
+          "role": "logic",
+          "symbol": "validate",
+          "anchor": "fb126f60b2c9",
+          "first": "def validate(raw: str) -> dict:"
+        },
+        {
+          "file": "code/alphafraud/calculate.py",
+          "start": 78,
+          "end": 109,
+          "role": "logic",
+          "symbol": "compute",
+          "anchor": "cd7d8ab589f7",
+          "first": "def compute(entity_id: str) -> dict:"
+        }
+      ]
+    }
+  ]
+}

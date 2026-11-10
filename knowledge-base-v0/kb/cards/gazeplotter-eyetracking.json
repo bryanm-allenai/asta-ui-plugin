@@ -1,0 +1,453 @@
+{
+  "schema": "astaui.card/1",
+  "id": "gazeplotter-eyetracking",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T07:52:57Z"
+  },
+  "app": {
+    "title": "GazePlotter",
+    "summary": "A person loads eye-tracker exports, or a saved workspace, and the recordings are split into participants, stimuli and areas of interest (AOIs). They lay out plots on a pan-and-zoom canvas: scarf plots of AOI sequences per participant, transition matrices, AOI comparison bars, timelines, scanpaths, heatmaps and similarity networks. Selecting a plot opens a settings pane where they pick the stimulus, participant selection, metric, time range and AOI selection. In shared libraries they rename, merge and group participants, AOIs and stimuli, and they configure metric instances. They export metric tables for statistics, figures, segmented data and a reusable analysis specification.",
+    "task": {
+      "text": "Turn AOI-coded eye-tracking recordings into sequence charts, transition matrices and per-AOI metric tables, so attention can be compared across participants, groups and stimuli.",
+      "verbs": [
+        "derive",
+        "compare",
+        "explore",
+        "summarize",
+        "organize"
+      ]
+    },
+    "data": {
+      "text": "Eye-tracking recordings exported from vendor software: timed gaze segments (fixations, saccades and others) per participant and stimulus, each tagged with the areas of interest it hit. Optional coordinates, event channels and reference images or videos can be added.",
+      "item": "one participant's recording on one stimulus: a timed sequence of eye-movement segments, each with its AOI hits",
+      "shapes": [
+        "sequence",
+        "time series",
+        "events",
+        "categories",
+        "table",
+        "network",
+        "image",
+        "media"
+      ]
+    },
+    "stage": {
+      "text": "analysing AOI-coded eye-tracking recordings after they are exported from the tracker, before statistics and write-up",
+      "terms": [
+        "analyze",
+        "explore",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A canvas holds freely arranged, resizable plot panels. Each panel is drawn from a shared metric library and from shared selections of participants, AOIs and stimuli, and selecting a panel opens a pane with its settings. Hovering one plot marks the same moment and participant in the others, and library modals rename, merge and group entities across every plot.",
+      "views": [
+        "canvas",
+        "timeline",
+        "heatmap",
+        "bar chart",
+        "network diagram",
+        "scatter plot",
+        "line chart",
+        "image viewer",
+        "detail panel",
+        "list",
+        "form",
+        "strip plot"
+      ],
+      "interactions": [
+        "import",
+        "drag to arrange",
+        "zoom and pan",
+        "select",
+        "multi-select",
+        "hover for detail",
+        "filter",
+        "sort",
+        "inline edit",
+        "toggle view",
+        "time slider",
+        "undo",
+        "keyboard shortcuts",
+        "export",
+        "search"
+      ],
+      "patterns": [
+        "dashboard",
+        "linked views",
+        "master-detail",
+        "small multiples",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "AOI-based eye-tracking analysis in psychology and usability research",
+      "disciplines": [
+        "psychology"
+      ],
+      "terms": [
+        "eye tracking",
+        "scanpath analysis",
+        "areas of interest"
+      ]
+    },
+    "workflow": {
+      "name": "compute and compare per-category measures from coded sequences across people and conditions",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Import or drag-and-drop opens Tobii, SMI BeGaze, Gazepoint, Pupil Cloud, Varjo, OGAMA or custom CSV exports, or a .gazeplotter workspace. Parsing runs in a worker, Tobii asks how to split the recording into stimuli, and event and media files are matched to stimuli.",
+          "parts": [
+            "import"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Scarf plots draw each participant's AOI sequence as a coloured strip on an absolute, relative or ordinal timeline, with event channels beneath it.",
+          "parts": [
+            "workspace-canvas",
+            "scarf-plot"
+          ]
+        },
+        {
+          "step": "group items into clusters",
+          "here": "The AOI, participant, stimulus, event and eye-movement libraries rename, recolour and merge entries, and save named selections that every plot and export can narrow to.",
+          "parts": [
+            "entity-libraries"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The metric library builds instances from base measures (dwell time, fixation count, time to first fixation, transition probability, RQA, scanpath similarity). Each instance gets parameters, a projection to a shape and an optional sliding window.",
+          "parts": [
+            "metric-library"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "The settings pane of the selected plot picks the stimulus, participant selection, metric, start/end time range in ms, AOI selection and whether to hide No AOI data.",
+          "parts": [
+            "settings-pane"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Plots placed next to each other with different stimuli or participant selections. Linked hovering marks the same moment and participant across them.",
+          "parts": [
+            "workspace-canvas",
+            "scarf-plot"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Metric Data CSV in long or wide form with an optional codebook and analysis JSON, plus PNG/JPG figures, segmented and event CSVs, ScanGraph strings and a .gazeplotter workspace saved with Ctrl+S.",
+          "parts": [
+            "metric-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each metric declares a measurement class (extensive, intensive, proportion or group-level), and plots offer only the across-participant reductions that class makes sound, such as a cohort total only for additive quantities.",
+        "Fixations outside every AOI are kept as a reserved No AOI slot, and an Any Fixation slot holds stimulus-wide totals, so values are never lost when an AOI selection narrows the plot.",
+        "Windowed metrics follow explicit membership rules (clipped overlap for durations, midpoint ownership for counts), so the window values add up to the unwindowed total.",
+        "An exported analysis specification (renames, merges, selections, metric library) can be replayed headlessly from the command line on new recordings and gives the same table as the app.",
+        "Participants whose data is split across files can be merged reversibly, and a merge of members recorded on the same stimulus is refused."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "workspace-canvas",
+      "level": "view",
+      "parent": null,
+      "title": "Plot workspace canvas",
+      "summary": "A pan-and-zoom surface where the person adds, drags, resizes, multi-selects, duplicates and removes plot panels, with undo and redo.",
+      "views": [
+        "canvas"
+      ],
+      "interactions": [
+        "drag to arrange",
+        "zoom and pan",
+        "select",
+        "multi-select",
+        "undo",
+        "keyboard shortcuts"
+      ],
+      "patterns": [
+        "dashboard",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/lib/workspace/Workspace.svelte",
+          "start": 1,
+          "end": 651,
+          "role": "markup",
+          "anchor": "8d986460dc60",
+          "first": "<script lang=\"ts\">"
+        },
+        {
+          "file": "code/src/lib/workspace/grid/Grid.svelte",
+          "start": 1,
+          "end": 653,
+          "role": "logic",
+          "anchor": "fe0f5732449a",
+          "first": "<script lang=\"ts\">"
+        },
+        {
+          "file": "code/src/lib/workspace/controls/WorkspaceControls.svelte",
+          "start": 1,
+          "end": 205,
+          "role": "markup",
+          "anchor": "002810153105",
+          "first": "<script lang=\"ts\">"
+        },
+        {
+          "file": "code/src/lib/plots/shared/PlotSyncRegistry.svelte.ts",
+          "start": 1,
+          "end": 67,
+          "role": "logic",
+          "anchor": "bf0715484213",
+          "first": "/**"
+        }
+      ]
+    },
+    {
+      "id": "scarf-plot",
+      "level": "component",
+      "parent": "workspace-canvas",
+      "title": "Scarf plot",
+      "summary": "Draws one strip per participant, coloured by AOI over time, with event channels beneath it and hover details that link to the other plots.",
+      "views": [
+        "timeline"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view",
+        "time slider"
+      ],
+      "patterns": [
+        "linked views",
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/src/lib/plots/scarf/components/ScarfPlotFigure.svelte",
+          "start": 1,
+          "end": 576,
+          "role": "markup",
+          "anchor": "dcd179fc6a4b",
+          "first": "<script lang=\"ts\">"
+        },
+        {
+          "file": "code/src/lib/plots/scarf/core/renderer.ts",
+          "start": 1,
+          "end": 1024,
+          "role": "logic",
+          "anchor": "b9efa670bad1",
+          "first": "import {"
+        }
+      ]
+    },
+    {
+      "id": "settings-pane",
+      "level": "view",
+      "parent": null,
+      "title": "Plot settings pane",
+      "summary": "Opens beside the selected plot, with collapsible sections for stimulus, participants, metric, visualisation options, time range, AOIs and export.",
+      "views": [
+        "detail panel",
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "sort",
+        "time slider",
+        "toggle view"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/lib/workspace/pane/Pane.svelte",
+          "start": 1,
+          "end": 210,
+          "role": "markup",
+          "anchor": "f3c2c879d3e1",
+          "first": "<script lang=\"ts\">"
+        }
+      ]
+    },
+    {
+      "id": "entity-libraries",
+      "level": "view",
+      "parent": null,
+      "title": "AOI, participant and stimulus libraries",
+      "summary": "Lists entities to rename, recolour, reorder and merge, and a tray saves the selected rows as named selections that the whole workspace shares.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "multi-select",
+        "inline edit",
+        "drag to arrange",
+        "search"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/src/lib/modals/modification/shared/EditableEntityList.svelte",
+          "start": 1,
+          "end": 872,
+          "role": "markup",
+          "anchor": "5addd183969f",
+          "first": "<script module lang=\"ts\">"
+        },
+        {
+          "file": "code/src/lib/modals/modification/shared/SelectionTray.svelte",
+          "start": 1,
+          "end": 492,
+          "role": "markup",
+          "anchor": "cd56eab0dbaf",
+          "first": "<script lang=\"ts\">"
+        },
+        {
+          "file": "code/src/lib/modals/modification/aoi-modification/Modal.svelte",
+          "start": 1,
+          "end": 428,
+          "role": "markup",
+          "anchor": "43b89057587a",
+          "first": "<script lang=\"ts\">"
+        }
+      ]
+    },
+    {
+      "id": "metric-library",
+      "level": "view",
+      "parent": null,
+      "title": "Metric library",
+      "summary": "The person picks a base metric, sets its parameters, a projection and an optional window, then labels and saves the instance so every compatible plot offers it.",
+      "views": [
+        "sidebar list",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "inline edit"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/lib/modals/modification/metric-library/Modal.svelte",
+          "start": 1,
+          "end": 320,
+          "role": "markup",
+          "anchor": "8cb308af36c7",
+          "first": "<script lang=\"ts\">"
+        },
+        {
+          "file": "code/src/lib/modals/modification/metric-library/ConfigureMetric.svelte",
+          "start": 1,
+          "end": 802,
+          "role": "markup",
+          "anchor": "67fd14291698",
+          "first": "<script lang=\"ts\">"
+        },
+        {
+          "file": "code/src/lib/metrics/instances.ts",
+          "start": 47,
+          "end": 54,
+          "role": "logic",
+          "symbol": "createMetricInstance",
+          "anchor": "8df046d65f5d",
+          "first": "export function createMetricInstance(opts: {"
+        }
+      ]
+    },
+    {
+      "id": "import",
+      "level": "component",
+      "parent": "workspace-canvas",
+      "title": "File import and drop",
+      "summary": "Accepts eye-tracker exports, event files, media and workspaces by picker or drop, detects the format, parses it in a worker and asks any format questions.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/lib/workspace/fileDrop.svelte.ts",
+          "start": 1,
+          "end": 50,
+          "role": "logic",
+          "anchor": "7df73c217787",
+          "first": "/**"
+        },
+        {
+          "file": "code/src/lib/session/ingestService.svelte.ts",
+          "start": 1,
+          "end": 976,
+          "role": "logic",
+          "anchor": "ea3e72d61b33",
+          "first": "// The engine's worker entry, bundled by the consumer's Vite (`?worker`)."
+        },
+        {
+          "file": "code/src/lib/GazePlotter.svelte",
+          "start": 105,
+          "end": 137,
+          "role": "logic",
+          "symbol": "runLoad",
+          "anchor": "22b0c2deaa1d",
+          "first": "async function runLoad("
+        }
+      ]
+    },
+    {
+      "id": "metric-export",
+      "level": "view",
+      "parent": null,
+      "title": "Metric data export",
+      "summary": "Stepwise choice of metrics, stimuli, participants and AOIs, then file format (long or wide, delimiter, time range, codebook), with a column preview before download.",
+      "views": [
+        "form",
+        "list"
+      ],
+      "interactions": [
+        "multi-select",
+        "search",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/lib/modals/export/export-metric-data/Modal.svelte",
+          "start": 1,
+          "end": 537,
+          "role": "markup",
+          "anchor": "e6b8303995e6",
+          "first": "<script lang=\"ts\">"
+        },
+        {
+          "file": "code/src/lib/data/export/mappers/metrics.ts",
+          "start": 248,
+          "end": 258,
+          "role": "logic",
+          "symbol": "exportMetrics",
+          "anchor": "1d6a659afc36",
+          "first": "export async function exportMetrics("
+        }
+      ]
+    }
+  ]
+}

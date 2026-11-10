@@ -1,0 +1,443 @@
+{
+  "schema": "astaui.card/1",
+  "id": "genequantify-qpcr-expression",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T07:21:44Z"
+  },
+  "app": {
+    "title": "GeneQuantify: Expression & CNV Analysis",
+    "summary": "A person sets up the study (how many target genes, patient groups and reference genes) and brings in Cq values. They can paste a column per gene and group, import an RDML or RDES file and map sample names to control and patient groups, or load a validation scenario. They set amplification efficiency for each gene, either by typing it, from a slope, or with a standard-curve calculator. Flagged outlier replicates can be excluded one by one, and when there are several reference genes their stability is checked. The interface then computes ΔCq, ΔΔCq fold change and the Pfaffl ratio for each gene and group, picks and runs the statistical tests, and corrects for multiple comparisons. The person reads the tables, bar charts and replicate distribution plots and downloads CSV tables and a PDF report.",
+    "task": {
+      "text": "Turn replicate Cq values from qPCR runs into normalised fold changes for each gene and group against a control, with automatically chosen significance tests, and export the results.",
+      "verbs": [
+        "derive",
+        "compare",
+        "clean",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Cycle-threshold (Cq) values for technical or biological replicates, grouped by target gene, reference gene and sample group (one control and one or more treated or patient groups), with optional amplification efficiencies for each gene.",
+      "item": "a replicate Cq value for one gene in one sample group",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "analysing relative expression after the qPCR run, before writing up",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "The data-entry tab gathers the design, efficiency settings and pasted or imported Cq columns, and shows outlier flags and reference-gene stability inline. Every change reruns the pipeline, which recomputes ΔCq, fold changes and the automatically chosen tests in the results tab and refreshes the PDF report tab.",
+      "views": [
+        "form",
+        "table view",
+        "bar chart",
+        "strip plot",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "exclude and refit",
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "relative quantification of qPCR gene expression (ΔΔCq and Pfaffl) in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "molecular biology",
+        "qpcr",
+        "relative quantification"
+      ]
+    },
+    "workflow": {
+      "name": "compute normalised fold changes between groups and test them",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Cq columns are pasted for each gene, group and reference gene. Alternatively, an RDML or RDES file is uploaded and sample-name substrings are mapped to control and patient groups, or a validation scenario is loaded.",
+          "parts": [
+            "import-sidebar",
+            "cq-entry"
+          ]
+        },
+        {
+          "step": "set up the design and the method's parameters",
+          "here": "The person sets how many target genes, patient groups and reference genes there are. They choose the outlier method (Grubbs or IQR) and whether it runs on raw Cq or on ΔCq. They give each gene's efficiency as an E value or a slope, or fit one from a dilution series.",
+          "parts": [
+            "data-entry-tab",
+            "standard-curve-calculator"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Flagged outlier replicates each get an exclude checkbox. Excluding one removes the same replicate from the target and all reference genes. With two or more reference genes, geNorm M and CV are checked for each one.",
+          "parts": [
+            "cq-entry"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "ΔCq is computed against the mean of the reference genes, then ΔΔCq fold change and the Pfaffl ratio, both shown side by side. A test is chosen automatically by sample size, normality and equal variance (t, Welch or Mann-Whitney; ANOVA or Kruskal-Wallis with post-hoc tests for three or more groups). Bonferroni and FDR corrections are also computed.",
+          "parts": [
+            "cq-entry",
+            "results-tab"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "A grouped bar chart shows fold change for each gene across groups, switchable between ΔΔCq and Pfaffl and with an optional log2 scale. Each gene also gets a strip plot of replicates, showing RQ, ΔCq or ΔΔCq.",
+          "parts": [
+            "results-tab",
+            "distribution-plot"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "CSV downloads cover the input table, the statistics and the post-hoc and corrected p-values. A PDF report is generated in the chosen interface language.",
+          "parts": [
+            "results-tab",
+            "report-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Two quantification models run side by side (efficiency-free ΔΔCq and efficiency-corrected Pfaffl). A warning appears when the target and reference efficiencies differ by more than a set threshold.",
+        "Reference genes are averaged into a normalisation factor, and their stability is scored with geNorm M and CV against fixed thresholds.",
+        "The statistical test is chosen by a decision tree (sample size, then Shapiro-Wilk, then Levene) and run on linear RQ values rather than on log-scale ΔCq.",
+        "Outlier detection can run on raw Cq before normalisation. Excluded replicates are kept as flagged rows in the tables and the report.",
+        "Fold changes are classed as up-regulated, down-regulated or no change with fixed cutoffs of 1.5 and 0.67."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "import-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Import and scenarios sidebar",
+      "summary": "Loads Cq values from an RDML or RDES instrument file, mapping sample-name substrings to control and patient groups, or loads a preset validation scenario into the entry fields.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 2646,
+          "end": 2786,
+          "role": "data",
+          "anchor": "3632fc934d6b",
+          "first": "# ──Scenario-based example data loader ────────"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2787,
+          "end": 2841,
+          "role": "logic",
+          "anchor": "4630727b8a06",
+          "first": "st.sidebar.divider()"
+        },
+        {
+          "file": "code/app.py",
+          "start": 34,
+          "end": 143,
+          "role": "logic",
+          "symbol": "parse_rdml",
+          "anchor": "c80b4ee849bf",
+          "first": "def parse_rdml(file_bytes):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 147,
+          "end": 189,
+          "role": "logic",
+          "symbol": "parse_rdes",
+          "anchor": "eaa604abb8bf",
+          "first": "def parse_rdes(file_bytes):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2877,
+          "end": 2941,
+          "role": "logic",
+          "symbol": "apply_import_to_session",
+          "anchor": "ae8a727da9a9",
+          "first": "def apply_import_to_session(df, ctrl_sample_label, patient_labels):"
+        }
+      ]
+    },
+    {
+      "id": "data-entry-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Data entry: study design and settings",
+      "summary": "Sets the number of target genes, patient groups and reference genes, the outlier method and the stage it runs at, and each gene's amplification efficiency, warning when the target and reference efficiencies differ too much.",
+      "views": [
+        "form"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3069,
+          "end": 3173,
+          "role": "logic",
+          "anchor": "f152cd544016",
+          "first": "with tab_data:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3218,
+          "end": 3247,
+          "role": "logic",
+          "anchor": "5698bf5e949c",
+          "first": "# ── Per-gen efficiency girişi ─────────────────────────────────────────────"
+        }
+      ]
+    },
+    {
+      "id": "standard-curve-calculator",
+      "level": "component",
+      "parent": "data-entry-tab",
+      "title": "Standard curve efficiency calculator",
+      "summary": "Fits a line to Cq values from a dilution series against log concentration and reports the slope, E, percent efficiency and R², with a check against the accepted range.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3175,
+          "end": 3216,
+          "role": "logic",
+          "anchor": "70e15a6484b6",
+          "first": "# ── Standart eğri hesaplayıcı ─────────────────────────────────────────────"
+        }
+      ]
+    },
+    {
+      "id": "cq-entry",
+      "level": "component",
+      "parent": "data-entry-tab",
+      "title": "Cq entry, outlier exclusion and fold-change computation",
+      "summary": "Takes pasted Cq columns for each gene and group, flags outlier replicates for the person to exclude, shows geNorm reference stability, and computes ΔCq, ΔΔCq fold change, the Pfaffl ratio and the pairwise test.",
+      "views": [
+        "form",
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3249,
+          "end": 3905,
+          "role": "logic",
+          "anchor": "baa6a758529c",
+          "first": "# ── Gen verisi giriş başlığı ───────────────────────────────────────────────"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2872,
+          "end": 2874,
+          "role": "logic",
+          "symbol": "parse_input_data",
+          "anchor": "353887a6d15f",
+          "first": "def parse_input_data(input_data):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3003,
+          "end": 3034,
+          "role": "logic",
+          "symbol": "render_outlier_ui",
+          "anchor": "e110dfddad47",
+          "first": "def render_outlier_ui(data, label, key_prefix, method):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2968,
+          "end": 2993,
+          "role": "logic",
+          "symbol": "detect_outliers_grubbs",
+          "anchor": "9d409051e833",
+          "first": "def detect_outliers_grubbs(data, alpha=0.05):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2995,
+          "end": 3001,
+          "role": "logic",
+          "symbol": "detect_outliers_iqr",
+          "anchor": "e229e46f17f5",
+          "first": "def detect_outliers_iqr(data, multiplier=1.5):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2943,
+          "end": 2956,
+          "role": "logic",
+          "symbol": "compute_genorm_m",
+          "anchor": "f503c712426a",
+          "first": "def compute_genorm_m(ref_ct_matrix):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2958,
+          "end": 2961,
+          "role": "logic",
+          "symbol": "compute_cv",
+          "anchor": "622c0f35342a",
+          "first": "def compute_cv(ct_values):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2963,
+          "end": 2965,
+          "role": "logic",
+          "symbol": "geometric_mean_ct",
+          "anchor": "a143f9ca3bc7",
+          "first": "def geometric_mean_ct(ct_arrays):"
+        }
+      ]
+    },
+    {
+      "id": "results-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Results: tables, multi-group tests and multi-gene comparison",
+      "summary": "Shows the input, fold-change and statistics tables, the omnibus and post-hoc tests with Bonferroni and FDR corrections, and a grouped fold-change bar chart across genes and groups, with CSV downloads.",
+      "views": [
+        "table view",
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3906,
+          "end": 4045,
+          "role": "logic",
+          "anchor": "3c9946e1d95a",
+          "first": "# ─── MULTI-GROUP ANALYSIS (3+ patient groups per target gene) ────────────────"
+        },
+        {
+          "file": "code/app.py",
+          "start": 4051,
+          "end": 4381,
+          "role": "logic",
+          "anchor": "41d4b4336fb1",
+          "first": "with tab_results:"
+        }
+      ]
+    },
+    {
+      "id": "distribution-plot",
+      "level": "component",
+      "parent": "results-tab",
+      "title": "Replicate distribution plot",
+      "summary": "Plots each replicate as a jittered dot for control and each group, with group means, and can switch between RQ, ΔCq and ΔΔCq.",
+      "views": [
+        "strip plot"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 4383,
+          "end": 4527,
+          "role": "logic",
+          "anchor": "743b69b57391",
+          "first": "# ── Dağılım Grafikleri ────────────────────────────────────────────────────"
+        },
+        {
+          "file": "code/app.py",
+          "start": 4437,
+          "end": 4443,
+          "role": "logic",
+          "symbol": "_transform",
+          "anchor": "5847a3a674f1",
+          "first": "def _transform(dct_array, mode, ctrl_mean):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 4445,
+          "end": 4448,
+          "role": "logic",
+          "symbol": "_yaxis_label",
+          "anchor": "427c60363605",
+          "first": "def _yaxis_label(mode):"
+        }
+      ]
+    },
+    {
+      "id": "report-tab",
+      "level": "view",
+      "parent": null,
+      "title": "PDF report",
+      "summary": "Generates and downloads a PDF report with the input table, fold changes, statistics and multi-group results, in the chosen interface language.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 5191,
+          "end": 5206,
+          "role": "logic",
+          "anchor": "c9a9438b7907",
+          "first": "with tab_report:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 4638,
+          "end": 5187,
+          "role": "logic",
+          "symbol": "create_pdf",
+          "anchor": "b06c056476a3",
+          "first": "def create_pdf(results, stat_rows, input_df, language_code, multigroup_results=None):"
+        }
+      ]
+    }
+  ]
+}

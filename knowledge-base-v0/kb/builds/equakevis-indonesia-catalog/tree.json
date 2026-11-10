@@ -1,0 +1,753 @@
+{
+ "interface": {
+  "title": "E-QuakeVis (Database Gempa)",
+  "field": "Seismology / earthquake hazard (Indonesia)",
+  "stage_of_work": "exploration, analysis and reporting of an earthquake catalog, including hazard review and producing a publication map",
+  "what_it_is_for": "Filter the Indonesian BMKG/USGS earthquake catalog by time, magnitude, depth, region, coastline distance and map box, look at the epicenters on a fault/trench map and as hypocenters against Slab2 slab surfaces, review precomputed PSHA hazard maps and curves, and export the event table and a print-ready map sheet."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "The bundled gempa_working.sqlite holds 1,322 events (28 Apr – 26 Jul 2026). The precomputed PSHA run is 'ntt_revisi1_run1 · v2024.0.0 · 620 situs' (620 sites, Sumba/NTT area). Uploaded test files gempa_sample_mixed_invalid.csv and gempa_sample_missing_columns.csv were used only to check import validation and were not added to the database. Most basemap tiles loaded (Esri topo, OpenTopoMap), but the 'Humanitarian' basemap stayed grey (screens/029.webp)."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "isolate an earthquake set of interest, interpret its tectonic setting and hazard, and report it",
+  "specific": "filter the Indonesia catalog, read the hypocenters against Slab2, review precomputed PSHA, and export the table and an A4 publication map; building a new PSHA model (Bangun Model PSHA) is also a purpose of the tool but was blocked on this server (no GEM logic tree, no OpenQuake) and is not in this tree",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "bring in an external catalog before analysis",
+    "specific": "sidebar Impor 'Tambah data' uploader",
+    "children": [
+     {
+      "kind": "task",
+      "general": "check an uploaded catalog against row and column validation before adding it",
+      "specific": "upload a CSV; the app reports 'N baris valid dari M baris terbaca' or asks for column mapping ('Cocokkan kolom'); Tambahkan ke database stays disabled until required columns are mapped (committing a clean file was not tried)",
+      "branch": "when the uploaded file has invalid rows or unmatched column names",
+      "screens": [
+       "screens/066.webp",
+       "screens/067.webp",
+       "screens/071.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "uploaded gempa_sample_mixed_invalid.csv → '2 baris valid dari 6 baris terbaca'",
+        "screens": [
+         "screens/066.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Pratinjau data (2 rows shown)",
+        "screens": [
+         "screens/067.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "removed it and uploaded gempa_sample_missing_columns.csv → Cocokkan kolom panel, Magnitudo unmapped",
+        "screens": [
+         "screens/069.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the Magnitudo mapping list (no magnitude column available); Tambahkan ke database stays disabled",
+        "screens": [
+         "screens/070.webp",
+         "screens/071.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "select the events of interest",
+    "specific": "sidebar Filter + map box selection on the Peta Sebaran tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "restrict events by magnitude range",
+      "specific": "drag the Magnitudo (M) slider to 5.00–7.80 (1,322 → 99 events)",
+      "screens": [
+       "screens/007.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged Magnitudo start handle to 5.00",
+        "screens": [
+         "screens/006.webp",
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Home on the Magnitudo start handle to reset to 0.10",
+        "screens": [
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "restrict events to an administrative area",
+      "specific": "choose Provinsi then Kabupaten/Kota (the regency list follows the chosen province)",
+      "screens": [
+       "screens/010.webp",
+       "screens/012.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 'Maluku Utara' in Provinsi and pressed Enter",
+        "screens": [
+         "screens/009.webp",
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Kabupaten/Kota and chose Halmahera Barat",
+        "screens": [
+         "screens/011.webp",
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "cleared Provinsi with the x button",
+        "screens": [
+         "screens/015.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "restrict events by distance to the coastline",
+      "specific": "drag 'Jarak maksimum dari pantai (km)' (0–50, shown once a kabupaten is chosen) down to the wanted distance and read the summary cards",
+      "branch": "when a kabupaten/kota is selected",
+      "screens": [
+       "screens/014.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged Jarak maksimum dari pantai from 50 to 15 km (cards 2 → 1 event)",
+        "screens": [
+         "screens/013.webp",
+         "screens/014.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "restrict events to a rectangular lon/lat area",
+      "specific": "Seleksi kotak koordinat: type N/W/E/S and press Terapkan kotak, or draw a box with the square tool on the map",
+      "branch": "one-of",
+      "screens": [
+       "screens/016.webp",
+       "screens/022.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed North 0, West 100, East 110, South -9 and pressed Terapkan kotak (3 events)",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Hapus seleksi",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed the square box tool and dragged a box over the Banda Sea (sidebar fields filled to -0.9668/123.3984/129.5508/-8.4072; 3 events, median depth 170 km)",
+        "screens": [
+         "screens/019.webp",
+         "screens/021.webp",
+         "screens/022.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "inspect events on a map with tectonic reference layers",
+    "specific": "Peta Sebaran map with Tampilan Peta toggles",
+    "children": [
+     {
+      "kind": "task",
+      "general": "add or remove reference overlays and change the background map",
+      "specific": "switch on gunung api and kontur slab (100 km interval), switch off trench, choose a basemap in Jenis basemap",
+      "screens": [
+       "screens/029.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "switched on Tampilkan gunung api",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "switched off Tampilkan trench",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "switched on Tampilkan kontur slab",
+        "screens": [
+         "screens/025.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Jenis basemap and picked another basemap (OpenTopoMap loaded in the replay; Humanitarian stayed grey, see not_done)",
+        "screens": [
+         "screens/026.webp",
+         "check/screens/028.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "relate hypocenters to the subducting slab",
+    "specific": "Hiposenter 3D tab (Geometri subduksi & seismisitas)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "define a profile line and read the depth cross-section against the slab surface, optionally exaggerating the vertical scale",
+      "specific": "set A–A′ by coordinates or by clicking on the slicing map, choose Corridor ±, read Penampang A–A′ with the USGS Slab2 line; Skala vertikal stretches the 3D model",
+      "screens": [
+       "screens/036.webp",
+       "screens/039.webp",
+       "screens/037.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed A 107/-11 and A′ 107/-4, chose Corridor ± 50 km, pressed Terapkan koordinat (105 events in slice, Sunda slab)",
+        "screens": [
+         "screens/035.webp",
+         "screens/036.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Skala vertikal 3× (optional)",
+        "screens": [
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Gambar A–A′ di 3D, then clicked two points across Sumatra on the slicing map (3 events in slice)",
+        "screens": [
+         "screens/037.webp",
+         "screens/038.webp",
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the section to read the Slab2 depth (475.4 km along profile, depth 89.8 km)",
+        "screens": [
+         "screens/040.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "export the events inside the profile corridor",
+      "specific": "Unduh slice CSV → cross-section-a-slab2.csv (id, time, magnitude, depth, lon, lat, distanceKm, crossTrackKm); disabled when the slice holds 0 events",
+      "screens": [
+       "screens/036.webp",
+       "check/screens/033.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Unduh slice CSV → downloads/cross-section-a-slab2.csv",
+        "screens": [
+         "check/screens/033.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "review probabilistic seismic hazard",
+    "specific": "Bahaya Gempa (PSHA) tab (precomputed run only)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "view a hazard map and summary for one result, parameter and return period",
+      "specific": "ntt_revisi1_run1, PGA, 475 th: 620 sites, min 0.301 g, median 0.345 g, max 0.402 g",
+      "screens": [
+       "screens/042.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Bahaya Gempa (PSHA) tab and read the summary cards",
+        "screens": [
+         "screens/042.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "get the hazard curve at a picked site",
+      "specific": "click land on the map → Kurva Hazard (PGA, SA(0.2), SA(1.0)) with the 10%/50 and 2%/50 lines and a return-period table",
+      "screens": [
+       "screens/047.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked a land point on the hazard map",
+        "screens": [
+         "screens/044.webp",
+         "screens/047.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "export the hazard grid and the site curve",
+      "specific": "Unduh grid PGA-0.1 (CSV) and Unduh kurva hazard situs (CSV)",
+      "screens": [
+       "screens/047.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Unduh grid PGA-0.1 (CSV) → psha_ntt_revisi1_run1_PGA-0.1.csv",
+        "screens": [
+         "screens/047.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Unduh kurva hazard situs (CSV) → kurva_hazard_ntt_revisi1_run1_-9.69_119.34.csv",
+        "screens": [
+         "screens/047.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "summarise and export the selected events",
+    "specific": "Statistik and Data Kejadian tabs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "review summary statistics of the selection",
+      "specific": "Statistik: totals, mean M 3.55, depth histogram, M vs depth scatter, Provinsi Terbanyak, Magnitudo Terbesar",
+      "screens": [
+       "screens/049.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Statistik tab",
+        "screens": [
+         "screens/049.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "read the event table and download it",
+      "specific": "Data Kejadian table with province, regency, land/sea, nearest fault and segment; Unduh CSV → gempa_filter_20261101.csv",
+      "screens": [
+       "screens/048.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Unduh CSV",
+        "screens": [
+         "screens/048.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "produce a publication map",
+    "specific": "Peta Publikasi tab → Buat Peta Publikasi",
+    "children": [
+     {
+      "kind": "task",
+      "general": "compose and export a print-ready map sheet",
+      "specific": "set institution, template Format Lama, A4 Lanskap, 300 DPI, basemap Topografi Berwarna; Ambil Snapshot & Buat Layout; Unduh PDF/PNG",
+      "screens": [
+       "screens/063.webp",
+       "screens/064.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed Nama instansi 'UC San Diego – Uji E-QuakeVis'",
+        "screens": [
+         "screens/055.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened Template layout (Format Lama / Tata Ruang (RTRW)) and kept Format Lama",
+        "screens": [
+         "screens/055.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Basemap peta publikasi = Topografi Berwarna",
+        "screens": [
+         "screens/056.webp",
+         "screens/057.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Ambil Snapshot & Buat Layout",
+        "screens": [
+         "screens/059.webp",
+         "screens/062.webp",
+         "screens/063.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Unduh PDF and Unduh PNG",
+        "screens": [
+         "screens/064.webp"
+        ]
+       }
+      ],
+      "id": "t15",
+      "check": "not_confirmed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Cascading attribute + region filter panel with live summary cards",
+   "general": "narrow a point dataset with range sliders and linked parent→child region pickers, and see count/max/median cards update at once",
+   "specific": "sidebar Tanggal, Kedalaman, Magnitudo sliders, Provinsi → Kabupaten/Kota multiselects; cards Total kejadian, Magnitudo maks, Kedalaman median, Dekat sesar (<=10 km)",
+   "steps": [
+    "drag a range slider (magnitude ≥ 5)",
+    "pick a province; the regency list fills with that province's regencies",
+    "pick a regency; the map zooms to its outline",
+    "read the updated summary cards",
+    "clear a picker to widen again"
+   ],
+   "serves_tasks": [
+    "restrict events by magnitude range",
+    "restrict events to an administrative area"
+   ],
+   "screens": [
+    "screens/007.webp",
+    "screens/010.webp",
+    "screens/011.webp",
+    "screens/012.webp",
+    "screens/015.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Distance-to-coastline filter for a chosen area",
+   "general": "after choosing an area, keep only points within N km of its coastline",
+   "specific": "'Jarak maksimum dari pantai (km)' slider (0–50) shown when a kabupaten is selected, with the note 'N gempa dalam ≤ X km dari pantai …'; the note's count ignores the other active filters, so it can differ from the summary cards, which apply all filters",
+   "steps": [
+    "choose a kabupaten/kota",
+    "drag the coast-distance slider",
+    "read the summary cards for the filtered count (the note under the slider counts without the other filters)"
+   ],
+   "serves_tasks": [
+    "restrict events by distance to the coastline"
+   ],
+   "screens": [
+    "screens/013.webp",
+    "screens/014.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Bounding-box selection drawn on the map or typed, kept in sync",
+   "general": "select an area by dragging a rectangle on a web map or typing N/S/E/W; both paths fill the same box and filter the data, with a banner and a clear button",
+   "specific": "Leaflet square tool on Peta Sebaran ↔ sidebar 'Seleksi kotak koordinat' (Terapkan kotak), banner 'Seleksi kotak aktif …', Hapus seleksi",
+   "steps": [
+    "press the square tool on the map",
+    "drag a rectangle",
+    "the sidebar N/W/E/S fields fill and the cards update",
+    "or type the four bounds and press Terapkan kotak",
+    "press Hapus seleksi to clear"
+   ],
+   "serves_tasks": [
+    "restrict events to a rectangular lon/lat area"
+   ],
+   "screens": [
+    "screens/016.webp",
+    "screens/019.webp",
+    "screens/021.webp",
+    "screens/022.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Tectonic overlay layer panel for a web map",
+   "general": "turn reference layers on and off and pick a basemap; some layers bring their own display sub-options",
+   "specific": "Tampilan Peta: Jenis basemap, epicenters, population density, faults, volcanoes, trench, seismic stations, slab contours (Interval kontur slab), province boundaries, place names; Legenda Gempa / Legenda Tektonik on the map. Switching volcanoes on also reveals a 'Gunung api pada peta' picker, which belongs to a distance-to-volcano filter rather than the overlay display (that filter was not tried in this run)",
+   "steps": [
+    "switch a layer on (e.g. kontur slab)",
+    "set its sub-option (interval 100 km)",
+    "switch another off (trench)",
+    "change the basemap"
+   ],
+   "serves_tasks": [
+    "add or remove reference overlays and change the background map"
+   ],
+   "screens": [
+    "screens/024.webp",
+    "screens/026.webp",
+    "screens/029.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "3D hypocenter model linked to a cross-section profile tool",
+   "general": "define a profile line on a mini-map or by coordinates, set a corridor half-width, and see the events in the corridor plotted by distance and depth against a reference surface, also drawn in 3D; export the slice",
+   "specific": "Hiposenter 3D: Model 3D (Plotly) + Garis penampang (A–A′…D–D′, Gambar, Balik arah, Hapus garis, coordinates, Corridor ±) + Penampang A–A′ with the USGS Slab2 profile; Skala vertikal, Opacity, Gempa/Slab2/Referensi toggles; Unduh slice CSV",
+   "steps": [
+    "pick a line (A–A′)",
+    "type endpoints and press Terapkan koordinat, or press Gambar and click two points on the map",
+    "choose Corridor ± (10/25/50/custom km)",
+    "read the section (event count, Slab2 depth on hover)",
+    "set vertical exaggeration",
+    "press Unduh slice CSV"
+   ],
+   "serves_tasks": [
+    "define a profile line and read the depth cross-section against the slab surface, optionally exaggerating the vertical scale",
+    "export the events inside the profile corridor"
+   ],
+   "screens": [
+    "screens/031.webp",
+    "screens/035.webp",
+    "screens/036.webp",
+    "screens/037.webp",
+    "screens/038.webp",
+    "screens/039.webp",
+    "screens/040.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Hazard map with click-to-query hazard curve and CSV export",
+   "general": "show a gridded hazard map for a chosen result, intensity measure and return period; click a site to plot its exceedance-probability curves and download the curve or the whole grid",
+   "specific": "Bahaya Gempa (PSHA): Hasil perhitungan, Parameter guncangan (PGA/SA), Periode ulang (475/2475 th), summary cards, Leaflet hazard layer with legend; click → Kurva Hazard (PGA, SA(0.2), SA(1.0)) + return-period table; Unduh kurva hazard situs (CSV), Unduh grid (CSV), Pakai di Peta Publikasi. Only PGA / 475 th was viewed in this run",
+   "steps": [
+    "choose a result, parameter and return period",
+    "read the min/median/max cards and the map",
+    "click a land point",
+    "read the hazard curves",
+    "download the site curve CSV or the grid CSV"
+   ],
+   "serves_tasks": [
+    "view a hazard map and summary for one result, parameter and return period",
+    "get the hazard curve at a picked site",
+    "export the hazard grid and the site curve"
+   ],
+   "screens": [
+    "screens/042.webp",
+    "screens/047.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Catalog importer with row validation and column-mapping",
+   "general": "upload a tabular catalog; the app detects the format, counts valid rows, previews them, asks you to map required columns when names don't match, and blocks the commit until required fields are mapped",
+   "specific": "sidebar 'Tambah data' (CSV/XLSX/XLS) → 'N baris valid dari M baris terbaca', Pratinjau data, Cocokkan kolom (Tanggal*, Jam*, Lintang*, Bujur*, Kedalaman*, Magnitudo*, optional columns), Tambahkan ke database",
+   "steps": [
+    "upload a file",
+    "read the valid-row count",
+    "open Pratinjau data",
+    "if asked, map each required field in Cocokkan kolom",
+    "press Tambahkan ke database once it is enabled (not tried in this run)"
+   ],
+   "serves_tasks": [
+    "check an uploaded catalog against row and column validation before adding it"
+   ],
+   "screens": [
+    "screens/066.webp",
+    "screens/067.webp",
+    "screens/069.webp",
+    "screens/070.webp",
+    "screens/071.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Publication map-sheet composer",
+   "general": "capture the current filtered map into a print layout with title, institution, logos, scale bar, north arrow, legend, inset locator and source list; choose template, paper size, DPI, basemap and layers; export PNG/PDF",
+   "specific": "Peta Publikasi → Buat Peta Publikasi: Judul peta, Nama instansi, Logo 1/2, Template layout (Format Lama / Tata Ruang (RTRW)), Ukuran keluaran, Resolusi keluaran, Mode skala, layer toggles incl. PSHA and inset; Ambil Snapshot & Buat Layout; Unduh PNG / PDF / Snapshot",
+   "steps": [
+    "type title and institution",
+    "pick template, size, DPI and basemap",
+    "switch layers on or off",
+    "press Ambil Snapshot & Buat Layout and wait for tile download and render",
+    "check the Layout Publikasi preview",
+    "press Unduh PDF or Unduh PNG"
+   ],
+   "serves_tasks": [
+    "compose and export a print-ready map sheet"
+   ],
+   "screens": [
+    "screens/055.webp",
+    "screens/056.webp",
+    "screens/062.webp",
+    "screens/063.webp",
+    "screens/064.webp"
+   ],
+   "id": "f8",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Summary-statistics panel for a filtered catalog",
+   "general": "see headline counts and averages for the current selection with a depth histogram, a magnitude–depth scatter and top-region / largest-event tables",
+   "specific": "Statistik tab: Total kejadian, Rata-rata M, average depth, shallow count; depth histogram; M vs depth scatter; Provinsi Terbanyak and Magnitudo Terbesar tables",
+   "steps": [
+    "set filters in the sidebar",
+    "open the Statistik tab",
+    "read the summary cards",
+    "read the depth histogram and M–depth scatter",
+    "scroll to the Provinsi Terbanyak and Magnitudo Terbesar tables"
+   ],
+   "serves_tasks": [
+    "review summary statistics of the selection"
+   ],
+   "screens": [
+    "screens/049.webp",
+    "check/screens/045.webp"
+   ],
+   "id": "f9",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Bangun Model PSHA steps 3–5 (GMPE dan logic tree, Tinjau dan hitung, Hasil): locked behind step 2, which fails here. Tahap A (GEM IDN v2024) gives 'Logic tree sumber model GEM IDN v2024.0.0 tidak ditemukan', and Tahap B 'Bangun model sumber' gives 'Lingkungan OpenQuake tidak ditemukan: /work/app/.venv-oq/bin/python' (screens/050.webp, screens/053.webp)",
+  "'Hitung PSHA wilayah baru' expander on the PSHA tab: not opened",
+  "Tata Ruang (RTRW) template output: the option was seen (screens/055.webp) but no layout was made with it",
+  "B–B′, C–C′, D–D′ profile lines and Layar penuh (fullscreen) modes in Hiposenter 3D: not opened",
+  "Humanitarian basemap: tiles never loaded, so the map stayed grey (screens/029.webp)"
+ ],
+ "not_done": [
+  "Did not press 'Tambahkan ke database' for any upload, to avoid writing into the shared working SQLite; the clean import of gempa_sample_valid.csv was not tried",
+  "Did not switch the PSHA view to SA or to the 2,475-yr return period: the attempt hit the Data Kejadian tab instead, and the action budget ran out",
+  "Did not change the Tanggal date range or the Kedalaman slider, and did not try the Lokasi episentrum (Darat/Laut) picker, Provinsi sesar / Sesar pada peta / segment-distance filter, the 'Gunung api pada peta' distance-to-volcano filter, population density, stations or province-boundary overlays",
+  "Did not use 'Pakai di Peta Publikasi' or the PSHA layer in the publication map, did not upload logos, and did not export A3/A2 sizes",
+  "Did not click a single hypocenter in the 3D model to see the linked event detail; hovering showed only the Slab2 line tooltip",
+  "Building a new PSHA model was attempted on the Bangun Model PSHA tab but failed at step 2: Tahap A reported the GEM IDN v2024.0.0 logic tree missing and Tahap B reported OpenQuake not installed (screens/050.webp, screens/053.webp); no new PSHA calculation was run",
+  "Choosing the Humanitarian basemap was a dead end: its tiles never loaded and the map stayed grey (screens/029.webp)"
+ ],
+ "applied": [
+  "moved the import phase before event selection, as the plan places import before analysis",
+  "relabelled t14 as the validation branch for invalid or mismatched files, noting that a clean commit was not tried",
+  "folded t7 (Skala vertikal 3×) into t6 as an optional action and added its screen to t6",
+  "re-cited t8's Unduh slice CSV action to check/screens/033.webp and the downloaded file downloads/cross-section-a-slab2.csv",
+  "rewrote t3's specific label to say what the user does",
+  "fixed f2 so users read the summary cards, since the slider note ignores the other filters and can disagree with them",
+  "corrected f4 so the volcano picker is no longer described as an overlay sub-option",
+  "noted in the goal's specific label that building a new PSHA model is a purpose of the tool but was blocked here",
+  "recorded the failed Bangun Model PSHA attempt in not_done instead of adding a dead-end phase to the tree",
+  "moved the Humanitarian basemap dead end out of t5 into not_done and cited the replay's working basemap change",
+  "added a statistics-panel feature (f9) backed by screens/049.webp and check/screens/045.webp",
+  "updated f5 serves_tasks after the t6/t7 merge; noted in f6 that only PGA/475 th was viewed and in f7 that the commit step was not tried"
+ ],
+ "open_fixes": [
+  "Add tasks for the Tanggal (time-window) and Kedalaman (depth) filters: neither slider was moved in this run.",
+  "Add a proximity-filter task and feature covering fault-segment distance, volcano distance and the Darat/Laut picker, possibly absorbing f2: none of these controls were used.",
+  "Add a 'build a hazard model' phase (region/Vs30 → source model → GMPE logic tree → run): it needs a server with the GEM IDN v2024 logic tree and OpenQuake installed, since step 2 failed here.",
+  "Add a task for switching the PSHA view to SA(0.2)/SA(1.0) and the 2,475-yr return period: the attempt missed the control and the budget ran out.",
+  "Re-run t15/f8 to confirm the publication map: the checker hit its action limit before trying it.",
+  "Add the clean import of gempa_sample_valid.csv with Tambahkan ke database as the main import path: it was not tried, to avoid writing to the shared SQLite, so it needs a disposable database.",
+  "Add the Tata Ruang (RTRW) template and 'Pakai di Peta Publikasi' (PSHA layer on the publication map): neither was used.",
+  "Re-check t8's original screens/036.webp citation: no explorer screen is confirmed to show the Unduh slice CSV button."
+ ],
+ "screens_at": "pilot/public/runs/equakevis-indonesia-catalog/20261101-191321/",
+ "screens_filed": {
+  "screens/066.webp": "screens/066.webp",
+  "screens/007.webp": "screens/007.webp",
+  "screens/029.webp": "screens/029.webp",
+  "screens/036.webp": "screens/036.webp",
+  "screens/042.webp": "screens/042.webp",
+  "screens/049.webp": "screens/049.webp"
+ }
+}

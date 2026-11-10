@@ -1,0 +1,491 @@
+{
+  "schema": "astaui.card/1",
+  "id": "maize-yield-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:25:58Z"
+  },
+  "app": {
+    "title": "NeuroCrop – Maize Yield Predictor (Streamlit dashboard)",
+    "summary": "A person picks two parents and a location in the sidebar and reads the predicted yield for that cross, its High/Medium/Low category and its percentile among all crosses at that location. From there they rank every location for the chosen cross, or every cross at the chosen location, put two to four hybrids side by side, and follow a set of hybrids across locations as profile lines and a heatmap. A stability table ranks hybrids by mean yield and coefficient of variation across locations, with sliders to narrow it down. They leave with a PDF report for one cross, CSV tables of rankings and stability, or a batch of predictions for an uploaded list of crosses as CSV or Excel.",
+    "task": {
+      "text": "Choose which parent crosses to advance and where to grow them by ranking precomputed yield predictions across locations and weighing yield against stability.",
+      "verbs": [
+        "compare",
+        "decide",
+        "lookup",
+        "summarize",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "A precomputed table of predicted values, one row per combination of two parents and a location, plus an optional uploaded list of combinations to score.",
+      "item": "a predicted yield for one parent cross at one field location",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "choosing crosses and test locations from model predictions, before committing to field trials",
+      "terms": [
+        "decide",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar selectors set the current cross and location, and every tab redraws from them: a result card and gauge, a ranked location chart, a ranked cross list, side-by-side comparison cards with cross-location profiles, a G×E line chart and heatmap, and a filterable stability scatter and table. Each tab ends with its own download, and a batch tab looks up an uploaded list of combinations.",
+      "views": [
+        "form",
+        "summary stats",
+        "bar chart",
+        "line chart",
+        "scatter plot",
+        "heatmap",
+        "list",
+        "table view",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "filter",
+        "search",
+        "sort",
+        "toggle view",
+        "hover for detail",
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "genomic prediction of hybrid yield across environments in plant breeding",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "plant breeding",
+        "genomic prediction",
+        "genotype by environment"
+      ]
+    },
+    "workflow": {
+      "name": "rank candidate combinations by a predicted value and pick the best",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "The precomputed predictions table loads from a local file, falls back to a remote copy, and uses synthetic demo rows if neither is found. A batch tab also takes an uploaded CSV of Female, Male, Location, with a template to download.",
+          "parts": [
+            "cross-selector",
+            "batch-predict"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Female parent, male parent and location dropdowns pick one cross. The Predict tab shows its yield in bu/A, its category, its percentile at that location, its difference from the overall mean, and a gauge with category bands.",
+          "parts": [
+            "cross-selector",
+            "predict-card"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Ranks every location for the selected cross (bar, scatter or sorted list with a minimum-yield slider) and the top N crosses at the selected location, with sort order and a search by parent name.",
+          "parts": [
+            "best-location",
+            "best-cross"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Two to four hybrid–location choices appear as cards, then as a yield bar chart, as profile lines across all locations, and in a table with mean, CV% and stability label.",
+          "parts": [
+            "compare-hybrids"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Several female parents, each crossed with one fixed male, are drawn as lines across locations against the grand mean. A heatmap toggles between absolute yield and deviation from each hybrid's own mean, and a list shows which hybrid wins at each location.",
+          "parts": [
+            "ge-analysis"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "The stability table holds mean, standard deviation and CV% across locations for each hybrid. Sliders for minimum mean yield, maximum CV% and minimum number of locations narrow it, and counts of Stable, Moderate and Unstable hybrids show above a scatter, bubble or histogram view.",
+          "parts": [
+            "stability-ranking"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "A PDF report for the selected cross with its top locations; CSVs of location rankings, top crosses, comparisons and stability; batch predictions as CSV or Excel, with combinations that were not found listed apart.",
+          "parts": [
+            "predict-card",
+            "best-location",
+            "best-cross",
+            "stability-ranking",
+            "batch-predict"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each prediction is ranked against the other crosses at the same location (a percentile per location), not only against the global mean, because conditions differ so much between locations.",
+        "Stability across environments is a second criterion beside yield: the coefficient of variation across locations sorts hybrids into stable, moderate and unstable.",
+        "Genotype-by-environment interaction is read from crossing profile lines and a heatmap of deviation from each hybrid's mean, with one parent held fixed.",
+        "A combination is two parents and a location, and lookup tries the parents in both orders, so either parent can be the female.",
+        "Predictions are precomputed for every combination, so the interface looks them up and never runs the model."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "cross-selector",
+      "level": "view",
+      "parent": null,
+      "title": "Hybrid selector sidebar",
+      "summary": "Loads the prediction table and lets the person pick a female parent, a male parent and a location, then shows a preview of that cross's yield, category and percentile at the location.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 89,
+          "end": 142,
+          "role": "data",
+          "symbol": "load_data",
+          "anchor": "b6d682bc1c7b",
+          "first": "def load_data():"
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 145,
+          "end": 161,
+          "role": "logic",
+          "anchor": "e60d1c19f959",
+          "first": "df        = load_data()"
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 164,
+          "end": 173,
+          "role": "logic",
+          "symbol": "lookup",
+          "anchor": "0df689a2b9be",
+          "first": "def lookup(p1: str, p2: str, loc: str):"
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 193,
+          "end": 195,
+          "role": "logic",
+          "symbol": "pct_rank",
+          "anchor": "37026266b6ec",
+          "first": "def pct_rank(y: float, loc: str) -> float:"
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 198,
+          "end": 201,
+          "role": "logic",
+          "symbol": "cat",
+          "anchor": "07ed2a754e56",
+          "first": "def cat(y: float) -> str:"
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 392,
+          "end": 412,
+          "role": "style",
+          "anchor": "75409abd3c50",
+          "first": "st.markdown(\"\"\""
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 414,
+          "end": 454,
+          "role": "markup",
+          "anchor": "9f6166e88d4a",
+          "first": "st.sidebar.markdown(\"\"\""
+        }
+      ]
+    },
+    {
+      "id": "predict-card",
+      "level": "view",
+      "parent": null,
+      "title": "Predict tab",
+      "summary": "Shows the selected cross's predicted yield with its category, its percentile at the location and its difference from the overall mean, a gauge with category bands, a bar chart of the same cross across all locations, and a PDF report to download.",
+      "views": [
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [
+        "export",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 477,
+          "end": 500,
+          "role": "style",
+          "anchor": "02943fb2a948",
+          "first": "st.markdown(\"\"\""
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 502,
+          "end": 585,
+          "role": "markup",
+          "anchor": "7c3406091caa",
+          "first": "# TAB 1 — Predict ─────────────────────────────────────────────"
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 214,
+          "end": 220,
+          "role": "logic",
+          "symbol": "cross_locations",
+          "anchor": "d30ace682a7c",
+          "first": "def cross_locations(p1: str, p2: str) -> list:"
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 250,
+          "end": 296,
+          "role": "logic",
+          "symbol": "make_pdf",
+          "anchor": "65e1e04133b8",
+          "first": "def make_pdf(p1, p2, loc, pred, loc_rows, percentile):"
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 177,
+          "end": 179,
+          "role": "logic",
+          "symbol": "overall_stats",
+          "anchor": "8fa032b8474d",
+          "first": "def overall_stats():"
+        }
+      ]
+    },
+    {
+      "id": "best-location",
+      "level": "view",
+      "parent": null,
+      "title": "Best location ranking",
+      "summary": "Ranks every location for the selected cross, with medal cards for the top three and a toggle between a bar chart, a scatter of yield against local percentile, and a sorted list filtered by minimum yield.",
+      "views": [
+        "bar chart",
+        "scatter plot",
+        "list"
+      ],
+      "interactions": [
+        "toggle view",
+        "filter",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 592,
+          "end": 598,
+          "role": "logic",
+          "symbol": "_best_locs",
+          "anchor": "1c882caadcde",
+          "first": "def _best_locs(p1: str, p2: str) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 587,
+          "end": 641,
+          "role": "markup",
+          "anchor": "213a8f198570",
+          "first": "# TAB 2 — Best Location ───────────────────────────────────────"
+        }
+      ]
+    },
+    {
+      "id": "best-cross",
+      "level": "view",
+      "parent": null,
+      "title": "Top crosses at a location",
+      "summary": "Lists the top N crosses at the selected location as ranked rows and a horizontal bar chart, with sort order, a search by parent name and a CSV download.",
+      "views": [
+        "list",
+        "bar chart"
+      ],
+      "interactions": [
+        "sort",
+        "search",
+        "filter",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 643,
+          "end": 678,
+          "role": "markup",
+          "anchor": "703ed911b1ed",
+          "first": "# TAB 3 — Best Cross ──────────────────────────────────────────"
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 657,
+          "end": 661,
+          "role": "logic",
+          "symbol": "rank_badge",
+          "anchor": "61427f17d76b",
+          "first": "def rank_badge(i):"
+        }
+      ]
+    },
+    {
+      "id": "compare-hybrids",
+      "level": "view",
+      "parent": null,
+      "title": "Compare hybrids",
+      "summary": "Sets two to four chosen hybrid–location combinations side by side as cards, a yield bar chart, profile lines across all locations and a table with mean, CV% and stability.",
+      "views": [
+        "side-by-side panes",
+        "bar chart",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 680,
+          "end": 736,
+          "role": "markup",
+          "anchor": "84ccd6fab4b3",
+          "first": "# TAB 4 — Compare Hybrids ─────────────────────────────────────"
+        }
+      ]
+    },
+    {
+      "id": "ge-analysis",
+      "level": "view",
+      "parent": null,
+      "title": "G×E interaction analysis",
+      "summary": "Draws several female parents crossed with one fixed male as lines across locations against the grand mean, with a heatmap that toggles between absolute yield and deviation from each hybrid's mean, and a list of the winning hybrid at each location.",
+      "views": [
+        "line chart",
+        "heatmap",
+        "list"
+      ],
+      "interactions": [
+        "multi-select",
+        "select",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 738,
+          "end": 779,
+          "role": "markup",
+          "anchor": "51acbdf88866",
+          "first": "# TAB 5 — G×E Analysis ────────────────────────────────────────"
+        }
+      ]
+    },
+    {
+      "id": "stability-ranking",
+      "level": "view",
+      "parent": null,
+      "title": "Stability ranking",
+      "summary": "Computes each hybrid's mean, standard deviation and coefficient of variation across locations and labels it stable, moderate or unstable; sliders filter the table, and a scatter, bubble or histogram view shows yield against stability.",
+      "views": [
+        "scatter plot",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 239,
+          "end": 246,
+          "role": "logic",
+          "symbol": "stability_df",
+          "anchor": "bb2763130641",
+          "first": "def stability_df():"
+        },
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 781,
+          "end": 832,
+          "role": "markup",
+          "anchor": "2505032babe5",
+          "first": "# TAB 6 — Stability ───────────────────────────────────────────"
+        }
+      ]
+    },
+    {
+      "id": "batch-predict",
+      "level": "view",
+      "parent": null,
+      "title": "Batch predict",
+      "summary": "Takes an uploaded CSV of parent pairs and locations, looks each one up with a progress bar, shows the best, average and worst yield with a histogram, and exports the results as CSV or Excel, listing combinations that were not found apart.",
+      "views": [
+        "table view",
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/maize-yield-prediction/app/app.py",
+          "start": 883,
+          "end": 946,
+          "role": "markup",
+          "anchor": "24bae9d6c7fb",
+          "first": "# TAB 8 — Batch Predict ───────────────────────────────────────"
+        }
+      ]
+    }
+  ]
+}

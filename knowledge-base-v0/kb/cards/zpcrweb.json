@@ -1,0 +1,604 @@
+{
+  "schema": "astaui.card/1",
+  "id": "zpcrweb",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T07:54:54Z"
+  },
+  "app": {
+    "title": "zpcr//web — qPCR run viewer and Cq analysis",
+    "summary": "A person loads an instrument's qPCR run file by dropping it in, picking it from a folder on disk, or choosing a bundled sample, then picks the plate-read step and how curves are grouped (raw optical channel, fluorophore, target, or a table). They choose which wells to show on a plate-shaped grid, using sample-type shortcuts, and turn fluorophores, targets and samples on or off. They then read the amplification curves on a chart where they can switch baseline, scale and overlays. To set thresholds they change a noise multiplier, override a whole target's threshold, or drag a curve's Cq marker. Last, they narrow the results to a Cq range, read the per-well Cq/ΔRFU table (or melting temperatures for a melt step), jump from a table row to its well, and export the table as CSV. The analysis settings are written back into the run file.",
+    "task": {
+      "text": "Compute and check a quantification cycle for every well and dye in a qPCR run, adjusting thresholds and well selection, and export the results table.",
+      "verbs": [
+        "derive",
+        "explore",
+        "identify",
+        "compare",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "A real-time PCR run: fluorescence read on several optical channels for every well of a plate at every cycle, plus a plate definition (dye, target, sample and type per well), dye calibration files, the thermal protocol and instrument temperatures.",
+      "item": "a well on a 96-well plate, with one amplification curve per dye",
+      "shapes": [
+        "grid of series",
+        "per element",
+        "time series",
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "analysing a finished qPCR run for Cq values, before reporting",
+      "terms": [
+        "analyze",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A side rail of filters (step, view mode, a plate-shaped well grid, dye/target/sample chips, thresholds, a Cq range) drives one main view that is either the amplification or melt chart or the Cq table. Hovering over a chip, well or threshold row highlights the matching curves in the chart, dragging a Cq marker on the chart sets that curve's threshold, and clicking a table row narrows the rail back to that well, target or sample.",
+      "views": [
+        "sidebar list",
+        "fixed-layout grid",
+        "line chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "toggle view",
+        "hover for detail",
+        "select",
+        "multi-select",
+        "sort",
+        "inline edit",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "real-time qPCR amplification and melt-curve analysis in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "qpcr",
+        "quantification cycle",
+        "melt curve"
+      ]
+    },
+    "workflow": {
+      "name": "compute a per-item value from a grid of curves, tune its parameters, and export a results table",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drop a .zpcr, .pcrd or .bmrun file on the drop zone, add a folder on disk, or tick a bundled sample; each open file becomes a chip in the file bar.",
+          "parts": [
+            "load-files"
+          ]
+        },
+        {
+          "step": "choose what the main view shows",
+          "here": "Pick the plate-read step (amplification or melt), then a View mode: Channel, Fluorophore, Target or Table.",
+          "parts": [
+            "curves-rail"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Click wells, rows or columns on the 8×12 well grid, use sample-type shortcuts such as standards and NTC, and turn fluorophores/targets and samples on or off. Hovering over any of these highlights its curves.",
+          "parts": [
+            "well-matrix",
+            "curves-rail"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "All selected curves are overlaid on one chart. The person can switch Relative/Absolute values and Linear/Log scale, draw each curve's baseline, overlay dark background, a min/max band, temperature or LED current, and hover to see a well's values.",
+          "parts": [
+            "curve-chart"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Cq is the cycle where each baseline-corrected curve crosses its threshold. The threshold is set per target from a noise multiplier, a per-target override, or a per-curve override made by dragging the curve's Cq ring on the chart.",
+          "parts": [
+            "threshold-section",
+            "curve-chart"
+          ]
+        },
+        {
+          "step": "read the results per item",
+          "here": "The Table mode lists Cq and ΔRFU (or Tm for a melt step) per well and target. It can be sorted and narrowed to a Cq range, and clicking a well, target or sample in it narrows the rail to that item.",
+          "parts": [
+            "cq-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The CSV button saves the Cq/ΔRFU table, or the melting-temperature table for a melt step. Threshold settings are stored in the run file itself.",
+          "parts": [
+            "cq-table"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Raw readings from six optical channels are colour-separated into per-dye signals using the instrument's dye calibration files before any Cq is computed.",
+        "Thresholds can be set at three levels (a global noise multiplier, a per-target value, and a per-curve value dragged straight on the chart), and every view reads the same single analysis.",
+        "A melt step is detected from the reads themselves and swaps in −dF/dT curves and melting-temperature peaks in place of Cq.",
+        "Files from a device that carries its own baseline and Cq get File ↔ Computed toggles, so the device's analysis can be compared with the app's.",
+        "Analysis parameters are written into the run file so they travel with it, and nothing leaves the browser."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "load-files",
+      "level": "component",
+      "parent": null,
+      "title": "File drop zone and file bar",
+      "summary": "Loads run, plate and protocol files by drop, file picker or folder, and lists the open files as chips to switch between.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/apps/web/src/components/DropZone.tsx",
+          "start": 32,
+          "end": 41,
+          "role": "logic",
+          "symbol": "DropZone",
+          "anchor": "454c9353a2f1",
+          "first": "export function DropZone({"
+        },
+        {
+          "file": "code/apps/web/src/app.css",
+          "start": 272,
+          "end": 281,
+          "role": "style",
+          "symbol": ".dropzone",
+          "anchor": "1994e519ce61",
+          "first": ".dropzone {"
+        },
+        {
+          "file": "code/apps/web/src/components/FileBar.tsx",
+          "start": 394,
+          "end": 408,
+          "role": "logic",
+          "symbol": "FileBar",
+          "anchor": "47ca5c7df47a",
+          "first": "export function FileBar({"
+        },
+        {
+          "file": "code/apps/web/src/components/FileBar.tsx",
+          "start": 257,
+          "end": 272,
+          "role": "markup",
+          "symbol": "FileChip",
+          "anchor": "cc62f8cbfe03",
+          "first": "function FileChip({"
+        },
+        {
+          "file": "code/apps/web/src/app.css",
+          "start": 382,
+          "end": 390,
+          "role": "style",
+          "symbol": ".filechip",
+          "anchor": "dbb51fe5c07f",
+          "first": ".filechip {"
+        },
+        {
+          "file": "code/apps/web/src/App.tsx",
+          "start": 651,
+          "end": 656,
+          "role": "logic",
+          "symbol": "selectFile",
+          "anchor": "84454eafbdc4",
+          "first": "const selectFile = (id: string) => {"
+        }
+      ]
+    },
+    {
+      "id": "curves-rail",
+      "level": "view",
+      "parent": null,
+      "title": "Curves rail",
+      "summary": "The side panel of step, view mode, well, dye/target, sample, display and threshold controls that drives the main chart or table.",
+      "views": [
+        "sidebar list",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "toggle view",
+        "multi-select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/apps/web/src/components/views/CurvesView.tsx",
+          "start": 1364,
+          "end": 1876,
+          "role": "markup",
+          "anchor": "985eae6e2851",
+          "first": "<aside className=\"curves__rail\" id=\"curves-rail\">"
+        },
+        {
+          "file": "code/apps/web/src/app.css",
+          "start": 1750,
+          "end": 1758,
+          "role": "style",
+          "symbol": ".curves__rail",
+          "anchor": "a864cb17b7bc",
+          "first": ".curves__rail {"
+        },
+        {
+          "file": "code/apps/web/src/app.css",
+          "start": 1865,
+          "end": 1869,
+          "role": "style",
+          "symbol": ".rail__row",
+          "anchor": "41455a57d134",
+          "first": ".rail__row {"
+        },
+        {
+          "file": "code/apps/web/src/components/curves/FluorBar.tsx",
+          "start": 41,
+          "end": 41,
+          "role": "logic",
+          "symbol": "FluorBar",
+          "anchor": "5b7cda61657b",
+          "first": "export function FluorBar({ items, disabled, onToggle, onHover, onSolo, cardData }: Props) {"
+        },
+        {
+          "file": "code/apps/web/src/components/curves/SampleBar.tsx",
+          "start": 22,
+          "end": 22,
+          "role": "logic",
+          "symbol": "SampleBar",
+          "anchor": "c7f203886028",
+          "first": "export function SampleBar({ items, disabled, onToggle, onHover, onSolo, cardData }: Props) {"
+        },
+        {
+          "file": "code/apps/web/src/components/curves/ChannelBar.tsx",
+          "start": 19,
+          "end": 19,
+          "role": "logic",
+          "symbol": "ChannelBar",
+          "anchor": "45a84348ca13",
+          "first": "export function ChannelBar({ enabled, available, onToggle, onHover, onSolo, cardData }: Props) {"
+        },
+        {
+          "file": "code/apps/web/src/components/views/CurvesView.tsx",
+          "start": 954,
+          "end": 958,
+          "role": "logic",
+          "symbol": "toggleFluor",
+          "anchor": "f297b94e151a",
+          "first": "const toggleFluor = (dye: string) => {"
+        },
+        {
+          "file": "code/apps/web/src/components/views/CurvesView.tsx",
+          "start": 627,
+          "end": 631,
+          "role": "logic",
+          "symbol": "toggleSample",
+          "anchor": "3f1a0d17ab2d",
+          "first": "const toggleSample = (name: string) => {"
+        }
+      ]
+    },
+    {
+      "id": "well-matrix",
+      "level": "component",
+      "parent": "curves-rail",
+      "title": "Well grid",
+      "summary": "A plate-shaped 8×12 grid that picks which wells are drawn, with row/column headers, sample-type shortcuts, and positive wells marked.",
+      "views": [
+        "fixed-layout grid"
+      ],
+      "interactions": [
+        "multi-select",
+        "filter",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/apps/web/src/components/curves/WellMatrix.tsx",
+          "start": 95,
+          "end": 106,
+          "role": "logic",
+          "symbol": "WellMatrix",
+          "anchor": "676a25019630",
+          "first": "export function WellMatrix({"
+        },
+        {
+          "file": "code/apps/web/src/components/curves/WellTypeBar.tsx",
+          "start": 43,
+          "end": 43,
+          "role": "logic",
+          "symbol": "WellTypeBar",
+          "anchor": "569b2a6f7d26",
+          "first": "export function WellTypeBar({ groups, enabled, onToggle, onSolo, onHover }: Props) {"
+        },
+        {
+          "file": "code/apps/web/src/app.css",
+          "start": 2147,
+          "end": 2151,
+          "role": "style",
+          "symbol": ".wellmatrix",
+          "anchor": "05e9fde5e6fd",
+          "first": ".wellmatrix {"
+        },
+        {
+          "file": "code/apps/web/src/app.css",
+          "start": 2167,
+          "end": 2176,
+          "role": "style",
+          "symbol": ".wm-cell",
+          "anchor": "ad2cc49b4013",
+          "first": ".wm-cell {"
+        },
+        {
+          "file": "code/apps/web/src/components/views/CurvesView.tsx",
+          "start": 519,
+          "end": 524,
+          "role": "logic",
+          "symbol": "toggleWellType",
+          "anchor": "de7d8d7df315",
+          "first": "const toggleWellType = (g: WellTypeGroup) => {"
+        }
+      ]
+    },
+    {
+      "id": "curve-chart",
+      "level": "view",
+      "parent": null,
+      "title": "Amplification / melt chart",
+      "summary": "Overlays the selected curves against cycle (or temperature for a melt), with Cq rings that can be dragged to set a curve's threshold.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view",
+        "inline edit"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/apps/web/src/components/views/CurvesView.tsx",
+          "start": 1878,
+          "end": 1936,
+          "role": "markup",
+          "anchor": "3bd1d7832241",
+          "first": "{meltMode ? ("
+        },
+        {
+          "file": "code/apps/web/src/components/curves/CurveChart.tsx",
+          "start": 96,
+          "end": 115,
+          "role": "logic",
+          "symbol": "CurveChart",
+          "anchor": "0d68a2a0570a",
+          "first": "export function CurveChart({"
+        },
+        {
+          "file": "code/apps/web/src/lib/uplot/chart.ts",
+          "start": 581,
+          "end": 588,
+          "role": "logic",
+          "symbol": "buildChart",
+          "anchor": "8a21b15161b1",
+          "first": "export function buildChart(cfg: BuildChartConfig): {"
+        },
+        {
+          "file": "code/apps/web/src/lib/uplot/chart.ts",
+          "start": 1020,
+          "end": 1024,
+          "role": "logic",
+          "symbol": "overlayPlugin",
+          "anchor": "f990c57c7ca0",
+          "first": "function overlayPlugin("
+        },
+        {
+          "file": "code/apps/web/src/components/curves/MeltChart.tsx",
+          "start": 32,
+          "end": 38,
+          "role": "logic",
+          "symbol": "MeltChart",
+          "anchor": "8084b47e15d8",
+          "first": "export function MeltChart({"
+        },
+        {
+          "file": "code/apps/web/src/components/views/CurvesView.tsx",
+          "start": 1327,
+          "end": 1328,
+          "role": "logic",
+          "symbol": "dragCq",
+          "anchor": "986354248c24",
+          "first": "const dragCq = (t: CqDragTarget, threshold: number) =>"
+        },
+        {
+          "file": "code/apps/web/src/app.css",
+          "start": 1759,
+          "end": 1763,
+          "role": "style",
+          "symbol": ".curves__plot",
+          "anchor": "93d225cf35fc",
+          "first": ".curves__plot {"
+        }
+      ]
+    },
+    {
+      "id": "threshold-section",
+      "level": "component",
+      "parent": "curves-rail",
+      "title": "Threshold controls",
+      "summary": "Sets the auto-threshold noise multiplier and per-target or per-curve threshold overrides that decide each Cq.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "inline edit",
+        "hover for detail",
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/apps/web/src/components/curves/ThresholdSection.tsx",
+          "start": 74,
+          "end": 83,
+          "role": "logic",
+          "symbol": "ThresholdSection",
+          "anchor": "2603bf153e9e",
+          "first": "export function ThresholdSection({"
+        },
+        {
+          "file": "code/apps/web/src/components/views/CurvesView.tsx",
+          "start": 1246,
+          "end": 1252,
+          "role": "logic",
+          "symbol": "setThresholdOverride",
+          "anchor": "ce9ce7036468",
+          "first": "const setThresholdOverride = (group: string, raw: string) => {"
+        },
+        {
+          "file": "code/apps/web/src/components/views/CurvesView.tsx",
+          "start": 1255,
+          "end": 1261,
+          "role": "logic",
+          "symbol": "setCurveThresholdOverride",
+          "anchor": "e8b1dc361b3f",
+          "first": "const setCurveThresholdOverride = (key: string, raw: string) => {"
+        },
+        {
+          "file": "code/apps/web/src/app.css",
+          "start": 4037,
+          "end": 4047,
+          "role": "style",
+          "symbol": ".analysis__threshold-row",
+          "anchor": "3db02b1752ff",
+          "first": ".analysis__threshold-row {"
+        },
+        {
+          "file": "code/apps/web/src/app.css",
+          "start": 3849,
+          "end": 3854,
+          "role": "style",
+          "symbol": ".threshold-k",
+          "anchor": "d28dfd12e127",
+          "first": ".threshold-k {"
+        }
+      ]
+    },
+    {
+      "id": "cq-table",
+      "level": "view",
+      "parent": null,
+      "title": "Cq / ΔRFU table and CSV export",
+      "summary": "Lists Cq and end-point ΔRFU (or Tm) per well and target, sortable and filterable by a Cq range. Clicking a cell narrows the rail to that item, and the table exports as CSV.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort",
+        "filter",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/apps/web/src/components/curves/CurveTable.tsx",
+          "start": 252,
+          "end": 260,
+          "role": "logic",
+          "symbol": "CurveTable",
+          "anchor": "29d410ed275d",
+          "first": "export function CurveTable({"
+        },
+        {
+          "file": "code/apps/web/src/components/curves/MeltTable.tsx",
+          "start": 49,
+          "end": 49,
+          "role": "logic",
+          "symbol": "MeltTable",
+          "anchor": "3194f46b95c9",
+          "first": "export function MeltTable({ rows, seriesLabel, onPickWell }: Props) {"
+        },
+        {
+          "file": "code/apps/web/src/components/curves/CqRange.tsx",
+          "start": 29,
+          "end": 29,
+          "role": "logic",
+          "symbol": "CqRange",
+          "anchor": "13fc3c46e897",
+          "first": "export function CqRange({ cycleCount, cqMin, cqMax, onChange }: Props) {"
+        },
+        {
+          "file": "code/apps/web/src/components/views/CurvesView.tsx",
+          "start": 1107,
+          "end": 1112,
+          "role": "logic",
+          "symbol": "downloadCsv",
+          "anchor": "5a030e1d20ac",
+          "first": "const downloadCsv = () =>"
+        },
+        {
+          "file": "code/apps/web/src/components/views/CurvesView.tsx",
+          "start": 985,
+          "end": 987,
+          "role": "logic",
+          "symbol": "pickWell",
+          "anchor": "44308030fa49",
+          "first": "const pickWell = (row: number, col: number) => {"
+        },
+        {
+          "file": "code/apps/web/src/app.css",
+          "start": 3630,
+          "end": 3632,
+          "role": "style",
+          "symbol": ".analysis__tbl",
+          "anchor": "1eba17512fac",
+          "first": ".analysis__tbl {"
+        },
+        {
+          "file": "code/apps/web/src/app.css",
+          "start": 3612,
+          "end": 3620,
+          "role": "style",
+          "symbol": ".analysis__table-wrap",
+          "anchor": "631f8dd0f655",
+          "first": ".analysis__table-wrap {"
+        }
+      ]
+    }
+  ]
+}

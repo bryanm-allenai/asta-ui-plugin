@@ -1,0 +1,680 @@
+{
+  "schema": "astaui.card/1",
+  "id": "lasreader",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T09:18:15Z"
+  },
+  "app": {
+    "title": "LasReader: infer analyte concentration from a biosensor's standard curve",
+    "summary": "A person pastes a plate reader's 8 × 12 export, marks wells as standards, samples or medium blanks on a plate map, and fills an editable table of replicates. If needed, they switch to fluorescence divided by OD600. They then look at the standards' readings, exclude bad ones with a written reason, and fit a weighted four-parameter logistic curve, which gives EC50, Hill slope, LOD and RMSE. The page averages each sample's replicates, inverts the mean through the curve and scales it by the dilution. The result is a concentration with a 95% confidence interval, or only a bound when the value is out of range. Everything is exported as a CSV of every reading and result plus a PNG of the curve, which a companion page can read back to compare against a second instrument.",
+    "task": {
+      "text": "Turn raw biosensor readings into each sample's inferred concentration with a confidence interval, using standards read on the same plate.",
+      "verbs": [
+        "derive",
+        "clean",
+        "annotate",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "Plate-reader readings from one plate: replicate wells of standards at known concentrations, blanks and unknown samples, optionally paired with optical-density readings.",
+      "item": "a well on a 96-well plate, grouped with its replicates into a standard concentration or a named sample",
+      "shapes": [
+        "table",
+        "per element",
+        "notes"
+      ]
+    },
+    "stage": {
+      "text": "quantifying samples against in-plate standards, straight from the reader's export",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "Four step cards open in order, and each says what it is still waiting for. A clickable 96-well plate map builds the replicate table, and the table drives a standards table with per-reading exclusions. Fitting draws the curve with error bars and fills summary tiles. A results table then inverts every sample through the fit, and the export buttons save the readings and the curve.",
+      "views": [
+        "fixed-layout grid",
+        "table view",
+        "scatter plot",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "multi-select",
+        "apply label",
+        "inline edit",
+        "exclude and refit",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline",
+        "category palette"
+      ]
+    },
+    "field": {
+      "text": "biosensor calibration with a 4PL standard curve in synthetic biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "synthetic biology",
+        "standard curve",
+        "igem"
+      ]
+    },
+    "workflow": {
+      "name": "estimate unknowns' concentrations from a standard curve",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Paste the reader's 8 × 12 fluorescence block (and an OD600 block in F ÷ OD mode), with or without row and column headers, or type or paste rows from a spreadsheet straight into the table.",
+          "parts": [
+            "data-entry",
+            "plate-map"
+          ]
+        },
+        {
+          "step": "label each item's role in the layout",
+          "here": "Select wells by click, Shift-click range or row/column header, mark them Standard (nM), Sample (name, dilution) or Medium blank, then 'Fill the table'. Wells marked alike become replicates.",
+          "parts": [
+            "plate-map",
+            "replicate-table"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "In the standards table, tick any reading to exclude it and type a required reason. Any change discards the current fit.",
+          "parts": [
+            "fit-step"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Fit fits a weighted 4PL by Levenberg–Marquardt (at least 4 concentrations and 2 blanks) and shows the curve with error bars plus EC50, Hill slope, LOD and RMSE tiles.",
+          "parts": [
+            "fit-step"
+          ]
+        },
+        {
+          "step": "convert each unknown through the fit, with its uncertainty",
+          "here": "Each sample's replicates are averaged and inverted once, giving the concentration in the well and × dilution in the sample, with a delta-method 95% CI and CV. Outside the usable range only the bound is shown.",
+          "parts": [
+            "results-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Export CSV gives one row per reading with its well, exclusion reason, curve and sample result. Export curve saves the PNG. Nothing is stored, and the page warns before you leave with unexported data.",
+          "parts": [
+            "export-step"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "On the Cross-Validation page, the exported CSV and a batch from the team's own reader are paired by sample name. A log-log plot shows both CIs, alongside the geometric mean ratio and Bland–Altman limits of agreement.",
+          "parts": [
+            "cross-validation"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The curve never extrapolates: a usable range is cut at the LOD/lowest standard and at the highest standard or 95% of the curve's span, and anything outside reports only a bound.",
+        "Replicates are averaged in signal space and converted once, so reading variance shrinks with n but curve uncertainty does not.",
+        "An optional fluorescence ÷ OD600 mode adds a medium-blank role and subtracts its mean F and OD from every well before dividing.",
+        "Every exclusion needs a written reason, and each step stays locked until the step before is complete, with the reason it is waiting shown.",
+        "The same fitting module serves a low-cost custom reader whose curves are bound to an instrument configuration fingerprint, so results from both instruments can be cross-validated."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-entry",
+      "level": "view",
+      "parent": null,
+      "title": "Enter data",
+      "summary": "Holds the experiment fields and the signal-mode and entry-method switches, and lists everything still missing before fitting can start.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "import"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/plate-assay.html",
+          "start": 33,
+          "end": 186,
+          "role": "markup",
+          "anchor": "8d60ab58aeec",
+          "first": "<!-- 1. Enter data: the experiment, then one row per standard concentration or sample. -->"
+        },
+        {
+          "file": "code/frontend/css/style.css",
+          "start": 501,
+          "end": 526,
+          "role": "style",
+          "anchor": "31c6d9645e23",
+          "first": ".step-card-head { display: flex; align-items: flex-start; gap: 14px; }"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 99,
+          "end": 109,
+          "role": "logic",
+          "symbol": "setStepCard",
+          "anchor": "4d4941d63da9",
+          "first": "function setStepCard(card, state, waitingReason = null) {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 239,
+          "end": 313,
+          "role": "logic",
+          "symbol": "dataProblems",
+          "anchor": "8cb17f882c30",
+          "first": "function dataProblems() {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 580,
+          "end": 586,
+          "role": "logic",
+          "symbol": "setOdMode",
+          "anchor": "08026f5115f6",
+          "first": "function setOdMode(on) {"
+        },
+        {
+          "file": "code/frontend/js/plate_layout.js",
+          "start": 341,
+          "end": 344,
+          "role": "logic",
+          "symbol": "renderEntryMethod",
+          "anchor": "7a97077396d8",
+          "first": "function renderEntryMethod() {"
+        }
+      ]
+    },
+    {
+      "id": "plate-map",
+      "level": "component",
+      "parent": "data-entry",
+      "title": "Plate paste and well map",
+      "summary": "Parses a pasted 8 × 12 plate, lets the person select wells on a 96-well grid and mark them as standards, samples or blanks, then builds the replicate table from the marks.",
+      "views": [
+        "fixed-layout grid"
+      ],
+      "interactions": [
+        "import",
+        "multi-select",
+        "apply label"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/plate-assay.html",
+          "start": 103,
+          "end": 159,
+          "role": "markup",
+          "anchor": "67d3d968606d",
+          "first": "<!-- Import from a plate: the 8 x 12 block any reader exports, marked well by well, then"
+        },
+        {
+          "file": "code/frontend/css/style.css",
+          "start": 851,
+          "end": 859,
+          "role": "style",
+          "anchor": "512ab4fa4a89",
+          "first": ".plate-grid { width: auto; min-width: 0; border-collapse: separate; border-spacing: 3px; }"
+        },
+        {
+          "file": "code/frontend/js/plate_layout.js",
+          "start": 26,
+          "end": 61,
+          "role": "logic",
+          "symbol": "parsePlate",
+          "anchor": "6a4cf67de738",
+          "first": "function parsePlate(text) {"
+        },
+        {
+          "file": "code/frontend/js/plate_layout.js",
+          "start": 140,
+          "end": 188,
+          "role": "logic",
+          "symbol": "renderPlate",
+          "anchor": "97fb83c45aac",
+          "first": "function renderPlate() {"
+        },
+        {
+          "file": "code/frontend/js/plate_layout.js",
+          "start": 120,
+          "end": 130,
+          "role": "logic",
+          "symbol": "clickWell",
+          "anchor": "c6833c189da8",
+          "first": "function clickWell(well, event) {"
+        },
+        {
+          "file": "code/frontend/js/plate_layout.js",
+          "start": 224,
+          "end": 240,
+          "role": "logic",
+          "symbol": "markSelection",
+          "anchor": "8ebd1b6ec778",
+          "first": "function markSelection() {"
+        },
+        {
+          "file": "code/frontend/js/plate_layout.js",
+          "start": 307,
+          "end": 329,
+          "role": "logic",
+          "symbol": "fillTableFromPlate",
+          "anchor": "782aa51e7d84",
+          "first": "function fillTableFromPlate() {"
+        }
+      ]
+    },
+    {
+      "id": "replicate-table",
+      "level": "component",
+      "parent": "data-entry",
+      "title": "Standards and samples table",
+      "summary": "An editable table with one row per standard concentration, sample or medium blank and 1–6 replicate columns, which accepts blocks pasted from a spreadsheet.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/plate-assay.html",
+          "start": 161,
+          "end": 180,
+          "role": "markup",
+          "anchor": "414b67f6e0b1",
+          "first": "<h3 class=\"subsection-heading table-heading\">The table</h3>"
+        },
+        {
+          "file": "code/frontend/css/style.css",
+          "start": 841,
+          "end": 845,
+          "role": "style",
+          "anchor": "a0b46e6490bf",
+          "first": ".assay-table { min-width: 0; }"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 478,
+          "end": 566,
+          "role": "logic",
+          "symbol": "renderEntryTable",
+          "anchor": "8ad96ec17016",
+          "first": "function renderEntryTable() {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 360,
+          "end": 410,
+          "role": "logic",
+          "symbol": "pasteBlock",
+          "anchor": "438c95c89c8d",
+          "first": "function pasteBlock(startRow, startCol, text) {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 335,
+          "end": 340,
+          "role": "logic",
+          "symbol": "addRow",
+          "anchor": "f598b00dc6d8",
+          "first": "function addRow(role) {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 342,
+          "end": 353,
+          "role": "logic",
+          "symbol": "setRepCount",
+          "anchor": "8c841d8c1772",
+          "first": "function setRepCount(count) {"
+        }
+      ]
+    },
+    {
+      "id": "fit-step",
+      "level": "view",
+      "parent": null,
+      "title": "4PL standard curve",
+      "summary": "Lists the standards' readings with residuals and reasoned exclusions, fits the weighted 4PL, and draws the curve with EC50, Hill slope, LOD and RMSE.",
+      "views": [
+        "table view",
+        "scatter plot",
+        "summary stats"
+      ],
+      "interactions": [
+        "exclude and refit",
+        "write notes"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/plate-assay.html",
+          "start": 188,
+          "end": 259,
+          "role": "markup",
+          "anchor": "4515c22fe0b2",
+          "first": "<!-- 2. Fit: the standards with their exclusions first, then Fit, then the curve. -->"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 646,
+          "end": 709,
+          "role": "logic",
+          "symbol": "renderFitTable",
+          "anchor": "b1e4bea8f323",
+          "first": "function renderFitTable() {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 634,
+          "end": 644,
+          "role": "logic",
+          "symbol": "toggleExclusion",
+          "anchor": "1e78d3fe7dd6",
+          "first": "function toggleExclusion(id, checked) {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 608,
+          "end": 618,
+          "role": "logic",
+          "symbol": "blockedFitReason",
+          "anchor": "aa574dc92707",
+          "first": "function blockedFitReason() {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 620,
+          "end": 632,
+          "role": "logic",
+          "symbol": "runFit",
+          "anchor": "eceada68fb9a",
+          "first": "function runFit() {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 741,
+          "end": 816,
+          "role": "logic",
+          "symbol": "renderFitChart",
+          "anchor": "7c3a08372ae6",
+          "first": "function renderFitChart() {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 824,
+          "end": 839,
+          "role": "logic",
+          "symbol": "renderFitMetrics",
+          "anchor": "402e5bb383e8",
+          "first": "function renderFitMetrics() {"
+        },
+        {
+          "file": "code/frontend/js/curve_fit.js",
+          "start": 182,
+          "end": 272,
+          "role": "logic",
+          "symbol": "CurveFit",
+          "anchor": "2480a69f7c59",
+          "first": "const CurveFit = {"
+        }
+      ]
+    },
+    {
+      "id": "results-table",
+      "level": "view",
+      "parent": null,
+      "title": "Inferred concentrations",
+      "summary": "Shows each sample's mean signal, SD and CV, and its inferred concentration in the well and in the sample with 95% CIs, or only a bound when it is out of range.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/plate-assay.html",
+          "start": 261,
+          "end": 298,
+          "role": "markup",
+          "anchor": "b42341a75710",
+          "first": "<!-- 3. Results: each sample's replicates averaged, converted once, and scaled by its dilution. -->"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 845,
+          "end": 866,
+          "role": "logic",
+          "symbol": "sampleResult",
+          "anchor": "9b297f04fe53",
+          "first": "function sampleResult(row) {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 869,
+          "end": 873,
+          "role": "logic",
+          "symbol": "formatResult",
+          "anchor": "acc50c959289",
+          "first": "function formatResult(result, value, scale) {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 875,
+          "end": 901,
+          "role": "logic",
+          "symbol": "renderResults",
+          "anchor": "bfd5f6fa97af",
+          "first": "function renderResults() {"
+        }
+      ]
+    },
+    {
+      "id": "export-step",
+      "level": "view",
+      "parent": null,
+      "title": "Export files",
+      "summary": "Saves every reading, exclusion, curve parameter and sample result as one CSV, and the curve as a PNG.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/plate-assay.html",
+          "start": 300,
+          "end": 324,
+          "role": "markup",
+          "anchor": "bf79b101ece3",
+          "first": "<!-- 4. Export: nothing is stored, so the files are the record. -->"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 928,
+          "end": 935,
+          "role": "data",
+          "symbol": "CSV_HEADERS",
+          "anchor": "a8d986f373b4",
+          "first": "const CSV_HEADERS = ["
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 941,
+          "end": 975,
+          "role": "logic",
+          "symbol": "csvRows",
+          "anchor": "d16d1bd80e8b",
+          "first": "function csvRows() {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 978,
+          "end": 984,
+          "role": "logic",
+          "symbol": "exportCsv",
+          "anchor": "b204cda328c4",
+          "first": "function exportCsv() {"
+        },
+        {
+          "file": "code/frontend/js/plate_assay.js",
+          "start": 987,
+          "end": 1000,
+          "role": "logic",
+          "symbol": "exportPng",
+          "anchor": "eb74130cd52d",
+          "first": "function exportPng() {"
+        }
+      ]
+    },
+    {
+      "id": "cross-validation",
+      "level": "view",
+      "parent": null,
+      "title": "Cross-Validation",
+      "summary": "Loads results from two instruments, pairs samples by name, and shows a log-log plot with both CIs, the geometric mean ratio, Bland–Altman limits of agreement and CI overlap, with export.",
+      "views": [
+        "side-by-side panes",
+        "scatter plot",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "agreement summary"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/compare.html",
+          "start": 34,
+          "end": 56,
+          "role": "markup",
+          "symbol": "#plate-card",
+          "anchor": "8fd304ce2ea8",
+          "first": "<section class=\"card step-card\" id=\"plate-card\">"
+        },
+        {
+          "file": "code/frontend/compare.html",
+          "start": 59,
+          "end": 93,
+          "role": "markup",
+          "symbol": "#device-card",
+          "anchor": "768c4e29ffa4",
+          "first": "<section class=\"card step-card\" id=\"device-card\">"
+        },
+        {
+          "file": "code/frontend/compare.html",
+          "start": 96,
+          "end": 158,
+          "role": "markup",
+          "symbol": "#compare-card",
+          "anchor": "8dca827e144d",
+          "first": "<section class=\"card step-card\" id=\"compare-card\">"
+        },
+        {
+          "file": "code/frontend/compare.html",
+          "start": 161,
+          "end": 180,
+          "role": "markup",
+          "symbol": "#export-card",
+          "anchor": "80443f61b443",
+          "first": "<section class=\"card step-card\" id=\"export-card\">"
+        },
+        {
+          "file": "code/frontend/js/compare.js",
+          "start": 148,
+          "end": 182,
+          "role": "logic",
+          "symbol": "readPlateCsv",
+          "anchor": "438208086351",
+          "first": "function readPlateCsv(text, filename) {"
+        },
+        {
+          "file": "code/frontend/js/compare.js",
+          "start": 209,
+          "end": 235,
+          "role": "logic",
+          "symbol": "readBatch",
+          "anchor": "c81ba07f4927",
+          "first": "function readBatch(batch) {"
+        },
+        {
+          "file": "code/frontend/js/compare.js",
+          "start": 320,
+          "end": 342,
+          "role": "logic",
+          "symbol": "pairs",
+          "anchor": "971784717e40",
+          "first": "function pairs() {"
+        },
+        {
+          "file": "code/frontend/js/compare.js",
+          "start": 345,
+          "end": 357,
+          "role": "logic",
+          "symbol": "agreement",
+          "anchor": "e62d80db24c1",
+          "first": "function agreement(compared) {"
+        },
+        {
+          "file": "code/frontend/js/compare.js",
+          "start": 368,
+          "end": 423,
+          "role": "logic",
+          "symbol": "renderComparison",
+          "anchor": "7e6d5da70368",
+          "first": "function renderComparison() {"
+        },
+        {
+          "file": "code/frontend/js/compare.js",
+          "start": 453,
+          "end": 511,
+          "role": "logic",
+          "symbol": "renderChart",
+          "anchor": "3db1a74c5545",
+          "first": "function renderChart(compared) {"
+        },
+        {
+          "file": "code/frontend/js/compare.js",
+          "start": 546,
+          "end": 560,
+          "role": "logic",
+          "symbol": "exportCsv",
+          "anchor": "a3fcf2b2bfea",
+          "first": "function exportCsv() {"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,690 @@
+{
+  "schema": "astaui.card/1",
+  "id": "spectralab-photo",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T10:11:36Z"
+  },
+  "app": {
+    "title": "SpectraLab: spectrometer photo analysis",
+    "summary": "The person loads a photo of a spectrum by file, camera, drag, paste or a synthetic demo. The tool takes a brightness profile along one chosen row and finds the line peaks, which are re-detected as the person moves the row, band width and detection sliders. They then turn pixel positions into wavelengths, either automatically against a chosen reference lamp, optionally with a quadratic correction, or from two points they type in. They check the fit quality, the residual plot and the ranked element matches. They can also compute a grating constant with its uncertainty from angle readings. Finally they export the line list as CSV or JSON, or produce a report image to save or print.",
+    "task": {
+      "text": "Turn a photographed emission spectrum into a calibrated, checkable line list with element identification and a grating constant for a lab report.",
+      "verbs": [
+        "derive",
+        "identify",
+        "explore",
+        "write"
+      ]
+    },
+    "data": {
+      "text": "A single photograph of a dispersed spectrum, reduced to a 1-D brightness profile along one row, with a built-in library of reference emission lines per element.",
+      "item": "a spectral line (peak) found along the profile, with pixel position, intensity and calibrated wavelength",
+      "shapes": [
+        "image",
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "analysing a spectrum photo from a teaching lab, then writing up the result",
+      "terms": [
+        "analyze",
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "An image canvas with a draggable profile row sits above a profile chart that shares its x axis. Every parameter change re-runs peak finding, lamp calibration and element matching. A tabbed results panel shows the line table, the fit statistics with a fit chart, ranked element cards and a report generator.",
+      "views": [
+        "image viewer",
+        "line chart",
+        "table view",
+        "summary stats",
+        "scatter plot",
+        "form",
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "hover for detail",
+        "toggle view",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "emission spectroscopy with wavelength calibration in an undergraduate physics lab",
+      "disciplines": [
+        "physics"
+      ],
+      "terms": [
+        "spectroscopy",
+        "wavelength calibration",
+        "diffraction grating"
+      ]
+    },
+    "workflow": {
+      "name": "compute calibrated measurements from one image and write them up",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Choose a file, take a phone photo, drag or paste an image, or load a synthetic demo spectrum with known lines",
+          "parts": [
+            "image-intake"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Peaks are found along a brightness profile taken from a row the person drags on the image. Sliders for sensitivity, minimum spacing, smoothing and band width re-run detection live",
+          "parts": [
+            "detection-params",
+            "spectrum-stage"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Map pixels to wavelengths: auto-calibrate against a Hg, Na, H or He lamp (optionally quadratic), or enter two pixel and wavelength pairs by hand",
+          "parts": [
+            "calibration-controls"
+          ]
+        },
+        {
+          "step": "check the result against references",
+          "here": "Read the dispersion, intercept, R² and RMS with a fit chart. Then read the elements ranked by matched lines, with chips marking which library lines were hit",
+          "parts": [
+            "results-tabs"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Enter the order, left and right vernier angles and a wavelength to get d = kλ/sinθ with propagated uncertainty",
+          "parts": [
+            "grating-calc"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Export the line table as CSV or the full analysis as JSON, or generate a PNG report with image, line table, calibration and grating result, then save or print it",
+          "parts": [
+            "results-tabs",
+            "report"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The brightness profile comes from a user-chosen image row and band width, dragged directly on the photo",
+        "Peak markers and table swatches are coloured by their calibrated wavelength",
+        "Calibration matches detected peaks to a reference lamp's known lines and reports R² and RMS, so the fit can be checked",
+        "An element is only named when at least three of its library lines match",
+        "A grating-equation calculator propagates the angle uncertainty into the grating constant"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "controls",
+      "level": "view",
+      "parent": null,
+      "title": "Input and controls panel",
+      "summary": "Left panel that holds image input, detection parameters, calibration and grating calculation.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 61,
+          "end": 157,
+          "role": "markup",
+          "symbol": "#panel-controls",
+          "anchor": "76717f065a66",
+          "first": "<aside class=\"panel controls\" id=\"panel-controls\">"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 157,
+          "end": 168,
+          "role": "style",
+          "symbol": ".panel",
+          "anchor": "8b97e9800990",
+          "first": ".panel {"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 282,
+          "end": 285,
+          "role": "style",
+          "symbol": ".accordion",
+          "anchor": "341fe659a76e",
+          "first": ".accordion {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 971,
+          "end": 992,
+          "role": "logic",
+          "symbol": "bindMisc",
+          "anchor": "fdb978fda418",
+          "first": "function bindMisc() {"
+        }
+      ]
+    },
+    {
+      "id": "image-intake",
+      "level": "component",
+      "parent": "controls",
+      "title": "Photo dropzone",
+      "summary": "Loads a spectrum image by file, camera, drag-and-drop, paste or a synthetic demo.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 67,
+          "end": 84,
+          "role": "markup",
+          "symbol": "#dropzone",
+          "anchor": "67029e82d8f6",
+          "first": "<div class=\"dropzone\" id=\"dropzone\">"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 184,
+          "end": 192,
+          "role": "style",
+          "symbol": ".dropzone",
+          "anchor": "fbd1a2505e21",
+          "first": ".dropzone {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 943,
+          "end": 958,
+          "role": "logic",
+          "symbol": "bindFileInputs",
+          "anchor": "7e89c511f25c",
+          "first": "function bindFileInputs() {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 80,
+          "end": 92,
+          "role": "logic",
+          "symbol": "loadFile",
+          "anchor": "b9d8ea253267",
+          "first": "async function loadFile(file) {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 94,
+          "end": 121,
+          "role": "logic",
+          "symbol": "setImage",
+          "anchor": "0f20f4d45e19",
+          "first": "function setImage(img) {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 908,
+          "end": 913,
+          "role": "logic",
+          "symbol": "loadDemo",
+          "anchor": "c8bd6fa3ae36",
+          "first": "function loadDemo() {"
+        }
+      ]
+    },
+    {
+      "id": "detection-params",
+      "level": "component",
+      "parent": "controls",
+      "title": "Line detection sliders",
+      "summary": "Sensitivity, minimum spacing and smoothing sliders that re-run peak finding on every change.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 86,
+          "end": 105,
+          "role": "markup",
+          "anchor": "63a2496f3a63",
+          "first": "<details class=\"accordion\" open>"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 474,
+          "end": 489,
+          "role": "logic",
+          "symbol": "bindParams",
+          "anchor": "822d311e4866",
+          "first": "function bindParams() {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 124,
+          "end": 149,
+          "role": "logic",
+          "symbol": "analyze",
+          "anchor": "4b18e3411cb4",
+          "first": "function analyze() {"
+        },
+        {
+          "file": "code/web/js/core.js",
+          "start": 151,
+          "end": 151,
+          "role": "logic",
+          "symbol": "findPeaks",
+          "anchor": "4385ac28b5b7",
+          "first": "export function findPeaks(profile, opts = {}) {"
+        }
+      ]
+    },
+    {
+      "id": "calibration-controls",
+      "level": "component",
+      "parent": "controls",
+      "title": "Wavelength calibration",
+      "summary": "Calibrates pixels to wavelengths, either automatically against a chosen reference lamp (optionally quadratic) or from two points entered by hand.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 107,
+          "end": 134,
+          "role": "markup",
+          "anchor": "8e603efbd4db",
+          "first": "<details class=\"accordion\" open>"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 598,
+          "end": 645,
+          "role": "logic",
+          "symbol": "bindCalibration",
+          "anchor": "f9a8d3e630dc",
+          "first": "function bindCalibration() {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 151,
+          "end": 157,
+          "role": "logic",
+          "symbol": "tryAutoCalibrate",
+          "anchor": "adaab9e94786",
+          "first": "function tryAutoCalibrate() {"
+        },
+        {
+          "file": "code/web/js/core.js",
+          "start": 57,
+          "end": 70,
+          "role": "data",
+          "symbol": "ELEMENTS",
+          "anchor": "7043172d938a",
+          "first": "export const ELEMENTS = {"
+        },
+        {
+          "file": "code/web/js/core.js",
+          "start": 73,
+          "end": 78,
+          "role": "data",
+          "symbol": "LAMPS",
+          "anchor": "a5a93fb29569",
+          "first": "export const LAMPS = ["
+        }
+      ]
+    },
+    {
+      "id": "grating-calc",
+      "level": "component",
+      "parent": "controls",
+      "title": "Grating constant calculator",
+      "summary": "Computes d = kλ/sinθ from the order, the vernier angles and a wavelength, with propagated uncertainty.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 136,
+          "end": 151,
+          "role": "markup",
+          "anchor": "04a7e79fdb1c",
+          "first": "<details class=\"accordion\" open>"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 305,
+          "end": 314,
+          "role": "style",
+          "symbol": ".result-line",
+          "anchor": "59c137e06ca0",
+          "first": ".result-line {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 648,
+          "end": 673,
+          "role": "logic",
+          "symbol": "bindGrating",
+          "anchor": "0017d89f0445",
+          "first": "function bindGrating() {"
+        }
+      ]
+    },
+    {
+      "id": "spectrum-stage",
+      "level": "view",
+      "parent": null,
+      "title": "Image canvas and profile",
+      "summary": "Shows the photo with a draggable profile row and wavelength-coloured peak marks, above a brightness profile chart that shares its x axis.",
+      "views": [
+        "image viewer",
+        "line chart"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "hover for detail",
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 160,
+          "end": 198,
+          "role": "markup",
+          "symbol": "#panel-stage",
+          "anchor": "2629a19eed6a",
+          "first": "<section class=\"panel stage\" id=\"panel-stage\">"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 332,
+          "end": 341,
+          "role": "style",
+          "symbol": ".canvas-wrap",
+          "anchor": "ef1930f0b296",
+          "first": ".canvas-wrap {"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 380,
+          "end": 384,
+          "role": "style",
+          "symbol": ".profile-wrap",
+          "anchor": "ce810f65edfc",
+          "first": ".profile-wrap {"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 364,
+          "end": 378,
+          "role": "style",
+          "symbol": ".tooltip",
+          "anchor": "4fa6f8b5d45c",
+          "first": ".tooltip {"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 319,
+          "end": 324,
+          "role": "style",
+          "symbol": ".stage-toolbar",
+          "anchor": "68e7fddd5fe1",
+          "first": ".stage-toolbar {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 192,
+          "end": 249,
+          "role": "logic",
+          "symbol": "drawStage",
+          "anchor": "ef8bc49e3678",
+          "first": "function drawStage() {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 252,
+          "end": 305,
+          "role": "logic",
+          "symbol": "drawProfile",
+          "anchor": "5eb795ca4a22",
+          "first": "function drawProfile() {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 491,
+          "end": 593,
+          "role": "logic",
+          "symbol": "bindStage",
+          "anchor": "496d53ad1ef1",
+          "first": "function bindStage() {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 461,
+          "end": 472,
+          "role": "logic",
+          "symbol": "bindRowControls",
+          "anchor": "91e06c0227a8",
+          "first": "function bindRowControls() {"
+        }
+      ]
+    },
+    {
+      "id": "results-tabs",
+      "level": "view",
+      "parent": null,
+      "title": "Results tabs",
+      "summary": "Tabbed panes for the line table with CSV and JSON export, calibration statistics with a fit chart, and element matches ranked by hits.",
+      "views": [
+        "table view",
+        "summary stats",
+        "scatter plot",
+        "list"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 201,
+          "end": 259,
+          "role": "markup",
+          "symbol": "#panel-results",
+          "anchor": "11418d9a9161",
+          "first": "<aside class=\"panel results\" id=\"panel-results\">"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 395,
+          "end": 395,
+          "role": "style",
+          "symbol": ".tabs",
+          "anchor": "4c0c4cc178fe",
+          "first": ".tabs { display: flex; gap: 2px; padding: 8px 8px 0; border-bottom: 1px solid var(--line); }"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 433,
+          "end": 433,
+          "role": "style",
+          "symbol": ".table",
+          "anchor": "a0ebeedb8f2d",
+          "first": ".table { width: 100%; border-collapse: collapse; font-size: 12px; }"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 459,
+          "end": 459,
+          "role": "style",
+          "symbol": ".stat-grid",
+          "anchor": "0e90d868b110",
+          "first": ".stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 475,
+          "end": 482,
+          "role": "style",
+          "symbol": ".elem-card",
+          "anchor": "8f40d9edd526",
+          "first": ".elem-card {"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 489,
+          "end": 495,
+          "role": "style",
+          "symbol": ".line-chip",
+          "anchor": "262ea6245615",
+          "first": ".line-chip {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 960,
+          "end": 969,
+          "role": "logic",
+          "symbol": "bindTabs",
+          "anchor": "4d6c0451c8be",
+          "first": "function bindTabs() {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 308,
+          "end": 337,
+          "role": "logic",
+          "symbol": "renderPeaksTable",
+          "anchor": "5c5e9145f9cb",
+          "first": "function renderPeaksTable() {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 351,
+          "end": 371,
+          "role": "logic",
+          "symbol": "renderCalib",
+          "anchor": "08a98ed1256d",
+          "first": "function renderCalib() {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 373,
+          "end": 423,
+          "role": "logic",
+          "symbol": "drawFitChart",
+          "anchor": "895e1e27c243",
+          "first": "function drawFitChart() {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 426,
+          "end": 458,
+          "role": "logic",
+          "symbol": "renderElements",
+          "anchor": "24429e80895a",
+          "first": "function renderElements() {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 691,
+          "end": 723,
+          "role": "logic",
+          "symbol": "bindExport",
+          "anchor": "7db889ad2694",
+          "first": "function bindExport() {"
+        }
+      ]
+    },
+    {
+      "id": "report",
+      "level": "component",
+      "parent": "results-tabs",
+      "title": "Report generator",
+      "summary": "Builds a PNG lab report with the image, line table, calibration and grating result, ready to save or print.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/index.html",
+          "start": 243,
+          "end": 257,
+          "role": "markup",
+          "anchor": "d799c0a97faf",
+          "first": "<div class=\"pane\" data-pane=\"report\">"
+        },
+        {
+          "file": "code/web/styles.css",
+          "start": 499,
+          "end": 499,
+          "role": "style",
+          "symbol": ".report-preview img",
+          "anchor": "3fa3f9cba6b5",
+          "first": ".report-preview img { width: 100%; border-radius: 10px; border: 1px solid var(--line); margin-top: 10px; }"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 834,
+          "end": 853,
+          "role": "logic",
+          "symbol": "bindReport",
+          "anchor": "25a93da9dcbc",
+          "first": "function bindReport() {"
+        },
+        {
+          "file": "code/web/js/app.js",
+          "start": 726,
+          "end": 832,
+          "role": "logic",
+          "symbol": "buildReportCanvas",
+          "anchor": "66f9a5b5a462",
+          "first": "function buildReportCanvas() {"
+        }
+      ]
+    }
+  ]
+}

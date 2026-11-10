@@ -1,0 +1,519 @@
+{
+  "schema": "astaui.card/1",
+  "id": "bvid-fe-composite-damage",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T06:45:47Z"
+  },
+  "app": {
+    "title": "BVID-FE — Barely Visible Impact Damage analysis",
+    "summary": "A person describes a damaged laminate panel in a sidebar: material, ply stack, panel size, and the damage source. The damage can be an impact event to predict from, or a measured inspection file to load. Before running, a live preview estimates the energy at which damage starts and the predicted damage area. The person picks a model tier and loading mode, runs the analysis, and reads the pristine strength, the residual strength and the knockdown, with views of the damage footprint, a 3D damaged mesh, a through-thickness severity heatmap and buckling modes. The person can sweep impact energy to get a knockdown curve as a CSV. Finally they fill in a nonconformance report that attaches the analysis and a proposed disposition with flags and criteria, and export it as Markdown and JSON.",
+    "task": {
+      "text": "Predict how much strength an impact-damaged laminate keeps and turn that into a nonconformance report with a proposed disposition for a review board.",
+      "verbs": [
+        "derive",
+        "decide",
+        "write",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A configuration of one laminate panel and its damage, given as an impact event or as measured delamination ellipses from an inspection JSON. Results are strengths, a damage state over the panel, an energy sweep table and a report form.",
+      "item": "one impacted composite panel with its ply stack and damage state",
+      "shapes": [
+        "table",
+        "field",
+        "judgements",
+        "document"
+      ]
+    },
+    "stage": {
+      "text": "assessing an impact-damaged part after inspection, before a review board decides its disposition",
+      "terms": [
+        "analyze",
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar inputs build one analysis configuration, which is synced to a shareable URL and can be filled from presets. A run fills a row of result tabs: summary numbers, a damage map, a 3D mesh, a severity heatmap, a buckling chart and an energy sweep. The last tab turns the latest result and a form into a nonconformance report with a rule-based disposition recommendation.",
+      "views": [
+        "form",
+        "summary stats",
+        "map",
+        "heatmap",
+        "bar chart",
+        "line chart",
+        "table view",
+        "document reader",
+        "3d view"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "residual-strength prediction for impact-damaged composite laminates in aerospace damage tolerance",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "damage tolerance",
+        "compression after impact",
+        "composite laminates"
+      ]
+    },
+    "workflow": {
+      "name": "estimate a damaged specimen's remaining capacity and file a disposition report",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "material, ply angles and panel size in the sidebar, with an optional preset. The damage source is either an impact event (energy, impactor) or an uploaded inspection JSON of delamination ellipses, and the run button is blocked until that file loads.",
+          "parts": [
+            "config-sidebar",
+            "damage-input"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "a live preview of the onset energy and the predicted damage area, then Run analysis on the chosen tier (empirical, semi_analytical, fe3d) gives pristine strength, residual strength and knockdown",
+          "parts": [
+            "onset-preview",
+            "results-summary"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "tabs show the delamination footprint map, a 3D damaged mesh, a through-thickness severity heatmap and buckling mode values",
+          "parts": [
+            "damage-views"
+          ]
+        },
+        {
+          "step": "compare across a range of conditions",
+          "here": "an energy sweep over a list of energies on a chosen tier draws a knockdown-vs-energy curve, lists any failed points, and downloads as CSV",
+          "parts": [
+            "energy-sweep"
+          ]
+        },
+        {
+          "step": "write up the result",
+          "here": "a nonconformance form (part, station, type, description, dent threshold) gets a proposed disposition banded from the knockdown, dent and fiber breakage, with flags and criteria in a previewed report",
+          "parts": [
+            "ncr-export"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "the report downloads as Markdown and JSON, and the results as JSON",
+          "parts": [
+            "ncr-export",
+            "results-summary"
+          ]
+        }
+      ],
+      "distinctive": [
+        "three model tiers of rising cost, from milliseconds to a 3D finite-element solve, are chosen per run, and an oversized mesh is refused before it is solved",
+        "damage comes either from a predicted impact event or from measured inspection ellipses, so prediction and as-found assessment share one path",
+        "the disposition recommendation is banded by strength retention, a dent detectability threshold and fiber breakage, and is always marked as proposed until a review board approves it",
+        "the configuration is written to the URL and stale results are flagged when inputs change after a run"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "config-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Configuration sidebar",
+      "summary": "Builds the analysis configuration from a preset, material, ply angles, panel size, tier and loading mode, and keeps it in a shareable URL.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 739,
+          "end": 875,
+          "role": "markup",
+          "anchor": "977b094d9dff",
+          "first": "# Hydrate session_state from URL on first run, then from preset whenever the"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1002,
+          "end": 1081,
+          "role": "markup",
+          "anchor": "27ba3517af3b",
+          "first": "st.markdown(\"**Analysis**\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 147,
+          "end": 198,
+          "role": "data",
+          "anchor": "2372a2a54d80",
+          "first": "PRESET_CUSTOM = \"Custom\""
+        },
+        {
+          "file": "code/app.py",
+          "start": 320,
+          "end": 337,
+          "role": "logic",
+          "symbol": "_parse_layup",
+          "anchor": "346a0e5cd14b",
+          "first": "def _parse_layup(text: str) -> list[float]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 265,
+          "end": 279,
+          "role": "logic",
+          "symbol": "_hydrate_from_preset",
+          "anchor": "ddc3cb970447",
+          "first": "def _hydrate_from_preset() -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 247,
+          "end": 262,
+          "role": "logic",
+          "symbol": "_hydrate_from_url",
+          "anchor": "c8cff9c5b81b",
+          "first": "def _hydrate_from_url() -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 282,
+          "end": 311,
+          "role": "logic",
+          "symbol": "_sync_query_params",
+          "anchor": "e30a00a87af9",
+          "first": "def _sync_query_params() -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1088,
+          "end": 1146,
+          "role": "logic",
+          "anchor": "f7829aae6384",
+          "first": "panel = None"
+        }
+      ]
+    },
+    {
+      "id": "damage-input",
+      "level": "component",
+      "parent": "config-sidebar",
+      "title": "Damage source",
+      "summary": "Takes either an impact event (energy, impactor size, shape, mass, location) or an uploaded inspection JSON of delamination ellipses, with optional dent and fiber-break overrides.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 877,
+          "end": 1000,
+          "role": "markup",
+          "anchor": "c41992ef6558",
+          "first": "impact_event: ImpactEvent | None = None"
+        },
+        {
+          "file": "code/src/bvidfe/damage/io.py",
+          "start": 128,
+          "end": 153,
+          "role": "logic",
+          "symbol": "damage_state_from_dict",
+          "anchor": "478976019a87",
+          "first": "def damage_state_from_dict(data: Dict[str, Any]) -> DamageState:"
+        }
+      ]
+    },
+    {
+      "id": "onset-preview",
+      "level": "component",
+      "parent": "config-sidebar",
+      "title": "Onset and damage-area preview",
+      "summary": "Before a run, shows the impact energy at which damage starts and the predicted damage area as a share of the panel, flagging saturation.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 385,
+          "end": 396,
+          "role": "logic",
+          "symbol": "_onset_preview_cached",
+          "anchor": "25945a34118e",
+          "first": "def _onset_preview_cached("
+        },
+        {
+          "file": "code/app.py",
+          "start": 1154,
+          "end": 1170,
+          "role": "logic",
+          "symbol": "_live_onset_preview",
+          "anchor": "7918f25228f8",
+          "first": "def _live_onset_preview() -> str | None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1173,
+          "end": 1175,
+          "role": "markup",
+          "anchor": "8dfdd37aaffe",
+          "first": "preview = _live_onset_preview()"
+        }
+      ]
+    },
+    {
+      "id": "results-summary",
+      "level": "view",
+      "parent": null,
+      "title": "Run and summary",
+      "summary": "Runs the cached analysis, warns when inputs have changed since the last run, and shows pristine strength, residual strength, knockdown and notes, with a JSON download.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 341,
+          "end": 370,
+          "role": "logic",
+          "symbol": "_run_analysis_cached",
+          "anchor": "2e6594d40435",
+          "first": "def _run_analysis_cached(config_dict: dict) -> dict:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 439,
+          "end": 492,
+          "role": "logic",
+          "symbol": "_config_from_dict",
+          "anchor": "96a9f701d969",
+          "first": "def _config_from_dict(d: dict) -> AnalysisConfig:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1182,
+          "end": 1254,
+          "role": "logic",
+          "anchor": "0b35e5ea3540",
+          "first": "if run_clicked:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1259,
+          "end": 1284,
+          "role": "markup",
+          "anchor": "c64753adf590",
+          "first": "with tabs[0]:"
+        }
+      ]
+    },
+    {
+      "id": "damage-views",
+      "level": "view",
+      "parent": null,
+      "title": "Damage and buckling tabs",
+      "summary": "Shows the result's damage as an ellipse footprint map, a rotatable 3D mesh coloured by stiffness loss, a through-thickness severity heatmap over the panel, and buckling mode values as a bar chart and table.",
+      "views": [
+        "map",
+        "3d view",
+        "heatmap",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1289,
+          "end": 1299,
+          "role": "markup",
+          "anchor": "664372dad646",
+          "first": "with tabs[1]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1339,
+          "end": 1444,
+          "role": "logic",
+          "anchor": "95e98f24f27e",
+          "first": "with tabs[3]:"
+        },
+        {
+          "file": "code/src/bvidfe/viz/plots_2d.py",
+          "start": 36,
+          "end": 40,
+          "role": "logic",
+          "symbol": "plot_damage_map",
+          "anchor": "b671c4400d6a",
+          "first": "def plot_damage_map("
+        },
+        {
+          "file": "code/src/bvidfe/viz/plotly_3d.py",
+          "start": 144,
+          "end": 163,
+          "role": "logic",
+          "symbol": "mesh_damage_figure",
+          "anchor": "ac3dd1da2766",
+          "first": "def mesh_damage_figure(mesh: FeMesh, *, title: str = \"Damage factor\") -> go.Figure:"
+        }
+      ]
+    },
+    {
+      "id": "energy-sweep",
+      "level": "view",
+      "parent": null,
+      "title": "Knockdown curve and energy sweep",
+      "summary": "Runs the analysis over a list of impact energies on a chosen tier with live progress, lists failed points, and plots knockdown against energy, with a CSV download.",
+      "views": [
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1302,
+          "end": 1334,
+          "role": "markup",
+          "anchor": "13338bc563e6",
+          "first": "# --- Knockdown Curve tab --------------------------------------------------"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1449,
+          "end": 1572,
+          "role": "logic",
+          "anchor": "07a301fa33d4",
+          "first": "with tabs[6]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 374,
+          "end": 381,
+          "role": "logic",
+          "symbol": "_sweep_cached",
+          "anchor": "c9c29b2f99d9",
+          "first": "def _sweep_cached(config_dict: dict, tier: str, energies: tuple[float, ...]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 314,
+          "end": 317,
+          "role": "logic",
+          "symbol": "_show_df",
+          "anchor": "598b65941adf",
+          "first": "def _show_df(df: pd.DataFrame) -> None:"
+        },
+        {
+          "file": "code/src/bvidfe/viz/plots_2d.py",
+          "start": 135,
+          "end": 140,
+          "role": "logic",
+          "symbol": "plot_knockdown_curve",
+          "anchor": "1377824c71c0",
+          "first": "def plot_knockdown_curve("
+        }
+      ]
+    },
+    {
+      "id": "ncr-export",
+      "level": "view",
+      "parent": null,
+      "title": "Nonconformance report",
+      "summary": "A form records the nonconformance and attaches the latest analysis. A rule-based proposed disposition with flags and review criteria is added, and the report is previewed and downloaded as Markdown and JSON.",
+      "views": [
+        "form",
+        "document reader"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 94,
+          "end": 119,
+          "role": "data",
+          "anchor": "38299ba76406",
+          "first": "# MRB / NCR disposition support -------------------------------------------"
+        },
+        {
+          "file": "code/app.py",
+          "start": 500,
+          "end": 581,
+          "role": "logic",
+          "symbol": "_recommend_disposition",
+          "anchor": "7269baaca9cf",
+          "first": "def _recommend_disposition(result_dict: dict, dent_threshold_mm: float) -> dict:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 584,
+          "end": 732,
+          "role": "logic",
+          "symbol": "_build_ncr",
+          "anchor": "cb2cab731841",
+          "first": "def _build_ncr(form: dict, cfg, result_dict: dict | None, rec: dict | None) -> tuple[str, dict]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1577,
+          "end": 1721,
+          "role": "markup",
+          "anchor": "31231caa88be",
+          "first": "with tabs[7]:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "3d view"
+    }
+  ]
+}

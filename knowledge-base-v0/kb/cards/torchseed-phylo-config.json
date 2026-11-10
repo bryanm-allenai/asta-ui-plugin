@@ -1,0 +1,558 @@
+{
+  "schema": "astaui.card/1",
+  "id": "torchseed-phylo-config",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T07:16:11Z"
+  },
+  "app": {
+    "title": "torchseed — graphical configuration builder for torchtree",
+    "summary": "A person loads a sequence alignment, can optionally attach a sampling date to each sequence, and loads a starting tree. With dates in place they can run a root-to-tip regression to check for clock-like signal. They then work through numbered tabs to pick the substitution and site models, the clock model, a tree prior and a prior for each estimated parameter, then the variational family and optimiser settings. Finally they generate the full analysis configuration, preview it with a summary of its components, and download it as a JSON file to run in the inference engine.",
+    "task": {
+      "text": "Specify a Bayesian phylogenetic analysis (data, model components, priors and variational inference settings) and export it as a ready-to-run configuration file.",
+      "verbs": [
+        "plan",
+        "derive",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A multiple sequence alignment of DNA or protein, optional sampling dates per sequence from the names or a CSV, a starting tree in Newick or NEXUS, and a registry of model parameters, each with a starting value, constraint, prior and variational family.",
+      "item": "an estimated model parameter with its starting value, prior and variational distribution",
+      "shapes": [
+        "sequence",
+        "hierarchy",
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "setting up a phylogenetic inference run once the alignment and tree exist, before running it",
+      "terms": [
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "Numbered tabs act as a wizard: each tab is a form that writes to one shared parameter registry, and later tabs stay locked until an alignment and tree are loaded. The output tab assembles the registry into a JSON configuration to preview and download, while dialogs, plots and tables along the way let the person check the inputs (alignment, tree, dates, root-to-tip fit, rate categories).",
+      "views": [
+        "form",
+        "table view",
+        "sequence track",
+        "tree diagram",
+        "scatter plot",
+        "line chart",
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "wizard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "Bayesian phylogenetic inference with molecular clocks and coalescent priors, fitted by variational inference, in evolutionary biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "phylogenetics",
+        "phylodynamics",
+        "variational inference"
+      ]
+    },
+    "workflow": {
+      "name": "specify a statistical model step by step and export it as a run configuration",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a FASTA alignment, choose DNA or Protein in an import dialog, and see it as a row (taxa, sites, type) that can be opened in an alignment viewer or deleted.",
+          "parts": [
+            "alignment-tab"
+          ]
+        },
+        {
+          "step": "attach a time to each item",
+          "here": "Turn on tip dates and parse them from taxon names with a regex or from a CSV with strain and date columns, set the time direction, then check coverage, a date and height table and a histogram with a bin slider.",
+          "parts": [
+            "dates-tab"
+          ]
+        },
+        {
+          "step": "bring in the starting structure and check its signal",
+          "here": "Upload a Newick or NEXUS tree, view it, and run root-to-tip regression (maximise r² or minimise SSR over every possible root) to read the rate, TMRCA and r² next to a date vs distance scatter plot.",
+          "parts": [
+            "tree-tab",
+            "root-to-tip"
+          ]
+        },
+        {
+          "step": "choose model components and their parameters",
+          "here": "Pick a substitution model, which shows its rate matrix, plus Weibull rate categories, invariant sites and a strict or per-branch clock. Each free parameter shows up as a row with a starting value and an estimate checkbox.",
+          "parts": [
+            "model-tabs"
+          ]
+        },
+        {
+          "step": "set a prior on each estimated parameter",
+          "here": "Choose a coalescent tree prior, then for each estimated parameter pick a distribution and hyperparameters. A hyperparameter can be promoted to an estimated parameter with its own prior, or a prior can be removed.",
+          "parts": [
+            "priors-tab"
+          ]
+        },
+        {
+          "step": "configure the fitting algorithm",
+          "here": "Pick a variational family per parameter (shown with its transform to unconstrained space), set the time-tree reparameterisation, the objective, optimiser, learning rate, iterations, convergence tolerance and output file stem.",
+          "parts": [
+            "algorithm-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Generate / Refresh JSON assembles the config or reports what is missing, then it shows a JSON preview and a table of component ids and types, with a download button for <stem>.json.",
+          "parts": [
+            "output-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each parameter's constraint (positive, shifted positive, unit interval, simplex, real) decides which priors and variational families are offered and which transform and Jacobian enter the config.",
+        "Turning on tip dates switches the analysis from an unrooted tree to a time tree, which unlocks the clock and coalescent models and sets the root height's lower bound to the span of the dates.",
+        "A root-to-tip regression searches every edge for the best root to check clock-like signal before the model is specified.",
+        "Hyperparameters of a prior can be promoted to estimated parameters with their own priors, and these links survive when the model is changed."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "alignment-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Alignment",
+      "summary": "Uploads a FASTA alignment with a chosen data type, lists loaded alignments with taxa and site counts, and opens a viewer or deletes one.",
+      "views": [
+        "table view",
+        "sequence track"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/torchseed/tabs/tab_alignment.py",
+          "start": 13,
+          "end": 151,
+          "role": "logic",
+          "symbol": "render",
+          "anchor": "2cfd56e06a16",
+          "first": "def render() -> None:"
+        },
+        {
+          "file": "code/torchseed/tabs/tab_alignment.py",
+          "start": 34,
+          "end": 79,
+          "role": "logic",
+          "symbol": "import_dialog",
+          "anchor": "532bca0ff205",
+          "first": "def import_dialog():"
+        },
+        {
+          "file": "code/torchseed/tabs/tab_alignment.py",
+          "start": 103,
+          "end": 109,
+          "role": "logic",
+          "symbol": "view_dialog",
+          "anchor": "9156d0664cee",
+          "first": "def view_dialog(aln: dict):"
+        },
+        {
+          "file": "code/torchseed/builders/alignment.py",
+          "start": 5,
+          "end": 24,
+          "role": "logic",
+          "symbol": "parse_fasta",
+          "anchor": "ce64b35f0dd9",
+          "first": "def parse_fasta(text: str) -> tuple[list[str], dict[str, str]]:"
+        },
+        {
+          "file": "code/torchseed/viewers/msa.py",
+          "start": 17,
+          "end": 32,
+          "role": "markup",
+          "symbol": "msaviewer_html",
+          "anchor": "22adcb967c60",
+          "first": "def msaviewer_html(aln: dict, height: int = 600) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "dates-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Dates",
+      "summary": "Attaches a sampling date to each sequence from a regex on the names or from a CSV, then shows coverage, a date and height table and a histogram with adjustable bins.",
+      "views": [
+        "form",
+        "table view",
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/torchseed/tabs/tab_dates.py",
+          "start": 49,
+          "end": 174,
+          "role": "logic",
+          "symbol": "render",
+          "anchor": "6b1aa622497a",
+          "first": "def render() -> None:"
+        },
+        {
+          "file": "code/torchseed/tabs/tab_dates.py",
+          "start": 11,
+          "end": 12,
+          "role": "logic",
+          "symbol": "_parse_dates_from_names",
+          "anchor": "a18721877f7c",
+          "first": "def _parse_dates_from_names("
+        },
+        {
+          "file": "code/torchseed/tabs/tab_dates.py",
+          "start": 32,
+          "end": 46,
+          "role": "logic",
+          "symbol": "_parse_dates_from_csv",
+          "anchor": "9e2b38d91a00",
+          "first": "def _parse_dates_from_csv(text: str) -> tuple[dict[str, float], str | None]:"
+        },
+        {
+          "file": "code/torchseed/state.py",
+          "start": 14,
+          "end": 21,
+          "role": "data",
+          "anchor": "f954c3e95a94",
+          "first": "# --- Tab 2: Dates ---"
+        }
+      ]
+    },
+    {
+      "id": "tree-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Tree",
+      "summary": "Loads a starting tree from a Newick or NEXUS file and opens it in a tree viewer dialog.",
+      "views": [
+        "tree diagram"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/torchseed/tabs/tab_tree.py",
+          "start": 88,
+          "end": 147,
+          "role": "logic",
+          "anchor": "ad06f08d9119",
+          "first": "def render() -> None:"
+        },
+        {
+          "file": "code/torchseed/viewers/tree.py",
+          "start": 7,
+          "end": 18,
+          "role": "markup",
+          "symbol": "phylocanvas_html",
+          "anchor": "ac778b902312",
+          "first": "def phylocanvas_html(newick: str, height: int = 600) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "root-to-tip",
+      "level": "component",
+      "parent": "tree-tab",
+      "title": "Root-to-tip regression",
+      "summary": "Searches every edge for the root that best fits dates against root-to-tip distance, and reports the rate, TMRCA, r² and number of tips next to a scatter plot with the fitted line.",
+      "views": [
+        "scatter plot",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/torchseed/tabs/tab_tree.py",
+          "start": 20,
+          "end": 85,
+          "role": "logic",
+          "symbol": "_render_root_to_tip",
+          "anchor": "47c2a13cb863",
+          "first": "def _render_root_to_tip(newick: str, dates: dict) -> None:"
+        },
+        {
+          "file": "code/torchseed/analyses/root_to_tip.py",
+          "start": 75,
+          "end": 78,
+          "role": "logic",
+          "symbol": "root_to_tip",
+          "anchor": "0af3c0f0c4b5",
+          "first": "def root_to_tip("
+        }
+      ]
+    },
+    {
+      "id": "model-tabs",
+      "level": "view",
+      "parent": null,
+      "title": "Site and clock models",
+      "summary": "Picks the substitution model (with its rate matrix shown), Weibull rate categories with a density plot and table, invariant sites, and a strict or per-branch clock, and gives each parameter a starting value and an estimate checkbox.",
+      "views": [
+        "form",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/torchseed/tabs/tab_site_model.py",
+          "start": 70,
+          "end": 238,
+          "role": "logic",
+          "symbol": "render",
+          "anchor": "5f7d6ec30bb8",
+          "first": "def render() -> None:"
+        },
+        {
+          "file": "code/torchseed/tabs/tab_site_model.py",
+          "start": 25,
+          "end": 67,
+          "role": "logic",
+          "symbol": "_param_row",
+          "anchor": "d5a1e25aafc2",
+          "first": "def _param_row(spec: dict, step=0.01, registry_key: str = \"parameter_registry\") -> None:"
+        },
+        {
+          "file": "code/torchseed/tabs/tab_clock.py",
+          "start": 41,
+          "end": 83,
+          "role": "logic",
+          "symbol": "render",
+          "anchor": "40dbc236f08a",
+          "first": "def render() -> None:"
+        },
+        {
+          "file": "code/torchseed/tabs/tab_clock.py",
+          "start": 9,
+          "end": 39,
+          "role": "logic",
+          "symbol": "_param_row",
+          "anchor": "2fdf964bb91f",
+          "first": "def _param_row(spec: dict, registry_key: str = \"parameter_registry\") -> None:"
+        },
+        {
+          "file": "code/torchseed/parameter_registry.py",
+          "start": 142,
+          "end": 283,
+          "role": "data",
+          "symbol": "build_default_registry",
+          "anchor": "bb8df55cd8f1",
+          "first": "def build_default_registry(state: dict) -> list[ParameterSpec]:"
+        }
+      ]
+    },
+    {
+      "id": "priors-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Priors",
+      "summary": "Chooses a coalescent tree prior and, for each estimated parameter, a prior distribution with hyperparameters, which can be promoted to their own priors or removed.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/torchseed/tabs/tab_priors.py",
+          "start": 322,
+          "end": 395,
+          "role": "logic",
+          "symbol": "render",
+          "anchor": "6c55d016be85",
+          "first": "def render() -> None:"
+        },
+        {
+          "file": "code/torchseed/tabs/tab_priors.py",
+          "start": 198,
+          "end": 319,
+          "role": "logic",
+          "symbol": "_render_prior_expander",
+          "anchor": "2823ea663e2c",
+          "first": "def _render_prior_expander(spec: dict) -> None:"
+        },
+        {
+          "file": "code/torchseed/tabs/tab_priors.py",
+          "start": 70,
+          "end": 109,
+          "role": "logic",
+          "symbol": "_add_hyperparam_prior",
+          "anchor": "186338563231",
+          "first": "def _add_hyperparam_prior(parent_pid: str, hyper_name: str) -> None:"
+        },
+        {
+          "file": "code/torchseed/tabs/tab_priors.py",
+          "start": 112,
+          "end": 142,
+          "role": "logic",
+          "symbol": "_unlink_hyperparam",
+          "anchor": "1029a9ade01d",
+          "first": "def _unlink_hyperparam(parent_pid: str, hyper_name: str) -> None:"
+        },
+        {
+          "file": "code/torchseed/tabs/tab_priors.py",
+          "start": 145,
+          "end": 153,
+          "role": "logic",
+          "symbol": "_remove_prior",
+          "anchor": "7ba13165652f",
+          "first": "def _remove_prior(pid: str) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "algorithm-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Algorithm",
+      "summary": "Sets the variational family and its starting values per parameter (showing the transform used), the time-tree reparameterisation, and the objective, optimiser, convergence and output settings.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/torchseed/tabs/tab_algorithm.py",
+          "start": 221,
+          "end": 310,
+          "role": "logic",
+          "symbol": "render",
+          "anchor": "ad81347d057c",
+          "first": "def render() -> None:"
+        },
+        {
+          "file": "code/torchseed/tabs/tab_algorithm.py",
+          "start": 34,
+          "end": 104,
+          "role": "logic",
+          "symbol": "_vi_expander",
+          "anchor": "30aa5bfb45cf",
+          "first": "def _vi_expander(spec: dict) -> None:"
+        },
+        {
+          "file": "code/torchseed/tabs/tab_algorithm.py",
+          "start": 107,
+          "end": 218,
+          "role": "logic",
+          "symbol": "_render_tree_reparam",
+          "anchor": "16b8b1d5e845",
+          "first": "def _render_tree_reparam(dates: dict, registry: list) -> None:"
+        },
+        {
+          "file": "code/torchseed/builders/assemble.py",
+          "start": 331,
+          "end": 392,
+          "role": "logic",
+          "symbol": "compute_vi_info",
+          "anchor": "5d65f93df3a9",
+          "first": "def compute_vi_info(param: dict, family_key: str) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "output-tab",
+      "level": "view",
+      "parent": null,
+      "title": "JSON Configuration",
+      "summary": "Assembles everything into the analysis configuration, or reports what is missing, then shows a JSON preview and a component table and offers the file for download.",
+      "views": [
+        "document reader",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/torchseed/tabs/tab_output.py",
+          "start": 12,
+          "end": 66,
+          "role": "logic",
+          "symbol": "render",
+          "anchor": "3c4170d0c695",
+          "first": "def render() -> None:"
+        },
+        {
+          "file": "code/torchseed/builders/assemble.py",
+          "start": 525,
+          "end": 658,
+          "role": "logic",
+          "symbol": "assemble_config",
+          "anchor": "8e9438d3d524",
+          "first": "def assemble_config(state: dict) -> tuple[list[dict] | None, str | None]:"
+        },
+        {
+          "file": "code/torchseed/builders/assemble.py",
+          "start": 57,
+          "end": 152,
+          "role": "logic",
+          "symbol": "build_component_list",
+          "anchor": "6853f6418ef3",
+          "first": "def build_component_list(state: dict) -> tuple[list[dict] | None, str | None]:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "tree diagram"
+    },
+    {
+      "facet": "mechanism",
+      "list": "patterns",
+      "term": "wizard"
+    }
+  ]
+}

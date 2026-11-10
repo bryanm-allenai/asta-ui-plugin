@@ -1,0 +1,556 @@
+{
+  "schema": "astaui.card/1",
+  "id": "cnatool-network-analysis",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:38:07Z"
+  },
+  "app": {
+    "title": "Complex Network Analysis Tool (CNATool)",
+    "summary": "A person opens a network file (Pajek, JSON or an adjacency-matrix CSV) or generates a synthetic network of a chosen topology, and sees it drawn as a graph they can lay out with a force-directed or no-overlap algorithm and drag by hand. A side panel shows the network's counts and density. Ticking 'Calculate Properties' computes average degree, average clustering, average shortest path, diameter and global efficiency, optionally on the GPU. Per-vertex tables of degree, clustering and centrality open in new windows, and the network, an SVG of the drawing and an HTML properties report can be saved.",
+    "task": {
+      "text": "Compute the topological properties of a network, overall and per vertex, and save them as a report alongside the drawn graph.",
+      "verbs": [
+        "derive",
+        "summarize",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A graph of vertices and possibly weighted, possibly directed edges, loaded from a network file or generated from a topology model, with derived per-vertex measures shown as tables.",
+      "item": "a network, made of vertices and the edges between them",
+      "shapes": [
+        "network",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "analysing a network's structure once it has been built, before writing up its properties",
+      "terms": [
+        "analyze",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A properties panel beside a canvas drawing of the network: the panel's checkboxes and layout menu redraw the graph and recompute the global measures, while the menus generate or load networks, open per-vertex report tables in new windows and save the network, drawing and report.",
+      "views": [
+        "network diagram",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "drag to arrange",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "complex network analysis in network science",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "network science",
+        "complex networks",
+        "social network analysis"
+      ]
+    },
+    "workflow": {
+      "name": "compute and report the structural measures of a graph",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "File > Open reads a Pajek .net, a JSON nodes/edges file or a CSV adjacency matrix; File > New instead generates a complete, random, scale-free, small-world or hybrid network from vertex count, edge count, probability or average degree typed into prompts.",
+          "parts": [
+            "file-menu",
+            "network-generator"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The network is drawn on a canvas; a layout menu runs Force Atlas 2 or No Overlap, nodes can be dragged, and checkboxes show labels and scale edge widths by weight.",
+          "parts": [
+            "network-canvas",
+            "layout-controls"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The panel always shows vertices, edges and density; ticking 'Calculate Properties' adds average degree, average clustering coefficient, average shortest path, diameter and global efficiency, with a directed-graph switch and an option to run on the GPU.",
+          "parts": [
+            "properties-panel"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "View menu opens tables of each vertex's degree, clustering coefficient and centralities, or the full properties summary, in a new window; these refuse until properties have been calculated.",
+          "parts": [
+            "vertex-reports"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "File > Save writes the network as Pajek or JSON, the drawing as SVG, or the properties summary as an HTML report.",
+          "parts": [
+            "save-menu"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Synthetic networks of standard topologies (complete, random, scale-free, small-world, hybrid) can be generated as baselines to compare against loaded networks.",
+        "The expensive all-pairs measures (shortest paths, diameter, efficiency) only run when a checkbox is ticked, and can be offloaded to the GPU.",
+        "A directed/undirected switch changes how density and the other measures are computed.",
+        "Reads and writes the Pajek network format as well as JSON and adjacency-matrix CSV."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "file-menu",
+      "level": "view",
+      "parent": null,
+      "title": "Menu bar and file opening",
+      "summary": "A drop-down menu bar with File, View and Help, whose Open item loads a Pajek, JSON or CSV adjacency-matrix network.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 36,
+          "end": 98,
+          "role": "markup",
+          "symbol": "nav.menu",
+          "anchor": "aeaf34a6e1b5",
+          "first": "<nav class=\"menu\">"
+        },
+        {
+          "file": "code/css/menu.css",
+          "start": 4,
+          "end": 14,
+          "role": "style",
+          "symbol": ".menu-bar",
+          "anchor": "41f7ec6b9714",
+          "first": ".menu-bar {"
+        },
+        {
+          "file": "code/css/menu.css",
+          "start": 17,
+          "end": 20,
+          "role": "style",
+          "symbol": ".menu",
+          "anchor": "5ccb8c01135a",
+          "first": ".menu {"
+        },
+        {
+          "file": "code/css/menu.css",
+          "start": 23,
+          "end": 25,
+          "role": "style",
+          "symbol": ".sub-menu",
+          "anchor": "73f4897a636c",
+          "first": ".sub-menu {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 653,
+          "end": 706,
+          "role": "logic",
+          "symbol": "openFile",
+          "anchor": "0eea7a754137",
+          "first": "function openFile() {"
+        }
+      ]
+    },
+    {
+      "id": "network-generator",
+      "level": "component",
+      "parent": "file-menu",
+      "title": "New network of a chosen topology",
+      "summary": "Generates a complete, random, scale-free, small-world or hybrid network from parameters typed into prompts.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 46,
+          "end": 58,
+          "role": "markup",
+          "anchor": "25e5a242d226",
+          "first": "<li><a href=\"#\">New <span class=\"drop-icon\">&#9658;</span>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 404,
+          "end": 448,
+          "role": "logic",
+          "symbol": "newComplete",
+          "anchor": "b571d0cbda56",
+          "first": "function newComplete() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 450,
+          "end": 504,
+          "role": "logic",
+          "symbol": "newRandom",
+          "anchor": "cf7fa1c4d883",
+          "first": "function newRandom() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 506,
+          "end": 553,
+          "role": "logic",
+          "symbol": "newScaleFree",
+          "anchor": "0c264b5c7fb9",
+          "first": "function newScaleFree() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 555,
+          "end": 602,
+          "role": "logic",
+          "symbol": "newSmallWorld",
+          "anchor": "0e73f8775160",
+          "first": "function newSmallWorld() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 604,
+          "end": 651,
+          "role": "logic",
+          "symbol": "newHybrid",
+          "anchor": "7499e6c03fde",
+          "first": "function newHybrid() {"
+        }
+      ]
+    },
+    {
+      "id": "network-canvas",
+      "level": "view",
+      "parent": null,
+      "title": "Network drawing",
+      "summary": "Draws the network on a canvas with draggable nodes.",
+      "views": [
+        "network diagram"
+      ],
+      "interactions": [
+        "drag to arrange"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 189,
+          "end": 189,
+          "role": "markup",
+          "symbol": "#container",
+          "anchor": "043aa7b07a36",
+          "first": "<div id=\"container\"></div>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 26,
+          "end": 29,
+          "role": "style",
+          "anchor": "688932281d0c",
+          "first": "#container {"
+        },
+        {
+          "file": "code/css/split.css",
+          "start": 26,
+          "end": 32,
+          "role": "style",
+          "symbol": ".right",
+          "anchor": "1c61c82b1a31",
+          "first": ".right {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 197,
+          "end": 237,
+          "role": "logic",
+          "symbol": "showGraph",
+          "anchor": "211ae8db8b77",
+          "first": "function showGraph(data) {"
+        }
+      ]
+    },
+    {
+      "id": "properties-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Properties panel",
+      "summary": "Lists vertices, edges and density, and on request the average degree, clustering, shortest path, diameter and global efficiency, with directed-graph and GPU switches.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 102,
+          "end": 151,
+          "role": "markup",
+          "anchor": "527dd5a5daa9",
+          "first": "<div class=\"split left\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 162,
+          "end": 166,
+          "role": "markup",
+          "anchor": "19a396844506",
+          "first": "<li class=\"list\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 176,
+          "end": 187,
+          "role": "markup",
+          "anchor": "4afed503035f",
+          "first": "<li class=\"list\">"
+        },
+        {
+          "file": "code/css/split.css",
+          "start": 17,
+          "end": 23,
+          "role": "style",
+          "symbol": ".left",
+          "anchor": "b9368dfa5cf3",
+          "first": ".left {"
+        },
+        {
+          "file": "code/css/list.css",
+          "start": 3,
+          "end": 8,
+          "role": "style",
+          "symbol": ".list",
+          "anchor": "54a6004ff348",
+          "first": ".list {"
+        },
+        {
+          "file": "code/css/list.css",
+          "start": 9,
+          "end": 19,
+          "role": "style",
+          "symbol": ".item",
+          "anchor": "454a4b2c7739",
+          "first": ".item {"
+        },
+        {
+          "file": "code/css/list.css",
+          "start": 21,
+          "end": 24,
+          "role": "style",
+          "symbol": ".label",
+          "anchor": "c689ab85f9fc",
+          "first": ".label {"
+        },
+        {
+          "file": "code/css/list.css",
+          "start": 26,
+          "end": 30,
+          "role": "style",
+          "symbol": ".value",
+          "anchor": "7a44e3738769",
+          "first": ".value {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 335,
+          "end": 342,
+          "role": "logic",
+          "symbol": "updateProperties",
+          "anchor": "19e044b0286c",
+          "first": "function updateProperties() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 344,
+          "end": 398,
+          "role": "logic",
+          "symbol": "showProperties",
+          "anchor": "6d6a1e933822",
+          "first": "function showProperties(property) {"
+        }
+      ]
+    },
+    {
+      "id": "layout-controls",
+      "level": "component",
+      "parent": "properties-panel",
+      "title": "Layout and display controls",
+      "summary": "Picks a layout algorithm (Force Atlas 2 or No Overlap) and toggles node labels and weight-scaled edge widths.",
+      "views": [],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 152,
+          "end": 161,
+          "role": "markup",
+          "anchor": "7533f8dbbc7a",
+          "first": "<li class=\"list\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 167,
+          "end": 174,
+          "role": "markup",
+          "anchor": "8a2a17210d5b",
+          "first": "<div class=\"item\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 239,
+          "end": 301,
+          "role": "logic",
+          "symbol": "updateGraph",
+          "anchor": "a7597e243d01",
+          "first": "function updateGraph() {"
+        }
+      ]
+    },
+    {
+      "id": "vertex-reports",
+      "level": "component",
+      "parent": "file-menu",
+      "title": "Per-vertex report tables",
+      "summary": "Opens tables of the properties summary, vertex degrees, vertex clustering or vertex centralities in a new window.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 73,
+          "end": 83,
+          "role": "markup",
+          "anchor": "be1462e54086",
+          "first": "<li><a href=\"#\">View <span class=\"drop-icon\">&#9662;</span>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 757,
+          "end": 778,
+          "role": "logic",
+          "symbol": "showSummary",
+          "anchor": "3d2ce5d84817",
+          "first": "function showSummary() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 780,
+          "end": 803,
+          "role": "logic",
+          "symbol": "showDegrees",
+          "anchor": "2825f9ec89bf",
+          "first": "function showDegrees() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 805,
+          "end": 828,
+          "role": "logic",
+          "symbol": "showClustering",
+          "anchor": "5eb42a786dec",
+          "first": "function showClustering() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 830,
+          "end": 853,
+          "role": "logic",
+          "symbol": "showCentralities",
+          "anchor": "f468cbb34df5",
+          "first": "function showCentralities() {"
+        }
+      ]
+    },
+    {
+      "id": "save-menu",
+      "level": "component",
+      "parent": "file-menu",
+      "title": "Save network, drawing and report",
+      "summary": "Saves the network as Pajek or JSON, the drawing as SVG, or the properties summary as an HTML report.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 60,
+          "end": 70,
+          "role": "markup",
+          "anchor": "3f821e44df2a",
+          "first": "<li><a href=\"#\">Save <span class=\"drop-icon\">&#9658;</span>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 708,
+          "end": 715,
+          "role": "logic",
+          "symbol": "saveFile",
+          "anchor": "567ffd34a587",
+          "first": "function saveFile() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 717,
+          "end": 726,
+          "role": "logic",
+          "symbol": "saveJsonFile",
+          "anchor": "ffae03b06c9c",
+          "first": "function saveJsonFile() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 728,
+          "end": 739,
+          "role": "logic",
+          "symbol": "saveGraph",
+          "anchor": "a984b5d54a42",
+          "first": "function saveGraph() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 741,
+          "end": 755,
+          "role": "logic",
+          "symbol": "saveReport",
+          "anchor": "385dcf162c99",
+          "first": "function saveReport() {"
+        }
+      ]
+    }
+  ]
+}

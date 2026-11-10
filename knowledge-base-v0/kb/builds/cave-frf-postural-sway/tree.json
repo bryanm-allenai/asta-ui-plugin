@@ -1,0 +1,830 @@
+{
+ "interface": {
+  "title": "CAVE FRF — CAVE Gain / Phase Analysis (Streamlit, v0.4)",
+  "field": "Biomechanics / vestibular and concussion rehabilitation research (postural control, visual-perturbation sway analysis)",
+  "stage_of_work": "Analysis of collected force-plate and motion-capture trials: batch signal processing, group comparison, and export for statistics",
+  "what_it_is_for": "Point it at a folder of per-subject standing (COP) and walking (COM) trial files from the CAVE sum-of-sines visual-perturbation protocol, and it computes gain, phase and coherence at each stimulus frequency plus RMS, path-length and velocity sway metrics, then shows them as bar, recovery-trajectory, Nyquist and spectra plots and as CSVs to download."
+ },
+ "data": {
+  "source": "loaded example",
+  "note": "I typed the server-side sample folder /work/app/sample_data/CAVE_Demo_Data (16 files: 6 COP standing, 10 COM walking, Control_001 Acute and SubAcute) and used the bundled trial-order file Updated-_CAVE_Adult_Stimulus_Factor_Trial.txt. I loaded configs/demo_quickstart.yaml first (one stimulus component at 0.5 Hz, 5 s trials). Both planted edge cases behaved as described. The spike in standing Acute_8 shows up clearly: gain 0.66 against about 0.03 elsewhere, coherence 0.29, and inflated AP RMS and path length. The NaN in walking SubAcute_3 still gave finite results (gain 0.048, coherence 0.98). As a deliberate wrong input, I also uploaded README_SYNTHETIC_DATA.txt in place of the trial-order file. Caution for statistics: summary_metrics.csv is meant to have one row per trial, but the replay's file had 28 rows for 16 trials, with the standing trials duplicated. The Summary row-count caption also varied across re-runs (32, 26 and 28 rows for 16 or 14 trials). De-duplicate on trial before analysis."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Measure how body sway follows a periodic visual perturbation, and compare that response across groups, conditions and recovery stages",
+  "specific": "Compute CAVE gain, phase and coherence plus sway summary metrics for standing (COP) and walking (COM) trials, review them, and export CSVs",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Set up the analysis inputs",
+    "specific": "Steps 1–2 plus the sidebar Stimulus configuration",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Choose the protocol parameters that match the recordings",
+      "specific": "Load a stimulus YAML config (frequencies, weights, duration, axis mapping) from the sidebar",
+      "screens": [
+       "screens/005.webp",
+       "screens/008.webp",
+       "screens/009.webp",
+       "screens/058.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded ⚙️ Stimulus configuration",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "task",
+        "general": "Pick the parameter set for this protocol",
+        "specific": "Type one YAML path in Path to YAML config and press Load config",
+        "screens": [
+         "screens/008.webp",
+         "screens/058.webp"
+        ],
+        "branch": "one-of",
+        "children": [
+         {
+          "kind": "action",
+          "label": "typed configs/demo_quickstart.yaml and pressed Load config (matches the 5 s sample trials)",
+          "screens": [
+           "screens/008.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "typed configs/example_other_lab.yaml and pressed Load config (Active config becomes 'Example: 3-component stimulus, eyes-closed standing only')",
+          "screens": [
+           "screens/058.webp"
+          ]
+         }
+        ],
+        "id": "n1"
+       },
+       {
+        "kind": "action",
+        "label": "read 'Loaded: configs/demo_quickstart.yaml' and the Active config name (Quickstart demo). The parameter list below did not update and still shows 4 components / 120 s",
+        "screens": [
+         "screens/009.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Supply the table that maps each trial to its stimulus level",
+      "specific": "Trial-order file: use the bundled file or upload your own TXT",
+      "screens": [
+       "screens/004.webp",
+       "screens/044.webp",
+       "screens/046.webp",
+       "screens/047.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "left 'Use bundled file' checked (shows 'Using bundled: Updated-_CAVE_Adult_Stimulus_Factor_Trial.txt')",
+        "screens": [
+         "screens/004.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "unchecked 'Use bundled file' to upload your own trial-order TXT",
+        "screens": [
+         "screens/043.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "error path: pressed Upload and gave README_SYNTHETIC_DATA.txt, a non-trial-order file. It was accepted without validation and the status line showed 'Loaded:'",
+        "error_path": true,
+        "screens": [
+         "screens/044.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "error path: pressed Run analysis with the wrong file. It failed only at run time, with 'No trials matched the filter'",
+        "error_path": true,
+        "screens": [
+         "screens/046.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "error path recovery: re-checked 'Use bundled file'",
+        "error_path": true,
+        "screens": [
+         "screens/047.webp"
+        ]
+       }
+      ],
+      "note": "A correctly formatted custom trial-order file was never uploaded, so the normal upload route is shown only up to unchecking the box.",
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Point the tool at the recordings and confirm every expected file was found",
+      "specific": "Enter the top-level CAVE Data folder path and check the found-files count and the breakdown table",
+      "screens": [
+       "screens/006.webp",
+       "screens/007.webp",
+       "screens/048.webp",
+       "screens/049.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed /work/app/sample_data/CAVE_Demo_Data and pressed Enter → 'Found 16 data files (6 COP / standing, 10 COM / walking)'",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "expanded 'Breakdown by condition / file type / group / timepoint'",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "error path: typed /work/app/sample_data/Missing_Folder → red 'Folder does not exist'",
+        "error_path": true,
+        "screens": [
+         "screens/048.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed /work/app/sample_data/CAVE_Demo_Data/Walking to take a subset → 'Found 10 data files (0 COP / 10 COM)'",
+        "screens": [
+         "screens/049.webp"
+        ]
+       }
+      ],
+      "note": "The sidebar has a folder-layout hint (group/timepoint folders, including Chronic/) that describes the expected structure, but it was not captured on its own screen. The interface does not suggest a folder path; the replay had to guess one. Whether the Run button stays disabled until both inputs are valid was not observed.",
+      "id": "t3",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Run the batch analysis",
+    "specific": "Step 3 — Analyze",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Choose which trials to include and process them all",
+      "specific": "Set Condition (standing/walking/both) and Include amp=0 baseline trials, then press Run analysis",
+      "screens": [
+       "screens/010.webp",
+       "screens/011.webp",
+       "screens/012.webp",
+       "screens/040.webp",
+       "screens/041.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "selected Condition 'both'",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed ▶ Run analysis → '16 trials from 1 subjects analyzed', FRF 32 rows",
+        "screens": [
+         "screens/011.webp",
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected Condition 'standing'",
+        "screens": [
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "unchecked 'Include amp=0 baseline trials'",
+        "screens": [
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed ▶ Run analysis → '4 trials from 1 subjects analyzed', FRF 8 rows",
+        "screens": [
+         "screens/040.webp",
+         "screens/041.webp"
+        ]
+       }
+      ],
+      "note": "In the replay, the first 'both' run captioned 'Summary: 28 rows (one per trial)' for 16 trials, so the Summary count does not match the trial count.",
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Re-run after the data set changes, reusing earlier results",
+      "specific": "With 'Skip already-processed trials' on, re-run on the same folder, then on a subset folder (…/Walking), then on the full folder. The UI never reports which trials were reused",
+      "screens": [
+       "screens/033.webp",
+       "screens/035.webp",
+       "screens/053.webp",
+       "screens/056.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed ▶ Run analysis again with 'Skip already-processed trials' checked (same 16 trials; no reused/recomputed count shown)",
+        "screens": [
+         "screens/033.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "set folder to …/Walking, Condition both, baseline on, skip on, pressed ▶ Run analysis → '14 trials': the 10 walking trials plus the 4 cached standing trials from the earlier standing-only run",
+        "screens": [
+         "screens/052.webp",
+         "screens/053.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "set folder back to …/CAVE_Demo_Data and pressed ▶ Run analysis → '16 trials', FRF 32 rows / Summary 28 rows",
+        "screens": [
+         "screens/055.webp",
+         "screens/056.webp"
+        ]
+       }
+      ],
+      "note": "Not confirmed that only new or changed trials are reprocessed. The tooltip says 'Reuses results from the previous run for trials that haven't changed…' (screens/035.webp), but no screen shows a skip. The subset-folder run merged in 4 cached standing trials from outside the current folder. Summary rows exceed the trial count (28 for 16), and the replay found duplicated standing trials in summary_metrics.csv.",
+      "id": "t5",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Review the response measures",
+    "specific": "Plot options and the result tabs",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Inspect response gain and timing lag at each stimulus frequency, per stimulus level",
+      "specific": "Gain & Phase tab with plot style Bar (per-trial), switching Analysis axis between stim_matched, AP and ML",
+      "screens": [
+       "screens/012.webp",
+       "screens/014.webp",
+       "screens/062.webp",
+       "screens/042.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "viewed Gain & Phase with stim_matched axis (bars per amplitude at 0.5 Hz)",
+        "screens": [
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected Analysis axis 'AP'",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected Analysis axis 'ML'",
+        "screens": [
+         "screens/062.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed the chart's Fullscreen button, then Escape",
+        "screens": [
+         "screens/042.webp"
+        ]
+       }
+      ],
+      "note": "Only one stimulus frequency (0.5 Hz) was ever shown; views with several frequencies were not reached.",
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Follow how the response changes across recovery stages",
+      "specific": "Plot style Hwang-style (recovery) or Both: gain and phase from Acute to SubAcute, with SEM error bars, per group and amplitude",
+      "screens": [
+       "screens/016.webp",
+       "screens/018.webp",
+       "screens/041.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "selected Plot style 'Hwang-style (recovery)'",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected Plot style 'Both' (bars above the recovery trajectory)",
+        "screens": [
+         "screens/018.webp"
+        ]
+       }
+      ],
+      "note": "Only Control_001 at Acute and SubAcute was present. Concussion appears in the legend, but no Concussion lines or Chronic points were ever drawn.",
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Judge how reliably the response is driven by the stimulus",
+      "specific": "Coherence tab: 0–1 bars per amplitude, for the stim_matched and ML axes",
+      "screens": [
+       "screens/020.webp",
+       "screens/063.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 📊 Coherence tab",
+        "screens": [
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "with ML axis selected, clicked 📊 Coherence again",
+        "screens": [
+         "screens/063.webp"
+        ]
+       }
+      ],
+      "note": "In the sample data, coherence at amp=0.04 is lower (about 0.63). The CSV shows Acute standing trial 8 AP at 0.29, which matches the planted spike.",
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "See gain and phase together as points in the complex plane",
+      "specific": "Nyquist tab: polar plot of the FRF at 0.5 Hz",
+      "screens": [
+       "screens/021.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 🎯 Nyquist tab",
+        "screens": [
+         "screens/021.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check each trial's frequency content for artifacts",
+      "specific": "Spectra tab: per-trial COP_AP response spectra with stimulus frequencies marked",
+      "screens": [
+       "screens/022.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 📈 Spectra tab",
+        "screens": [
+         "screens/022.webp"
+        ]
+       }
+      ],
+      "note": "The marked frequencies are the default 0.16/0.21/0.24/0.49 Hz, not the 0.5 Hz the analysis used.",
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Compare overall sway size and speed across conditions and recovery stages",
+      "specific": "Summary metrics tab: RMS, path length and mean velocity by AP/ML axis, group × timepoint, SEM bars, switching between walking and standing",
+      "screens": [
+       "screens/023.webp",
+       "screens/026.webp",
+       "screens/027.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 📋 Summary metrics tab (walking)",
+        "screens": [
+         "screens/023.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "selected 'Summary metrics — which condition?' = standing",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the path length and mean velocity panels",
+        "screens": [
+         "screens/027.webp"
+        ]
+       }
+      ],
+      "note": "Only the Control group had data, so no between-group comparison was shown.",
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Read the group averages as numbers and find extreme values",
+      "specific": "Group means table tab: sort by gain, search within the table",
+      "screens": [
+       "screens/028.webp",
+       "screens/029.webp",
+       "screens/031.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 📑 Group means table tab",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the 'gain' column header twice (sort descending; the Acute standing amp=0.04 outlier comes to the top)",
+        "screens": [
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed the table Search icon and typed 'SubAcute' (12 results highlighted)",
+        "screens": [
+         "screens/031.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Export results for statistics",
+    "specific": "Download buttons above Plot options",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Save the per-trial response measures and sway metrics as spreadsheets",
+      "specific": "Download frf_results.csv (trial × frequency × axis: gain, phase_deg, coherence, response_amplitude_m, baseline_only) and summary_metrics.csv (path length, RMS, mean velocity for AP and ML)",
+      "screens": [
+       "screens/012.webp",
+       "screens/036.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 📥 FRF results (downloaded frf_results.csv, 32 rows; amp=0 rows have empty gain)",
+        "screens": [
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 📥 Summary metrics (downloaded summary_metrics.csv; meant as one row per trial, but the replay's file had 28 rows for 16 trials, with the standing trials duplicated)",
+        "screens": [
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 📥 Summary metrics again after a later re-run (caption: Summary 32 rows for 16 trials)",
+        "screens": [
+         "screens/036.webp"
+        ]
+       }
+      ],
+      "note": "The explorer recorded summary_metrics.csv as 16 rows, but the replay contradicts this: it found 28 rows with duplicate standing-trial rows, and the captions drift across re-runs (32, 26, 28). Check for and remove duplicate trial rows before statistics.",
+      "id": "t13",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Data-folder discovery with an inventory breakdown",
+   "general": "Type a path to a folder tree of recordings. The tool walks it, reports how many files of each kind it found, warns if the path is wrong, and shows a count table by condition, file type, group and timepoint so you can confirm nothing is missing before processing.",
+   "specific": "Path to top-level CAVE Data folder → 'Found N data files (x COP / standing, y COM / walking)' or 'Folder does not exist' → expand 'Breakdown by condition / file type / group / timepoint'",
+   "steps": [
+    "type the folder path and press Enter",
+    "read the found-files count (or the red missing-folder error)",
+    "expand the breakdown table to check counts per condition/group/timepoint",
+    "optionally point at a subfolder to analyse a subset"
+   ],
+   "serves_tasks": [
+    "Point the tool at the recordings and confirm every expected file was found",
+    "Re-run after the data set changes, reusing earlier results"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/007.webp",
+    "screens/048.webp",
+    "screens/049.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Swappable protocol configuration file",
+   "general": "Keep the stimulus parameters in a small config file and load a different one to fit another lab's protocol. The panel shows the formula and the name of the active config. The parameter list shown did not refresh after a load.",
+   "specific": "Sidebar ⚙️ Stimulus configuration: D(t)=A·Σ wᵢ sin(2π fᵢ t+φᵢ), the parameter list, Path to YAML config, Load config, 'Loaded:' confirmation and 'Active config:' name",
+   "steps": [
+    "expand ⚙️ Stimulus configuration",
+    "type the YAML path (e.g. configs/demo_quickstart.yaml or configs/example_other_lab.yaml)",
+    "press Load config",
+    "check 'Loaded:' and the Active config name",
+    "re-run the analysis so results use it"
+   ],
+   "serves_tasks": [
+    "Choose the protocol parameters that match the recordings"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/058.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Trial-condition lookup: bundled default or upload",
+   "general": "Give the table that maps each recording to its experimental level, either the built-in default or your own uploaded file. Trials missing from the table are left out of the run. An uploaded file is not checked when it is loaded, so a wrong file only shows up at run time.",
+   "specific": "1 — Trial-order file: 'Use bundled file' checkbox or Upload a TXT; the status line says 'Using bundled:' or 'Loaded:'",
+   "steps": [
+    "leave 'Use bundled file' checked, or uncheck it",
+    "press Upload and choose a .txt trial-order file",
+    "check the status line",
+    "run; if nothing matches you get 'No trials matched the filter'"
+   ],
+   "serves_tasks": [
+    "Supply the table that maps each trial to its stimulus level"
+   ],
+   "screens": [
+    "screens/004.webp",
+    "screens/044.webp",
+    "screens/046.webp",
+    "screens/047.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Filtered batch run",
+   "general": "Choose which subset of trials to process (condition, whether to include no-stimulus baselines), run the batch, and get a count of trials and output rows.",
+   "specific": "3 — Analyze: Condition radio (standing/walking/both), 'Include amp=0 baseline trials', ▶ Run analysis → 'N trials from M subjects analyzed' and the 'FRF: … rows. Summary: … rows.' caption",
+   "steps": [
+    "pick Condition",
+    "toggle 'Include amp=0 baseline trials'",
+    "press ▶ Run analysis",
+    "read the trial and row counts (or the 'No trials matched the filter' warning)"
+   ],
+   "serves_tasks": [
+    "Choose which trials to include and process them all"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/011.webp",
+    "screens/040.webp",
+    "screens/041.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Per-level gain and phase bars with axis switch",
+   "general": "Bar charts of response gain and phase lag for each stimulus level at each stimulus frequency, with a switch for which measurement axis to analyse and a fullscreen view.",
+   "specific": "Plot options: Analysis axis (stim_matched/AP/ML), Plot style 'Bar (per-trial)', 📊 Gain & Phase tab, chart Fullscreen button",
+   "steps": [
+    "choose Analysis axis",
+    "choose Plot style 'Bar (per-trial)'",
+    "read gain and phase per amplitude in 📊 Gain & Phase",
+    "open the chart fullscreen to read it"
+   ],
+   "serves_tasks": [
+    "Inspect response gain and timing lag at each stimulus frequency, per stimulus level"
+   ],
+   "screens": [
+    "screens/012.webp",
+    "screens/014.webp",
+    "screens/042.webp",
+    "screens/062.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Group × timepoint sway-metric comparison",
+   "general": "Bar charts of sway amplitude, path length and speed for each axis, grouped by subject group and timepoint with standard-error bars, with a switch for which task condition to show.",
+   "specific": "📋 Summary metrics tab with 'Summary metrics — which condition?' (walking/standing): RMS, path length and mean velocity in AP and ML, Control vs Concussion, Acute vs SubAcute",
+   "steps": [
+    "open 📋 Summary metrics",
+    "choose walking or standing",
+    "compare the bars and SEM across timepoints and groups for each metric and axis"
+   ],
+   "serves_tasks": [
+    "Compare overall sway size and speed across conditions and recovery stages"
+   ],
+   "screens": [
+    "screens/023.webp",
+    "screens/026.webp",
+    "screens/027.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Sortable, searchable group-means table",
+   "general": "A table of averaged results per group, condition, timepoint, level, frequency and axis. Sort any column to bring extremes to the top and search to highlight matching cells.",
+   "specific": "📑 Group means table: columns group, condition, timepoint, amplitude_m, frequency_hz, axis, n_trials, gain, phase_deg, coherence; click a header to sort; toolbar Search, Show/hide columns, Download as CSV, Fullscreen",
+   "steps": [
+    "open 📑 Group means table",
+    "click a column header (e.g. gain) to sort",
+    "press Search and type a term to highlight matches",
+    "optionally hide columns or download"
+   ],
+   "serves_tasks": [
+    "Read the group averages as numbers and find extreme values"
+   ],
+   "screens": [
+    "screens/028.webp",
+    "screens/029.webp",
+    "screens/031.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Tidy CSV export of per-trial results",
+   "general": "Two download buttons give long-format tables ready for statistics software: one row per trial × frequency × axis for the response measures, and one row per trial for the sway metrics. In this run the sway-metrics file contained duplicated trial rows, so check it before use.",
+   "specific": "📥 FRF results → frf_results.csv; 📥 Summary metrics → summary_metrics.csv; a caption shows the row counts",
+   "steps": [
+    "run the analysis",
+    "press 📥 FRF results",
+    "press 📥 Summary metrics",
+    "check summary_metrics.csv for duplicate trial rows, then open the CSVs downstream"
+   ],
+   "serves_tasks": [
+    "Save the per-trial response measures and sway metrics as spreadsheets"
+   ],
+   "screens": [
+    "screens/012.webp",
+    "screens/036.webp"
+   ],
+   "id": "f8",
+   "check": "replayed"
+  },
+  {
+   "name": "Recovery-trajectory plot of the frequency response",
+   "general": "Gain and phase plotted against recovery timepoint, one line per group × stimulus level, with standard-error bars. It can be shown alone or stacked under the per-level bars.",
+   "specific": "Plot style 'Hwang-style (recovery)' or 'Both' → 'FRF recovery trajectory … error bars = SEM' (Acute → SubAcute → Chronic on x, Control/Concussion × amplitude lines)",
+   "steps": [
+    "choose Plot style 'Hwang-style (recovery)' or 'Both'",
+    "choose Analysis axis",
+    "read gain and phase change across timepoints for each group and amplitude, with SEM"
+   ],
+   "serves_tasks": [
+    "Follow how the response changes across recovery stages"
+   ],
+   "screens": [
+    "screens/016.webp",
+    "screens/018.webp",
+    "screens/041.webp"
+   ],
+   "id": "f9",
+   "check": "replayed"
+  },
+  {
+   "name": "Frequency-response diagnostics: coherence, complex-plane and spectra views",
+   "general": "Three checks on the quality of the response estimate: coherence bars (0–1) per stimulus level, a polar plot of each trial's response in the complex plane, and per-trial response spectra with the stimulus frequencies marked. Use them to spot outlier trials and artifacts.",
+   "specific": "Tabs 📊 Coherence, 🎯 Nyquist ('FRF in complex plane'), 📈 Spectra (COP_AP spectra; the markers showed the default 0.16–0.49 Hz rather than the loaded config's 0.5 Hz)",
+   "steps": [
+    "open 📊 Coherence and look for low-coherence levels",
+    "open 🎯 Nyquist and look for outlying points",
+    "open 📈 Spectra and look for off-stimulus peaks",
+    "reopen the tab after changing a plot option (it resets to Gain & Phase)"
+   ],
+   "serves_tasks": [
+    "Judge how reliably the response is driven by the stimulus",
+    "See gain and phase together as points in the complex plane",
+    "Check each trial's frequency content for artifacts"
+   ],
+   "screens": [
+    "screens/020.webp",
+    "screens/021.webp",
+    "screens/022.webp",
+    "screens/063.webp"
+   ],
+   "id": "f10",
+   "check": "replayed"
+  },
+  {
+   "name": "Incremental re-run cache",
+   "general": "An option meant to reuse results already computed for unchanged recordings when re-running on a changed data set. In this run it merged cached trials from outside the current folder into the results and gave summary row counts larger than the trial count.",
+   "specific": "'Skip already-processed trials' checkbox (tooltip: 'Reuses results from the previous run for trials that haven't changed…') with ▶ Run analysis",
+   "steps": [
+    "check 'Skip already-processed trials'",
+    "change the folder or add data",
+    "press ▶ Run analysis",
+    "compare the trial count and FRF/Summary row counts with the found-files count"
+   ],
+   "serves_tasks": [
+    "Re-run after the data set changes, reusing earlier results"
+   ],
+   "screens": [
+    "screens/033.webp",
+    "screens/035.webp",
+    "screens/053.webp",
+    "screens/056.webp"
+   ],
+   "id": "f11",
+   "check": "not_confirmed"
+  }
+ ],
+ "screens_never_reached": [
+  "The tool's main scientific use, comparing groups (Control vs Concussion) across all three timepoints (Acute, SubAcute, Chronic), was never shown. The legends list Concussion and the folder-layout hint shows Chronic/, but the sample data only has Control_001 at Acute and SubAcute, so no Concussion bars or Chronic points ever appeared.",
+  "Multi-frequency results (several stimulus components): the demo config has one 0.5 Hz component, and the 4-component CAVE default was not run because the 5 s sample files do not match its 120 s duration",
+  "The README's naming/layout warnings ('No CAVE data files found', type-vs-trial-number mismatch) and the Run button's disabled state before inputs are valid"
+ ],
+ "not_done": [
+  "I could not confirm that caching reprocesses only new trials. The UI never says how many trials were reused and how many were recomputed. With caching on, running on the Walking subfolder reported 14 trials (10 walking plus 4 cached standing trials from the previous run), which means cached results from outside the current folder get merged in. The Summary row-count caption also drifted (32, 26 and 28 rows for 16 or 14 trials). The replay found summary_metrics.csv at 28 rows for 16 trials, with duplicated standing trials. My earlier record of 16 rows is not supported.",
+  "Download as CSV from the Group means table toolbar did not produce a file I could read.",
+  "The sidebar parameter list (N components 4; 0.16/0.21/0.24/0.49 Hz; 120 s) never updated after loading a different config, even though the Active config name changed. The Spectra tab also marks the default 0.16–0.49 Hz frequencies instead of 0.5 Hz, so the displayed protocol parameters may not match the ones used to compute the results.",
+  "I did not test with a real, correctly formatted custom trial-order file. Only the bundled file and a wrong file (README) were tried; the wrong file was accepted without validation and only failed at run time with 'No trials matched the filter'.",
+  "Clicking the help icon next to 'Skip already-processed trials' also toggles the checkbox, so I turned caching off by accident and ran one uncached re-run because of it (caption: Summary 32 rows). That run is left out of the workflow.",
+  "After the config probe I re-loaded configs/demo_quickstart.yaml and re-ran (screens/059.webp) only to restore the earlier state; that step is left out of the workflow.",
+  "Changing a plot option resets the result tabs to Gain & Phase, so each view had to be reopened.",
+  "In the replay, the folder path field was redrawn mid-typing during a re-run, so one intended run used the previous path."
+ ],
+ "applied": [
+  "t1: removed 'one-of' from the task, making it a sequence; nested the config choice as one-of task n1",
+  "t1: dropped the restore-quickstart reload action and moved it to not_done",
+  "t2: marked the README upload, the wrong-file run and the re-check as error_path; noted that a real custom upload was never tried",
+  "t3: marked the missing-folder probe as error_path; added a note on the folder-layout hint and the unobserved readiness gate",
+  "t5: dropped the help-icon click and the uncached re-run; relabelled specific so it no longer promises skipping; noted the merged cached trials and that skipping was never shown",
+  "t13 and data note: removed the unsupported 16-row claim; recorded 28 rows with duplicated standing trials and the caption drift; added a de-duplication caution",
+  "t8: moved the Acute_8 spike interpretation from the specific label into a note",
+  "t4/t6/t7/t10/t11: added notes on the Summary row mismatch, single frequency, Control-only data and stale spectra markers",
+  "Split f5 into f5 (per-level bars + axis switch), f9 (recovery trajectory) and f10 (coherence/Nyquist/spectra diagnostics)",
+  "Split the cache out of f4 into f11, marked not_confirmed",
+  "f3/f8: added the no-validation and duplicate-row cautions to general words",
+  "screens_never_reached: flagged the group × three-timepoint comparison as the main use never shown; added the naming warnings and readiness gate",
+  "not_done: corrected the summary-CSV statement; added the dropped accidental and restore runs and the replay's path-redraw issue"
+ ],
+ "open_fixes": [
+  "Group comparison across Acute/SubAcute/Chronic needs a run on data with Concussion subjects and a Chronic timepoint; the sample has only Control_001 at two timepoints.",
+  "Multi-frequency results need a run with the 4-component CAVE config on 120 s trials; the sample files are 5 s.",
+  "A folder-layout guide / input-readiness gate feature needs screens of the sidebar 'Folder layout' guide and of the Run button disabled before inputs are valid; neither was captured.",
+  "The naming-rule warnings ('No CAVE data files found', type-vs-trial-number mismatch) need data that breaks the naming rules.",
+  "The 'add a new subject's block to the trial-order file, then re-run' workflow and a valid custom upload need a correctly formatted trial-order TXT, which was not available.",
+  "Whether the cache skips unchanged trials, and whether summary duplication occurs on a fresh first run or only across re-runs, need a fresh session that adds one trial and inspects counts and the CSV after each run.",
+  "Group means table 'Download as CSV' needs a re-try with a readable download."
+ ],
+ "screens_at": "pilot/public/runs/cave-frf-postural-sway/20261030-073609/",
+ "screens_filed": {
+  "screens/005.webp": "screens/005.webp",
+  "screens/010.webp": "screens/010.webp",
+  "screens/012.webp": "screens/012.webp"
+ }
+}

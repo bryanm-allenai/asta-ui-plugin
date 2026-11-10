@@ -1,0 +1,391 @@
+{
+  "schema": "astaui.card/1",
+  "id": "scholar-fetcher-search",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T18:59:59Z"
+  },
+  "app": {
+    "title": "Scholar Fetcher",
+    "summary": "A person chooses one or more literature databases, types a search query, and sets how many records to fetch, where terms should match and whether to remove duplicates. The search pages through each source with a progress bar, then merges records of the same work across sources and keeps the most-cited records up to the requested number. A summary line and a per-source table show how many records were found, how many duplicates were removed, and whether any pages were lost. The person scans the merged table and downloads it as a spreadsheet, CSV, BibTeX or RIS file for a reference manager.",
+    "task": {
+      "text": "Gather a deduplicated, citable set of bibliographic records for a search query from one or more scholarly databases, with counts at every stage, and export it for screening.",
+      "verbs": [
+        "lookup",
+        "clean",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Bibliographic records returned by scholarly search APIs, normalized into one row per work with title, authors, year, venue, citation count, DOI, abstract or snippet, and provenance flags, plus a fetch report per source.",
+      "item": "a bibliographic record for one published work",
+      "shapes": [
+        "table",
+        "text corpus"
+      ]
+    },
+    "stage": {
+      "text": "identifying records for a literature review, before screening",
+      "terms": [
+        "collect",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A form sets the sources, query and limits; submitting it fetches from each source with a progress bar, deduplicates, and stores the result so the counts summary, per-source detail, results table and four export buttons all render from that one stored search. Downloading one format does not run the search again.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "search",
+        "import",
+        "sort",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "literature search and deduplication for systematic reviews (PRISMA identification stage)",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "systematic review",
+        "bibliometrics",
+        "prisma"
+      ]
+    },
+    "workflow": {
+      "name": "gather records from several sources into one deduplicated list and export it",
+      "steps": [
+        {
+          "step": "set what to search for and where",
+          "here": "a multiselect of sources (OpenAlex by default; Google Scholar only when switched on and a key is set), a query box, the number of results, a delay between pages, title-abstract or fulltext matching, an optional contact email, and a remove-duplicates checkbox",
+          "parts": [
+            "search-form",
+            "source-picker"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "Search checks that there is a query and a source, then pages through each source, with a progress bar showing fetched of requested",
+          "parts": [
+            "fetch-progress"
+          ]
+        },
+        {
+          "step": "merge duplicate items",
+          "here": "records are matched on source record id, then DOI, then normalized title with first-author surname; the best-attested copy is kept and fills its gaps from the copies that were dropped",
+          "parts": [
+            "fetch-progress"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "a success line gives the number identified, the duplicates removed, and how many are shown out of the number requested; an expander lists each source's requested, returned and failed pages, and a warning appears for any source with lost pages",
+          "parts": [
+            "run-summary"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "a full-width table of the merged records, most-cited first, with records that have no count placed after those with zero",
+          "parts": [
+            "results-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "four download buttons write Excel, CSV, BibTeX or RIS from the same stored result, with a file name made from the query plus a short hash",
+          "parts": [
+            "export-bar"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Records are cut down to the requested number only after deduplication, so extra records already fetched fill the places that removed duplicates leave",
+        "Missing values are never filled in: a missing citation count stays blank with a source flag, and a DOI taken from a URL is marked as derived",
+        "Lost pages are reported per source and the result is flagged as incomplete, so a short result set is not mistaken for a complete one",
+        "The paid source is hidden unless it is switched on deliberately, so a hosted copy cannot use up the owner's quota",
+        "Exports are ready for reference managers: BibTeX is LaTeX-escaped and uses stable cite keys built from each work"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "search-form",
+      "level": "view",
+      "parent": null,
+      "title": "Search form",
+      "summary": "Collects the query, the number of results, the delay between pages, where terms should match, a contact email and the dedup setting, and starts the search.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "search"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 52,
+          "end": 80,
+          "role": "markup",
+          "anchor": "8af57c167cd7",
+          "first": "with st.form(\"search\"):"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 94,
+          "end": 103,
+          "role": "logic",
+          "anchor": "57a411728275",
+          "first": "if submitted:"
+        }
+      ]
+    },
+    {
+      "id": "source-picker",
+      "level": "component",
+      "parent": "search-form",
+      "title": "Source picker with paid-source guard",
+      "summary": "Offers the databases that can be searched, hiding the paid source unless it is switched on, and warns when its key is missing.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 36,
+          "end": 58,
+          "role": "logic",
+          "anchor": "6b8f54e1a1ab",
+          "first": "# Scholar is opt-in for the web interface. This app has no authentication and no"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 82,
+          "end": 92,
+          "role": "markup",
+          "anchor": "600570233423",
+          "first": "if not scholar_on:"
+        },
+        {
+          "file": "code/scholar_fetcher/config.py",
+          "start": 71,
+          "end": 85,
+          "role": "logic",
+          "symbol": "scholar_enabled",
+          "anchor": "c4607f19d740",
+          "first": "def scholar_enabled(dotenv_path: str | None = None) -> bool:"
+        },
+        {
+          "file": "code/scholar_fetcher/config.py",
+          "start": 88,
+          "end": 109,
+          "role": "logic",
+          "symbol": "get_api_key",
+          "anchor": "b1e840ac9a44",
+          "first": "def get_api_key(dotenv_path: str | None = None) -> str:"
+        },
+        {
+          "file": "code/scholar_fetcher/sources.py",
+          "start": 63,
+          "end": 70,
+          "role": "logic",
+          "symbol": "get_source",
+          "anchor": "b77a1b487386",
+          "first": "def get_source(name: str) -> Source:"
+        }
+      ]
+    },
+    {
+      "id": "fetch-progress",
+      "level": "component",
+      "parent": "search-form",
+      "title": "Fetch, progress and deduplication",
+      "summary": "Runs the search across the chosen sources with a progress bar, removes duplicate works, ranks by citations, cuts to the requested number, and stores the result.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 105,
+          "end": 157,
+          "role": "logic",
+          "anchor": "f04a8d6f09b4",
+          "first": "bar = st.progress(0.0, text=\"Searching…\")"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 107,
+          "end": 108,
+          "role": "logic",
+          "symbol": "_progress",
+          "anchor": "5ea027e1cc00",
+          "first": "def _progress(collected, target):"
+        },
+        {
+          "file": "code/scholar_fetcher/sources.py",
+          "start": 77,
+          "end": 83,
+          "role": "logic",
+          "symbol": "search",
+          "anchor": "1f35aae1c1df",
+          "first": "def search("
+        },
+        {
+          "file": "code/scholar_fetcher/process.py",
+          "start": 211,
+          "end": 285,
+          "role": "logic",
+          "symbol": "dedup_results",
+          "anchor": "128a1adb4ac2",
+          "first": "def dedup_results(papers: list[dict]) -> tuple[list[dict], int]:"
+        }
+      ]
+    },
+    {
+      "id": "run-summary",
+      "level": "view",
+      "parent": null,
+      "title": "Counts and per-source detail",
+      "summary": "Shows records identified, duplicates removed and records shown against those requested, with an expandable per-source table and warnings for lost pages.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 159,
+          "end": 183,
+          "role": "markup",
+          "anchor": "2a5494c01ba1",
+          "first": "# --- render from session state, so a download never triggers a re-search -----"
+        }
+      ]
+    },
+    {
+      "id": "results-table",
+      "level": "view",
+      "parent": null,
+      "title": "Results table",
+      "summary": "Lists the merged records, most-cited first, with every bibliographic and provenance column.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 185,
+          "end": 185,
+          "role": "markup",
+          "anchor": "b17c2480747e",
+          "first": "st.dataframe(pd.DataFrame(rows, columns=FIELDNAMES), width=\"stretch\", hide_index=True)"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 137,
+          "end": 141,
+          "role": "logic",
+          "anchor": "4a6acfb8990b",
+          "first": "rows = sorted("
+        }
+      ]
+    },
+    {
+      "id": "export-bar",
+      "level": "component",
+      "parent": "results-table",
+      "title": "Export buttons",
+      "summary": "Downloads the stored result as Excel, CSV, BibTeX or RIS without running the search again.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 187,
+          "end": 199,
+          "role": "markup",
+          "anchor": "d1f7b2980165",
+          "first": "st.subheader(\"Export\")"
+        },
+        {
+          "file": "code/scholar_fetcher/export.py",
+          "start": 52,
+          "end": 65,
+          "role": "logic",
+          "symbol": "generate_file_name",
+          "anchor": "86d153a2bf56",
+          "first": "def generate_file_name(query: str, ext: str = \"xlsx\") -> str:"
+        },
+        {
+          "file": "code/scholar_fetcher/export.py",
+          "start": 85,
+          "end": 95,
+          "role": "logic",
+          "symbol": "to_excel",
+          "anchor": "daf41786c15e",
+          "first": "def to_excel(papers: list[dict], target):"
+        },
+        {
+          "file": "code/scholar_fetcher/export.py",
+          "start": 104,
+          "end": 118,
+          "role": "logic",
+          "symbol": "to_csv",
+          "anchor": "43559cd57e32",
+          "first": "def to_csv(papers: list[dict], path: str | None = None) -> str:"
+        },
+        {
+          "file": "code/scholar_fetcher/export.py",
+          "start": 153,
+          "end": 176,
+          "role": "logic",
+          "symbol": "to_bibtex",
+          "anchor": "37c5f1d59fc4",
+          "first": "def to_bibtex(papers: list[dict]) -> str:"
+        },
+        {
+          "file": "code/scholar_fetcher/export.py",
+          "start": 184,
+          "end": 208,
+          "role": "logic",
+          "symbol": "to_ris",
+          "anchor": "c7cbef68f9ea",
+          "first": "def to_ris(papers: list[dict]) -> str:"
+        }
+      ]
+    }
+  ]
+}

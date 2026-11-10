@@ -1,0 +1,329 @@
+{
+  "schema": "astaui.card/1",
+  "id": "countkit-colony-review",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T16:01:00Z"
+  },
+  "app": {
+    "title": "CountKit review",
+    "summary": "A person opens a folder of automatic count results and goes through the images one at a time with Previous and Next or a dropdown. Each image shows an overlay with every counted object outlined and numbered. To add an object the counter missed, the person clicks on it. To remove a false hit, they pick its number from a list. The automatic count and the corrected count sit side by side, along with any warning flags. Saving writes the edits to a corrections file and writes a corrected counts table that marks which images were reviewed.",
+    "task": {
+      "text": "Check automatic object counts against overlay images, add missed objects and remove false ones, and save corrected counts per image.",
+      "verbs": [
+        "clean",
+        "review",
+        "annotate",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "A folder of images, each with an automatic segmentation shown as a numbered overlay. It comes with a per-image counts table, a per-object table of positions and a set of saved manual corrections.",
+      "item": "an image (a plate photo or a microscope field) with its automatically detected, numbered objects",
+      "shapes": [
+        "image collection",
+        "table",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "proofreading automated colony or cell counts after image segmentation, before validation and analysis",
+      "terms": [
+        "clean",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "A navigator picks the current image, and the large overlay viewer and the corrections panel then follow that image. Clicks on the image add points, numbers chosen in the side list mark objects as removed, both are drawn back onto the overlay, and the corrected count updates next to the automatic one.",
+      "views": [
+        "image viewer",
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "click to mark point",
+        "multi-select",
+        "accept or reject",
+        "undo",
+        "export"
+      ],
+      "patterns": [
+        "review queue"
+      ]
+    },
+    "field": {
+      "text": "automated colony and cell counting from images in microbiology and cell biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "colony counting",
+        "cell counting",
+        "microbiology"
+      ]
+    },
+    "workflow": {
+      "name": "correct automatic object counts image by image",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Launched on a results folder, the page loads counts.csv, objects.csv and any corrections.json saved earlier.",
+          "parts": [
+            "image-navigator"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "Previous and Next buttons, or an Image dropdown, move through the images. Navigation is clamped at both ends.",
+          "parts": [
+            "image-navigator"
+          ]
+        },
+        {
+          "step": "mark what the automatic step missed",
+          "here": "Clicking on the overlay adds a magenta circle at that spot. The click is scaled back to original image pixels, and 'Undo last added point' removes the newest circle.",
+          "parts": [
+            "overlay-viewer",
+            "correction-actions"
+          ]
+        },
+        {
+          "step": "decide keep or drop for each detected object",
+          "here": "A multiselect of the numbers drawn on the overlay marks false hits, and each removed object is crossed out in red.",
+          "parts": [
+            "remove-objects",
+            "overlay-viewer"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The corrected count is the automatic count minus removed objects plus added points, shown next to the automatic count with the image's pipeline flags as a warning.",
+          "parts": [
+            "count-metrics"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Save corrections' writes corrections.json (removed ids and added coordinates per image) and counts_corrected.csv, which adds corrected_count and reviewed columns.",
+          "parts": [
+            "correction-actions"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Corrections are stored as edits (removed object ids and added x,y points), so the automatic count is kept and the corrected count is computed from it.",
+        "The numbers drawn on the overlay match object ids in the per-object table, so false hits are removed by number rather than by clicking on them.",
+        "Pipeline quality flags such as crowded plate, many clumps or no plate found are shown as a warning on each image under review.",
+        "The corrected table marks which images were reviewed, so a later validation step can use the corrected counts."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "image-navigator",
+      "level": "view",
+      "parent": null,
+      "title": "Image navigator",
+      "summary": "Loads the results folder and moves through its images with Previous/Next buttons or a dropdown.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "review queue"
+      ],
+      "spans": [
+        {
+          "file": "code/countkit/review_app.py",
+          "start": 16,
+          "end": 37,
+          "role": "data",
+          "anchor": "65d98c62f8a7",
+          "first": "results = Path(sys.argv[-1]) if len(sys.argv) > 1 else Path(\"countkit_results\")"
+        },
+        {
+          "file": "code/countkit/review_app.py",
+          "start": 40,
+          "end": 42,
+          "role": "logic",
+          "symbol": "step",
+          "anchor": "ebc45a4a9a8e",
+          "first": "def step(delta):"
+        },
+        {
+          "file": "code/countkit/review_app.py",
+          "start": 45,
+          "end": 52,
+          "role": "markup",
+          "anchor": "3614762ff5d7",
+          "first": "nav = st.columns([1, 1, 6])"
+        },
+        {
+          "file": "code/countkit/corrections.py",
+          "start": 15,
+          "end": 17,
+          "role": "logic",
+          "symbol": "load",
+          "anchor": "8a6a18c68fdb",
+          "first": "def load(path):"
+        }
+      ]
+    },
+    {
+      "id": "overlay-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "Overlay viewer",
+      "summary": "Shows the numbered overlay large, draws added points and removed objects on it, and adds a point wherever the person clicks.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "click to mark point"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/countkit/review_app.py",
+          "start": 54,
+          "end": 79,
+          "role": "logic",
+          "anchor": "8ce170cbdb2e",
+          "first": "left, right = st.columns([3, 1])"
+        }
+      ]
+    },
+    {
+      "id": "corrections-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Corrections panel",
+      "summary": "Side panel for the current image that holds the remove list, the counts and the save controls.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/countkit/review_app.py",
+          "start": 80,
+          "end": 98,
+          "role": "markup",
+          "anchor": "9136f21041c9",
+          "first": "with right:"
+        }
+      ]
+    },
+    {
+      "id": "remove-objects",
+      "level": "component",
+      "parent": "corrections-panel",
+      "title": "Remove objects by number",
+      "summary": "A multiselect of the object numbers on the overlay, used to mark detections that are not real objects.",
+      "views": [],
+      "interactions": [
+        "multi-select",
+        "accept or reject"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/countkit/review_app.py",
+          "start": 81,
+          "end": 87,
+          "role": "logic",
+          "anchor": "1b95032e149e",
+          "first": "# Read the remove list first so the corrected count below is current."
+        }
+      ]
+    },
+    {
+      "id": "count-metrics",
+      "level": "component",
+      "parent": "corrections-panel",
+      "title": "Auto and corrected count",
+      "summary": "Shows the automatic count beside the corrected count, plus a warning with any flags the pipeline raised for the image.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/countkit/review_app.py",
+          "start": 88,
+          "end": 91,
+          "role": "markup",
+          "anchor": "35ba3ada29fe",
+          "first": "st.metric(\"Auto count\", int(row[\"count\"]))"
+        },
+        {
+          "file": "code/countkit/corrections.py",
+          "start": 24,
+          "end": 25,
+          "role": "logic",
+          "symbol": "corrected_count",
+          "anchor": "086fba68a9b4",
+          "first": "def corrected_count(count, entry):"
+        }
+      ]
+    },
+    {
+      "id": "correction-actions",
+      "level": "component",
+      "parent": "corrections-panel",
+      "title": "Undo and save",
+      "summary": "Takes back the last added point, and saves the corrections file and the corrected counts table.",
+      "views": [],
+      "interactions": [
+        "undo",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/countkit/review_app.py",
+          "start": 92,
+          "end": 98,
+          "role": "logic",
+          "anchor": "ef4eaaaa9ae7",
+          "first": "if st.button(\"Undo last added point\") and entry[\"added\"]:"
+        },
+        {
+          "file": "code/countkit/corrections.py",
+          "start": 20,
+          "end": 21,
+          "role": "logic",
+          "symbol": "save",
+          "anchor": "95aa33a59821",
+          "first": "def save(path, corrections):"
+        },
+        {
+          "file": "code/countkit/corrections.py",
+          "start": 28,
+          "end": 35,
+          "role": "logic",
+          "symbol": "apply",
+          "anchor": "d3b2225757c2",
+          "first": "def apply(counts_csv, corrections):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "interactions",
+      "term": "click to mark point"
+    }
+  ]
+}

@@ -1,0 +1,455 @@
+{
+  "schema": "astaui.card/1",
+  "id": "petrolog-well-logs",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T08:41:43Z"
+  },
+  "app": {
+    "title": "PetroLog",
+    "summary": "A person uploads a well-log file and views its curves as tracks down a depth window, with curves of their choice in each track and optional depth markers. They can group depth samples into clusters on chosen curves, and set any two curves against each other in a crossplot. Next they compute derived curves from editable model parameters, then apply cutoffs to pick the depth intervals that qualify as reservoir and pay. The result is a zone table, a summary by depth bin, tracks with the zones marked and a plain-language narrative, all of which can be downloaded as CSV, LAS or text.",
+    "task": {
+      "text": "Compute rock and fluid properties from a well's log curves and find the depth intervals that pass reservoir and pay cutoffs, with a written summary.",
+      "verbs": [
+        "derive",
+        "identify",
+        "summarize",
+        "explore",
+        "organize"
+      ]
+    },
+    "data": {
+      "text": "Log curves from one well, each recorded at regular depth steps, plus the properties, flags and zone ids derived from them",
+      "item": "a depth sample with a value for each log curve",
+      "shapes": [
+        "table",
+        "depth profile"
+      ]
+    },
+    "stage": {
+      "text": "quick-look petrophysical evaluation of a logged well, from raw curves to net-pay intervals",
+      "terms": [
+        "analyze",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "Five tabs share the uploaded log through session state. Each plots curves as tracks on a shared depth axis, either inside a depth window the person sets or shaded by cluster or pay band. Parameter forms drive the computation of new curves and the picking of cutoff zones, and the results are shown as tables, headline totals, a narrative and download buttons.",
+      "views": [
+        "line chart",
+        "scatter plot",
+        "table view",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "multi-select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "stacked tracks on a shared axis"
+      ]
+    },
+    "field": {
+      "text": "quick-look well-log petrophysics and net-pay interpretation in petroleum geoscience",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "petrophysics",
+        "well log analysis",
+        "net pay"
+      ]
+    },
+    "workflow": {
+      "name": "compute derived properties along a profile and pick the intervals that pass cutoffs",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a LAS file. Curve names from different vendors are mapped to standard names, null values are removed and depth is converted to metres.",
+          "parts": [
+            "log-viewer"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A depth-window slider and four track pickers draw the chosen curves side by side down the depth axis, with optional comma-separated depth markers. The window can be downloaded as PNG or CSV.",
+          "parts": [
+            "log-viewer"
+          ]
+        },
+        {
+          "step": "group items into clusters",
+          "here": "Choose a cluster count and feature curves, then run K-Means. Clusters are drawn as coloured bands behind the tracks, and the labelled data can be downloaded.",
+          "parts": [
+            "clustering"
+          ]
+        },
+        {
+          "step": "compare two variables against each other",
+          "here": "Pick an X curve, a Y curve and an optional colour curve within a depth window to draw a crossplot. The plot and its points can be downloaded.",
+          "parts": [
+            "crossplots"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Choose a shale-volume model and enter matrix and fluid density, clean and shale GR, and Archie a, m, n and Rw. This computes porosity, shale volume, water saturation, hydrocarbon pore-volume index and gas, fracture and invasion flags, with optional pay shading on the tracks. The result can be downloaded as CSV or LAS.",
+          "parts": [
+            "petrophysics"
+          ]
+        },
+        {
+          "step": "pick the intervals that pass cutoffs and total them",
+          "here": "Cutoffs for maximum VSH, minimum PHI, maximum SW and minimum thickness pick contiguous net-reservoir and net-pay zones. These are shown as headline totals, a zone table, a net-to-gross table by depth bin and tracks with pay tops and bases marked.",
+          "parts": [
+            "cutoff-form",
+            "zone-summary"
+          ]
+        },
+        {
+          "step": "write up the result",
+          "here": "A narrative is generated that states the cutoffs used and grades each pay zone's porosity, shaliness, water and hydrocarbon volume in words, with notes on gas and fractures. It can be downloaded as text, and the interpreted data as CSV and LAS.",
+          "parts": [
+            "narrative",
+            "zone-summary"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Shale volume can come from any of four empirical models (Linear, Larionov young, Larionov old, Steiber), and water saturation follows Archie's law with exponents and water resistivity the person can edit.",
+        "A zone is a contiguous run of depth samples that passes every cutoff and meets a minimum thickness. Net reservoir (shale and porosity only) is kept apart from net pay (which adds water saturation).",
+        "Each zone counts flagged samples, such as gas from density–neutron separation and fractures or washouts from caliper spikes.",
+        "Net-to-gross and pay fraction are totalled in depth bins whose size the person sets.",
+        "Results are written back out as a standard LAS log file with the derived curves and zone ids added."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "log-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "Upload and quick viewer",
+      "summary": "Loads a LAS file, standardises its curves and plots up to four chosen tracks inside a depth window with optional markers. The window can be downloaded as PNG or CSV.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "multi-select",
+        "export"
+      ],
+      "patterns": [
+        "stacked tracks on a shared axis"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 274,
+          "end": 355,
+          "role": "logic",
+          "anchor": "e1aa9a064fb9",
+          "first": "with tabs[0]:"
+        },
+        {
+          "file": "code/src/io_las.py",
+          "start": 31,
+          "end": 62,
+          "role": "logic",
+          "symbol": "read_las",
+          "anchor": "0c1b577c267b",
+          "first": "def read_las(path: str) -> Tuple[pd.DataFrame, lasio.LASFile]:"
+        },
+        {
+          "file": "code/src/io_las.py",
+          "start": 8,
+          "end": 29,
+          "role": "data",
+          "anchor": "3ae32a6f7cc2",
+          "first": "NULL_SENTINELS = {-999.25, -9999.0, 999.25, 1e30, 1e20}"
+        },
+        {
+          "file": "code/src/plotting.py",
+          "start": 6,
+          "end": 15,
+          "role": "logic",
+          "symbol": "plot_tracks",
+          "anchor": "bcabc99399ae",
+          "first": "def plot_tracks("
+        }
+      ]
+    },
+    {
+      "id": "clustering",
+      "level": "view",
+      "parent": null,
+      "title": "Facies-like clustering",
+      "summary": "Runs K-Means on the chosen curves and shows the clusters as coloured depth bands behind the log tracks. The clustered data can be downloaded.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "multi-select",
+        "export"
+      ],
+      "patterns": [
+        "stacked tracks on a shared axis"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 359,
+          "end": 377,
+          "role": "logic",
+          "anchor": "4c8835621070",
+          "first": "with tabs[1]:"
+        },
+        {
+          "file": "code/src/plotting.py",
+          "start": 6,
+          "end": 15,
+          "role": "logic",
+          "symbol": "plot_tracks",
+          "anchor": "bcabc99399ae",
+          "first": "def plot_tracks("
+        }
+      ]
+    },
+    {
+      "id": "crossplots",
+      "level": "view",
+      "parent": null,
+      "title": "Crossplots",
+      "summary": "Plots any curve against another within a depth window, with points optionally coloured by a third curve. The plot and its points can be downloaded.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "filter",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 488,
+          "end": 529,
+          "role": "logic",
+          "anchor": "912598353833",
+          "first": "with tabs[3]:"
+        },
+        {
+          "file": "code/src/plotting.py",
+          "start": 144,
+          "end": 157,
+          "role": "logic",
+          "symbol": "plot_crossplot",
+          "anchor": "070e97784f1d",
+          "first": "def plot_crossplot(df, x, y, color=None, title=\"Crossplot\"):"
+        }
+      ]
+    },
+    {
+      "id": "petrophysics",
+      "level": "view",
+      "parent": null,
+      "title": "Petrophysics",
+      "summary": "Computes porosity, shale volume, Archie water saturation and indicator flags from the chosen model and parameters, and plots them with optional pay shading. The result can be downloaded as CSV or LAS.",
+      "views": [
+        "form",
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "stacked tracks on a shared axis"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 380,
+          "end": 482,
+          "role": "logic",
+          "anchor": "e50966d4002a",
+          "first": "with tabs[2]:"
+        },
+        {
+          "file": "code/src/interpretation.py",
+          "start": 30,
+          "end": 37,
+          "role": "logic",
+          "symbol": "compute_petrophysics",
+          "anchor": "f5f0a02b6f63",
+          "first": "def compute_petrophysics("
+        },
+        {
+          "file": "code/src/interpretation.py",
+          "start": 11,
+          "end": 27,
+          "role": "logic",
+          "symbol": "vsh_from_gr",
+          "anchor": "f293a41b2786",
+          "first": "def vsh_from_gr(gr: pd.Series, gr_clean: float, gr_shale: float, model: str = \"Linear\") -> pd.Series:"
+        },
+        {
+          "file": "code/src/io_las.py",
+          "start": 64,
+          "end": 127,
+          "role": "logic",
+          "symbol": "write_las_from_df",
+          "anchor": "9bb6c45ac971",
+          "first": "def write_las_from_df(df: pd.DataFrame, template_las, out_path: str) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "cutoff-form",
+      "level": "component",
+      "parent": "interpretation",
+      "title": "Cutoffs and parameters",
+      "summary": "Holds the shale, porosity, saturation and thickness cutoffs, the shale-volume model and depth-bin size, and the petrophysics inputs, with an option to recompute before interpreting.",
+      "views": [
+        "form"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 601,
+          "end": 649,
+          "role": "markup",
+          "anchor": "38d8dfc23bb0",
+          "first": "# ---------- UI ----------"
+        }
+      ]
+    },
+    {
+      "id": "zone-summary",
+      "level": "component",
+      "parent": "interpretation",
+      "title": "Zone summary and net-to-gross",
+      "summary": "Picks the contiguous net-reservoir and net-pay zones and shows headline totals, a zone table, a net-to-gross table by depth bin and tracks with pay tops and bases marked. Each of these can be downloaded.",
+      "views": [
+        "summary stats",
+        "table view",
+        "line chart"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "stacked tracks on a shared axis"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 651,
+          "end": 743,
+          "role": "logic",
+          "anchor": "433eaaf0f8b2",
+          "first": "# ---------- Run ----------"
+        },
+        {
+          "file": "code/src/interpretation.py",
+          "start": 126,
+          "end": 131,
+          "role": "logic",
+          "symbol": "interpret_zones",
+          "anchor": "5466704126f1",
+          "first": "def interpret_zones("
+        },
+        {
+          "file": "code/src/interpretation.py",
+          "start": 185,
+          "end": 190,
+          "role": "logic",
+          "symbol": "summarize_by_interval",
+          "anchor": "2cccb2f92e51",
+          "first": "def summarize_by_interval("
+        }
+      ]
+    },
+    {
+      "id": "narrative",
+      "level": "component",
+      "parent": "interpretation",
+      "title": "Plain-language narrative",
+      "summary": "Writes up the cutoffs, totals and a graded comment on each pay zone, with guidance by lithology. The text can be downloaded.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 551,
+          "end": 599,
+          "role": "logic",
+          "anchor": "9821aa2407f6",
+          "first": "# ---------- helpers for narrative ----------"
+        },
+        {
+          "file": "code/app.py",
+          "start": 745,
+          "end": 757,
+          "role": "logic",
+          "anchor": "46062d42138a",
+          "first": "# narrative"
+        }
+      ]
+    },
+    {
+      "id": "interpretation",
+      "level": "view",
+      "parent": null,
+      "title": "Interpretation",
+      "summary": "The tab where cutoffs are applied to the computed curves to call net reservoir and net pay, and where the results are written up.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats",
+        "line chart"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 532,
+          "end": 549,
+          "role": "logic",
+          "anchor": "c9e92d3fd03e",
+          "first": "with tabs[4]:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "data",
+      "list": "shapes",
+      "term": "depth profile"
+    },
+    {
+      "facet": "mechanism",
+      "list": "patterns",
+      "term": "stacked tracks on a shared axis"
+    }
+  ]
+}

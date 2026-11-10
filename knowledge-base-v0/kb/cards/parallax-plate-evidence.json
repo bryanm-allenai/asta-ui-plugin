@@ -1,0 +1,571 @@
+{
+  "schema": "astaui.card/1",
+  "id": "parallax-plate-evidence",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T23:23:27Z"
+  },
+  "app": {
+    "title": "Parallax · Scientific claim stress testing",
+    "summary": "A person names an experiment and uploads microscopy images, a map CSV that marks each well or field as treatment or control with dose and replicate, and an optional independent endpoint CSV. Templates are available for both CSVs, and advanced settings choose a dataset profile and a cell-counting model. The analysis then runs in the background with a progress bar. When it finishes, the person picks a treatment claim and reads its verdict and support score. They see how the effect changes under each challenge: QC exclusions, leave-one-replicate-out, position matching, a permutation test and the independent endpoint. They can colour a plate map by any metric and open any well to compare its original image with the segmentation overlay and its QC warnings. Last, they download an evidence PDF, a well-level CSV or the analysis JSON.",
+    "task": {
+      "text": "Check whether an apparent treatment effect measured from plate images still holds when bad images, single replicates, plate position, shuffled labels and an independent assay are used to challenge it, and record a cautious verdict for each claim.",
+      "verbs": [
+        "derive",
+        "review",
+        "compare",
+        "clean",
+        "identify",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "Microscopy images linked by well or evidence ID to a plate map (treatment, dose, replicate, control flag) and an optional independent endpoint reading per well or per group. Each image gets image-derived counts, quality metrics and pass/warn/fail QC.",
+      "item": "a well on a multiwell plate (or an imaged field), with its images, condition and measurements",
+      "shapes": [
+        "image collection",
+        "per element",
+        "table",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "confirming that a treatment effect from an imaging plate experiment holds up before trusting or reporting it",
+      "terms": [
+        "confirm",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "After an upload form and a background analysis job, a results page puts a verdict banner over effect metrics. Below it are a plate heatmap whose colour layer can be switched and a waterfall of the effect under each challenge. Clicking a well in the heatmap, the evidence ledger table or the excluded-well chips opens the same well inspector, with the original image and overlay side by side.",
+      "views": [
+        "form",
+        "fixed-layout grid",
+        "heatmap",
+        "bar chart",
+        "table view",
+        "summary stats",
+        "side-by-side panes",
+        "detail panel",
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "hover for detail",
+        "toggle view",
+        "exclude and refit",
+        "export",
+        "inline edit"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "dashboard",
+        "side-by-side comparison",
+        "status pipeline"
+      ]
+    },
+    "field": {
+      "text": "image-based treatment/control plate assays with segmentation-based cell counting and robustness checks, in cell biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "cell biology",
+        "high content imaging",
+        "cell segmentation"
+      ]
+    },
+    "workflow": {
+      "name": "stress-test a measured effect against alternative analyses and record a verdict",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Name the experiment and drop in microscopy images (well ID in each filename), a plate or evidence map CSV and an optional independent endpoint CSV. Templates can be downloaded. Advanced settings choose the dataset profile, the segmentation engine and a manifest. A file-check strip shows what is missing before 'Analyze my experiment'.",
+          "parts": [
+            "upload-form"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A background job segments every image, measures focus, illumination, saturation and coverage, and assigns pass/warn/fail QC. It then computes each treatment's effect against controls. Progress is shown until it finishes, and the run is saved in My experiments.",
+          "parts": [
+            "experiment-list",
+            "experiment-detail"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "The effect is recomputed after QC failures are dropped, after each replicate is left out in turn, with position-matched controls, under 2000 label permutations and with the independent endpoint. The waterfall shows each result against no effect, and a table lists the leave-one-replicate-out results.",
+          "parts": [
+            "robustness-waterfall",
+            "verdict-panel",
+            "evidence-ledger"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A plate heatmap (or evidence grid when positions are unknown) can be switched between count, focus, illumination, SNR, independent endpoint and QC status layers, with a plate toggle for multi-plate runs.",
+          "parts": [
+            "plate-heatmap"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Clicking a well in the heatmap, the ledger or an excluded-well chip opens a dialog. It shows the original image and segmentation overlay per channel, the metrics, the model and its agreement, and every QC warning.",
+          "parts": [
+            "well-inspector",
+            "evidence-ledger"
+          ]
+        },
+        {
+          "step": "decide on the result, with a reason",
+          "here": "Each claim gets a rule-based verdict (robust, quality-sensitive, replicate-sensitive, position-confounded, modality-discordant, underpowered or inconclusive), extra flag chips, a 0–100 support score and a one-line explanation. A selector switches between claims.",
+          "parts": [
+            "verdict-panel"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Buttons download an evidence report PDF, a well-level evidence CSV and the full analysis JSON.",
+          "parts": [
+            "verdict-panel"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Challenges are gated by what the data supports: position matching and the independent-endpoint comparison are marked unavailable instead of being run on invented coordinates.",
+        "A group-level orthogonal endpoint is deduplicated by series before comparison, so it is not treated as if it were paired to each well.",
+        "Verdict categories name the way the claim fails (quality, a single replicate, plate position, disagreement between measurement methods, too few samples), not just pass or fail.",
+        "Every number links back to the well images and segmentation overlays behind it, and model-vs-classical segmentation disagreement can fail an image's QC."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "upload-form",
+      "level": "view",
+      "parent": null,
+      "title": "Start a new analysis",
+      "summary": "Collects the experiment name, images, plate map and optional endpoint CSV, plus profile and model settings, and checks that the required files are present before submitting.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/ExperimentUpload.jsx",
+          "start": 32,
+          "end": 201,
+          "role": "markup",
+          "symbol": "ExperimentUpload",
+          "anchor": "174dd37d7775",
+          "first": "export default function ExperimentUpload() {"
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentUpload.jsx",
+          "start": 18,
+          "end": 18,
+          "role": "markup",
+          "symbol": "FileDrop",
+          "anchor": "27a9355315f4",
+          "first": "function FileDrop({ icon, title, detail, accept, multiple, files, onChange }) {"
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentUpload.jsx",
+          "start": 79,
+          "end": 106,
+          "role": "logic",
+          "symbol": "submit",
+          "anchor": "5dce5831f220",
+          "first": "const submit = async () => {"
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentUpload.jsx",
+          "start": 63,
+          "end": 77,
+          "role": "logic",
+          "symbol": "downloadTemplate",
+          "anchor": "7c1e71351f32",
+          "first": "const downloadTemplate = async (filename) => {"
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentUpload.jsx",
+          "start": 56,
+          "end": 61,
+          "role": "logic",
+          "symbol": "selectDataset",
+          "anchor": "d80717f1ecc0",
+          "first": "const selectDataset = (value) => {"
+        },
+        {
+          "file": "code/backend/api/app.py",
+          "start": 499,
+          "end": 559,
+          "role": "logic",
+          "symbol": "create_experiment",
+          "anchor": "7b6c1278e6e8",
+          "first": "def create_experiment():"
+        }
+      ]
+    },
+    {
+      "id": "experiment-list",
+      "level": "view",
+      "parent": null,
+      "title": "My experiments",
+      "summary": "Lists saved analyses as cards showing status, progress, primary verdict and counts, with rename and delete controls and a link to inspect the evidence.",
+      "views": [
+        "list",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "inline edit"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/ParallaxDashboard.jsx",
+          "start": 77,
+          "end": 77,
+          "role": "markup",
+          "symbol": "ParallaxDashboard",
+          "anchor": "ba084059244a",
+          "first": "export default function ParallaxDashboard({ listOnly = false }) {"
+        },
+        {
+          "file": "code/frontend/src/components/ParallaxDashboard.jsx",
+          "start": 22,
+          "end": 22,
+          "role": "markup",
+          "symbol": "ExperimentCard",
+          "anchor": "2b0ec8a1fcd8",
+          "first": "function ExperimentCard({ experiment, onRenamed, onDeleted }) {"
+        },
+        {
+          "file": "code/frontend/src/components/ParallaxDashboard.jsx",
+          "start": 83,
+          "end": 96,
+          "role": "logic",
+          "symbol": "load",
+          "anchor": "7cfa712eada0",
+          "first": "const load = async () => {"
+        },
+        {
+          "file": "code/frontend/src/components/AnalysisActions.jsx",
+          "start": 12,
+          "end": 12,
+          "role": "logic",
+          "symbol": "AnalysisActions",
+          "anchor": "988420867c15",
+          "first": "export default function AnalysisActions({ resource, resourceId, name, onRenamed, onDeleted }) {"
+        }
+      ]
+    },
+    {
+      "id": "experiment-detail",
+      "level": "view",
+      "parent": null,
+      "title": "Experiment evidence page",
+      "summary": "Polls the background analysis until it completes, then lays out the verdict, effect metrics, plate map, waterfall, quality audit and evidence ledger for the selected claim.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "dashboard",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/ExperimentDetail.jsx",
+          "start": 84,
+          "end": 155,
+          "role": "markup",
+          "symbol": "ExperimentDetail",
+          "anchor": "179ebbf1364f",
+          "first": "export default function ExperimentDetail() {"
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentDetail.jsx",
+          "start": 95,
+          "end": 105,
+          "role": "logic",
+          "symbol": "load",
+          "anchor": "ecd14e6ceff9",
+          "first": "const load = async () => {"
+        },
+        {
+          "file": "code/backend/science/experiment_analyzer.py",
+          "start": 117,
+          "end": 125,
+          "role": "logic",
+          "symbol": "analyze",
+          "anchor": "fb32aa90bc10",
+          "first": "def analyze("
+        }
+      ]
+    },
+    {
+      "id": "verdict-panel",
+      "level": "component",
+      "parent": "experiment-detail",
+      "title": "Claim verdict and exports",
+      "summary": "Shows the selected claim's verdict, flag chips, support score, available challenges and four effect metrics (apparent, after QC, endpoint or FocusNet, permutation p), with buttons to export the PDF, CSV and JSON.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/ExperimentDetail.jsx",
+          "start": 152,
+          "end": 180,
+          "role": "markup",
+          "anchor": "4a4bba1ed29c",
+          "first": "<Stack direction={{ xs: 'column', md: 'row' }} justifyContent=\"space-between\" gap={2} alignItems={{ xs: 'stretch', md: '"
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentDetail.jsx",
+          "start": 113,
+          "end": 127,
+          "role": "logic",
+          "symbol": "downloadExport",
+          "anchor": "efe2d8745ec3",
+          "first": "const downloadExport = async (suffix, filename) => {"
+        },
+        {
+          "file": "code/frontend/src/components/VerdictChip.jsx",
+          "start": 16,
+          "end": 16,
+          "role": "markup",
+          "symbol": "VerdictChip",
+          "anchor": "efdb2714fe3e",
+          "first": "export default function VerdictChip({ verdict, size = 'small' }) {"
+        },
+        {
+          "file": "code/frontend/src/components/VerdictChip.jsx",
+          "start": 4,
+          "end": 12,
+          "role": "data",
+          "symbol": "styles",
+          "anchor": "af47fbb9aa42",
+          "first": "const styles = {"
+        },
+        {
+          "file": "code/backend/science/stress_testing.py",
+          "start": 128,
+          "end": 134,
+          "role": "logic",
+          "symbol": "stress_test_claim",
+          "anchor": "a0f5ae54c3b1",
+          "first": "def stress_test_claim("
+        },
+        {
+          "file": "code/backend/science/reporting.py",
+          "start": 48,
+          "end": 172,
+          "role": "logic",
+          "symbol": "build_evidence_report",
+          "anchor": "2634dc4015e2",
+          "first": "def build_evidence_report(analysis: dict[str, Any], experiment_dir: str | Path, output_path: str | Path) -> Path:"
+        }
+      ]
+    },
+    {
+      "id": "plate-heatmap",
+      "level": "component",
+      "parent": "experiment-detail",
+      "title": "Interactive plate",
+      "summary": "Draws wells in their physical plate positions (or an evidence grid when positions are unknown), coloured by a chosen metric layer, with a tooltip for each well and a click that opens it.",
+      "views": [
+        "fixed-layout grid",
+        "heatmap"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/PlateHeatmap.jsx",
+          "start": 24,
+          "end": 24,
+          "role": "markup",
+          "symbol": "PlateHeatmap",
+          "anchor": "0ceadb617b6c",
+          "first": "export default function PlateHeatmap({ wells, plate, selectedWell, onSelect }) {"
+        },
+        {
+          "file": "code/frontend/src/components/PlateHeatmap.jsx",
+          "start": 4,
+          "end": 13,
+          "role": "data",
+          "symbol": "layerOptions",
+          "anchor": "6a7289943eb2",
+          "first": "const layerOptions = ["
+        },
+        {
+          "file": "code/frontend/src/components/PlateHeatmap.jsx",
+          "start": 37,
+          "end": 45,
+          "role": "logic",
+          "symbol": "background",
+          "anchor": "2c43f41420ce",
+          "first": "const background = (well) => {"
+        },
+        {
+          "file": "code/frontend/src/components/PlateHeatmap.jsx",
+          "start": 47,
+          "end": 57,
+          "role": "logic",
+          "symbol": "evidenceButton",
+          "anchor": "315e05330c6c",
+          "first": "const evidenceButton = (well, round = false) => {"
+        }
+      ]
+    },
+    {
+      "id": "robustness-waterfall",
+      "level": "component",
+      "parent": "experiment-detail",
+      "title": "Robustness waterfall",
+      "summary": "Shows the estimated effect under each challenge as a bar diverging from zero, so the person can see which challenge shrinks or reverses the effect.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "exclude and refit"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/RobustnessWaterfall.jsx",
+          "start": 4,
+          "end": 4,
+          "role": "markup",
+          "symbol": "RobustnessWaterfall",
+          "anchor": "aeb3b7c83e7e",
+          "first": "export default function RobustnessWaterfall({ scenarios = [], compact = false }) {"
+        },
+        {
+          "file": "code/backend/science/stress_testing.py",
+          "start": 221,
+          "end": 233,
+          "role": "logic",
+          "anchor": "5463591820f8",
+          "first": "scenarios = ["
+        }
+      ]
+    },
+    {
+      "id": "evidence-ledger",
+      "level": "component",
+      "parent": "experiment-detail",
+      "title": "Quality audit, leave-one-replicate-out and evidence ledger",
+      "summary": "Counts pass/warn/fail QC and lists the excluded wells as chips. A table gives the effect remaining after each replicate is removed, and the full ledger lists every well's condition, measurement, focus, endpoint and QC status, with each row clickable.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "linked views",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/ExperimentDetail.jsx",
+          "start": 187,
+          "end": 199,
+          "role": "markup",
+          "anchor": "8dddec03ff06",
+          "first": "<Grid container spacing={3} sx={{ mt: 1 }}>"
+        }
+      ]
+    },
+    {
+      "id": "well-inspector",
+      "level": "component",
+      "parent": "experiment-detail",
+      "title": "Well inspector",
+      "summary": "Opens one well with chips to switch channels, its original image beside the segmentation overlay, metric tiles, model agreement notes and every QC warning.",
+      "views": [
+        "detail panel",
+        "side-by-side panes",
+        "image viewer"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/ExperimentDetail.jsx",
+          "start": 44,
+          "end": 44,
+          "role": "markup",
+          "symbol": "WellDialog",
+          "anchor": "cefa9992e407",
+          "first": "function WellDialog({ experimentId, well, onClose }) {"
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentDetail.jsx",
+          "start": 25,
+          "end": 25,
+          "role": "logic",
+          "symbol": "SecureImage",
+          "anchor": "ce811b283f58",
+          "first": "function SecureImage({ url, alt }) {"
+        },
+        {
+          "file": "code/frontend/src/components/ExperimentDetail.jsx",
+          "start": 40,
+          "end": 40,
+          "role": "markup",
+          "symbol": "Metric",
+          "anchor": "ac7d35334e8b",
+          "first": "function Metric({ label, value, detail }) {"
+        },
+        {
+          "file": "code/backend/api/app.py",
+          "start": 627,
+          "end": 636,
+          "role": "logic",
+          "symbol": "get_asset",
+          "anchor": "a63af8c5d9a7",
+          "first": "def get_asset(experiment_id: str, kind: str, filename: str):"
+        }
+      ]
+    }
+  ]
+}

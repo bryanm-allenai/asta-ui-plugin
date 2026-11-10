@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from dataclasses import field as dc_field
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Mapping, Optional, Sequence, Set, Tuple
 
 from .cards import STRUCTURE, check_query, facet_text, matches_filter, structure_text, tags, workflow_text
 from .index import Index
@@ -29,7 +29,7 @@ from .ontology import FACETS, Ontology, norm_word
 from .vec import dot
 from .slices import slice_part
 from .symbols import index_build
-from .workflows import StepSpace, compare, format_diff, query_vectors
+from .workflows import StepSpace, _Lazy, compare, format_diff, query_vectors
 
 
 
@@ -80,16 +80,30 @@ def same_field(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
     return len(wa & wb) / max(1, min(len(wa), len(wb))) >= 0.5
 
 
+MAX_RECALL = 20000  # the most builds or steps a search asks the database for in one channel
+
+
 class Searcher:
     def __init__(self, kb: KB, embedder: Optional[str] = None, index: Optional[Index] = None):
         self.kb = kb
         self.ont = Ontology.load(kb.root / "ontology.json")
         self.index = index or Index(kb, embedder)
         self.index.ensure()
-        self.cards = {c["id"]: c for c in kb.cards()}
-        self.kinds = {b.id: b.kind for b in kb.builds()}
-        self.titles = {b.id: b.title for b in kb.builds()}
+        # With a database copy of the vectors, a search asks it for the builds nearest
+        # the request and reads only those; without one, it reads them all.
+        self.lean = self.index.store_ready()
+        if self.lean:
+            self.cards: Mapping[str, Dict[str, Any]] = _Lazy(kb.card_ids(), kb.card)
+            builds = kb.build_ids()
+            self.kinds: Mapping[str, str] = _Lazy(builds, lambda b: kb.build(b).kind)
+            self.titles: Mapping[str, str] = _Lazy(builds, lambda b: kb.build(b).title)
+        else:
+            self.cards = {c["id"]: c for c in kb.cards()}
+            self.kinds = {b.id: b.kind for b in kb.builds()}
+            self.titles = {b.id: b.title for b in kb.builds()}
         scfg = kb.config.get("search", {})
+        # How many builds the database is asked for in each channel.
+        self.recall = int(scfg.get("recall", 200))
         self.prompt_weight = float(scfg.get("prompt_weight", 0.25))
         self._symbols: Dict[str, Any] = {}
         self.tag_weight = float(scfg.get("tag_weight", 0.15))
@@ -125,15 +139,44 @@ class Searcher:
         return dict(zip(keys, vecs))
 
     # -- ranking ------------------------------------------------------------------
+    def _scores(self, channel: str, q: Optional[Any], among: Optional[Set[str]]) -> Dict[str, float]:
+        """q's similarity with each build in one channel: the named builds, from the
+        database, or every build, from the index."""
+        if q is None:
+            return {}
+        if among is not None and self.lean:
+            return self.index.store.scores(channel, q, sorted(among))
+        return self.index.scores(channel, q)
+
+    def recall_for(self, qv: Dict[str, Any], channels: Sequence[str], k: Optional[int] = None) -> Set[str]:
+        """The builds nearest the request in any of these channels, from the database:
+        the only builds a search then ranks."""
+        k = k or self.recall
+        out: Set[str] = set()
+        for ch in channels:
+            v = qv.get("request") if ch in ("card", "prompt") else qv.get(ch)
+            if v is not None:
+                out.update(c for c, _, _ in self.index.store.nearest(ch, v, k))
+        return {c for c in out if c in self.cards}
+
     def rank(self, q: Dict[str, Any], where: Sequence[str] = (), exclude: Sequence[str] = (),
-             facets_only: Optional[Sequence[str]] = None, use_prompt: bool = True, use_tags: bool = True) -> List[Hit]:
+             facets_only: Optional[Sequence[str]] = None, use_prompt: bool = True, use_tags: bool = True,
+             among: Optional[Set[str]] = None) -> List[Hit]:
         qv = self._query_vectors(q)
         weights = self.ont.weights()
         # The general workflow counts like a facet: matching is by the workflow a build serves.
         facet_keys = [f for f in ("summary", "workflow") + FACETS if f in qv]
         if facets_only is not None:
             facet_keys = [f for f in facet_keys if f in facets_only]
-        chans = {ch: self.index.channel(ch) for ch in ("summary", "workflow") + FACETS + ("card", "prompt")}
+        if among is None and self.lean:
+            # Exact filters can leave few of the nearest, so ask for more when there are some.
+            k = self.recall * (5 if where else 1)
+            among = self.recall_for(qv, list(facet_keys) + ["structure", "card", "prompt"], k)
+        # Each channel's similarity with every build, computed in one pass per channel.
+        sims = {f: self._scores(f, qv[f], among) for f in facet_keys}
+        if "request" in qv:
+            sims["card"] = self._scores("card", qv["request"], among)
+            sims["prompt"] = self._scores("prompt", qv["request"], among)
         qtags = tags(q)
         filters = []
         for w in where:
@@ -142,7 +185,8 @@ class Searcher:
             k, v = w.split("=", 1)
             filters.append((k, v))
         hits: List[Hit] = []
-        for cid, card in self.cards.items():
+        for cid in (sorted(among) if among is not None else self.cards):
+            card = self.cards[cid]
             if cid in exclude:
                 continue
             if any(not matches_filter(card, k, v, self.ont, self.kinds.get(cid, "")) for k, v in filters):
@@ -155,22 +199,20 @@ class Searcher:
                 fw = sum(weights[f] for f in facet_keys)
                 fs = 0.0
                 for f in facet_keys:
-                    cv = chans[f].get(cid)
-                    s = dot(qv[f], cv) if cv else 0.0
+                    s = sims[f].get(cid, 0.0)
                     by[f] = s
                     fs += weights[f] * s
                 facet_score = fs / fw if fw else 0.0
-            elif "request" in qv and chans["card"].get(cid):
+            elif "request" in qv and cid in sims["card"]:
                 # No query card: the request against the whole card.
-                facet_score = dot(qv["request"], chans["card"][cid])
+                facet_score = sims["card"][cid]
                 by["card"] = facet_score
             else:
                 facet_score = 0.0
             # Prompt against prompts.
             pw = self.prompt_weight if (use_prompt and "request" in qv and facets_only is None) else 0.0
             if pw:
-                pv = chans["prompt"].get(cid)
-                ps = dot(qv["request"], pv) if pv else 0.0
+                ps = sims["prompt"].get(cid, 0.0)
                 by["prompt"] = ps
                 parts.append((pw, ps))
             # Shared ontology words.
@@ -210,8 +252,9 @@ class Searcher:
         allowed = {h.id: h for h in hits}  # already filtered and excluded
         qvs = self._query_vectors(q)
         qv, qw = qvs.get("structure"), qvs.get("workflow")
-        svecs = self.index.channel("structure")
-        wvecs = self.index.channel("workflow")
+        ids = set(allowed) if self.lean else None
+        ssims = self._scores("structure", qv, ids)
+        wsims = self._scores("workflow", qw, ids)
         qtags = tags(q)
         weights = self.ont.weights()
         best: Optional[Tuple[float, Hit, Dict[str, float], Dict[str, List[str]]]] = None
@@ -222,10 +265,10 @@ class Searcher:
             if same_field(app, anchor) or (qfield and same_field(app, {"field": qfield})):
                 continue
             by: Dict[str, float] = {}
-            if qv is not None and cid in svecs:
-                by["structure"] = dot(qv, svecs[cid])
-            if qw is not None and cid in wvecs:
-                by["workflow"] = dot(qw, wvecs[cid])
+            if cid in ssims:
+                by["structure"] = ssims[cid]
+            if cid in wsims:
+                by["workflow"] = wsims[cid]
             ctags = tags(app)
             shared: Dict[str, List[str]] = {}
             tsum = twsum = 0.0
@@ -247,6 +290,23 @@ class Searcher:
             return None
         score, h, by, shared = best
         return Hit(id=h.id, title=h.title, score=score, by=by, shared=shared, field=h.field, kind=h.kind)
+
+    def _far_among(self, q: Dict[str, Any], close: Hit) -> Set[str]:
+        """Builds for the far match, from the database: the nearest by structure and by
+        workflow, asked for in larger numbers until enough are from another field than
+        the closest build's and the request's."""
+        qv = self._query_vectors(q)
+        anchor = self.cards[close.id]["app"]
+        qfield = q.get("field")
+        want = max(20, self.recall // 4)
+        k = self.recall
+        while True:
+            got = self.recall_for(qv, ["structure", "workflow"], k)
+            other = {c for c in got if not same_field(self.cards[c]["app"], anchor)
+                     and not (qfield and same_field(self.cards[c]["app"], {"field": qfield}))}
+            if len(other) >= want or k >= MAX_RECALL or len(got) < k:
+                return other | {close.id}
+            k *= 4
 
     def _space_ready(self) -> StepSpace:
         if getattr(self, "_space", None) is None:
@@ -303,21 +363,27 @@ class Searcher:
         space = self._space_ready()
         out = []
         for st, (qg, qh) in zip(steps, qsteps):
-            cands = []
-            for cid, vecs in space.vecs.items():
-                best = None
-                for j, (g, h) in enumerate(vecs):
-                    if g is None or qg is None:
-                        continue
-                    sim = dot(qg, g)
-                    if sim < space.tau:
-                        continue
+            # Every step in the knowledge base that is the same move, found in one pass,
+            # and how each of them is done against how the request does it.
+            best_of: Dict[str, Tuple[float, float, int]] = {}
+            k = self.recall * 5
+            while True:
+                near, more = self._steps_near(space, qg, k)
+                how = self._how_done(space, qh if st.get("here") else None, near)
+                best_of = {}
+                for sim, cid, j in near:
                     # How the step is done counts a little too, so the closest case wins a tie.
-                    score = sim + (0.25 * dot(qh, h) if (qh is not None and h is not None and st.get("here")) else 0.0)
-                    if best is None or score > best[0]:
-                        best = (score, sim, j)
-                if best:
-                    cands.append((best[0], best[1], cid, best[2]))
+                    score = sim + (0.25 * how[(cid, j)] if (cid, j) in how else 0.0)
+                    b = best_of.get(cid)
+                    if b is None or score > b[0] or (score == b[0] and j < b[2]):
+                        best_of[cid] = (score, sim, j)
+                # A step further down is at most a quarter better for how it is done: stop
+                # once the next could not beat what is found, or there is no next.
+                top = sorted((b[0] for b in best_of.values()), reverse=True)
+                if not more or (len(top) >= per_step and near and near[-1][0] + 0.25 < top[per_step - 1]):
+                    break
+                k *= 4
+            cands = [(sc, sim, cid, j) for cid, (sc, sim, j) in best_of.items()]
             cands.sort(reverse=True)
             entry: Dict[str, Any] = {"step": st["step"], "here": st.get("here", ""), "from": []}
             for score, sim, cid, j in cands[:per_step]:
@@ -338,6 +404,31 @@ class Searcher:
             out.append(entry)
         return out
 
+    def _steps_near(self, space: StepSpace, qg: Optional[Any], k: int) -> Tuple[List[Tuple[float, str, int]], bool]:
+        """The steps of the knowledge base that are the same move as qg, as (similarity,
+        build, step), most alike first, and whether there may be more: from the
+        database, its k nearest; from memory, all of them."""
+        if qg is None:
+            return [], False
+        if not self.lean:
+            out = [(sim, *space.rows[r]) for r, sim in enumerate(space.set.scores(qg)) if sim >= space.tau]
+            out.sort(key=lambda x: -x[0])
+            return out, False
+        rows = self.index.store.nearest("step", qg, k, app=False)
+        out = [(sim, cid, int(part.split("-", 1)[1]) - 1) for cid, part, sim in rows
+               if sim >= space.tau and cid in space.counts and part.startswith("step-")]
+        more = len(rows) >= k and bool(rows) and rows[-1][2] >= space.tau and k < MAX_RECALL
+        return out, more
+
+    def _how_done(self, space: StepSpace, qh: Optional[Any], near: List[Tuple[float, str, int]]) -> Dict[Tuple[str, int], float]:
+        """How alike each of these steps is done to how the request does it."""
+        if qh is None:
+            return {}
+        if self.lean:
+            found = self.index.store.scores_at("here", qh, [(cid, f"step-{j + 1}") for _, cid, j in near])
+            return {(cid, j): found[(cid, f"step-{j + 1}")] for _, cid, j in near if (cid, f"step-{j + 1}") in found}
+        return {(cid, j): dot(qh, space.vecs[cid][j][1]) for _, cid, j in near if space.vecs[cid][j][1] is not None}
+
     def pieces(self, q: Dict[str, Any], skip: Sequence[str], n: int = 5) -> List[Dict[str, Any]]:
         """Views and components from anywhere in the knowledge base that fit the request,
         for requests described without a workflow."""
@@ -346,10 +437,15 @@ class Searcher:
         if not anchor:
             return []
         scored = []
-        for (cid, pid), v in self.index.parts().items():
-            if cid in skip or cid not in self.cards:
-                continue
-            scored.append((dot(anchor, v), cid, pid))
+        if self.lean:
+            for cid, pid, sim in self.index.store.nearest("part", anchor, n * 10 + len(skip) * 10, app=False):
+                if cid not in skip and cid in self.cards:
+                    scored.append((sim, cid, pid))
+        else:
+            for (cid, pid), v in self.index.parts().items():
+                if cid in skip or cid not in self.cards:
+                    continue
+                scored.append((dot(anchor, v), cid, pid))
         scored.sort(reverse=True)
         out = []
         for s, cid, pid in scored[:n]:
@@ -373,7 +469,10 @@ class Searcher:
         qsteps = query_vectors(self.index, q.get("workflow") or {})
         for h in top:
             self.attach_parts(q, h, parts, qsteps)
-        far_hit = self.far(q, hits, top[0] if top else None, where, exclude) if far else None
+        far_pool = hits
+        if far and top and self.lean:
+            far_pool = self.rank(q, where=where, exclude=exclude, among=self._far_among(q, top[0]))
+        far_hit = self.far(q, far_pool, top[0] if top else None, where, exclude) if far else None
         if far_hit:
             self.attach_parts(q, far_hit, parts, qsteps)
         shown = [h.id for h in top] + ([far_hit.id] if far_hit else [])

@@ -1,0 +1,699 @@
+{
+  "schema": "astaui.card/1",
+  "id": "blotgrid-quantify",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:12:26Z"
+  },
+  "app": {
+    "title": "BlotGrid",
+    "summary": "A person uploads one or more blot scans, one per replicate; text recognition fills in the target rows and lane names, and the scan can be straightened against a guide grid. The app proposes a box around every band in each target-by-lane cell, all the same size, and the person moves, adds, excludes and approves boxes on the image and in a table, checking doubtful ones against their intensity profile. They then run background-subtracted densitometry, divide each band by the loading control in the same lane (optionally as fold change against a reference lane), pool replicates into mean with SD, SEM or confidence interval and an optional significance test, and export a styled bar chart with the underlying CSV/XLSX tables.",
+    "task": {
+      "text": "Measure the intensity of every band on blot scans, normalize each target to a loading control in the same lane, and summarize replicates into an exportable figure and table.",
+      "verbs": [
+        "derive",
+        "locate",
+        "clean",
+        "summarize",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "Scanned blot images, each a grid of lanes (samples or conditions) by target rows, measured into a table of band intensities per blot, target and lane.",
+      "item": "a band at one target row and one lane on a blot scan",
+      "shapes": [
+        "image collection",
+        "image",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "quantifying blot scans after imaging, before plotting and statistics",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Tabs lead from upload through box layout, densitometry, normalization and replicate statistics to a chart; on the layout tab the on-image box editor and the editable box table change the same layout, and choosing a box shows its vertical intensity profile with the integrated interval. Any change to boxes or measurement settings clears the downstream results so they must be recomputed.",
+      "views": [
+        "image viewer",
+        "thumbnail grid",
+        "table view",
+        "line chart",
+        "bar chart",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "drag to arrange",
+        "inline edit",
+        "keyboard shortcuts",
+        "zoom and pan",
+        "accept or reject",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "master-detail",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "Western blot densitometry in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "western blot",
+        "densitometry"
+      ]
+    },
+    "workflow": {
+      "name": "measure regions on images, normalize to a reference, and summarize replicates",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload TIFF/PNG/JPG scans (one per replicate); local OCR reads printed target and lane labels or infers a neutral grid, and an optional alignment-grid panel estimates and applies a straightening angle.",
+          "parts": [
+            "upload-tab",
+            "experiment-setup"
+          ]
+        },
+        {
+          "step": "mark every region to be measured",
+          "here": "Detect all bands proposes one fixed-size box per band in each target × lane cell (classical, GelGenie or a local checkpoint), colour-coded as accepted, control, needs review or excluded fallback.",
+          "parts": [
+            "roi-tab",
+            "roi-canvas"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Drag boxes on the blot, nudge with arrow keys, add missed bands by target and lane, untick Use in the table, inspect a box's vertical intensity profile, and approve labels after attesting the whole image was reviewed.",
+          "parts": [
+            "roi-canvas",
+            "roi-table",
+            "band-profile"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run densitometry on all blots: net integrated density with local, rolling-ball or fixed background, profile-guided or full-rectangle, flagging saturated and non-positive bands.",
+          "parts": [
+            "quantify-normalize",
+            "experiment-setup"
+          ]
+        },
+        {
+          "step": "compute a value relative to a reference",
+          "here": "Divide each target by the loading control in the same lane, optionally as fold change against a chosen reference lane; without a control, net intensity is carried forward.",
+          "parts": [
+            "quantify-normalize"
+          ]
+        },
+        {
+          "step": "summarize replicates and test differences",
+          "here": "Pool blots by lane label into mean, SD, SEM, t-based 95% CI and N per target and condition, with an optional t-test or ANOVA for one target.",
+          "parts": [
+            "quantify-normalize"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Style a bar chart per target (error bars, points, palette, size in inches) and download PNG/TIFF/SVG/PDF, a summary CSV, an all-data XLSX, and a project JSON.",
+          "parts": [
+            "plot-export",
+            "experiment-setup"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every box on a blot shares one locked width and height, so resizing any handle resizes all and no band gets its own measurement area.",
+        "Normalization is per lane against a chosen loading-control row, and is skipped honestly (intensity in arbitrary units) when no control is present.",
+        "Saturated pixels are flagged in either band polarity, since clipped exposures break the linear range.",
+        "Scan straightening always rotates from the untouched upload against a display-only guide grid, and any rotation or box change clears approvals and results.",
+        "A restored project only reapplies saved box layouts after the re-uploaded image matches its stored SHA-256."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "experiment-setup",
+      "level": "view",
+      "parent": null,
+      "title": "Experiment setup sidebar",
+      "summary": "Lists target rows and lane names, picks the loading control, sets detection backend, polarity, background method and integration mode, and saves or restores the project file.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 632,
+          "end": 1027,
+          "role": "logic",
+          "anchor": "f22def28d0e2",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 607,
+          "end": 626,
+          "role": "logic",
+          "anchor": "78c70d35f727",
+          "first": "# Apply values staged by image OCR or project restore before keyed widgets are"
+        },
+        {
+          "file": "code/wblot/project_io.py",
+          "start": 10,
+          "end": 17,
+          "role": "logic",
+          "symbol": "project_json",
+          "anchor": "e7839fee4460",
+          "first": "def project_json(state: dict) -> str:"
+        },
+        {
+          "file": "code/wblot/project_io.py",
+          "start": 25,
+          "end": 42,
+          "role": "logic",
+          "symbol": "load_project",
+          "anchor": "0458465fd2e7",
+          "first": "def load_project(source) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "upload-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Upload and straighten",
+      "summary": "Takes blot images, shows them as sized previews with bit depth and saturation warnings, reads labels by OCR, assigns replicate numbers, and straightens each scan against a cyan guide grid.",
+      "views": [
+        "thumbnail grid",
+        "image viewer",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1036,
+          "end": 1364,
+          "role": "logic",
+          "anchor": "f5e324d5f59c",
+          "first": "with tabs[0]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 392,
+          "end": 406,
+          "role": "logic",
+          "symbol": "_alignment_figure",
+          "anchor": "8d8032ae3470",
+          "first": "def _alignment_figure(img: image_io.LoadedImage, grid_step: int):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 586,
+          "end": 604,
+          "role": "logic",
+          "symbol": "_queue_detected_metadata",
+          "anchor": "d303f03af28f",
+          "first": "def _queue_detected_metadata(labels: label_ocr.ExperimentLabels, image_name: str) -> None:"
+        },
+        {
+          "file": "code/wblot/alignment.py",
+          "start": 74,
+          "end": 76,
+          "role": "logic",
+          "symbol": "estimate_correction_angle",
+          "anchor": "163f1343761e",
+          "first": "def estimate_correction_angle("
+        },
+        {
+          "file": "code/wblot/alignment.py",
+          "start": 23,
+          "end": 49,
+          "role": "logic",
+          "symbol": "rotate_loaded",
+          "anchor": "642e8f6a6da4",
+          "first": "def rotate_loaded(image: LoadedImage, correction_angle: float) -> LoadedImage:"
+        },
+        {
+          "file": "code/wblot/label_ocr.py",
+          "start": 450,
+          "end": 458,
+          "role": "logic",
+          "symbol": "read_experiment_labels_or_grid",
+          "anchor": "6f463f684286",
+          "first": "def read_experiment_labels_or_grid(image: image_io.LoadedImage) -> ExperimentLabels:"
+        },
+        {
+          "file": "code/wblot/image_io.py",
+          "start": 39,
+          "end": 78,
+          "role": "logic",
+          "symbol": "load_image",
+          "anchor": "87d562c8fa0d",
+          "first": "def load_image(source, name: str = \"blot\") -> LoadedImage:"
+        }
+      ]
+    },
+    {
+      "id": "roi-tab",
+      "level": "view",
+      "parent": null,
+      "title": "ROIs tab",
+      "summary": "Picks a blot, runs automatic band detection or an even-grid fallback, shows counts of active, excluded and needs-review boxes, and lays out the image editor beside the box controls.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1369,
+          "end": 1486,
+          "role": "logic",
+          "anchor": "8b8f33edd73e",
+          "first": "with tabs[1]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1907,
+          "end": 1948,
+          "role": "logic",
+          "anchor": "1a51e16b3444",
+          "first": "else:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 422,
+          "end": 540,
+          "role": "logic",
+          "symbol": "automatic_layout",
+          "anchor": "90b5f65c0268",
+          "first": "def automatic_layout(img: image_io.LoadedImage, targets, lanes):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 409,
+          "end": 419,
+          "role": "logic",
+          "symbol": "default_layout",
+          "anchor": "e5db9c0b5040",
+          "first": "def default_layout(img: image_io.LoadedImage, targets, n_lanes):"
+        },
+        {
+          "file": "code/wblot/detection.py",
+          "start": 777,
+          "end": 785,
+          "role": "logic",
+          "symbol": "detect_bands",
+          "anchor": "964df27dc63a",
+          "first": "def detect_bands("
+        },
+        {
+          "file": "code/wblot/detection.py",
+          "start": 1034,
+          "end": 1041,
+          "role": "logic",
+          "symbol": "ensure_complete_grid",
+          "anchor": "ae402888e73d",
+          "first": "def ensure_complete_grid("
+        }
+      ]
+    },
+    {
+      "id": "roi-canvas",
+      "level": "component",
+      "parent": "roi-tab",
+      "title": "On-image box editor",
+      "summary": "Draws every box over the blot colour-coded by status, lets the person click and drag a box to move it, drag handles to resize all boxes together, nudge with arrow keys, and zoom or scroll the image.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "select",
+        "drag to arrange",
+        "keyboard shortcuts",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/wblot/roi_editor_frontend/index.html",
+          "start": 11,
+          "end": 13,
+          "role": "markup",
+          "symbol": "#canvas-viewport",
+          "anchor": "36cd6e4d95e4",
+          "first": "<div id=\"canvas-viewport\" class=\"canvas-viewport\">"
+        },
+        {
+          "file": "code/wblot/roi_editor_frontend/index.html",
+          "start": 14,
+          "end": 14,
+          "role": "markup",
+          "symbol": "#roi-status",
+          "anchor": "0be3a3b3d459",
+          "first": "<div id=\"roi-status\" class=\"status\">Click a rectangle to select it.</div>"
+        },
+        {
+          "file": "code/wblot/roi_editor_frontend/style.css",
+          "start": 34,
+          "end": 42,
+          "role": "style",
+          "symbol": ".canvas-viewport",
+          "anchor": "5b80bd054aab",
+          "first": ".canvas-viewport {"
+        },
+        {
+          "file": "code/wblot/roi_editor_frontend/style.css",
+          "start": 44,
+          "end": 53,
+          "role": "style",
+          "symbol": "canvas",
+          "anchor": "211f22bb7fa8",
+          "first": "canvas {"
+        },
+        {
+          "file": "code/wblot/roi_editor_frontend/roi_editor.js",
+          "start": 169,
+          "end": 238,
+          "role": "logic",
+          "symbol": "draw",
+          "anchor": "b0c2518e8eda",
+          "first": "function draw() {"
+        },
+        {
+          "file": "code/wblot/roi_editor_frontend/roi_editor.js",
+          "start": 270,
+          "end": 279,
+          "role": "logic",
+          "symbol": "emitChange",
+          "anchor": "fd1169797869",
+          "first": "function emitChange(action) {"
+        },
+        {
+          "file": "code/wblot/roi_editor_frontend/roi_editor.js",
+          "start": 334,
+          "end": 341,
+          "role": "logic",
+          "symbol": "endPointer",
+          "anchor": "f73f1249c99c",
+          "first": "function endPointer(event) {"
+        },
+        {
+          "file": "code/wblot/roi_editor.py",
+          "start": 29,
+          "end": 38,
+          "role": "logic",
+          "symbol": "edit_rois",
+          "anchor": "4112694794a1",
+          "first": "def edit_rois("
+        },
+        {
+          "file": "code/app.py",
+          "start": 1487,
+          "end": 1518,
+          "role": "logic",
+          "anchor": "3b2c57a97fe2",
+          "first": "with image_panel:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 253,
+          "end": 259,
+          "role": "logic",
+          "symbol": "_apply_roi_editor_event",
+          "anchor": "c2c8e7a0f8da",
+          "first": "def _apply_roi_editor_event("
+        },
+        {
+          "file": "code/wblot/roi_constraints.py",
+          "start": 41,
+          "end": 48,
+          "role": "logic",
+          "symbol": "apply_editor_event",
+          "anchor": "ebf5b9c99017",
+          "first": "def apply_editor_event("
+        }
+      ]
+    },
+    {
+      "id": "roi-table",
+      "level": "component",
+      "parent": "roi-tab",
+      "title": "Box table, manual additions and approval",
+      "summary": "Lists every box with its target, lane, position, status and confidence for exact edits and Use toggles, adds boxes for missed bands, sets the shared box size, and approves boxes after a whole-image attestation.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "accept or reject",
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1526,
+          "end": 1691,
+          "role": "logic",
+          "anchor": "1e869b317dbb",
+          "first": "with control_panel:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1763,
+          "end": 1839,
+          "role": "logic",
+          "anchor": "c7c9d7f30bce",
+          "first": "old_rois_by_id = {"
+        },
+        {
+          "file": "code/app.py",
+          "start": 277,
+          "end": 283,
+          "role": "logic",
+          "symbol": "_add_manual_band_boxes",
+          "anchor": "60178697d7ec",
+          "first": "def _add_manual_band_boxes("
+        },
+        {
+          "file": "code/app.py",
+          "start": 221,
+          "end": 234,
+          "role": "logic",
+          "symbol": "_ensure_shared_roi_size",
+          "anchor": "7950942befc9",
+          "first": "def _ensure_shared_roi_size(layout, img: image_io.LoadedImage) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "band-profile",
+      "level": "component",
+      "parent": "roi-tab",
+      "title": "Band review and intensity profile",
+      "summary": "Opens on the first box needing review and plots its vertical mean-signal profile with the interval used for integration shaded, with an optional model-based recentring of that box.",
+      "views": [
+        "line chart",
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1692,
+          "end": 1761,
+          "role": "logic",
+          "anchor": "f68f1f5cad6c",
+          "first": "profile_rois = list(layout[\"rois\"])"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1840,
+          "end": 1906,
+          "role": "logic",
+          "anchor": "83d20b377e40",
+          "first": "pending_sam_roi_id = S.pop("
+        },
+        {
+          "file": "code/wblot/densitometry.py",
+          "start": 104,
+          "end": 154,
+          "role": "logic",
+          "symbol": "profile_peak_interval",
+          "anchor": "6dea66eabbe9",
+          "first": "def profile_peak_interval(roi: np.ndarray, background_per_px: float) -> tuple[int, int, np.ndarray]:"
+        }
+      ]
+    },
+    {
+      "id": "quantify-normalize",
+      "level": "view",
+      "parent": null,
+      "title": "Quantify, Normalize and Replicates tabs",
+      "summary": "Runs densitometry on every active box with saturation and non-positive warnings, divides each target by the same-lane control (or fold change versus a reference lane), and pools replicates into mean, SD, SEM, CI and N with an optional significance test.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1953,
+          "end": 2098,
+          "role": "logic",
+          "anchor": "165b15e727e8",
+          "first": "with tabs[2]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 543,
+          "end": 569,
+          "role": "logic",
+          "symbol": "rois_from_layout",
+          "anchor": "0c11c59ea907",
+          "first": "def rois_from_layout(layout, targets, lanes):"
+        },
+        {
+          "file": "code/wblot/densitometry.py",
+          "start": 157,
+          "end": 171,
+          "role": "logic",
+          "symbol": "measure_band",
+          "anchor": "b765db80270c",
+          "first": "def measure_band("
+        },
+        {
+          "file": "code/wblot/normalization.py",
+          "start": 54,
+          "end": 60,
+          "role": "logic",
+          "symbol": "normalize_to_control",
+          "anchor": "5c04418acee0",
+          "first": "def normalize_to_control("
+        },
+        {
+          "file": "code/wblot/normalization.py",
+          "start": 113,
+          "end": 119,
+          "role": "logic",
+          "symbol": "fold_change",
+          "anchor": "b380af670d56",
+          "first": "def fold_change("
+        },
+        {
+          "file": "code/wblot/stats.py",
+          "start": 9,
+          "end": 12,
+          "role": "logic",
+          "symbol": "aggregate",
+          "anchor": "e88ca0788c5f",
+          "first": "def aggregate("
+        },
+        {
+          "file": "code/wblot/stats.py",
+          "start": 43,
+          "end": 49,
+          "role": "logic",
+          "symbol": "compare_groups",
+          "anchor": "6c6ec18c6a93",
+          "first": "def compare_groups("
+        }
+      ]
+    },
+    {
+      "id": "plot-export",
+      "level": "view",
+      "parent": null,
+      "title": "Plot & Export",
+      "summary": "Builds a bar chart for one target with chosen error bars, data points, palette, fonts and physical size, and downloads the figure as PNG/TIFF/SVG/PDF plus the summary CSV and an all-data XLSX.",
+      "views": [
+        "bar chart",
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 2103,
+          "end": 2195,
+          "role": "logic",
+          "anchor": "4ce423bc4c45",
+          "first": "with tabs[5]:"
+        },
+        {
+          "file": "code/wblot/plotting.py",
+          "start": 83,
+          "end": 90,
+          "role": "logic",
+          "symbol": "bar_chart",
+          "anchor": "a0ae23f0b784",
+          "first": "def bar_chart("
+        },
+        {
+          "file": "code/wblot/plotting.py",
+          "start": 26,
+          "end": 65,
+          "role": "data",
+          "symbol": "PlotOptions",
+          "anchor": "aded634a3cb9",
+          "first": "class PlotOptions:"
+        },
+        {
+          "file": "code/wblot/excel_export.py",
+          "start": 164,
+          "end": 216,
+          "role": "logic",
+          "symbol": "dataframes_to_xlsx",
+          "anchor": "09db2bd05cdc",
+          "first": "def dataframes_to_xlsx(sheets: Mapping[str, object]) -> bytes:"
+        }
+      ]
+    }
+  ]
+}

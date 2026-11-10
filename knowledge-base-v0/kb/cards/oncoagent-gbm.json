@@ -1,0 +1,538 @@
+{
+  "schema": "astaui.card/1",
+  "id": "oncoagent-gbm",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T07:47:21Z"
+  },
+  "app": {
+    "title": "OncoAgent-GBM: compound screening, docking and redocking validation",
+    "summary": "A person pastes candidate molecules as SMILES, or picks them from a reference library, and screens them against drug-likeness and brain-penetration rules. Each molecule gets a verdict, a plot of where it falls on a simplified absorption map, and a list of structural toxicity alerts that can be checked against values copied from an external predictor. The person then loads a protein structure, chooses how the docking box is placed, and docks one ligand to get ranked poses, an interaction view and a reproducibility record. A separate redocking test checks whether the docking setup can put a crystal ligand back where it belongs. Screening tables, docking scores, poses and per-compound reports can be downloaded.",
+    "task": {
+      "text": "Screen candidate molecules against rule-based property criteria, dock promising ones into a target protein, and check that the docking setup reproduces a known pose before trusting its scores.",
+      "verbs": [
+        "derive",
+        "triage",
+        "identify",
+        "compare",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "Small molecules given as SMILES strings, and protein structures from PDB files, with docked poses and per-run docking parameters.",
+      "item": "a candidate molecule, screened on its descriptors and docked into a receptor structure",
+      "shapes": [
+        "table",
+        "sequence",
+        "judgements",
+        "versions"
+      ]
+    },
+    "stage": {
+      "text": "computational screening and docking of candidate compounds early in drug discovery, before experimental testing",
+      "terms": [
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "Tabs go in order from rule-based screening (metric tiles, a verdict box, an absorption-map scatter, an alert list) to docking (receptor and ligand form, grid-box choice, a pose table and a 3D viewer) to a redocking test whose pass or fail verdict says whether docking scores can be trusted. Each stage ends in downloads. Literature, statistics, omics and notebook tabs sit beside these.",
+      "views": [
+        "form",
+        "summary stats",
+        "scatter plot",
+        "table view",
+        "detail panel",
+        "canvas"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "toggle view",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "rubric",
+        "status pipeline",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "rule-based compound screening and structure-based molecular docking in medicinal chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "medicinal chemistry",
+        "molecular docking",
+        "cheminformatics"
+      ]
+    },
+    "workflow": {
+      "name": "screen candidates against rules, run the main computation, and validate the method before reporting",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Paste SMILES strings, one per line, or pick a compound from the formula-verified reference library, then press Execute Screening.",
+          "parts": [
+            "compound-screening"
+          ]
+        },
+        {
+          "step": "score each item against criteria",
+          "here": "Each molecule gets Lipinski, BBB-index and Veber checks with descriptor tiles and a MEETS / PARTIAL / BELOW verdict box. It is also placed on a simplified BOILED-Egg map of WLOGP against TPSA, and its structural toxicity alerts are listed.",
+          "parts": [
+            "compound-screening",
+            "boiled-egg"
+          ]
+        },
+        {
+          "step": "compare the result against an external reference",
+          "here": "Values copied from ProTox-3 (LD50, class, binary endpoints) are entered and set against the local alerts. This gives a per-endpoint agreement table and a concordance percentage.",
+          "parts": [
+            "tox-concordance"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Load a receptor by PDB ID or upload, paste one ligand SMILES, and choose how the grid box is placed: detected pocket, co-crystal ligand, residues or manual. Set exhaustiveness and seed, then run AutoDock Vina to get binding energy, ranked poses, a 3D view with contacts and H-bond candidates, and a JSON run card.",
+          "parts": [
+            "docking-setup",
+            "docking-results"
+          ]
+        },
+        {
+          "step": "check that the method reproduces a known answer",
+          "here": "Pick a bound ligand from a crystal structure and redock it with one to three seeds. Top-pose RMSD of 2.0 Å or less passes. The crystal and redocked poses are shown overlaid.",
+          "parts": [
+            "redock-validation"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download the screening CSV, per-compound PDF and Word reports, the docking CSV and PDF, all poses as CSV and PDBQT, and the run card.",
+          "parts": [
+            "report-export",
+            "docking-results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The verdict comes from fixed property rules with stated thresholds and weights (Lipinski, BBB window, Veber, structural quality), shown as a rubric table next to the input.",
+        "A rule-based toxicity screen is checked against an external predictor's values typed in by hand, and the result is reported as percent concordance.",
+        "Docking scores only count once a redocking test passes: the crystal ligand must come back within 2.0 Å RMSD across several random seeds.",
+        "Every docking run records its seed, engine version and exact command in a downloadable run card, so it can be reproduced.",
+        "The grid box can be placed in four ways (detected cavity, co-crystal ligand, listed residues, manual coordinates), and a whole-protein box is flagged as low-confidence."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "compound-screening",
+      "level": "view",
+      "parent": null,
+      "title": "Compound Screening & BBB Triage",
+      "summary": "Takes SMILES or a library pick and shows descriptor tiles, rule compliance and a coloured verdict for each molecule.",
+      "views": [
+        "form",
+        "summary stats",
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [
+        "rubric"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 463,
+          "end": 546,
+          "role": "logic",
+          "anchor": "767b7d7f5483",
+          "first": "def tab_compound_screening():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 303,
+          "end": 330,
+          "role": "style",
+          "anchor": "a163288e2d04",
+          "first": ".verdict-box {"
+        },
+        {
+          "file": "code/cheminformatics.py",
+          "start": 294,
+          "end": 331,
+          "role": "logic",
+          "symbol": "screen_compound",
+          "anchor": "6453107dbfa1",
+          "first": "def screen_compound(smiles: str) -> CompoundMetrics:"
+        },
+        {
+          "file": "code/cheminformatics.py",
+          "start": 334,
+          "end": 336,
+          "role": "logic",
+          "symbol": "batch_screen",
+          "anchor": "f2037c38ffa0",
+          "first": "def batch_screen(smiles_list: list[str]) -> list[CompoundMetrics]:"
+        },
+        {
+          "file": "code/agent_evaluator.py",
+          "start": 138,
+          "end": 234,
+          "role": "logic",
+          "symbol": "estimate_toxicity",
+          "anchor": "3d4d925f5b4c",
+          "first": "def estimate_toxicity(mol) -> ToxicityProfile:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 592,
+          "end": 627,
+          "role": "logic",
+          "anchor": "36c9bfa5e378",
+          "first": "if results:"
+        }
+      ]
+    },
+    {
+      "id": "boiled-egg",
+      "level": "component",
+      "parent": "compound-screening",
+      "title": "BOILED-Egg absorption map",
+      "summary": "Plots each molecule on WLOGP against TPSA, with rectangular absorption and brain-penetration zones, and names the region it falls in.",
+      "views": [
+        "scatter plot",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 547,
+          "end": 591,
+          "role": "logic",
+          "anchor": "df64341d3984",
+          "first": "if results:"
+        },
+        {
+          "file": "code/admet.py",
+          "start": 51,
+          "end": 82,
+          "role": "logic",
+          "symbol": "compute_admet",
+          "anchor": "36c865adab0f",
+          "first": "def compute_admet(smiles: str) -> AdmetResult:"
+        },
+        {
+          "file": "code/admet.py",
+          "start": 85,
+          "end": 123,
+          "role": "logic",
+          "symbol": "boiled_egg_png",
+          "anchor": "beae4ca4b3d2",
+          "first": "def boiled_egg_png(result: AdmetResult) -> Optional[bytes]:"
+        }
+      ]
+    },
+    {
+      "id": "tox-concordance",
+      "level": "component",
+      "parent": "compound-screening",
+      "title": "Validate against ProTox-3",
+      "summary": "Takes values copied from ProTox-3 and shows how often the local alert screen agrees with them, endpoint by endpoint.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "agreement summary"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 628,
+          "end": 672,
+          "role": "logic",
+          "anchor": "055eba26096b",
+          "first": "if tox_profiles:"
+        },
+        {
+          "file": "code/agent_evaluator.py",
+          "start": 237,
+          "end": 330,
+          "role": "logic",
+          "symbol": "compare_with_protox",
+          "anchor": "8ed222d5e897",
+          "first": "def compare_with_protox(profile: ToxicityProfile, protox: dict) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "docking-setup",
+      "level": "view",
+      "parent": null,
+      "title": "Targeted Molecular Docking setup",
+      "summary": "Loads a receptor, takes one ligand SMILES, places the grid box by one of four methods and sets the Vina search parameters and seed.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 833,
+          "end": 1078,
+          "role": "logic",
+          "anchor": "c705626f80cf",
+          "first": "def tab_docking():"
+        },
+        {
+          "file": "code/docking_engine.py",
+          "start": 90,
+          "end": 103,
+          "role": "logic",
+          "symbol": "fetch_pdb_from_rcsb",
+          "anchor": "ed8977dd7202",
+          "first": "def fetch_pdb_from_rcsb(pdb_id: str, output_dir: str) -> str:"
+        },
+        {
+          "file": "code/docking_engine.py",
+          "start": 393,
+          "end": 459,
+          "role": "logic",
+          "symbol": "detect_pocket_grid",
+          "anchor": "450400741c6d",
+          "first": "def detect_pocket_grid(pdb_path: str, padding: float = 6.0) -> tuple:"
+        },
+        {
+          "file": "code/docking_engine.py",
+          "start": 177,
+          "end": 204,
+          "role": "logic",
+          "symbol": "compute_grid_from_ligand",
+          "anchor": "05d71e21bae5",
+          "first": "def compute_grid_from_ligand(ligand_pdb_text: str, padding: float = 10.0) -> GridBox:"
+        },
+        {
+          "file": "code/docking_engine.py",
+          "start": 207,
+          "end": 211,
+          "role": "logic",
+          "symbol": "compute_grid_from_residues",
+          "anchor": "b942e233bd6a",
+          "first": "def compute_grid_from_residues("
+        }
+      ]
+    },
+    {
+      "id": "docking-results",
+      "level": "component",
+      "parent": "docking-setup",
+      "title": "Docking results and 3D view",
+      "summary": "Shows binding energy, the pose ranking table, a reproducibility run card and a 3D receptor-ligand view with pocket contacts and H-bond candidates.",
+      "views": [
+        "summary stats",
+        "table view",
+        "canvas"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1079,
+          "end": 1170,
+          "role": "logic",
+          "anchor": "51e329eb0f01",
+          "first": "with st.spinner(\"Running docking...\"):"
+        },
+        {
+          "file": "code/docking_engine.py",
+          "start": 690,
+          "end": 698,
+          "role": "logic",
+          "symbol": "run_vina_docking",
+          "anchor": "b31a1964d75a",
+          "first": "def run_vina_docking("
+        },
+        {
+          "file": "code/viewer3d.py",
+          "start": 101,
+          "end": 105,
+          "role": "logic",
+          "symbol": "build_viewer_html",
+          "anchor": "eca9633a6b7a",
+          "first": "def build_viewer_html(receptor_pdb: str, pdbqt_poses_text: str, grid: dict | None = None,"
+        },
+        {
+          "file": "code/viewer3d.py",
+          "start": 15,
+          "end": 29,
+          "role": "logic",
+          "symbol": "prepare_payload",
+          "anchor": "7a99ed26c7e2",
+          "first": "def prepare_payload(receptor_pdb: str, pdbqt_poses_text: str, grid: dict | None = None,"
+        },
+        {
+          "file": "code/runcard.py",
+          "start": 36,
+          "end": 56,
+          "role": "logic",
+          "symbol": "build_runcard",
+          "anchor": "f916352561cf",
+          "first": "def build_runcard(kind: str, inputs: dict, parameters: dict | None = None,"
+        }
+      ]
+    },
+    {
+      "id": "redock-validation",
+      "level": "view",
+      "parent": null,
+      "title": "Docking validation: redocking test",
+      "summary": "Redocks a crystal ligand over several seeds and gives a PASS / PARTIAL / FAIL verdict from top-pose RMSD, with the crystal and docked poses overlaid.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view",
+        "canvas"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 2419,
+          "end": 2512,
+          "role": "logic",
+          "symbol": "tab_validation",
+          "anchor": "dafe6cbf93ca",
+          "first": "def tab_validation():"
+        },
+        {
+          "file": "code/redock_auto.py",
+          "start": 21,
+          "end": 34,
+          "role": "logic",
+          "symbol": "list_ligands",
+          "anchor": "40ab4ca2c6a4",
+          "first": "def list_ligands(pdb_text: str, min_heavy: int = 6) -> list:"
+        },
+        {
+          "file": "code/redock_auto.py",
+          "start": 50,
+          "end": 98,
+          "role": "logic",
+          "symbol": "run_redock",
+          "anchor": "5949b6a51c10",
+          "first": "def run_redock(pdb_text: str, resname: str, chain: str, resseq: int, seeds=(42, 7, 11),"
+        },
+        {
+          "file": "code/validation.py",
+          "start": 74,
+          "end": 105,
+          "role": "logic",
+          "symbol": "redock_rmsd",
+          "anchor": "2075cb74a692",
+          "first": "def redock_rmsd(reference_block: str, docked_pose_block: str) -> RMSDResult:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 2365,
+          "end": 2416,
+          "role": "logic",
+          "symbol": "_manual_validation",
+          "anchor": "ea77b1271344",
+          "first": "def _manual_validation():"
+        }
+      ]
+    },
+    {
+      "id": "report-export",
+      "level": "component",
+      "parent": "compound-screening",
+      "title": "Export Reports",
+      "summary": "Downloads the screening table as CSV and a PDF or Word report for each compound, and the docking scores and poses as CSV, PDF and PDBQT.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 673,
+          "end": 719,
+          "role": "logic",
+          "anchor": "f6d3a27afc21",
+          "first": "st.markdown(\"---\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1172,
+          "end": 1207,
+          "role": "logic",
+          "anchor": "6875999502ae",
+          "first": "st.markdown(\"---\")"
+        },
+        {
+          "file": "code/cheminformatics.py",
+          "start": 344,
+          "end": 365,
+          "role": "logic",
+          "symbol": "export_results_csv_rows",
+          "anchor": "e9a44a32e843",
+          "first": "def export_results_csv_rows(results: list[CompoundMetrics]) -> list[dict]:"
+        },
+        {
+          "file": "code/agent_evaluator.py",
+          "start": 790,
+          "end": 812,
+          "role": "logic",
+          "symbol": "generate_pdf_report",
+          "anchor": "346aae6bb742",
+          "first": "def generate_pdf_report(eval_result: LeadEvaluation) -> bytes:"
+        },
+        {
+          "file": "code/agent_evaluator.py",
+          "start": 925,
+          "end": 930,
+          "role": "logic",
+          "symbol": "generate_docx_report",
+          "anchor": "414d7d3d76b9",
+          "first": "def generate_docx_report(eval_result: LeadEvaluation) -> bytes:"
+        }
+      ]
+    }
+  ]
+}

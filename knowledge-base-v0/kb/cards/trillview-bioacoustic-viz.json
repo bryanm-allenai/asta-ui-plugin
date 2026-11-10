@@ -1,0 +1,711 @@
+{
+  "schema": "astaui.card/1",
+  "id": "trillview-bioacoustic-viz",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T17:25:16Z"
+  },
+  "app": {
+    "title": "Trill View (TrillView + Spec View)",
+    "summary": "A person loads a CSV of a sound classifier's predictions. Each sound frame is a point at 2D coordinates, coloured and shaped by its class. They pan and zoom the scatter, hide classes from the legend, hover a point to see its spectrogram, and click it to hear the clip. With the box or lasso tool they select points and append those frames to a saved CSV. A second page then shows the saved frames as pages of spectrogram cards, each with an audio player and a moving playhead, where the person corrects each frame's label and writes the edited labels out to a CSV.",
+    "task": {
+      "text": "Explore where a classifier placed each sound frame, pick out the frames that look wrong or interesting, listen to them and correct their labels.",
+      "verbs": [
+        "explore",
+        "identify",
+        "review",
+        "clean",
+        "annotate"
+      ]
+    },
+    "data": {
+      "text": "A table of audio frames, one row each, with source recording, start and end time, true class, predicted class and score, and 2D coordinates computed from the class probabilities. The audio is loaded on demand to draw spectrograms and play clips.",
+      "item": "a short time window (frame) of an audio recording, with its true and predicted class",
+      "shapes": [
+        "table",
+        "media",
+        "judgements",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "reviewing a trained sound classifier's predictions, and correcting frame labels, after inference",
+      "terms": [
+        "review",
+        "explore",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A scatter plot of every frame is the overview: hovering a point shows its spectrogram in a tooltip, clicking plays the clip, and a box or lasso selection saves frames to a shared CSV. The second page reads that CSV and lays the frames out as pages of spectrogram cards with audio players, a playhead that follows playback, and label fields you can edit.",
+      "views": [
+        "scatter plot",
+        "heatmap",
+        "small multiples",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "hover for detail",
+        "select",
+        "multi-select",
+        "brush",
+        "zoom and pan",
+        "filter",
+        "toggle view",
+        "inline edit",
+        "keyboard shortcuts",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "small multiples"
+      ]
+    },
+    "field": {
+      "text": "evaluating sound-classifier predictions in bioacoustics",
+      "disciplines": [
+        "ecology"
+      ],
+      "terms": [
+        "bioacoustics",
+        "model evaluation",
+        "spectrogram"
+      ]
+    },
+    "workflow": {
+      "name": "select items from a 2D projection, inspect each, and correct their labels",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drag and drop a .csv or .csv.zst of frames with x, y, file path, timestamps and classes. Each class becomes one legend trace with its own colour and marker.",
+          "parts": [
+            "scatter-view"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Pan and zoom a scatter of all frames placed by their radial coordinates. Clicking a legend entry hides that class, and double-clicking isolates it.",
+          "parts": [
+            "scatter-view"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "After a short pause, hovering a point shows a mel or STFT spectrogram (n_fft is selectable) with the true and predicted class, score, file and time range. Clicking the point plays the clip.",
+          "parts": [
+            "hover-spectrogram",
+            "click-playback"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Box or lasso select a group of points. The button counts the selected markers, and each press appends those frames to the saved CSV.",
+          "parts": [
+            "selection-saver"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "Spec View pages through the saved frames as a grid of spectrogram cards. Columns and frames per page are set from dropdowns, and arrow or PageUp/PageDown keys turn pages. Each card has an audio player, and a red playhead moves across the spectrogram during playback.",
+          "parts": [
+            "spec-grid",
+            "pagination",
+            "playhead"
+          ]
+        },
+        {
+          "step": "apply a label to each item",
+          "here": "Clicking a card's label, pencil or spectrogram opens a text field. ✓ or Enter saves the new label, and ✕ cancels.",
+          "parts": [
+            "label-editor"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Save labels to CSV' writes every frame with an added edited_label column.",
+          "parts": [
+            "label-editor"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Classes are laid out at fixed points on a circle, and each frame is placed by its class probabilities, so a frame's distance and direction from its class show the model's confidence and confusion.",
+        "Spectrograms are computed live from the source audio, with a choice of mel or linear STFT and the FFT window size, on a fixed dB scale with one shared colour bar.",
+        "A playhead line follows audio playback across each spectrogram card.",
+        "Selections from the scatter build up across saves in one shared CSV, which the detail page then reads."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "scatter-view",
+      "level": "view",
+      "parent": null,
+      "title": "Prediction scatter",
+      "summary": "Loads the predictions file and draws every frame as a point at its 2D coordinates, with one legend trace per class to hide or isolate.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "filter"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 152,
+          "end": 208,
+          "role": "markup",
+          "anchor": "4678e5621642",
+          "first": "layout = html.Div("
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 218,
+          "end": 221,
+          "role": "logic",
+          "symbol": "save_upload",
+          "anchor": "2ea66a8af489",
+          "first": "def save_upload(contents, filename):"
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 50,
+          "end": 84,
+          "role": "logic",
+          "symbol": "get_df",
+          "anchor": "e68939726e36",
+          "first": "def get_df(contents, file_name):"
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 234,
+          "end": 269,
+          "role": "logic",
+          "symbol": "change_df_trill",
+          "anchor": "55d6be02ce8e",
+          "first": "def change_df_trill(pathname,data):"
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 30,
+          "end": 46,
+          "role": "data",
+          "anchor": "8fbe91c809f2",
+          "first": "df_column_to_display = 'sps' ## select the column name to display in legend"
+        }
+      ]
+    },
+    {
+      "id": "hover-spectrogram",
+      "level": "component",
+      "parent": "scatter-view",
+      "title": "Hover spectrogram tooltip",
+      "summary": "After a short hover, shows the frame's spectrogram and its true and predicted class, score, file and timestamps, with the spectrogram type and n_fft taken from the dropdowns.",
+      "views": [
+        "heatmap"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 170,
+          "end": 183,
+          "role": "markup",
+          "anchor": "c870cb341a12",
+          "first": "html.Span('Spec. type:', id='text_mel',"
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 197,
+          "end": 197,
+          "role": "markup",
+          "anchor": "1d3eacb2944e",
+          "first": "dcc.Tooltip(id=\"graph_tooltip_name_trill\", direction='bottom'),"
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 275,
+          "end": 294,
+          "role": "logic",
+          "anchor": "912d15797058",
+          "first": "clientside_callback("
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 310,
+          "end": 341,
+          "role": "logic",
+          "symbol": "fig_func_trill",
+          "anchor": "dfe8c0d502cc",
+          "first": "def fig_func_trill(hoverData, spec_type, n_fft_sel, df_store_trill, df_sel):"
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 114,
+          "end": 134,
+          "role": "logic",
+          "symbol": "file_to_spec",
+          "anchor": "723c3684514c",
+          "first": "def file_to_spec(df_hover, spec_type, n_fft_sel):"
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 86,
+          "end": 112,
+          "role": "logic",
+          "symbol": "df_to_text",
+          "anchor": "68517296af11",
+          "first": "def df_to_text(df_hover, df_column_to_display):"
+        }
+      ]
+    },
+    {
+      "id": "click-playback",
+      "level": "component",
+      "parent": "scatter-view",
+      "title": "Click to listen",
+      "summary": "Clicking a point plays its audio clip and shows it as the last clicked frame.",
+      "views": [],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 156,
+          "end": 157,
+          "role": "markup",
+          "anchor": "9342db31af18",
+          "first": "html.Audio(id='audio_player_trill', controls=False, autoPlay=False,"
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 356,
+          "end": 384,
+          "role": "logic",
+          "symbol": "clicks_funct_trill",
+          "anchor": "15d47e7f166a",
+          "first": "def clicks_funct_trill(graph_click, df_store_trill, df_sel, dataset_choice):"
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 136,
+          "end": 143,
+          "role": "logic",
+          "symbol": "file_to_base64",
+          "anchor": "9bbffbea5af4",
+          "first": "def file_to_base64(df_hover):"
+        }
+      ]
+    },
+    {
+      "id": "selection-saver",
+      "level": "component",
+      "parent": "scatter-view",
+      "title": "Save selected frames",
+      "summary": "Counts the points picked with the box or lasso tool and appends those frames to the shared CSV for the detail page.",
+      "views": [],
+      "interactions": [
+        "brush",
+        "multi-select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 184,
+          "end": 189,
+          "role": "markup",
+          "anchor": "a5560dc12d40",
+          "first": "html.Button(id='button1_trill', children='No selections to save',"
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 389,
+          "end": 404,
+          "role": "logic",
+          "anchor": "005065adb954",
+          "first": "clientside_callback("
+        },
+        {
+          "file": "code/pages/trill_view.py",
+          "start": 420,
+          "end": 463,
+          "role": "logic",
+          "symbol": "save_selected_data_trill",
+          "anchor": "94e286396e6c",
+          "first": "def save_selected_data_trill(button_click, select_data, df_store_trill,"
+        }
+      ]
+    },
+    {
+      "id": "spec-grid",
+      "level": "view",
+      "parent": null,
+      "title": "Spectrogram card grid",
+      "summary": "Reads the saved frames and shows one page of them as spectrogram cards with a shared dB colour bar, a total count, and controls for spectrogram type, n_fft, columns and frames per page.",
+      "views": [
+        "small multiples",
+        "heatmap",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 550,
+          "end": 648,
+          "role": "markup",
+          "symbol": "layout",
+          "anchor": "616af465e95e",
+          "first": "def layout():"
+        },
+        {
+          "file": "code/assets/styles.css",
+          "start": 32,
+          "end": 32,
+          "role": "style",
+          "symbol": ".spec-row",
+          "anchor": "ec4897a0eb2f",
+          "first": ".spec-row { display:grid; gap:var(--gap); margin-bottom:var(--gap); }"
+        },
+        {
+          "file": "code/assets/styles.css",
+          "start": 33,
+          "end": 33,
+          "role": "style",
+          "symbol": ".spec-card",
+          "anchor": "870911af3211",
+          "first": ".spec-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; tr"
+        },
+        {
+          "file": "code/assets/styles.css",
+          "start": 13,
+          "end": 13,
+          "role": "style",
+          "symbol": ".app-header",
+          "anchor": "00c2bf2cc807",
+          "first": ".app-header { display:flex; align-items:center; gap:0; padding:0 20px; height:58px; border-bottom:2px solid var(--border"
+        },
+        {
+          "file": "code/assets/styles.css",
+          "start": 54,
+          "end": 54,
+          "role": "style",
+          "symbol": ".card-footer",
+          "anchor": "d96717388898",
+          "first": ".card-footer { display:flex; align-items:center; padding:4px 8px 5px; gap:8px; border-top:1px solid var(--border); backg"
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 667,
+          "end": 689,
+          "role": "logic",
+          "symbol": "load_csv",
+          "anchor": "c2eaff247a6a",
+          "first": "def load_csv(csv_path):"
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 697,
+          "end": 698,
+          "role": "logic",
+          "symbol": "sync_params",
+          "anchor": "adf163821165",
+          "first": "def sync_params(spec_type, n_fft):"
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 710,
+          "end": 717,
+          "role": "logic",
+          "symbol": "sync_cpp",
+          "anchor": "aab362d0efb1",
+          "first": "def sync_cpp(stored, selected):"
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 728,
+          "end": 735,
+          "role": "logic",
+          "symbol": "sync_cols",
+          "anchor": "59e6c4a20008",
+          "first": "def sync_cols(stored, selected):"
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 773,
+          "end": 791,
+          "role": "logic",
+          "symbol": "render_page",
+          "anchor": "bfbe42f2b4f3",
+          "first": "def render_page(page, label_store, cpp, cols, params, stored_data):"
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 313,
+          "end": 319,
+          "role": "logic",
+          "symbol": "make_page_grid",
+          "anchor": "9e6f99a61adb",
+          "first": "def make_page_grid("
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 230,
+          "end": 239,
+          "role": "logic",
+          "symbol": "make_card",
+          "anchor": "cf998073ac93",
+          "first": "def make_card("
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 96,
+          "end": 101,
+          "role": "logic",
+          "symbol": "build_spectrogram_figure",
+          "anchor": "61e6b02f0d10",
+          "first": "def build_spectrogram_figure("
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 161,
+          "end": 202,
+          "role": "logic",
+          "symbol": "build_colorbar_figure",
+          "anchor": "6d3834c83e71",
+          "first": "def build_colorbar_figure() -> go.Figure:"
+        }
+      ]
+    },
+    {
+      "id": "pagination",
+      "level": "component",
+      "parent": "spec-grid",
+      "title": "Page navigation",
+      "summary": "Prev and Next buttons with a page counter, also driven by the arrow and PageUp/PageDown keys.",
+      "views": [],
+      "interactions": [
+        "keyboard shortcuts"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 359,
+          "end": 378,
+          "role": "logic",
+          "symbol": "make_pagination",
+          "anchor": "04ccc6925a2d",
+          "first": "def make_pagination(current_page: int, n_pages: int,"
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 750,
+          "end": 758,
+          "role": "logic",
+          "symbol": "handle_page_nav",
+          "anchor": "fa99f4a243cc",
+          "first": "def handle_page_nav(prev_clicks, next_clicks, stored_data, current_page, cpp):"
+        },
+        {
+          "file": "code/assets/custom.js",
+          "start": 67,
+          "end": 77,
+          "role": "logic",
+          "anchor": "8728210e4c73",
+          "first": "document.addEventListener('keydown', function (e) {"
+        },
+        {
+          "file": "code/assets/styles.css",
+          "start": 60,
+          "end": 60,
+          "role": "style",
+          "symbol": ".pagination-bar",
+          "anchor": "a0af67f07c01",
+          "first": ".pagination-bar { display:flex; align-items:center; justify-content:center; gap:14px; padding:10px 20px 16px; }"
+        },
+        {
+          "file": "code/assets/styles.css",
+          "start": 61,
+          "end": 61,
+          "role": "style",
+          "symbol": ".page-btn",
+          "anchor": "4e917b9f66a0",
+          "first": ".page-btn { background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:5px; padding:6px"
+        }
+      ]
+    },
+    {
+      "id": "playhead",
+      "level": "component",
+      "parent": "spec-grid",
+      "title": "Audio player with playhead",
+      "summary": "Plays each card's clip and draws a moving red line on its spectrogram at the current playback time.",
+      "views": [],
+      "interactions": [],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 209,
+          "end": 223,
+          "role": "logic",
+          "symbol": "clip_to_audio_src",
+          "anchor": "2e273c8e113d",
+          "first": "def clip_to_audio_src(filepath: str, start: float, end: float) -> str:"
+        },
+        {
+          "file": "code/assets/custom.js",
+          "start": 19,
+          "end": 32,
+          "role": "logic",
+          "symbol": "setPlayhead",
+          "anchor": "d0731a24c3a1",
+          "first": "function setPlayhead(idx, xVal) {"
+        },
+        {
+          "file": "code/assets/custom.js",
+          "start": 34,
+          "end": 48,
+          "role": "logic",
+          "symbol": "attachAudio",
+          "anchor": "dd651c3f427f",
+          "first": "function attachAudio(audio) {"
+        },
+        {
+          "file": "code/assets/custom.js",
+          "start": 50,
+          "end": 52,
+          "role": "logic",
+          "symbol": "scanAudio",
+          "anchor": "f2c825d0167d",
+          "first": "function scanAudio() {"
+        },
+        {
+          "file": "code/assets/custom.js",
+          "start": 54,
+          "end": 65,
+          "role": "logic",
+          "anchor": "188f16bfde8e",
+          "first": "new MutationObserver(function (mutations) {"
+        },
+        {
+          "file": "code/assets/styles.css",
+          "start": 55,
+          "end": 55,
+          "role": "style",
+          "symbol": ".audio-player",
+          "anchor": "68f3d62f5410",
+          "first": ".audio-player { height:26px; flex:1; min-width:0; }"
+        }
+      ]
+    },
+    {
+      "id": "label-editor",
+      "level": "component",
+      "parent": "spec-grid",
+      "title": "Label editing and CSV save",
+      "summary": "Lets the person retype a frame's label in place and saves every frame with its edited label to a CSV.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 809,
+          "end": 816,
+          "role": "logic",
+          "symbol": "toggle_edit_mode",
+          "anchor": "6f58f0691f79",
+          "first": "def toggle_edit_mode(_e, _lt, _c, _s, _ns, _click, current_text):"
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 831,
+          "end": 850,
+          "role": "logic",
+          "symbol": "save_label",
+          "anchor": "62efc2fa1df7",
+          "first": "def save_label(_saves, _submits, input_values, input_ids, store):"
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 862,
+          "end": 874,
+          "role": "logic",
+          "symbol": "save_to_csv",
+          "anchor": "3e66298c24e0",
+          "first": "def save_to_csv(n_clicks, stored_data, label_store):"
+        },
+        {
+          "file": "code/pages/spec_view.py",
+          "start": 638,
+          "end": 648,
+          "role": "markup",
+          "anchor": "5c1455f32ffb",
+          "first": "html.Div(["
+        },
+        {
+          "file": "code/assets/styles.css",
+          "start": 39,
+          "end": 39,
+          "role": "style",
+          "symbol": ".label-text-btn",
+          "anchor": "3bb9594d8728",
+          "first": ".label-text-btn { background:transparent; border:none; color:var(--text); font-size:14px; font-weight:600; font-family:i"
+        },
+        {
+          "file": "code/assets/styles.css",
+          "start": 42,
+          "end": 42,
+          "role": "style",
+          "symbol": ".label-input",
+          "anchor": "2d420e7258cd",
+          "first": ".label-input { flex:1; background:var(--bg); border:1px solid var(--accent); border-radius:4px; color:var(--text); font-"
+        },
+        {
+          "file": "code/assets/styles.css",
+          "start": 67,
+          "end": 67,
+          "role": "style",
+          "symbol": ".save-btn-main",
+          "anchor": "e419048f3391",
+          "first": ".save-btn-main { background:var(--accent2); border:none; color:#fff; border-radius:5px; padding:7px 18px; font-size:14px"
+        }
+      ]
+    }
+  ]
+}

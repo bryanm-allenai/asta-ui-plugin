@@ -1,0 +1,557 @@
+{
+  "schema": "astaui.card/1",
+  "id": "labbridge-qc",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T07:10:31Z"
+  },
+  "app": {
+    "title": "LabBridge",
+    "summary": "A person loads a plate-reader export, or a bundled sample. The interface detects the file layout and shows the raw table. Next they review a proposed mapping of each raw column to a standard schema, where every column has a confidence score and a colour (auto, needs review, unmapped), and they confirm or change each one. Quality checks then run, and the person sees a plate heatmap with flagged wells marked next to a table that gives each flag a severity and a reason. A validation step fits a standard curve, back-calculates sample concentrations, scores replicate agreement and charts positive-control history against Westgard limits, and ends in a pass, review or fail verdict. Finally the person checks every normalized value before and after, and downloads the clean dataset, a quality summary and the transformation log.",
+    "task": {
+      "text": "Turn a messy instrument export into a standardized, quality-flagged dataset and decide whether it is fit for analysis.",
+      "verbs": [
+        "clean",
+        "derive",
+        "identify",
+        "decide",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A long-format plate-reader export with one reading per well (well role, sample, analyte, value, unit, replicate, expected concentration), plus a history of control readings across runs and a log of every change and flag.",
+      "item": "a well on a 96-well plate",
+      "shapes": [
+        "table",
+        "per element",
+        "time series",
+        "events"
+      ]
+    },
+    "stage": {
+      "text": "cleaning and validating raw plate-reader exports before downstream analysis",
+      "terms": [
+        "clean",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "A six-step wizard with a progress stepper moves from upload to export, and each step needs the one before it: the checks run only once the column mapping is confirmed. The QC step shows a plate heatmap with flag markers beside a flag table sorted by severity. The validation step uses tabs for the curve fit, replicate CV bars, a Levey-Jennings control chart and a verdict banner.",
+      "views": [
+        "table view",
+        "form",
+        "heatmap",
+        "fixed-layout grid",
+        "scatter plot",
+        "bar chart",
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "hover for detail",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "step by step wizard",
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "plate-reader assay quality control with standard curves and Westgard rules",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "laboratory quality control",
+        "plate reader assays",
+        "levey jennings"
+      ]
+    },
+    "workflow": {
+      "name": "turn a raw instrument export into a validated, quality-checked dataset",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drop a CSV or Excel export, or click Load sample plate export. The interface detects long or grid layout and shows the raw table with row and column counts.",
+          "parts": [
+            "upload"
+          ]
+        },
+        {
+          "step": "match raw columns to a standard schema, confirming the uncertain ones",
+          "here": "Each raw column gets a proposed canonical field, a confidence badge and a reason (exact, synonym, fuzzy or content match). A dropdown per column lets the person confirm or change it, and Confirm mapping & run quality checks runs the pipeline.",
+          "parts": [
+            "mapping"
+          ]
+        },
+        {
+          "step": "flag problems in each item, with a reason",
+          "here": "Metrics show rows in and out, number of flags, errors, warnings and whether the data is ML-ready. A plate heatmap on a log colour scale marks flagged wells with triangles, beside a table of flags sorted by severity, each with its well, rule and reason.",
+          "parts": [
+            "qc-review",
+            "plate-map"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Tabs fit a linear standard curve (R², slope, acceptance) and back-calculate sample concentrations with 95% CIs. They also chart replicate CV per sample against a fail line and plot positive-control runs against mean ±2/3 SD limits, with Westgard violations marked.",
+          "parts": [
+            "qc-intel",
+            "control-chart"
+          ]
+        },
+        {
+          "step": "decide whether the data is fit for use",
+          "here": "A PASS, REVIEW or FAIL banner, with one reason line each for the curve, replicates, outliers and control drift.",
+          "parts": [
+            "qc-intel"
+          ]
+        },
+        {
+          "step": "keep a record of changes",
+          "here": "A before → after table of every normalized value (unit conversion, decimal comma, embedded unit, date, well coordinate, control spelling), with a toggle to show all of them, then the full clean table with a per-row qc_flag column.",
+          "parts": [
+            "clean-preview"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download buttons for the clean dataset (CSV), the data-quality summary (Markdown) and the transformation log (JSON). The summary renders inline and the log appears as a table.",
+          "parts": [
+            "export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Column-to-schema mapping is explainable: each proposal carries a confidence score and the signal that produced it. Low-confidence matches wait for a human decision, and contested targets are resolved automatically.",
+        "Wells sit on a fixed 8×12 plate layout, so flagged readings are shown where they are on the plate, not just listed.",
+        "Control readings are tracked across past runs on a Levey-Jennings chart with Westgard rules (1_3s, 2_2s, shift), which catches reagent drift that checks on a single run miss.",
+        "Outliers are found with a robust median/MAD z-score, and replicate agreement is judged by coefficient of variation within each sample.",
+        "Nothing changes silently: every normalization and flag is written to an audit log that is exported with the data."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "upload",
+      "level": "view",
+      "parent": null,
+      "title": "Upload",
+      "summary": "Loads an instrument export or the bundled sample, detects its layout and shows the raw table unchanged.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [
+        "step by step wizard"
+      ],
+      "spans": [
+        {
+          "file": "code/labbridge/app.py",
+          "start": 94,
+          "end": 132,
+          "role": "markup",
+          "symbol": "step_upload",
+          "anchor": "fe357c9af277",
+          "first": "def step_upload() -> None:"
+        },
+        {
+          "file": "code/labbridge/app.py",
+          "start": 78,
+          "end": 88,
+          "role": "logic",
+          "symbol": "_load_source",
+          "anchor": "c3f6012f5fc7",
+          "first": "def _load_source(path: Path, name: str) -> None:"
+        },
+        {
+          "file": "code/labbridge/core/parsers.py",
+          "start": 87,
+          "end": 103,
+          "role": "logic",
+          "symbol": "load_table",
+          "anchor": "ba4aa1ab73f3",
+          "first": "def load_table(path: str | Path) -> tuple[pd.DataFrame, Layout]:"
+        },
+        {
+          "file": "code/labbridge/core/parsers.py",
+          "start": 31,
+          "end": 58,
+          "role": "logic",
+          "symbol": "detect_layout",
+          "anchor": "181633836dd6",
+          "first": "def detect_layout(df: pd.DataFrame) -> Layout:"
+        }
+      ]
+    },
+    {
+      "id": "mapping",
+      "level": "view",
+      "parent": null,
+      "title": "Schema mapping",
+      "summary": "Lists every raw column with its proposed canonical field, confidence badge and reason, plus a dropdown to confirm or override it before the checks run.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [
+        "step by step wizard"
+      ],
+      "spans": [
+        {
+          "file": "code/labbridge/app.py",
+          "start": 135,
+          "end": 195,
+          "role": "markup",
+          "symbol": "step_mapping",
+          "anchor": "47fe821944f2",
+          "first": "def step_mapping() -> None:"
+        },
+        {
+          "file": "code/labbridge/app.py",
+          "start": 48,
+          "end": 53,
+          "role": "data",
+          "anchor": "59c953a29771",
+          "first": "UNMAPPED = \"— leave unmapped —\""
+        },
+        {
+          "file": "code/labbridge/core/mapping.py",
+          "start": 127,
+          "end": 161,
+          "role": "logic",
+          "symbol": "propose_mappings",
+          "anchor": "6b82c71522bb",
+          "first": "def propose_mappings(df: pd.DataFrame) -> list[ColumnMapping]:"
+        },
+        {
+          "file": "code/labbridge/core/mapping.py",
+          "start": 214,
+          "end": 223,
+          "role": "logic",
+          "symbol": "apply_override",
+          "anchor": "122fc9963633",
+          "first": "def apply_override(mapping: ColumnMapping, target_field: Optional[str]) -> ColumnMapping:"
+        },
+        {
+          "file": "code/labbridge/core/schema.py",
+          "start": 100,
+          "end": 171,
+          "role": "data",
+          "anchor": "8c4f1b58c78b",
+          "first": "# --- The canonical schema ---------------------------------------------------"
+        }
+      ]
+    },
+    {
+      "id": "qc-review",
+      "level": "view",
+      "parent": null,
+      "title": "Data QC",
+      "summary": "Shows summary metrics for the run, and a table of flagged wells sorted by severity in which each flag says which well and why.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/labbridge/app.py",
+          "start": 215,
+          "end": 228,
+          "role": "markup",
+          "anchor": "6f417b72fcc3",
+          "first": "def step_qc() -> None:"
+        },
+        {
+          "file": "code/labbridge/app.py",
+          "start": 256,
+          "end": 288,
+          "role": "markup",
+          "anchor": "7b40cd955d8e",
+          "first": "with right:"
+        },
+        {
+          "file": "code/labbridge/core/qc.py",
+          "start": 37,
+          "end": 46,
+          "role": "logic",
+          "symbol": "run_qc",
+          "anchor": "689ae4443261",
+          "first": "def run_qc(df: pd.DataFrame, audit: AuditLog) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/labbridge/core/normalize.py",
+          "start": 86,
+          "end": 194,
+          "role": "logic",
+          "symbol": "normalize_frame",
+          "anchor": "0c6ce0fd963d",
+          "first": "def normalize_frame(df: pd.DataFrame, audit: AuditLog) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "plate-map",
+      "level": "component",
+      "parent": "qc-review",
+      "title": "Plate map",
+      "summary": "Draws the 96-well plate as a heatmap on a log colour scale, marks flagged wells with triangles and shows each well's details on hover.",
+      "views": [
+        "heatmap",
+        "fixed-layout grid"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/labbridge/app.py",
+          "start": 198,
+          "end": 212,
+          "role": "logic",
+          "symbol": "_plate_frame",
+          "anchor": "b8ac13c9def1",
+          "first": "def _plate_frame(clean: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/labbridge/app.py",
+          "start": 229,
+          "end": 254,
+          "role": "markup",
+          "anchor": "d737a7aee6ef",
+          "first": "with left:"
+        }
+      ]
+    },
+    {
+      "id": "qc-intel",
+      "level": "view",
+      "parent": null,
+      "title": "QC Intelligence",
+      "summary": "In tabs, fits the standard curve and back-calculates sample concentrations, charts replicate CV per sample, and gives an overall PASS, REVIEW or FAIL verdict with reasons.",
+      "views": [
+        "scatter plot",
+        "bar chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/labbridge/app.py",
+          "start": 291,
+          "end": 373,
+          "role": "markup",
+          "anchor": "bf4521b33cff",
+          "first": "VERDICT_STYLE = {"
+        },
+        {
+          "file": "code/labbridge/app.py",
+          "start": 409,
+          "end": 422,
+          "role": "markup",
+          "anchor": "d8ee353b0f1c",
+          "first": "# --- fitness verdict ---------------------------------------------------"
+        },
+        {
+          "file": "code/labbridge/core/qc_intel.py",
+          "start": 50,
+          "end": 72,
+          "role": "logic",
+          "symbol": "fit_standard_curve",
+          "anchor": "b670784620d9",
+          "first": "def fit_standard_curve(clean: pd.DataFrame) -> Optional[CurveFit]:"
+        },
+        {
+          "file": "code/labbridge/core/qc_intel.py",
+          "start": 75,
+          "end": 94,
+          "role": "logic",
+          "symbol": "backcalculate",
+          "anchor": "d2cd4a0fc921",
+          "first": "def backcalculate(clean: pd.DataFrame, curve: Optional[CurveFit]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/labbridge/core/qc_intel.py",
+          "start": 98,
+          "end": 116,
+          "role": "logic",
+          "symbol": "replicate_reliability",
+          "anchor": "c0e9738f8008",
+          "first": "def replicate_reliability(clean: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/labbridge/core/qc_intel.py",
+          "start": 120,
+          "end": 141,
+          "role": "logic",
+          "symbol": "detect_anomalies",
+          "anchor": "5ae4026a9644",
+          "first": "def detect_anomalies(clean: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/labbridge/core/qc_intel.py",
+          "start": 200,
+          "end": 229,
+          "role": "logic",
+          "symbol": "assess_fitness",
+          "anchor": "197496324323",
+          "first": "def assess_fitness(curve: Optional[CurveFit], reps: pd.DataFrame,"
+        }
+      ]
+    },
+    {
+      "id": "control-chart",
+      "level": "component",
+      "parent": "qc-intel",
+      "title": "Control monitoring",
+      "summary": "Plots the positive control across past runs against limits set from a baseline period (mean, ±2 SD, ±3 SD) and marks Westgard violations.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/labbridge/app.py",
+          "start": 374,
+          "end": 407,
+          "role": "markup",
+          "anchor": "f7cb81276712",
+          "first": "# --- control monitoring (Levey-Jennings) ------------------------------"
+        },
+        {
+          "file": "code/labbridge/core/qc_intel.py",
+          "start": 155,
+          "end": 190,
+          "role": "logic",
+          "symbol": "control_chart",
+          "anchor": "dc1fb75182fa",
+          "first": "def control_chart(history: pd.DataFrame, control_type: str = \"positive\","
+        },
+        {
+          "file": "code/labbridge/data/control_runs.csv",
+          "start": 1,
+          "end": 49,
+          "role": "data",
+          "anchor": "23317e6b7e9e",
+          "first": "run_id,run_date,control_type,analyte,value,unit,instrument_id"
+        }
+      ]
+    },
+    {
+      "id": "clean-preview",
+      "level": "view",
+      "parent": null,
+      "title": "Clean preview",
+      "summary": "Shows every normalized value before and after, with a toggle to show them all, then the full clean table with a per-row QC flag.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/labbridge/app.py",
+          "start": 425,
+          "end": 459,
+          "role": "markup",
+          "symbol": "step_clean",
+          "anchor": "dcf00fdbe571",
+          "first": "def step_clean() -> None:"
+        },
+        {
+          "file": "code/labbridge/core/audit.py",
+          "start": 33,
+          "end": 64,
+          "role": "logic",
+          "symbol": "AuditLog",
+          "anchor": "589d61600118",
+          "first": "class AuditLog:"
+        }
+      ]
+    },
+    {
+      "id": "export",
+      "level": "view",
+      "parent": null,
+      "title": "Export & report",
+      "summary": "Offers downloads of the clean CSV, the Markdown quality summary and the JSON transformation log, and shows the summary and the log inline.",
+      "views": [
+        "document reader",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/labbridge/app.py",
+          "start": 462,
+          "end": 498,
+          "role": "markup",
+          "symbol": "step_export",
+          "anchor": "d81b4934ab14",
+          "first": "def step_export() -> None:"
+        },
+        {
+          "file": "code/labbridge/core/audit.py",
+          "start": 67,
+          "end": 94,
+          "role": "logic",
+          "symbol": "build_summary",
+          "anchor": "77c4fa05dd95",
+          "first": "def build_summary(audit: AuditLog, rows_in: int, rows_out: int,"
+        },
+        {
+          "file": "code/labbridge/core/audit.py",
+          "start": 97,
+          "end": 122,
+          "role": "logic",
+          "symbol": "summary_to_markdown",
+          "anchor": "77abacf2fca9",
+          "first": "def summary_to_markdown(summary: dict) -> str:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "patterns",
+      "term": "step by step wizard"
+    }
+  ]
+}

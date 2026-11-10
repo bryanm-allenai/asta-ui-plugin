@@ -1,0 +1,677 @@
+{
+  "schema": "astaui.card/1",
+  "id": "vresto-satellite-browser",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T02:17:37Z"
+  },
+  "app": {
+    "title": "Sentinel Browser (vresto)",
+    "summary": "A person picks a date range and draws an area on a map. The map's grid tiles are shaded by how many satellite scenes cover each one in those dates. They search the catalogue with filters for collection, product level and cloud cover, open a quicklook or the metadata of a result, or click a grid tile, choose one of its scenes and stream its true-colour image onto the map. They can lay contextual raster overlays over the streamed tile and click to read the value under the cursor. They can also pick a point and chart its vegetation index over a period, scrub through the dates to bring each date's image onto the map, and export the series as CSV. In a separate tab they fetch a product's bands and download chosen band and resolution pairs to a folder.",
+    "task": {
+      "text": "Find the satellite scenes that cover an area and period, preview them on a map, read values and time series at points, and download the bands needed for analysis.",
+      "verbs": [
+        "explore",
+        "locate",
+        "lookup",
+        "summarize",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "A catalogue of multispectral satellite scenes on a fixed global tiling grid, each with an acquisition date, cloud cover and per-band raster files, plus gridded contextual layers (land cover, elevation, vegetation, temperature, soil moisture) and per-point time series sampled from the scenes",
+      "item": "one satellite scene (product) covering one grid tile on one date",
+      "shapes": [
+        "geospatial",
+        "image collection",
+        "field",
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "exploring and gathering satellite imagery for a study area, before analysis",
+      "terms": [
+        "explore",
+        "collect"
+      ]
+    },
+    "mechanism": {
+      "text": "A central map shows the tiling grid coloured by scene counts for the chosen dates. Clicking a tile opens a scene chooser and streams the chosen image onto the map, where overlays and a value inspector read rasters at a point. A floating panel charts one point over time, and its slider brings the selected date's image back onto the map. A side panel searches the catalogue and lists result cards that open quicklooks and metadata, and a download tab turns a band-by-resolution checkbox matrix into files.",
+      "views": [
+        "map",
+        "sidebar list",
+        "list",
+        "line chart",
+        "detail panel",
+        "image viewer",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "select",
+        "filter",
+        "search",
+        "hover for detail",
+        "toggle view",
+        "time slider",
+        "multi-select",
+        "export",
+        "import"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "master-detail",
+        "focus and context"
+      ]
+    },
+    "field": {
+      "text": "satellite remote sensing and earth observation in earth science",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "remote sensing",
+        "earth observation",
+        "ndvi"
+      ]
+    },
+    "workflow": {
+      "name": "find the images that cover a place and period, preview them, and pull data out of them",
+      "steps": [
+        {
+          "step": "filter to the items that matter",
+          "here": "a date range picker, a drawn area on the map, and a search panel with collection, product level, cloud-cover slider and max results; Search fills a list of product cards",
+          "parts": [
+            "map-view",
+            "search-panel"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "grid tiles are shaded by scenes per month in the chosen dates; zoomed out, whole grid zones are shaded instead; hovering a tile shows its count and best cloud cover",
+          "parts": [
+            "map-view"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "clicking a tile opens a chooser of its scenes with thumbnails and streams the chosen true-colour image onto the map; result cards open a quicklook or parsed metadata in a dialog",
+          "parts": [
+            "scene-chooser",
+            "product-viewer"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "switch on a contextual overlay (land cover, elevation, vegetation index, surface temperature, soil moisture and more) and turn on Inspect values to read the value under a click in a popup",
+          "parts": [
+            "overlay-controls",
+            "map-view"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Pick a point charts a variable over a chosen period, with clear readings as a line and cloudy or snowy readings as grey dots; the slider or a chart click brings that date's image onto the map",
+          "parts": [
+            "pixel-history"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "CSV saves the point's series; the download tab fetches a product's bands into a band-by-resolution checkbox matrix with select-by-resolution buttons, then downloads the chosen files to a folder",
+          "parts": [
+            "pixel-history",
+            "download-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "coverage is shown on a fixed global tiling grid, coloured by how many scenes fall in the chosen dates, so a person sees where imagery is dense before searching",
+        "each point reading is flagged clear, cloud, shadow or snow by the scene's own per-pixel classification, not the scene-wide cloud percentage",
+        "the time-series slider is linked back to the map, so a dip in the curve can be checked against that date's image",
+        "the map click is shared by modes: selecting tiles, inspecting overlay values and picking a history point exclude one another",
+        "imagery streams from either an authenticated or an anonymous public source, depending on which credentials are present"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "map-view",
+      "level": "view",
+      "parent": null,
+      "title": "Map with tiling grid",
+      "summary": "Shows the area on a pannable map with draw tools and the tiling grid coloured by scene counts, and sends tile and point clicks to the other panels.",
+      "views": [
+        "map",
+        "summary stats"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "select",
+        "hover for detail",
+        "brush"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/vresto/ui/widgets/map_widget.py",
+          "start": 99,
+          "end": 123,
+          "role": "markup",
+          "symbol": "create",
+          "anchor": "7a5638d42654",
+          "first": "def create(self, messages_column=None):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_widget.py",
+          "start": 134,
+          "end": 168,
+          "role": "logic",
+          "symbol": "_setup_map_handlers",
+          "anchor": "21bc631ba99b",
+          "first": "def _setup_map_handlers(self, m, messages_column):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_widget.py",
+          "start": 423,
+          "end": 513,
+          "role": "logic",
+          "symbol": "set_grid_layer",
+          "anchor": "81890b1c627d",
+          "first": "def set_grid_layer(self, geojson: dict) -> None:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_widget.py",
+          "start": 586,
+          "end": 635,
+          "role": "logic",
+          "symbol": "update_grid_density",
+          "anchor": "f2dbee4fe310",
+          "first": "def update_grid_density(self, density: dict[str, dict], truncated: bool = False) -> None:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_widget.py",
+          "start": 47,
+          "end": 60,
+          "role": "logic",
+          "symbol": "grid_density_legend",
+          "anchor": "903398660e52",
+          "first": "def grid_density_legend() -> list[tuple[str, str]]:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 213,
+          "end": 260,
+          "role": "markup",
+          "symbol": "create",
+          "anchor": "01ae150f3e9d",
+          "first": "def create(self):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 873,
+          "end": 937,
+          "role": "logic",
+          "symbol": "_refresh_density",
+          "anchor": "6740aea8ee99",
+          "first": "async def _refresh_density(self, generation: int, bbox: tuple, client) -> None:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 820,
+          "end": 836,
+          "role": "logic",
+          "symbol": "_handle_moveend",
+          "anchor": "aa8326c314ea",
+          "first": "def _handle_moveend(self, bbox: tuple, zoom: int):"
+        },
+        {
+          "file": "code/src/vresto/services/tile_density.py",
+          "start": 452,
+          "end": 458,
+          "role": "logic",
+          "symbol": "count_products_per_tile",
+          "anchor": "b7dbd0b5e57b",
+          "first": "def count_products_per_tile("
+        },
+        {
+          "file": "code/src/vresto/ui/static/style.css",
+          "start": 47,
+          "end": 57,
+          "role": "style",
+          "symbol": ".mgrs-tooltip",
+          "anchor": "b7536486508d",
+          "first": ".mgrs-tooltip {"
+        }
+      ]
+    },
+    {
+      "id": "overlay-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Tile streaming and overlays sidebar",
+      "summary": "Holds the date picker, grid and colouring switches, overlay toggles with opacity and year or time options, and the Inspect values switch that reads a raster value at a clicked point.",
+      "views": [
+        "sidebar list",
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "filter",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 262,
+          "end": 282,
+          "role": "markup",
+          "symbol": "_create_sidebar",
+          "anchor": "39972be5c436",
+          "first": "def _create_sidebar(self):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 303,
+          "end": 437,
+          "role": "markup",
+          "symbol": "_create_streaming_controls",
+          "anchor": "783cfff6ae55",
+          "first": "def _create_streaming_controls(self):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 737,
+          "end": 766,
+          "role": "logic",
+          "symbol": "_activate_overlay",
+          "anchor": "bcfa2cd15155",
+          "first": "async def _activate_overlay(self, overlay_name: str):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 1470,
+          "end": 1546,
+          "role": "logic",
+          "symbol": "_load_overlay",
+          "anchor": "95764f4663b4",
+          "first": "async def _load_overlay(self, overlay_name: str):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 1637,
+          "end": 1675,
+          "role": "logic",
+          "symbol": "_handle_map_click",
+          "anchor": "8202fb825b0d",
+          "first": "async def _handle_map_click(self, lat: float, lon: float):"
+        },
+        {
+          "file": "code/src/vresto/ui/overlays.py",
+          "start": 688,
+          "end": 720,
+          "role": "logic",
+          "symbol": "build_point_popup_html",
+          "anchor": "326f3daf4d92",
+          "first": "def build_point_popup_html(spec: OverlaySpec, text: str, lat: float, lon: float, suffix: str = \"\", show_resolution: bool"
+        },
+        {
+          "file": "code/src/vresto/ui/overlays.py",
+          "start": 653,
+          "end": 680,
+          "role": "logic",
+          "symbol": "build_overlay_legend_html",
+          "anchor": "4b4074aeae17",
+          "first": "def build_overlay_legend_html(spec: OverlaySpec, suffix: str = \"\") -> str:"
+        },
+        {
+          "file": "code/src/vresto/ui/static/style.css",
+          "start": 86,
+          "end": 89,
+          "role": "style",
+          "symbol": ".vresto-overlay-expansion.q-expansion-item--expanded > .q-item",
+          "anchor": "d87c8f4f33c8",
+          "first": ".vresto-overlay-expansion.q-expansion-item--expanded > .q-item {"
+        }
+      ]
+    },
+    {
+      "id": "scene-chooser",
+      "level": "component",
+      "parent": "map-view",
+      "title": "Tile scene chooser and streaming",
+      "summary": "On a tile click, lists that tile's scenes in the chosen dates with thumbnails and streams the chosen true-colour image onto the map.",
+      "views": [
+        "list",
+        "image viewer"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 979,
+          "end": 1026,
+          "role": "logic",
+          "symbol": "_handle_tile_click",
+          "anchor": "bbec2431eb83",
+          "first": "async def _handle_tile_click(self, tile_code: str):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 1067,
+          "end": 1071,
+          "role": "markup",
+          "symbol": "_show_tile_product_chooser",
+          "anchor": "042610bc52be",
+          "first": "def _show_tile_product_chooser("
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 1282,
+          "end": 1365,
+          "role": "logic",
+          "symbol": "_search_products_for_tile",
+          "anchor": "fb23e7eabcea",
+          "first": "async def _search_products_for_tile(self, tile_code: str, limit: int = TILE_PRODUCT_CHOICES) -> list:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 1148,
+          "end": 1226,
+          "role": "logic",
+          "symbol": "_stream_product",
+          "anchor": "18f0ed274ff3",
+          "first": "async def _stream_product(self, tile_code: str, product: ProductInfo) -> bool:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 1244,
+          "end": 1267,
+          "role": "logic",
+          "symbol": "_display_tci_layer",
+          "anchor": "86e78828808f",
+          "first": "async def _display_tci_layer(self, cog_path: str, tile_code: str):"
+        }
+      ]
+    },
+    {
+      "id": "pixel-history",
+      "level": "component",
+      "parent": "map-view",
+      "title": "Pixel history panel",
+      "summary": "Charts one picked point's variable over a period, with clear and cloudy readings marked apart, lets the person scrub dates to stream each date's image, and exports the series as CSV.",
+      "views": [
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "time slider",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/src/vresto/ui/widgets/pixel_history_panel.py",
+          "start": 258,
+          "end": 306,
+          "role": "markup",
+          "symbol": "create",
+          "anchor": "167e87d02cd7",
+          "first": "def create(self, classes: str = \"w-full p-3\") -> Any:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/pixel_history_panel.py",
+          "start": 330,
+          "end": 362,
+          "role": "logic",
+          "symbol": "load",
+          "anchor": "88954ee25220",
+          "first": "async def load(self, lat: float, lon: float) -> None:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/pixel_history_panel.py",
+          "start": 138,
+          "end": 184,
+          "role": "logic",
+          "symbol": "build_chart_options",
+          "anchor": "28abe4007606",
+          "first": "def build_chart_options(points: Sequence[HistoryPoint], variable: HistoryVariable, selected: Optional[int] = None) -> di"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/pixel_history_panel.py",
+          "start": 126,
+          "end": 135,
+          "role": "logic",
+          "symbol": "summarize",
+          "anchor": "a093c3f6d55f",
+          "first": "def summarize(points: Sequence[HistoryPoint], variable: HistoryVariable) -> str:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/pixel_history_panel.py",
+          "start": 395,
+          "end": 411,
+          "role": "logic",
+          "symbol": "select",
+          "anchor": "1130b34b4171",
+          "first": "def select(self, index: int) -> None:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/pixel_history_panel.py",
+          "start": 446,
+          "end": 452,
+          "role": "logic",
+          "symbol": "export_csv",
+          "anchor": "ca80bd00e6a5",
+          "first": "def export_csv(self) -> None:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 1603,
+          "end": 1609,
+          "role": "logic",
+          "symbol": "_show_history_scene",
+          "anchor": "1220bc63dd06",
+          "first": "async def _show_history_scene(self, observation) -> None:"
+        },
+        {
+          "file": "code/src/vresto/services/pixel_history.py",
+          "start": 202,
+          "end": 209,
+          "role": "logic",
+          "symbol": "point_history",
+          "anchor": "870fbda478e0",
+          "first": "def point_history("
+        },
+        {
+          "file": "code/src/vresto/services/pixel_history.py",
+          "start": 106,
+          "end": 118,
+          "role": "logic",
+          "symbol": "classify_scl",
+          "anchor": "b5d482a8e6b3",
+          "first": "def classify_scl(code: Optional[int]) -> PointStatus:"
+        }
+      ]
+    },
+    {
+      "id": "search-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Catalogue search and results",
+      "summary": "Filters the catalogue by collection, product level, cloud cover and the drawn area and dates, and lists the matching products as cards.",
+      "views": [
+        "form",
+        "list"
+      ],
+      "interactions": [
+        "search",
+        "filter",
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/vresto/ui/widgets/search_results_panel.py",
+          "start": 32,
+          "end": 135,
+          "role": "markup",
+          "anchor": "75c77b8c0a45",
+          "first": "def create(self, messages_column, on_search: Callable[[dict], None]) -> Tuple[ui.element, Callable[[], None]]:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 1713,
+          "end": 1851,
+          "role": "logic",
+          "symbol": "_handle_search",
+          "anchor": "53a5f0d350b9",
+          "first": "async def _handle_search(self, params: dict):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 1853,
+          "end": 1874,
+          "role": "logic",
+          "symbol": "_filter_by_level",
+          "anchor": "26661ca0732b",
+          "first": "def _filter_by_level(self, products: list, level_filter: str, collection: str = \"\") -> list:"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/map_search_tab.py",
+          "start": 1876,
+          "end": 1934,
+          "role": "markup",
+          "symbol": "_create_product_card",
+          "anchor": "9e992239e68e",
+          "first": "def _create_product_card(self, container, index: int, product, messages_column):"
+        }
+      ]
+    },
+    {
+      "id": "product-viewer",
+      "level": "component",
+      "parent": "search-panel",
+      "title": "Quicklook and metadata viewer",
+      "summary": "Opens a selected product's preview image or its parsed metadata in a dialog.",
+      "views": [
+        "image viewer",
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/vresto/ui/widgets/product_viewer.py",
+          "start": 43,
+          "end": 112,
+          "role": "logic",
+          "symbol": "show_quicklook",
+          "anchor": "ecf9048bccb8",
+          "first": "async def show_quicklook(self, product, messages_column):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/product_viewer.py",
+          "start": 170,
+          "end": 263,
+          "role": "logic",
+          "symbol": "show_metadata",
+          "anchor": "3b32bc35e68a",
+          "first": "async def show_metadata(self, product, messages_column):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/product_viewer.py",
+          "start": 114,
+          "end": 168,
+          "role": "logic",
+          "symbol": "_parse_sentinel2_metadata",
+          "anchor": "4ce00676a83f",
+          "first": "def _parse_sentinel2_metadata(self, xml_content: str) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "download-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Band download",
+      "summary": "Fetches the bands available for a named product, shows them as a band-by-resolution checkbox matrix with bulk-select buttons, and downloads the chosen files to a folder with progress.",
+      "views": [
+        "form",
+        "fixed-layout grid",
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "multi-select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/vresto/ui/widgets/download_tab.py",
+          "start": 71,
+          "end": 152,
+          "role": "markup",
+          "symbol": "_create_controls_panel",
+          "anchor": "ecaf0d03c539",
+          "first": "def _create_controls_panel(self):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/download_tab.py",
+          "start": 154,
+          "end": 158,
+          "role": "markup",
+          "symbol": "_create_activity_panel",
+          "anchor": "e9c246eced35",
+          "first": "def _create_activity_panel(self):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/download_tab.py",
+          "start": 166,
+          "end": 257,
+          "role": "logic",
+          "symbol": "_handle_fetch",
+          "anchor": "b58551f4a3d7",
+          "first": "async def _handle_fetch(self):"
+        },
+        {
+          "file": "code/src/vresto/ui/widgets/download_tab.py",
+          "start": 259,
+          "end": 377,
+          "role": "logic",
+          "symbol": "_handle_download",
+          "anchor": "11ac50d235d2",
+          "first": "async def _handle_download(self):"
+        }
+      ]
+    }
+  ]
+}

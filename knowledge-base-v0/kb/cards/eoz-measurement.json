@@ -1,0 +1,718 @@
+{
+  "schema": "astaui.card/1",
+  "id": "eoz-measurement",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T15:58:55Z"
+  },
+  "app": {
+    "title": "EOZ / Decentration Analysis — Pentacam TCDM",
+    "summary": "A person loads a screenshot of a corneal tangential curvature difference map. The tool finds the map origin and the pixel-per-millimetre scale on its own, and the person can correct either by hand. Optionally they mark the pupil centre and enter the surgeon's centration offset and the programmed zone diameter, then run the analysis. It traces the zero-dioptre boundary, fits an ellipse to it, and reports the zone's area, axes, shape, retention ratio and two decentration values. Each eye can be added to a series and exported as CSV, or a folder of images can be run as a batch that produces a CSV and an HTML summary report.",
+    "task": {
+      "text": "Measure the effective optical zone and its decentration from a corneal difference-map image, one eye at a time or in a batch, and export the measurements for a study.",
+      "verbs": [
+        "derive",
+        "summarize",
+        "clean"
+      ]
+    },
+    "data": {
+      "text": "Screenshots of corneal topography difference maps that include a colour scale bar and a ruler, plus a table of measurements for each eye built from them.",
+      "item": "one eye's difference-map image",
+      "shapes": [
+        "image",
+        "image collection",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "measuring treatment zones on post-operative maps, before the statistical analysis",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A zoomable canvas shows the map with layers that can be turned on and off (vertex, pupil, target, ablation centre, traced contour, fitted ellipse and axes), a loupe for exact clicks, and point and ruler tools. A side panel of numbered steps leads through calibration, marking and analysis settings, then shows a result readout. A series table gathers eyes analysed one by one, and a batch runner with a progress bar handles many images and exports CSV and a report.",
+      "views": [
+        "image viewer",
+        "form",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "zoom and pan",
+        "select",
+        "toggle view",
+        "hover for detail",
+        "keyboard shortcuts",
+        "drag to arrange",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "image-based measurement of optical zones on corneal topography maps in refractive surgery",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "ophthalmology",
+        "corneal topography",
+        "refractive surgery"
+      ]
+    },
+    "workflow": {
+      "name": "measure a geometric feature on calibrated images and tabulate it per item",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drop a map screenshot on the stage or use Open file. Once it loads, Auto-calibrate and Reset become available.",
+          "parts": [
+            "map-stage",
+            "load-calibrate"
+          ]
+        },
+        {
+          "step": "calibrate the image to real units and an origin",
+          "here": "The tool reads px/mm from the ruler ticks and finds the vertex (the map origin, shown as a black dot). The person can type a px/mm value, or drag or arrow-key the vertex marker if detection is off. A chip shows the calibration status.",
+          "parts": [
+            "load-calibrate",
+            "marking-tools",
+            "map-stage"
+          ]
+        },
+        {
+          "step": "mark reference points on the image",
+          "here": "Mode buttons set what a click on the map places: pupil centre, vertex, a coordinate probe, or a two-point ruler. A loupe magnifies the spot under the cursor.",
+          "parts": [
+            "marking-tools",
+            "map-stage"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The person enters the Px/Py offset and the POZ diameter, chooses the centre definition (ellipse fit or area centroid) and the boundary method (scale or hue), then presses Analyze. The tool traces the 0.00 D contour and fits an ellipse.",
+          "parts": [
+            "analysis-settings"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The result card shows vertex-referenced and target-referenced decentration, area, axes, meridian, retention ratio and flags. Overlay layers draw the contour and axes on the map. The result can be saved as a PNG, and a help dialog explains each formula.",
+          "parts": [
+            "result-card",
+            "map-stage"
+          ]
+        },
+        {
+          "step": "process many items in one run",
+          "here": "A multi-file input runs up to 500 images, each calibrated on its own. A progress bar shows how far it has got, and Stop keeps the rows finished so far.",
+          "parts": [
+            "batch-runner"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Add to series puts the eye in a table that exports as CSV. A batch run exports as CSV or as an HTML summary report that lists the images that failed.",
+          "parts": [
+            "series-table",
+            "batch-runner"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Two decentrations are reported: one from a fixed anatomical origin, and one from an intended target computed as the marked pupil plus a user-entered offset, with sign-convention toggles.",
+        "The boundary is an iso-value contour read through a colour scale bar decoded from the image itself, with a hue-threshold fallback. Measurements that fall back are flagged as degraded.",
+        "The direction of the difference map (pre minus post, or post minus pre) can be switched, which reverses which colours mean treated.",
+        "Batch mode cannot carry manual marks, so batch output has only the origin-referenced measure, and failed images are listed rather than skipped."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "map-stage",
+      "level": "view",
+      "parent": null,
+      "title": "Map canvas with layers and loupe",
+      "summary": "Shows the loaded map with switchable overlays for reference points, the traced contour and the fitted ellipse, and supports zoom, drag-and-drop loading and a magnifying loupe.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "toggle view",
+        "hover for detail",
+        "import"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 280,
+          "end": 323,
+          "role": "markup",
+          "symbol": "#stage",
+          "anchor": "c9ff5d444abe",
+          "first": "<div class=\"stage\" id=\"stage\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 59,
+          "end": 62,
+          "role": "style",
+          "symbol": ".stage",
+          "anchor": "ea64e2c9878b",
+          "first": ".stage{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 68,
+          "end": 69,
+          "role": "style",
+          "symbol": ".canvas-host",
+          "anchor": "050614e13edf",
+          "first": ".canvas-host{position:relative;display:flex;min-height:340px;max-height:76vh;overflow:auto;padding:12px;background:"
+        },
+        {
+          "file": "code/index.html",
+          "start": 86,
+          "end": 89,
+          "role": "style",
+          "symbol": "button.tg",
+          "anchor": "a46d902a7516",
+          "first": "button.tg{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 122,
+          "end": 126,
+          "role": "style",
+          "symbol": "#loupe",
+          "anchor": "1a69e75aca57",
+          "first": "#loupe{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3136,
+          "end": 3326,
+          "role": "logic",
+          "symbol": "redraw",
+          "anchor": "816098b2bab8",
+          "first": "function redraw() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 2975,
+          "end": 2987,
+          "role": "logic",
+          "symbol": "setZoom",
+          "anchor": "c3fd3a6cf119",
+          "first": "function setZoom(z, anchor) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 2961,
+          "end": 2973,
+          "role": "logic",
+          "symbol": "applyZoom",
+          "anchor": "6e52f9c0e6af",
+          "first": "function applyZoom() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3360,
+          "end": 3387,
+          "role": "logic",
+          "symbol": "showLoupe",
+          "anchor": "81fe40443c63",
+          "first": "function showLoupe(ev) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 4564,
+          "end": 4575,
+          "role": "logic",
+          "anchor": "9dcf9622587e",
+          "first": "$(\"fileInput\").addEventListener(\"change\", (e) => loadFile(e.target.files[0]));"
+        }
+      ]
+    },
+    {
+      "id": "load-calibrate",
+      "level": "view",
+      "parent": null,
+      "title": "Load map and calibrate",
+      "summary": "Opens a map image, detects the origin and px/mm scale automatically, and lets the person override the scale by hand.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 330,
+          "end": 350,
+          "role": "markup",
+          "anchor": "ce9d3fa41bab",
+          "first": "<div class=\"card\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 273,
+          "end": 273,
+          "role": "markup",
+          "symbol": "#calChip",
+          "anchor": "eeda1ec6ea26",
+          "first": "<span id=\"calChip\" class=\"cal-chip\">calibration pending</span>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 47,
+          "end": 51,
+          "role": "style",
+          "symbol": ".cal-chip",
+          "anchor": "1a7cd631028f",
+          "first": ".cal-chip{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 2915,
+          "end": 2944,
+          "role": "logic",
+          "symbol": "loadFile",
+          "anchor": "6c6642bf7035",
+          "first": "function loadFile(file) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3066,
+          "end": 3133,
+          "role": "logic",
+          "symbol": "autoCalibrate",
+          "anchor": "77201659ddb6",
+          "first": "function autoCalibrate() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 2386,
+          "end": 2535,
+          "role": "logic",
+          "symbol": "calibrateImage",
+          "anchor": "b25405472c15",
+          "first": "function calibrateImage(rgb, w, h, options) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 2908,
+          "end": 2912,
+          "role": "logic",
+          "symbol": "setChip",
+          "anchor": "3fb242b4066c",
+          "first": "function setChip(text, kind) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 4078,
+          "end": 4104,
+          "role": "logic",
+          "symbol": "resetAll",
+          "anchor": "0cdab16ec23f",
+          "first": "function resetAll() {"
+        }
+      ]
+    },
+    {
+      "id": "marking-tools",
+      "level": "component",
+      "parent": "load-calibrate",
+      "title": "Marking modes",
+      "summary": "Sets what a click on the map does (place the pupil, move the vertex, probe a coordinate or measure a distance) and shows the resulting coordinates in millimetres.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "drag to arrange",
+        "keyboard shortcuts",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 352,
+          "end": 383,
+          "role": "markup",
+          "anchor": "c01a05aaebb3",
+          "first": "<div class=\"card\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 192,
+          "end": 192,
+          "role": "style",
+          "symbol": "table.readout",
+          "anchor": "ab6e8f2db402",
+          "first": "table.readout{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nu"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3402,
+          "end": 3410,
+          "role": "logic",
+          "symbol": "setMode",
+          "anchor": "d4f830a2ffae",
+          "first": "function setMode(k) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3500,
+          "end": 3554,
+          "role": "logic",
+          "anchor": "f0b3e59f6784",
+          "first": "cv.addEventListener(\"click\", function (ev) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3555,
+          "end": 3622,
+          "role": "logic",
+          "anchor": "6ece90c70fd7",
+          "first": "cv.addEventListener(\"mousedown\", function (ev) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3625,
+          "end": 3679,
+          "role": "logic",
+          "symbol": "updateStates",
+          "anchor": "ff2890dfca63",
+          "first": "function updateStates() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3449,
+          "end": 3471,
+          "role": "logic",
+          "symbol": "setMapDirection",
+          "anchor": "2c9ff8f4c250",
+          "first": "function setMapDirection(dir) {"
+        }
+      ]
+    },
+    {
+      "id": "analysis-settings",
+      "level": "view",
+      "parent": null,
+      "title": "Centration and optical zone settings",
+      "summary": "Collects the offset, zone diameter, thresholds, sign conventions, centre definition and boundary method, then runs the contour extraction and ellipse fit.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 385,
+          "end": 467,
+          "role": "markup",
+          "anchor": "5fbb501adeb7",
+          "first": "<div class=\"card\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 157,
+          "end": 157,
+          "role": "style",
+          "symbol": ".field-grid",
+          "anchor": "878b91ee4f19",
+          "first": ".field-grid{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:7px 9px;align-items:center}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3764,
+          "end": 3829,
+          "role": "logic",
+          "anchor": "6266ad264a69",
+          "first": "$(\"runBtn\").addEventListener(\"click\", function () {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3695,
+          "end": 3700,
+          "role": "logic",
+          "symbol": "setCenterMode",
+          "anchor": "fba3ea889afd",
+          "first": "function setCenterMode(m) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3725,
+          "end": 3730,
+          "role": "logic",
+          "symbol": "setBoundarySource",
+          "anchor": "99ce6bcf673d",
+          "first": "function setBoundarySource(m) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 2541,
+          "end": 2819,
+          "role": "logic",
+          "symbol": "analyze",
+          "anchor": "b758b661f10f",
+          "first": "function analyze(hsv, w, h, vtx, pixelScaleMm, target, pozDiameterMm, opts) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 2247,
+          "end": 2339,
+          "role": "logic",
+          "symbol": "extractIsoContourRadial",
+          "anchor": "395d0e60984a",
+          "first": "function extractIsoContourRadial(field, w, h, centerPx, pixelScaleMm, isoD, opts) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 1118,
+          "end": 1190,
+          "role": "logic",
+          "symbol": "fitEllipse",
+          "anchor": "0fdc51d3e703",
+          "first": "function fitEllipse(points) {"
+        }
+      ]
+    },
+    {
+      "id": "result-card",
+      "level": "view",
+      "parent": null,
+      "title": "Result readout",
+      "summary": "Shows the two decentration values in large type, a table of zone metrics with flagged rows, a PNG export and a help dialog explaining each formula.",
+      "views": [
+        "summary stats",
+        "detail panel"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 469,
+          "end": 486,
+          "role": "markup",
+          "anchor": "975d62667ed4",
+          "first": "<div class=\"card\" id=\"resultCard\" style=\"display:none\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 183,
+          "end": 183,
+          "role": "style",
+          "symbol": ".headline",
+          "anchor": "77d47eb25184",
+          "first": ".headline{padding:13px 11px 11px;border-bottom:1px solid var(--line-soft)}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 199,
+          "end": 202,
+          "role": "style",
+          "symbol": "table.readout tr.key td",
+          "anchor": "6cedb7b9a18d",
+          "first": "table.readout tr.key td{"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3840,
+          "end": 3961,
+          "role": "logic",
+          "symbol": "render",
+          "anchor": "1fe18d0d1c9c",
+          "first": "function render(r) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 4058,
+          "end": 4069,
+          "role": "logic",
+          "anchor": "5b23c28c2071",
+          "first": "$(\"pngBtn\").addEventListener(\"click\", function () {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 4070,
+          "end": 4070,
+          "role": "logic",
+          "symbol": "openHelp",
+          "anchor": "f7de0c91cd91",
+          "first": "function openHelp() { helpBack.classList.add(\"open\"); $(\"helpClose\").focus(); }"
+        },
+        {
+          "file": "code/index.html",
+          "start": 206,
+          "end": 209,
+          "role": "style",
+          "symbol": "#helpBack",
+          "anchor": "0d93fe11fcf3",
+          "first": "#helpBack{"
+        }
+      ]
+    },
+    {
+      "id": "series-table",
+      "level": "view",
+      "parent": null,
+      "title": "Series of individually analysed eyes",
+      "summary": "Gathers each analysed eye as a row of key measurements, which can be cleared or exported as CSV.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 533,
+          "end": 546,
+          "role": "markup",
+          "anchor": "0d24eb88e7ab",
+          "first": "<div class=\"card\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 243,
+          "end": 243,
+          "role": "style",
+          "symbol": "table.series",
+          "anchor": "30fd51190043",
+          "first": "table.series{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;font-variant-numeric:tabular-num"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3964,
+          "end": 3970,
+          "role": "logic",
+          "anchor": "e4eed87d8f61",
+          "first": "$(\"addBtn\").addEventListener(\"click\", function () {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3971,
+          "end": 3991,
+          "role": "logic",
+          "symbol": "renderSeries",
+          "anchor": "16feef759e62",
+          "first": "function renderSeries() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 3995,
+          "end": 4057,
+          "role": "logic",
+          "anchor": "ab9d14e5e093",
+          "first": "$(\"clrBtn\").addEventListener(\"click\", function () {"
+        }
+      ]
+    },
+    {
+      "id": "batch-runner",
+      "level": "view",
+      "parent": null,
+      "title": "Batch analysis",
+      "summary": "Runs many images through the same pipeline with a progress bar and a stop button, then exports the per-image rows as CSV or as an HTML report with summary statistics and a list of failures.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 488,
+          "end": 531,
+          "role": "markup",
+          "anchor": "c6a165e46c1a",
+          "first": "<div class=\"card\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 4218,
+          "end": 4285,
+          "role": "logic",
+          "symbol": "runBatch",
+          "anchor": "54ceebd6e4ad",
+          "first": "async function runBatch(files) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 4162,
+          "end": 4216,
+          "role": "logic",
+          "symbol": "analyzeImage",
+          "anchor": "6137212f4c54",
+          "first": "function analyzeImage(im, ringMm, poz) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 4287,
+          "end": 4315,
+          "role": "logic",
+          "symbol": "renderBatch",
+          "anchor": "570e989409bb",
+          "first": "function renderBatch() {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 4365,
+          "end": 4372,
+          "role": "logic",
+          "symbol": "summarize",
+          "anchor": "c74a8d4e92dc",
+          "first": "function summarize(vals) {"
+        },
+        {
+          "file": "code/index.html",
+          "start": 4379,
+          "end": 4379,
+          "role": "logic",
+          "anchor": "422b659a5a6c",
+          "first": "$(\"batchInput\").addEventListener(\"change\", (e) => { runBatch(e.target.files); e.target.value = \"\"; });"
+        },
+        {
+          "file": "code/index.html",
+          "start": 4391,
+          "end": 4563,
+          "role": "logic",
+          "anchor": "365b1bfa99b4",
+          "first": "$(\"batchRepBtn\").addEventListener(\"click\", function () {"
+        }
+      ]
+    }
+  ]
+}

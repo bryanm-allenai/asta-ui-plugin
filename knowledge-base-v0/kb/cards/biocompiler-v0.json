@@ -1,0 +1,435 @@
+{
+  "schema": "astaui.card/1",
+  "id": "biocompiler-v0",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T14:38:14Z"
+  },
+  "app": {
+    "title": "BioCompiler V0: compile a temporary control into a persistent phenotype transition",
+    "summary": "The person picks a starting stable state and a desired stable state of a published gene-regulatory model, and sets constraints and a ranking objective. Compiling runs every candidate in a fixed grid of temporary controls. Each candidate is simulated, the control is removed and a washout follows, and only candidates that stay in the target state count as successes. The person then reads the best candidate: its state-space trajectory, its time series and a ranked table of alternatives. They can also build an atlas that compiles every ordered pair of states into a reachability graph, click an edge to read its stored evidence, and export the compiled transition or the atlas as JSON or CSV.",
+    "task": {
+      "text": "Find temporary interventions from a declared finite grid that move a simulated multistable system from one stable state to another and keep it there, and map which transitions are reachable under the chosen constraints.",
+      "verbs": [
+        "derive",
+        "identify",
+        "compare",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A published ordinary differential equation model with a few variables and several verified stable states, and a versioned grid of candidate controls. Each candidate is simulated into a trajectory over time, and the results are summed up as ranked candidate tables and a matrix of transitions between states.",
+      "item": "a candidate temporary control, simulated from one stable state toward another",
+      "shapes": [
+        "time series",
+        "table",
+        "network",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "in-silico control design on a reproduced published model, before any experiment",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls set the source, target, constraints and objective, and every result tab is invalidated when they change. The Compile tab searches the whole grid on request and shows the winning candidate as a trajectory, a time series, metrics and a ranked table. The Atlas tab draws a reachability graph: clicking an edge selects that transition's stored record, shown beside a table of the transitions.",
+      "views": [
+        "form",
+        "network diagram",
+        "line chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "master-detail"
+      ]
+    },
+    "field": {
+      "text": "inverse control design and attractor reachability on a gene-regulatory dynamical model in systems biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "systems biology",
+        "gene regulatory network",
+        "attractor reachability"
+      ]
+    },
+    "workflow": {
+      "name": "search a grid of candidate interventions for ones that reach a target state, and map which states are reachable",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "The published model spec and the search grid load at start-up. The four reference attractors are re-solved and checked for stability. A status strip and a reproduction table report residuals and eigenvalues.",
+          "parts": [
+            "status-strip",
+            "reproduction-table"
+          ]
+        },
+        {
+          "step": "set the request and the constraints on the search",
+          "here": "The sidebar sets the starting and desired phenotypes, the maximum number of controlled regulators (1 or 2), which regulators may not be controlled, and whether ranking puts robustness or sparsity first.",
+          "parts": [
+            "compiler-controls"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Compile transition' enumerates every control in the grid. Each one is simulated, released and washed out. Candidates that persist in the target state are kept, ranked and reduced to a Pareto set.",
+          "parts": [
+            "compile-view"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The best candidate is shown with three metrics: successes, regulators and integrated cost. It also gets a 3-D state trajectory, a gene time series marking where the control ends, and a table of the top 20 ranked candidates.",
+          "parts": [
+            "compiled-candidate"
+          ]
+        },
+        {
+          "step": "compute the result for every pair and draw it as a graph",
+          "here": "'Build reachability atlas' compiles all twelve ordered phenotype pairs, with an optional number of robustness replicates per found edge. Only completed found transitions become graph edges.",
+          "parts": [
+            "reachability-atlas"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Clicking an edge in the graph selects that transition in the 'Inspect transition record' box, which shows its status, candidate count and exact stored JSON evidence. A table lists every pair's status and robustness rates.",
+          "parts": [
+            "atlas-graph",
+            "reachability-atlas"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The compiled transition downloads as JSON with a run manifest (model, search digest, constraints, objective, classifier, runtime versions). The atlas downloads as JSON and as a CSV of transitions.",
+          "parts": [
+            "compiled-candidate",
+            "reachability-atlas"
+          ]
+        }
+      ],
+      "distinctive": [
+        "A candidate counts only if the system stays in the target state through a washout after the control is removed, not just if it reaches it",
+        "The search is an exhaustive finite grid, and a missing result is labelled bounded by the search, never impossible",
+        "Results are invalidated whenever the source, target, constraints or objective change, so stale results are never shown",
+        "Every export carries a manifest of the model, search digest, constraints and runtime versions, so a result can be reproduced",
+        "A separate tab checks that the published model's stable states are reproduced (residual, eigenvalues) before any control is trusted"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "compiler-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Compiler controls",
+      "summary": "Sidebar where the person chooses the starting and desired phenotypes, the regulator limits and the ranking objective that every tab uses.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 83,
+          "end": 103,
+          "role": "markup",
+          "anchor": "b433ad305acd",
+          "first": "with st.sidebar:"
+        }
+      ]
+    },
+    {
+      "id": "status-strip",
+      "level": "component",
+      "parent": null,
+      "title": "Model status strip",
+      "summary": "Header strip that names the model, its coordinates, how many attractors were verified and which search grid is in use, under a simulation-only warning.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 55,
+          "end": 61,
+          "role": "data",
+          "symbol": "scientific_context",
+          "anchor": "6fdbc9497512",
+          "first": "def scientific_context():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 29,
+          "end": 51,
+          "role": "style",
+          "anchor": "9b4774ec3cd9",
+          "first": "st.set_page_config(page_title=\"BioCompiler V0\", page_icon=\"∿\", layout=\"wide\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 64,
+          "end": 81,
+          "role": "markup",
+          "anchor": "0e29fc442f4e",
+          "first": "spec, equilibria, catalog, search = scientific_context()"
+        }
+      ]
+    },
+    {
+      "id": "compile-view",
+      "level": "view",
+      "parent": null,
+      "title": "Compile",
+      "summary": "States the requested transition, runs the exhaustive search on demand, shows the regulatory network, and reports when the search was incomplete or found nothing.",
+      "views": [
+        "network diagram",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 105,
+          "end": 142,
+          "role": "markup",
+          "anchor": "a00dcef9b9b7",
+          "first": "compile_tab, atlas_tab, reproduce_tab, methods_tab = st.tabs("
+        },
+        {
+          "file": "code/src/biocompiler/visualization.py",
+          "start": 111,
+          "end": 170,
+          "role": "logic",
+          "symbol": "regulatory_network_figure",
+          "anchor": "3d32d8abde8d",
+          "first": "def regulatory_network_figure(spec: ModelSpec) -> go.Figure:"
+        },
+        {
+          "file": "code/src/biocompiler/compiler.py",
+          "start": 81,
+          "end": 92,
+          "role": "logic",
+          "symbol": "compile_transition",
+          "anchor": "e8dd863801da",
+          "first": "def compile_transition("
+        }
+      ]
+    },
+    {
+      "id": "compiled-candidate",
+      "level": "component",
+      "parent": "compile-view",
+      "title": "Best compiled control",
+      "summary": "Shows the winning control's metrics, its state-space trajectory and gene time series, a ranked table of alternatives, and a JSON download with a run manifest.",
+      "views": [
+        "line chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 143,
+          "end": 186,
+          "role": "markup",
+          "anchor": "b84a7555dc0b",
+          "first": "else:"
+        },
+        {
+          "file": "code/src/biocompiler/visualization.py",
+          "start": 40,
+          "end": 44,
+          "role": "logic",
+          "symbol": "trajectory_figure",
+          "anchor": "cb96502f18c1",
+          "first": "def trajectory_figure("
+        },
+        {
+          "file": "code/src/biocompiler/visualization.py",
+          "start": 84,
+          "end": 108,
+          "role": "logic",
+          "symbol": "time_series_figure",
+          "anchor": "89bfbfc3d538",
+          "first": "def time_series_figure(simulation: SimulationResult, intervention_end: float) -> go.Figure:"
+        },
+        {
+          "file": "code/src/biocompiler/artifacts.py",
+          "start": 106,
+          "end": 107,
+          "role": "logic",
+          "symbol": "serialize_compiler_result",
+          "anchor": "356fc92e8432",
+          "first": "def serialize_compiler_result(result: CompilerResult, manifest: dict[str, Any]) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "reachability-atlas",
+      "level": "view",
+      "parent": null,
+      "title": "Reachability atlas",
+      "summary": "Compiles every ordered pair of states with optional robustness replicates, then lists each transition's status and robustness and exports the atlas as JSON and CSV.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 188,
+          "end": 210,
+          "role": "markup",
+          "anchor": "7e69e85582e2",
+          "first": "with atlas_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 238,
+          "end": 262,
+          "role": "markup",
+          "anchor": "5499871c0662",
+          "first": "rows = [transition.to_dict() for transition in atlas.transitions.values()]"
+        },
+        {
+          "file": "code/src/biocompiler/reachability.py",
+          "start": 131,
+          "end": 140,
+          "role": "logic",
+          "symbol": "build_reachability_atlas",
+          "anchor": "1b1b0970c585",
+          "first": "def build_reachability_atlas("
+        },
+        {
+          "file": "code/src/biocompiler/artifacts.py",
+          "start": 25,
+          "end": 26,
+          "role": "logic",
+          "symbol": "serialize_atlas",
+          "anchor": "9d4a02a422a0",
+          "first": "def serialize_atlas(atlas: ReachabilityAtlas) -> str:"
+        },
+        {
+          "file": "code/src/biocompiler/artifacts.py",
+          "start": 36,
+          "end": 73,
+          "role": "logic",
+          "symbol": "serialize_transition_csv",
+          "anchor": "173eac0a7459",
+          "first": "def serialize_transition_csv(atlas: ReachabilityAtlas) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "atlas-graph",
+      "level": "component",
+      "parent": "reachability-atlas",
+      "title": "Reachability graph and transition record",
+      "summary": "A directed graph of the states in which clicking an edge selects that transition and opens its exact stored evidence.",
+      "views": [
+        "network diagram",
+        "detail panel"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 211,
+          "end": 237,
+          "role": "logic",
+          "anchor": "f10bc341bc0d",
+          "first": "graph_event = st.plotly_chart("
+        },
+        {
+          "file": "code/src/biocompiler/visualization.py",
+          "start": 173,
+          "end": 242,
+          "role": "logic",
+          "symbol": "reachability_figure",
+          "anchor": "8c9a52339b6e",
+          "first": "def reachability_figure(atlas: ReachabilityAtlas) -> go.Figure:"
+        }
+      ]
+    },
+    {
+      "id": "reproduction-table",
+      "level": "view",
+      "parent": null,
+      "title": "Reproduction lab",
+      "summary": "Table of each reference attractor's coordinates, residual, largest eigenvalue and stability, beside the regulatory network, to confirm the published model is reproduced.",
+      "views": [
+        "table view",
+        "network diagram"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 264,
+          "end": 282,
+          "role": "markup",
+          "anchor": "0e51b210520f",
+          "first": "with reproduce_tab:"
+        },
+        {
+          "file": "code/src/biocompiler/equilibria.py",
+          "start": 69,
+          "end": 88,
+          "role": "logic",
+          "symbol": "verify_reference_attractors",
+          "anchor": "5c28bf6478f3",
+          "first": "def verify_reference_attractors(spec: ModelSpec) -> dict[str, EquilibriumRecord]:"
+        }
+      ]
+    }
+  ]
+}

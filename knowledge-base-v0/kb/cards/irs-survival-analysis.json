@@ -1,0 +1,421 @@
+{
+  "schema": "astaui.card/1",
+  "id": "irs-survival-analysis",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T19:13:13Z"
+  },
+  "app": {
+    "title": "IRS Survival Explorer (Immune Risk Score survival explorer)",
+    "summary": "A person loads a differential expression table and a gene set enrichment table, or uses the bundled ones, and sets significance cut-offs in a sidebar. The interface takes the significant genes that match a list of immune-gene prefixes and combines them into one risk score per patient, weighted by fold change. Because the expression results come with no outcome data, it simulates a patient cohort and splits it into high and low groups at the median. It then fits survival curves, a log-rank test and a proportional-hazards model with covariates, and checks the proportional-hazards assumption. The person can look at supporting plots of the expression, enrichment and network results, then download the simulated cohort table.",
+    "task": {
+      "text": "Turn differential expression and enrichment results into a composite risk score and see how it separates survival, and how sensitive that is to each cut-off.",
+      "verbs": [
+        "derive",
+        "compare",
+        "explore",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Per-gene differential expression statistics and per-term enrichment results as tables, which are turned into a simulated patient table of time-to-event outcomes with covariates. Precomputed protein-interaction network outputs are also shown.",
+      "item": "a gene with its fold change and adjusted p-value, rolled up into one patient's risk score with a survival time and event flag",
+      "shapes": [
+        "table",
+        "network"
+      ]
+    },
+    "stage": {
+      "text": "linking expression results to survival outcome, after differential expression and enrichment analysis",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar cut-offs and simulation settings feed one recomputation, and its results show in a row of header metrics and in tabs: survival curves with a forest plot, a volcano plot with the selected genes, an enrichment lollipop chart, a network viewer and the cohort table. Each change in the sidebar redraws every view from the same fitted models.",
+      "views": [
+        "summary stats",
+        "line chart",
+        "strip plot",
+        "scatter plot",
+        "bar chart",
+        "table view",
+        "image viewer"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "survival analysis of a transcriptomic risk score in cancer bioinformatics",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "survival analysis",
+        "transcriptomics",
+        "prognostic biomarkers"
+      ]
+    },
+    "workflow": {
+      "name": "build a composite score from selected features and test how it splits outcomes",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a DESeq2 results CSV and a clusterProfiler GSEA CSV in the sidebar. With no uploads, the bundled files are used. Required columns are checked on load.",
+          "parts": [
+            "sidebar-inputs"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Set the padj and |log2FC| cut-offs for genes and the FDR cut-off for enrichment terms. The volcano plot draws the thresholds, and a table lists the immune-prefix genes that enter the score.",
+          "parts": [
+            "sidebar-inputs",
+            "dea-tab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Simulate a cohort from the fold-change-weighted score, using the chosen cohort size, follow-up and seed. The effect size comes from the mean negative enrichment score, and the cohort is split into High and Low at the median.",
+          "parts": [
+            "sidebar-inputs",
+            "header-metrics"
+          ]
+        },
+        {
+          "step": "compare the groups on outcome",
+          "here": "Show Kaplan-Meier curves for High and Low groups with censor marks, the log-rank statistic and median survival per group. A Cox model of score, age and stage is shown as a forest plot and a hazard-ratio table, with an adjustable penalizer.",
+          "parts": [
+            "survival-tab",
+            "header-metrics"
+          ]
+        },
+        {
+          "step": "check that the model's assumption holds",
+          "here": "A Schoenfeld residual test table flags covariates whose effect changes over time.",
+          "parts": [
+            "survival-tab"
+          ]
+        },
+        {
+          "step": "look over the supporting evidence",
+          "here": "A lollipop chart of the most negatively enriched terms, with a slider for how many terms to show, and a precomputed protein-interaction network with hub-gene and centrality tables.",
+          "parts": [
+            "gsea-tab",
+            "ppi-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download the simulated patient table as a CSV.",
+          "parts": [
+            "cohort-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The outcome cohort is simulated from observed effect sizes, so the tool demonstrates the method and is not evidence. A fixed seed makes it reproduce a reference file.",
+        "The score's features are chosen by a gene-symbol prefix rule, with a fallback to all significant genes when nothing matches.",
+        "Changing the seed, cohort size or follow-up shows how stable the survival estimates are under resampling.",
+        "Covariates are drawn independently of survival, so their hazard ratios act as a negative control.",
+        "The proportional-hazards assumption is tested next to the model that relies on it."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar-inputs",
+      "level": "view",
+      "parent": null,
+      "title": "Inputs and parameters",
+      "summary": "Loads the two result tables and sets the significance cut-offs, the simulation settings and the model penalizer. Every view is recomputed from these.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 187,
+          "end": 198,
+          "role": "markup",
+          "anchor": "4f363b912ca3",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 201,
+          "end": 205,
+          "role": "logic",
+          "symbol": "cached_load",
+          "anchor": "f002d8ced355",
+          "first": "def cached_load(dea_bytes, gsea_bytes):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 41,
+          "end": 52,
+          "role": "logic",
+          "symbol": "load_inputs",
+          "anchor": "6f145d66e877",
+          "first": "def load_inputs(dea_src, gsea_src):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 207,
+          "end": 215,
+          "role": "logic",
+          "anchor": "1f57dc0577f8",
+          "first": "try:"
+        }
+      ]
+    },
+    {
+      "id": "header-metrics",
+      "level": "view",
+      "parent": null,
+      "title": "Header metrics",
+      "summary": "Shows counts of significant and selected genes, events over patients, the score's hazard ratio with its confidence interval, and the concordance index.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 217,
+          "end": 225,
+          "role": "markup",
+          "anchor": "c75a383e78c0",
+          "first": "irs = cph.summary.loc['IRS']"
+        },
+        {
+          "file": "code/app.py",
+          "start": 63,
+          "end": 102,
+          "role": "logic",
+          "symbol": "simulate_cohort",
+          "anchor": "34def530ea49",
+          "first": "def simulate_cohort(dea, gsea, padj=0.05, lfc=1.0, gsea_fdr=0.05,"
+        },
+        {
+          "file": "code/app.py",
+          "start": 59,
+          "end": 60,
+          "role": "logic",
+          "symbol": "is_immune",
+          "anchor": "0035560de14d",
+          "first": "def is_immune(symbol):"
+        }
+      ]
+    },
+    {
+      "id": "survival-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Survival",
+      "summary": "Shows Kaplan-Meier curves for the two risk groups with log-rank and median survival, a Cox forest plot with its hazard-ratio table, and the proportional-hazards test.",
+      "views": [
+        "line chart",
+        "strip plot",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 227,
+          "end": 242,
+          "role": "markup",
+          "anchor": "5b950b109763",
+          "first": "t_surv, t_dea, t_gsea, t_ppi, t_data = st.tabs("
+        },
+        {
+          "file": "code/app.py",
+          "start": 105,
+          "end": 113,
+          "role": "logic",
+          "symbol": "fit_models",
+          "anchor": "afaa8a6c271e",
+          "first": "def fit_models(cohort, penalizer=0.01):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 117,
+          "end": 125,
+          "role": "logic",
+          "symbol": "plot_km",
+          "anchor": "8ef11d595fa2",
+          "first": "def plot_km(kms, lr):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 128,
+          "end": 140,
+          "role": "logic",
+          "symbol": "plot_forest",
+          "anchor": "2bef8dd5d299",
+          "first": "def plot_forest(cph):"
+        }
+      ]
+    },
+    {
+      "id": "dea-tab",
+      "level": "view",
+      "parent": null,
+      "title": "DEA",
+      "summary": "A volcano plot drawn at the chosen cut-offs, with a table beside it of the genes that make up the score.",
+      "views": [
+        "scatter plot",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 244,
+          "end": 249,
+          "role": "markup",
+          "anchor": "4dea3f3d1581",
+          "first": "with t_dea:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 143,
+          "end": 161,
+          "role": "logic",
+          "symbol": "plot_volcano",
+          "anchor": "53e7cb2a6940",
+          "first": "def plot_volcano(dea, padj, lfc):"
+        }
+      ]
+    },
+    {
+      "id": "gsea-tab",
+      "level": "view",
+      "parent": null,
+      "title": "GSEA",
+      "summary": "A lollipop chart and table of the negatively enriched terms, with a slider for how many terms to show.",
+      "views": [
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 251,
+          "end": 254,
+          "role": "markup",
+          "anchor": "c26990063c6a",
+          "first": "with t_gsea:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 164,
+          "end": 174,
+          "role": "logic",
+          "symbol": "plot_gsea",
+          "anchor": "ae5bf7efba4f",
+          "first": "def plot_gsea(neg_gsea, k=15):"
+        }
+      ]
+    },
+    {
+      "id": "ppi-tab",
+      "level": "view",
+      "parent": null,
+      "title": "PPI network",
+      "summary": "Shows the precomputed protein-interaction network figure with its hub-gene and centrality tables.",
+      "views": [
+        "image viewer",
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 256,
+          "end": 265,
+          "role": "markup",
+          "anchor": "00092f11c964",
+          "first": "with t_ppi:"
+        },
+        {
+          "file": "code/PPI_hub_genes.csv",
+          "start": 1,
+          "end": 15,
+          "role": "data",
+          "anchor": "c147be70bd9e",
+          "first": "\"gene\",\"degree\",\"betweenness\",\"log2FC\""
+        },
+        {
+          "file": "code/PPI_centrality_metrics.csv",
+          "start": 1,
+          "end": 114,
+          "role": "data",
+          "anchor": "90a7d2cf49b6",
+          "first": "\"gene\",\"degree\",\"betweenness\",\"log2FC\",\"is_hub\""
+        }
+      ]
+    },
+    {
+      "id": "cohort-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Cohort data",
+      "summary": "Shows the simulated patient table and downloads it as a CSV.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 267,
+          "end": 270,
+          "role": "markup",
+          "anchor": "2de55ea0e62e",
+          "first": "with t_data:"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,660 @@
+{
+  "schema": "astaui.card/1",
+  "id": "reorient-mri",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:08:39Z"
+  },
+  "app": {
+    "title": "Reorient: manual reorientation and cropping of MRI volumes",
+    "summary": "A person drops a 3D MRI volume onto the page and sees it in three linked orthogonal views. They pick the Translate or Rotate tool and drag inside any view to line the brain up with the standard planes. They can also load a saved rotation matrix, append one to the current matrix, or reset it. Then they switch to the Select tool and drag a crop box in the views to enclose the part they want to keep. A side panel keeps the matrices and the crop box up to date. They save the affine matrix and the crop box as text files, and the reoriented, cropped volume as a new NIfTI file, so the same result can be reproduced offline by a script.",
+    "task": {
+      "text": "Align a 3D brain volume to the standard planes by hand, crop it, and save the transform so the result can be reproduced.",
+      "verbs": [
+        "derive",
+        "clean"
+      ]
+    },
+    "data": {
+      "text": "A 3D MRI volume (NIfTI) with its voxel-to-world affine matrix, plus a rotation matrix and a crop box as small text files",
+      "item": "one MRI volume in a .nii or .nii.gz file",
+      "shapes": [
+        "field",
+        "image"
+      ]
+    },
+    "stage": {
+      "text": "preprocessing raw MRI volumes, before segmentation and analysis",
+      "terms": [
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "Three linked slice views (sagittal, coronal, axial) redraw together as the person drags to translate or rotate the volume, and an info panel shows the updated matrices as they change. A tool switch turns on a resizable crop-box overlay in all three views, and buttons load, append, reset and save the matrix and the box, and resample the volume to export it.",
+      "views": [
+        "image viewer",
+        "side-by-side panes",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "drag to transform",
+        "toggle view",
+        "brush",
+        "undo",
+        "export"
+      ],
+      "patterns": [
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "manual reorientation and cropping of MRI volumes in neuroimaging",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "neuroimaging",
+        "neuroanatomy",
+        "mri preprocessing"
+      ]
+    },
+    "workflow": {
+      "name": "align and crop a 3D volume by hand and save the transform for reproducible reprocessing",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Drop a .nii or .nii.gz file on the upload box, or click Choose. An error message explains when a file fails to load or is unusually large.",
+          "parts": [
+            "drop-zone"
+          ]
+        },
+        {
+          "step": "adjust the item's position and orientation by direct manipulation",
+          "here": "With Translate or Rotate chosen in the tool switch, dragging in the sagittal, coronal or axial view moves or turns the volume, and all three views redraw together.",
+          "parts": [
+            "tool-chooser",
+            "slice-views"
+          ]
+        },
+        {
+          "step": "reuse or undo an earlier transform",
+          "here": "Load a rotation matrix to replace the current one, append one to compose it with the current one, or reset the matrix to the file's original.",
+          "parts": [
+            "transform-files"
+          ]
+        },
+        {
+          "step": "select the region to keep",
+          "here": "The Select tool shows a crop-box overlay in each view. Dragging its edges sets the box's min and max corners. A saved box can be loaded, and Reset Selection returns to the default.",
+          "parts": [
+            "crop-box",
+            "transform-files"
+          ]
+        },
+        {
+          "step": "check the computed values",
+          "here": "An info panel shows the volume shape, the world-to-voxel and voxel-to-world matrices, and the crop-box corners, and updates live.",
+          "parts": [
+            "info-panel"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Save the voxel-to-world matrix (reorient.mat) and the crop box (selection.txt) as text, and save the resampled, cropped volume as reoriented.nii.gz.",
+          "parts": [
+            "exports"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The matrix and the crop box are saved as plain text, so a companion script can rebuild the same reoriented volume from the original file offline.",
+        "The exported volume is resampled to isotropic voxels set to the median of the three original voxel sizes.",
+        "Saving the volume warns when the crop box still has its default size.",
+        "A matrix can be appended as well as replaced, which composes a new transform with the existing one.",
+        "Each view plane maps drags to a different rotation axis, so a 3D rotation is built up from 2D drags."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "control-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Left control panel",
+      "summary": "Holds the upload box, the tool switch, the file buttons and the matrix readout.",
+      "views": [],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 124,
+          "end": 182,
+          "role": "markup",
+          "symbol": "#panel-left",
+          "anchor": "a87cf79e7658",
+          "first": "<div id=\"panel-left\" style=\"flex:0 0 220px\">"
+        },
+        {
+          "file": "code/reorient.css",
+          "start": 25,
+          "end": 48,
+          "role": "style",
+          "anchor": "1765d60b1626",
+          "first": "#tools,"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 764,
+          "end": 778,
+          "role": "logic",
+          "symbol": "initUI",
+          "anchor": "3cf5b982a5c2",
+          "first": "function initUI(MUI) {"
+        }
+      ]
+    },
+    {
+      "id": "drop-zone",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Volume upload box",
+      "summary": "Loads a NIfTI volume by drag and drop or a file chooser, and shows an error when loading fails.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 144,
+          "end": 158,
+          "role": "markup",
+          "anchor": "2686db7b98aa",
+          "first": "<div class=\"box\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 53,
+          "end": 104,
+          "role": "style",
+          "anchor": "5ff6efa626e3",
+          "first": "<style>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 218,
+          "end": 245,
+          "role": "logic",
+          "anchor": "302340445878",
+          "first": "<script>"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 584,
+          "end": 595,
+          "role": "logic",
+          "symbol": "loadNifti",
+          "anchor": "27bce6481b75",
+          "first": "function loadNifti() {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 551,
+          "end": 583,
+          "role": "logic",
+          "symbol": "loadNiftiFailedMessage",
+          "anchor": "c9c0c154cd5d",
+          "first": "function loadNiftiFailedMessage(err) {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 741,
+          "end": 749,
+          "role": "logic",
+          "symbol": "init",
+          "anchor": "313f1ded266f",
+          "first": "async function init(file) {"
+        }
+      ]
+    },
+    {
+      "id": "tool-chooser",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Translate / Rotate / Select tool switch",
+      "summary": "Sets what a drag in the views does, and shows the crop-box overlay only when Select is chosen.",
+      "views": [],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 127,
+          "end": 137,
+          "role": "markup",
+          "symbol": "#tools",
+          "anchor": "3662195df08c",
+          "first": "<div id=\"tools\" class=\"mui-chose\" style=\"width:200px\">"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 751,
+          "end": 758,
+          "role": "logic",
+          "symbol": "selectTool",
+          "anchor": "47ce10fe4d23",
+          "first": "function selectTool(option) {"
+        }
+      ]
+    },
+    {
+      "id": "slice-views",
+      "level": "view",
+      "parent": null,
+      "title": "Linked sagittal, coronal and axial views",
+      "summary": "Shows the volume in three orthogonal planes that redraw together as the person drags to translate or rotate it.",
+      "views": [
+        "image viewer",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "drag to transform"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 184,
+          "end": 192,
+          "role": "markup",
+          "symbol": "#panel-right",
+          "anchor": "e56425fab5ba",
+          "first": "<div id=\"panel-right\" style=\"flex:1\">"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 665,
+          "end": 665,
+          "role": "logic",
+          "symbol": "_newMRIViewer",
+          "anchor": "f419a9cd9169",
+          "first": "function _newMRIViewer({file, path}) {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 681,
+          "end": 720,
+          "role": "logic",
+          "symbol": "_display",
+          "anchor": "494f8ca29567",
+          "first": "async function _display() {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 216,
+          "end": 219,
+          "role": "logic",
+          "symbol": "mouseDown",
+          "anchor": "9b648ba6b758",
+          "first": "function mouseDown(view, e) {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 226,
+          "end": 274,
+          "role": "logic",
+          "symbol": "mouseMove",
+          "anchor": "618f9940be87",
+          "first": "function mouseMove(view, e) {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 279,
+          "end": 282,
+          "role": "logic",
+          "symbol": "mouseUp",
+          "anchor": "be1983c97b22",
+          "first": "function mouseUp() {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 147,
+          "end": 166,
+          "role": "logic",
+          "symbol": "rotate",
+          "anchor": "7be9e61d683f",
+          "first": "function rotate(axis, val) {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 172,
+          "end": 189,
+          "role": "logic",
+          "symbol": "trans",
+          "anchor": "d7c00e3635ee",
+          "first": "function trans(delta) {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 6,
+          "end": 27,
+          "role": "data",
+          "symbol": "globals",
+          "anchor": "c8b3b427d215",
+          "first": "const globals = {"
+        }
+      ]
+    },
+    {
+      "id": "crop-box",
+      "level": "component",
+      "parent": "slice-views",
+      "title": "Crop-box overlay",
+      "summary": "A resizable rectangle in each view that sets the 3D region to keep, kept the same across all three planes.",
+      "views": [],
+      "interactions": [
+        "brush",
+        "undo"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/reorient.css",
+          "start": 22,
+          "end": 24,
+          "role": "style",
+          "symbol": ".overlay",
+          "anchor": "04b676adc2f4",
+          "first": ".overlay {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 288,
+          "end": 341,
+          "role": "logic",
+          "symbol": "updateOverlaysFromCropBox",
+          "anchor": "d05e84ac5668",
+          "first": "function updateOverlaysFromCropBox() {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 348,
+          "end": 377,
+          "role": "logic",
+          "symbol": "updateCropBoxFromOverlay",
+          "anchor": "cc1cf7137fc4",
+          "first": "function updateCropBoxFromOverlay(view, box) {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 658,
+          "end": 660,
+          "role": "logic",
+          "symbol": "_initCropBox",
+          "anchor": "8c88da91e17a",
+          "first": "function _initCropBox() {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 394,
+          "end": 399,
+          "role": "logic",
+          "symbol": "resetSelection",
+          "anchor": "cfbcb0c968c4",
+          "first": "function resetSelection() {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 702,
+          "end": 710,
+          "role": "logic",
+          "anchor": "dfc7b32b55b0",
+          "first": "// Add an overlay for the cropping"
+        }
+      ]
+    },
+    {
+      "id": "transform-files",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Load, append and reset matrix and selection",
+      "summary": "Loads a saved rotation matrix to replace or compose with the current one, loads a saved crop box, and resets the matrix or the box.",
+      "views": [],
+      "interactions": [
+        "import",
+        "undo"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 160,
+          "end": 160,
+          "role": "markup",
+          "symbol": "#loadMatrix",
+          "anchor": "c9af01e5802b",
+          "first": "<div id=\"loadMatrix\" class=\"mui mui-push\" style=\"padding:1.2% 0\">Load New Rotation Matrix</div>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 161,
+          "end": 161,
+          "role": "markup",
+          "symbol": "#appendMatrix",
+          "anchor": "710f1fb44f62",
+          "first": "<div id=\"appendMatrix\" class=\"mui mui-push\" style=\"padding:1.2% 0\">Append Rotation Matrix</div>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 163,
+          "end": 163,
+          "role": "markup",
+          "symbol": "#loadSelection",
+          "anchor": "43bdd40ad03d",
+          "first": "<div id=\"loadSelection\" class=\"mui mui-push\" style=\"padding:1.2% 0\">Load Selection Box</div>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 165,
+          "end": 165,
+          "role": "markup",
+          "symbol": "#resetMatrix",
+          "anchor": "9bbb6bcf1424",
+          "first": "<div id=\"resetMatrix\" class=\"mui mui-push\" style=\"padding:1.2% 0\">Reset Matrix</div>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 166,
+          "end": 166,
+          "role": "markup",
+          "symbol": "#resetSelection",
+          "anchor": "0138acacb976",
+          "first": "<div id=\"resetSelection\" class=\"mui mui-push\" style=\"padding:1.2% 0\">Reset Selection</div>"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 405,
+          "end": 437,
+          "role": "logic",
+          "symbol": "loadMatrix",
+          "anchor": "f6ae80bd5798",
+          "first": "function loadMatrix() {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 443,
+          "end": 476,
+          "role": "logic",
+          "symbol": "appendMatrix",
+          "anchor": "879e1f2e54c4",
+          "first": "function appendMatrix() {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 499,
+          "end": 527,
+          "role": "logic",
+          "symbol": "loadSelection",
+          "anchor": "de8b5d3a69b3",
+          "first": "function loadSelection() {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 382,
+          "end": 389,
+          "role": "logic",
+          "symbol": "resetMatrix",
+          "anchor": "f35e55f4496a",
+          "first": "function resetMatrix() {"
+        }
+      ]
+    },
+    {
+      "id": "exports",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Save matrix, selection and volume",
+      "summary": "Saves the affine matrix and the crop box as text, and the resampled, cropped volume as NIfTI, with a warning if the box was never adjusted.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 162,
+          "end": 162,
+          "role": "markup",
+          "symbol": "#saveMatrix",
+          "anchor": "2bf625efb533",
+          "first": "<div id=\"saveMatrix\" class=\"mui mui-push\" style=\"padding:1.2% 0\">Save Rotation Matrix</div>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 164,
+          "end": 164,
+          "role": "markup",
+          "symbol": "#saveSelection",
+          "anchor": "9e05afcb2576",
+          "first": "<div id=\"saveSelection\" class=\"mui mui-push\" style=\"padding:1.2% 0\">Save Selection Box</div>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 167,
+          "end": 167,
+          "role": "markup",
+          "symbol": "#saveNifti",
+          "anchor": "4cee007b8da0",
+          "first": "<div id=\"saveNifti\" class=\"mui mui-push\" style=\"padding:1.2% 0\">Save Nifti</div>"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 482,
+          "end": 494,
+          "role": "logic",
+          "symbol": "saveMatrix",
+          "anchor": "68c15c096309",
+          "first": "function saveMatrix() {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 532,
+          "end": 546,
+          "role": "logic",
+          "symbol": "saveSelection",
+          "anchor": "cb5b8bd1eec3",
+          "first": "function saveSelection() {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 601,
+          "end": 653,
+          "role": "logic",
+          "symbol": "saveNifti",
+          "anchor": "22d89cc0efdb",
+          "first": "function saveNifti() {"
+        },
+        {
+          "file": "code/reorient.py",
+          "start": 72,
+          "end": 104,
+          "role": "logic",
+          "symbol": "reorient",
+          "anchor": "b62f725df36c",
+          "first": "def reorient(img, rotation, selection):"
+        }
+      ]
+    },
+    {
+      "id": "info-panel",
+      "level": "component",
+      "parent": "control-panel",
+      "title": "Volume and matrix readout",
+      "summary": "Shows the volume shape, the world-to-voxel and voxel-to-world matrices, and the crop-box corners, updated after every change.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 171,
+          "end": 180,
+          "role": "markup",
+          "symbol": "#info",
+          "anchor": "d95333d483ea",
+          "first": "<div id=\"info\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 27,
+          "end": 33,
+          "role": "style",
+          "symbol": "pre",
+          "anchor": "a1bdf9a43ccf",
+          "first": "pre {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 49,
+          "end": 63,
+          "role": "logic",
+          "symbol": "printInfo",
+          "anchor": "dee2a0bbe98c",
+          "first": "function printInfo() {"
+        },
+        {
+          "file": "code/reorient.js",
+          "start": 39,
+          "end": 47,
+          "role": "logic",
+          "symbol": "matrix2str",
+          "anchor": "5f672ddff361",
+          "first": "function matrix2str(matrix) {"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "interactions",
+      "term": "drag to transform"
+    }
+  ]
+}

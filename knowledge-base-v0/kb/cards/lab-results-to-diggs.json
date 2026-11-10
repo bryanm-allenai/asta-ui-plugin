@@ -1,0 +1,726 @@
+{
+  "schema": "astaui.card/1",
+  "id": "lab-results-to-diggs",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T07:37:11Z"
+  },
+  "app": {
+    "title": "Lab Results → DIGGS",
+    "summary": "A person loads a project's existing data-exchange file, which lists the sampling locations and samples, and says whether the locations are proposed or final. From that file they download a spreadsheet workbook with the locations and samples already filled in. They enter test results on one sheet per test type, set the project units and drop the workbook back on the page. The page matches each result row to a sample in the file, and lists counts, errors and warnings for the person to fix. Once nothing blocks the build, they preview and download the standard XML file with the results merged in, and can optionally check it against an online validator. Without a starting file, a blank workbook is used instead and each location's coordinates are typed in a table.",
+    "task": {
+      "text": "Move finished laboratory test results from a spreadsheet into a project's standard data-exchange file without changing any value, then check the file against the standard's rules.",
+      "verbs": [
+        "curate",
+        "clean",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Sampling locations, each holding samples taken at depth intervals; each sample has laboratory test results on per-test sheets, with the raw measurements behind them, all ending up in one hierarchical XML file",
+      "item": "a test result row for one sample, identified by its location, sample name and depth interval",
+      "shapes": [
+        "table",
+        "hierarchy",
+        "geospatial",
+        "document"
+      ]
+    },
+    "stage": {
+      "text": "handing over finished lab test results into the project's shared data file, after testing",
+      "terms": [
+        "report",
+        "maintain"
+      ]
+    },
+    "mechanism": {
+      "text": "A numbered sequence of panels runs from loading the starting file and downloading a prefilled workbook, through units and the workbook drop, to the build panel. Any change to an input rebuilds the dataset straight away and redraws the summary counts, error and warning lists, location table and XML preview. The download and online-check buttons stay disabled until there are no errors.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats",
+        "list",
+        "document reader"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "inline edit",
+        "select"
+      ],
+      "patterns": [
+        "stepwise wizard"
+      ]
+    },
+    "field": {
+      "text": "translating soil laboratory test results into a data-exchange standard, in geotechnical engineering",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "geotechnical engineering",
+        "soil testing",
+        "diggs"
+      ]
+    },
+    "workflow": {
+      "name": "convert spreadsheet results into a standard exchange file and check it against the standard's rules",
+      "steps": [
+        {
+          "step": "bring the reference data in",
+          "here": "Drop the project's DIGGS XML file. The page shows counts of borings, borings with locations and samples, and warns about problems in the file. Radio buttons say whether the locations are proposed or as drilled, and whether to replace or keep results added on an earlier run.",
+          "parts": [
+            "source-step"
+          ]
+        },
+        {
+          "step": "get a template prefilled from the reference",
+          "here": "Download an .xlsx workbook already listing the file's borings and samples, with a sheet per test and a note on every column. A blank workbook or CSV templates are available when there is no starting file, and a reference table lists each sheet's columns and ASTM method.",
+          "parts": [
+            "workbook-templates"
+          ]
+        },
+        {
+          "step": "set project details and units",
+          "here": "Fill in the project name, laboratory and the units for depth, density, raw mass, dimension and volume. These come from the workbook's Project sheet, or from the source file when there is one, and every value is labelled with them.",
+          "parts": [
+            "project-units"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "Drop the filled-in workbook or CSV files. Each sheet's test type is detected from its header row, with a dropdown to override it. Adding a file again replaces the earlier copy.",
+          "parts": [
+            "file-loader"
+          ]
+        },
+        {
+          "step": "fill in what the reference lacks",
+          "here": "Without a starting file, a table lists each boring found in the results for typing latitude, longitude, ground elevation, total depth and date drilled. Missing coordinates are outlined in red.",
+          "parts": [
+            "boring-locations"
+          ]
+        },
+        {
+          "step": "check and fix problems",
+          "here": "Counts of borings, samples and tests, with totals by test type and how many samples were matched to the source file. Below them, numbered error and warning lists name the file and row of each problem. Errors block the build until fixed.",
+          "parts": [
+            "build-summary"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Preview the added XML records and download the merged DIGGS XML under a chosen name. Optionally, send it to an online validator for schema, codelist and business-rule checks, or wrap it in an inspector page.",
+          "parts": [
+            "build-summary",
+            "online-check"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The tool translates and never calculates: values are written as entered, and a result the lab did not report is marked 'notReported', so a test can carry its raw measurements alone",
+        "Results are matched to the file's existing samples by sample name within the boring, or else by a depth interval within a small tolerance. When depths disagree, the file's depths win and a warning is raised",
+        "The original file is kept as it was: new samples and tests are inserted with their own id prefix, and an audit-trail entry records who added them and whether the locations were proposed",
+        "Each test type maps to an ASTM method and a procedure element in the standard, with raw trial data (sieve points, hydrometer readings, Proctor trials) carried into the procedure",
+        "Everything runs offline in one HTML file, and nothing leaves the computer unless the person presses an online button"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "source-step",
+      "level": "view",
+      "parent": null,
+      "title": "Start from the project's DIGGS file",
+      "summary": "Loads the project's existing exchange file, shows how many borings, located borings and samples it holds and any problems with it, and asks whether the locations are proposed or final.",
+      "views": [
+        "summary stats",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [
+        "stepwise wizard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/index.html",
+          "start": 29,
+          "end": 89,
+          "role": "markup",
+          "symbol": "#step-source",
+          "anchor": "ee1cd0ed1b92",
+          "first": "<section class=\"card\" id=\"step-source\">"
+        },
+        {
+          "file": "code/src/styles.css",
+          "start": 81,
+          "end": 84,
+          "role": "style",
+          "symbol": ".dropzone",
+          "anchor": "3350d97561f2",
+          "first": ".dropzone {"
+        },
+        {
+          "file": "code/src/styles.css",
+          "start": 87,
+          "end": 87,
+          "role": "style",
+          "symbol": "#source-info",
+          "anchor": "c5064b65e94a",
+          "first": "#source-info { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-top: 12px; background: va"
+        },
+        {
+          "file": "code/src/styles.css",
+          "start": 95,
+          "end": 95,
+          "role": "style",
+          "symbol": ".stats",
+          "anchor": "b1c88898c5b0",
+          "first": ".stats { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }"
+        },
+        {
+          "file": "code/src/styles.css",
+          "start": 90,
+          "end": 90,
+          "role": "style",
+          "symbol": "fieldset.choice",
+          "anchor": "7c806edd69e9",
+          "first": "fieldset.choice { border: none; padding: 0; margin: 10px 0; display: flex; flex-wrap: wrap; gap: 4px 18px; }"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 85,
+          "end": 102,
+          "role": "logic",
+          "symbol": "setSource",
+          "anchor": "5e024ff1ae01",
+          "first": "function setSource(text, name) {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 104,
+          "end": 109,
+          "role": "logic",
+          "symbol": "readSourceFiles",
+          "anchor": "de864b299d3f",
+          "first": "function readSourceFiles(list) {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 111,
+          "end": 164,
+          "role": "logic",
+          "symbol": "renderSource",
+          "anchor": "1abf50dd11d0",
+          "first": "function renderSource() {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 228,
+          "end": 244,
+          "role": "logic",
+          "symbol": "loadExample",
+          "anchor": "298e976580d4",
+          "first": "function loadExample() {"
+        },
+        {
+          "file": "code/src/core.js",
+          "start": 1796,
+          "end": 1913,
+          "role": "logic",
+          "symbol": "readDiggs",
+          "anchor": "cabcdbc59e3f",
+          "first": "function readDiggs(text, fileName) {"
+        },
+        {
+          "file": "code/src/core.js",
+          "start": 1916,
+          "end": 1922,
+          "role": "logic",
+          "symbol": "describeSource",
+          "anchor": "696311dc0a39",
+          "first": "function describeSource(info) {"
+        }
+      ]
+    },
+    {
+      "id": "workbook-templates",
+      "level": "component",
+      "parent": "source-step",
+      "title": "Workbook and template downloads",
+      "summary": "Offers a workbook prefilled from the source file, or blank and example workbooks and CSV templates, plus a reference table of each sheet's columns and test method.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/index.html",
+          "start": 59,
+          "end": 59,
+          "role": "markup",
+          "symbol": "#dl-seeded",
+          "anchor": "61dcfc780f5c",
+          "first": "<button type=\"button\" id=\"dl-seeded\" class=\"btn primary\">Download a workbook for this project (.xlsx)</button>"
+        },
+        {
+          "file": "code/src/index.html",
+          "start": 63,
+          "end": 75,
+          "role": "markup",
+          "symbol": "#no-source",
+          "anchor": "10a2d3e6397f",
+          "first": "<details class=\"help\" id=\"no-source\">"
+        },
+        {
+          "file": "code/src/index.html",
+          "start": 82,
+          "end": 85,
+          "role": "markup",
+          "symbol": "#template-table",
+          "anchor": "c07f3a20ab7e",
+          "first": "<table class=\"templates\" id=\"template-table\">"
+        },
+        {
+          "file": "code/src/index.html",
+          "start": 87,
+          "end": 87,
+          "role": "markup",
+          "symbol": "#column-help",
+          "anchor": "b965c7c87d03",
+          "first": "<div id=\"column-help\"></div>"
+        },
+        {
+          "file": "code/src/styles.css",
+          "start": 110,
+          "end": 110,
+          "role": "style",
+          "symbol": ".colhelp dl",
+          "anchor": "1dbdc98a0e92",
+          "first": ".colhelp dl { margin: 0; display: grid; grid-template-columns: minmax(150px, max-content) 1fr; gap: 2px 12px; font-size:"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 167,
+          "end": 224,
+          "role": "logic",
+          "symbol": "renderTemplates",
+          "anchor": "acbd7921a92a",
+          "first": "function renderTemplates() {"
+        },
+        {
+          "file": "code/src/core.js",
+          "start": 1925,
+          "end": 1939,
+          "role": "logic",
+          "symbol": "sourceSeed",
+          "anchor": "eb8e603a4232",
+          "first": "function sourceSeed(info) {"
+        },
+        {
+          "file": "code/src/core.js",
+          "start": 129,
+          "end": 133,
+          "role": "data",
+          "symbol": "TEMPLATES",
+          "anchor": "f45d56ee5bac",
+          "first": "var TEMPLATES = TEMPLATE_DATA.templates.map(function (t) {"
+        }
+      ]
+    },
+    {
+      "id": "project-units",
+      "level": "view",
+      "parent": null,
+      "title": "Project and units",
+      "summary": "A form for project details and the units that label every value, filled in from the workbook's Project sheet and saved between sessions.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [
+        "stepwise wizard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/index.html",
+          "start": 91,
+          "end": 119,
+          "role": "markup",
+          "symbol": "#step-project",
+          "anchor": "09e5d4927e25",
+          "first": "<section class=\"card\" id=\"step-project\">"
+        },
+        {
+          "file": "code/src/styles.css",
+          "start": 70,
+          "end": 70,
+          "role": "style",
+          "symbol": ".grid",
+          "anchor": "e36362a3890b",
+          "first": ".grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px 16px; }"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 293,
+          "end": 318,
+          "role": "logic",
+          "symbol": "initSettings",
+          "anchor": "36c2e4aa45c7",
+          "first": "function initSettings() {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 274,
+          "end": 285,
+          "role": "logic",
+          "symbol": "settings",
+          "anchor": "4e9de7d08845",
+          "first": "function settings() {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 247,
+          "end": 263,
+          "role": "logic",
+          "symbol": "applyProject",
+          "anchor": "264915bdeb7f",
+          "first": "function applyProject(entries) {"
+        },
+        {
+          "file": "code/src/core.js",
+          "start": 336,
+          "end": 365,
+          "role": "logic",
+          "symbol": "projectSettings",
+          "anchor": "adf790b75b6c",
+          "first": "function projectSettings(rows) {"
+        },
+        {
+          "file": "code/src/core.js",
+          "start": 42,
+          "end": 48,
+          "role": "data",
+          "symbol": "DENSITY_UNITS",
+          "anchor": "4eddedf4e17a",
+          "first": "var DENSITY_UNITS = {"
+        }
+      ]
+    },
+    {
+      "id": "file-loader",
+      "level": "view",
+      "parent": null,
+      "title": "Add your filled-in workbook",
+      "summary": "Reads dropped workbooks or CSV files and lists each sheet with the test type detected from its headers, a dropdown to override it, its row count and a remove button.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [
+        "stepwise wizard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/index.html",
+          "start": 121,
+          "end": 135,
+          "role": "markup",
+          "symbol": "#step-files",
+          "anchor": "4ae2a426715b",
+          "first": "<section class=\"card\" id=\"step-files\">"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 321,
+          "end": 359,
+          "role": "logic",
+          "symbol": "readFiles",
+          "anchor": "71655de6e045",
+          "first": "function readFiles(list) {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 361,
+          "end": 381,
+          "role": "logic",
+          "symbol": "renderFiles",
+          "anchor": "78968bccc25e",
+          "first": "function renderFiles() {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 57,
+          "end": 73,
+          "role": "logic",
+          "symbol": "wireDropzone",
+          "anchor": "9d2274a34501",
+          "first": "function wireDropzone(zone, input, onFiles) {"
+        },
+        {
+          "file": "code/src/core.js",
+          "start": 240,
+          "end": 266,
+          "role": "logic",
+          "symbol": "detectTemplate",
+          "anchor": "2fc26e7645bb",
+          "first": "function detectTemplate(fileName, headers) {"
+        },
+        {
+          "file": "code/src/core.js",
+          "start": 146,
+          "end": 173,
+          "role": "data",
+          "symbol": "ALIASES",
+          "anchor": "5828412aa006",
+          "first": "var ALIASES = {"
+        }
+      ]
+    },
+    {
+      "id": "boring-locations",
+      "level": "view",
+      "parent": null,
+      "title": "Boring locations",
+      "summary": "Without a starting file, gives an editable row per boring for coordinates, elevation, total depth and date drilled, and flags borings with missing coordinates.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/index.html",
+          "start": 137,
+          "end": 146,
+          "role": "markup",
+          "symbol": "#step-borings",
+          "anchor": "2d3168f4255c",
+          "first": "<section class=\"card\" id=\"step-borings\" hidden>"
+        },
+        {
+          "file": "code/src/styles.css",
+          "start": 79,
+          "end": 79,
+          "role": "style",
+          "symbol": ".borings input",
+          "anchor": "9efe20e4450b",
+          "first": ".borings input { padding: 5px 7px; min-width: 90px; }"
+        },
+        {
+          "file": "code/src/styles.css",
+          "start": 80,
+          "end": 80,
+          "role": "style",
+          "symbol": ".borings input.missing",
+          "anchor": "5affbb5c69c5",
+          "first": ".borings input.missing { border-color: var(--error); background: var(--error-bg); }"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 386,
+          "end": 428,
+          "role": "logic",
+          "symbol": "renderBorings",
+          "anchor": "b71ce39700f2",
+          "first": "function renderBorings(ds) {"
+        }
+      ]
+    },
+    {
+      "id": "build-summary",
+      "level": "view",
+      "parent": null,
+      "title": "Build the DIGGS file",
+      "summary": "Rebuilds the dataset whenever an input changes and shows counts by test type, matched samples, and blocking errors and warnings. Once nothing blocks the build, it previews the added XML and downloads the file.",
+      "views": [
+        "summary stats",
+        "list",
+        "document reader"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "stepwise wizard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/index.html",
+          "start": 148,
+          "end": 160,
+          "role": "markup",
+          "symbol": "#step-build",
+          "anchor": "f943a38afcae",
+          "first": "<section class=\"card\" id=\"step-build\">"
+        },
+        {
+          "file": "code/src/styles.css",
+          "start": 99,
+          "end": 99,
+          "role": "style",
+          "symbol": ".msgbox",
+          "anchor": "582103711aaa",
+          "first": ".msgbox { border-radius: 8px; padding: 10px 14px; margin: 8px 0; }"
+        },
+        {
+          "file": "code/src/styles.css",
+          "start": 113,
+          "end": 116,
+          "role": "style",
+          "symbol": "pre#preview",
+          "anchor": "1c725c3a1ad4",
+          "first": "pre#preview {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 434,
+          "end": 507,
+          "role": "logic",
+          "symbol": "rebuild",
+          "anchor": "9ff004aa8004",
+          "first": "function rebuild() {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 509,
+          "end": 525,
+          "role": "logic",
+          "symbol": "setOutputs",
+          "anchor": "d3c73dfc0b64",
+          "first": "function setOutputs() {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 527,
+          "end": 530,
+          "role": "logic",
+          "symbol": "outName",
+          "anchor": "5d6c2fbcc55b",
+          "first": "function outName() {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 48,
+          "end": 55,
+          "role": "logic",
+          "symbol": "msgBox",
+          "anchor": "9bb2247f739d",
+          "first": "function msgBox(kind, title, items, limit) {"
+        },
+        {
+          "file": "code/src/core.js",
+          "start": 373,
+          "end": 1079,
+          "role": "logic",
+          "symbol": "buildDataset",
+          "anchor": "6776d7cd36f8",
+          "first": "function buildDataset(files, settings) {"
+        },
+        {
+          "file": "code/src/core.js",
+          "start": 2065,
+          "end": 2073,
+          "role": "logic",
+          "symbol": "summarize",
+          "anchor": "01b984e4b4f2",
+          "first": "function summarize(ds) {"
+        },
+        {
+          "file": "code/src/core.js",
+          "start": 1554,
+          "end": 1639,
+          "role": "logic",
+          "symbol": "generateDiggs",
+          "anchor": "e3b53f986b64",
+          "first": "function generateDiggs(ds, settings) {"
+        },
+        {
+          "file": "code/src/core.js",
+          "start": 1953,
+          "end": 2063,
+          "role": "logic",
+          "symbol": "mergeDiggs",
+          "anchor": "15d466ef04cc",
+          "first": "function mergeDiggs(info, ds, settings) {"
+        }
+      ]
+    },
+    {
+      "id": "online-check",
+      "level": "view",
+      "parent": null,
+      "title": "Optional online steps",
+      "summary": "Sends the built file to an online validator and lists its schema, codelist and business-rule errors and warnings, or downloads an inspector page that wraps the file.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/index.html",
+          "start": 162,
+          "end": 170,
+          "role": "markup",
+          "symbol": "#step-online",
+          "anchor": "1db9734ba758",
+          "first": "<section class=\"card\" id=\"step-online\">"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 559,
+          "end": 596,
+          "role": "logic",
+          "symbol": "validateOnline",
+          "anchor": "f599e8cf3da7",
+          "first": "function validateOnline() {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 544,
+          "end": 557,
+          "role": "logic",
+          "symbol": "reportMessages",
+          "anchor": "99e1a2f12779",
+          "first": "function reportMessages(xmlText) {"
+        },
+        {
+          "file": "code/src/ui.js",
+          "start": 598,
+          "end": 626,
+          "role": "logic",
+          "symbol": "buildInspector",
+          "anchor": "166c770e7f9d",
+          "first": "function buildInspector() {"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "patterns",
+      "term": "stepwise wizard"
+    }
+  ]
+}

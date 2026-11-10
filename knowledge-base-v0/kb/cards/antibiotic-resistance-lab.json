@@ -1,0 +1,347 @@
+{
+  "schema": "astaui.card/1",
+  "id": "antibiotic-resistance-lab",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:13:20Z"
+  },
+  "app": {
+    "title": "Antibiotic resistance virtual lab: formula score, model prediction and observed rate for a bacterium-antibiotic pair",
+    "summary": "A person picks one bacterium and one antibiotic from two dropdowns. The page shows a hand-built formula score and a trained model's prediction for that pair, and sets them beside the observed surveillance rate, or says no observed value exists. A donut chart splits the formula score into the share each resistance mechanism contributes, with percentages on hover. A separate report page explains how the two feature tables were combined, how both models were built and how they were validated.",
+    "task": {
+      "text": "Look up a predicted resistance rate for a chosen bacterium-antibiotic pair, check it against the observed rate and see which mechanisms drive it.",
+      "verbs": [
+        "lookup",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A precomputed cross-join of two feature tables: organisms by binary mechanism presence, and drugs by 0-1 vulnerability to each mechanism. Each pair carries per-mechanism contribution factors, a formula score, a model prediction and, for some pairs, an observed rate. A research report goes with it.",
+      "item": "a bacterium-antibiotic pair with its mechanism factors, formula score, model prediction and observed resistance rate where one exists",
+      "shapes": [
+        "table",
+        "document"
+      ]
+    },
+    "stage": {
+      "text": "checking model predictions against surveillance data after modelling, and sharing the write-up",
+      "terms": [
+        "compare",
+        "report"
+      ]
+    },
+    "mechanism": {
+      "text": "Two dropdowns choose the pair. That choice filters the precomputed tables to one row, which fills a readout of the formula score, model prediction and observed value, and a donut chart of mechanism shares. The report page is a separate long document with tables and figures.",
+      "views": [
+        "form",
+        "summary stats",
+        "pie chart",
+        "document reader",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "mechanism-based prediction of antimicrobial resistance with machine learning, in microbiology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "microbiology",
+        "antimicrobial resistance",
+        "machine learning"
+      ]
+    },
+    "workflow": {
+      "name": "look up a model's prediction for a chosen combination and check it against the observed value",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "On page load, the precomputed supertable (mechanism factors and formula score per pair) and the predictions table (model prediction plus observed rate) are read from CSV.",
+          "parts": [
+            "virtual-lab"
+          ]
+        },
+        {
+          "step": "choose one combination of inputs to examine",
+          "here": "'Choose a Bacteria?' and 'Choose an Antibiotic?' dropdowns list every organism and drug. The two choices filter both tables down to the one matching row.",
+          "parts": [
+            "pair-picker"
+          ]
+        },
+        {
+          "step": "compare predicted values with the observed value",
+          "here": "The readout lists the formula-based prediction, the predictive model's prediction and the observed (real) value. When surveillance data does not cover the pair, it says 'No comparative data provided from ATLAS'.",
+          "parts": [
+            "estimates-readout"
+          ]
+        },
+        {
+          "step": "break a value down into the share each factor contributes",
+          "here": "A donut chart shows each mechanism's factor (presence × vulnerability weight) as a share of the pair's total vulnerability. Zero shares are dropped, and hovering a slice shows its percentage.",
+          "parts": [
+            "mechanism-donut"
+          ]
+        },
+        {
+          "step": "read how the result was produced and validated",
+          "here": "The Report page sets out the method: a toy Table A × Table B cross-join, the scoring formula, gradient boosting with leave-one-out validation, and figures of predicted vs observed values and feature importance.",
+          "parts": [
+            "report",
+            "cross-join-demo"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Two models for the same pair are shown together: a hand-weighted formula and a regressor trained on observed rates, so a person can see how far each is from reality.",
+        "Observed rates exist for only part of the pairs, and the readout says so explicitly rather than leaving a gap.",
+        "The formula score breaks down into per-mechanism factors (binary presence × literature weight), and the chart shows these as shares.",
+        "Every number is precomputed by offline scripts. The interface only selects and displays, so nothing is recomputed or exported."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "virtual-lab",
+      "level": "view",
+      "parent": null,
+      "title": "Virtual Lab",
+      "summary": "The page that loads the precomputed pair tables and holds the picker, the estimates and the mechanism chart.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/website/pages/Virtual_Lab.py",
+          "start": 1,
+          "end": 14,
+          "role": "logic",
+          "anchor": "1903c3dbd424",
+          "first": "import streamlit as st"
+        },
+        {
+          "file": "code/website/pages/Virtual_Lab.py",
+          "start": 49,
+          "end": 52,
+          "role": "markup",
+          "anchor": "06d391700d6b",
+          "first": "st.set_page_config(page_title=\"Virtual Lab\", page_icon=\"🦠\")"
+        },
+        {
+          "file": "code/data set/supertable.csv",
+          "start": 1,
+          "end": 265,
+          "role": "data",
+          "anchor": "4bc1c2f1f11e",
+          "first": ",Bacteria Name,has multidrug efflux pump_bact,performs hydrolysis_bact,porin loss_bact,porin mutation_bact,PBP modificat"
+        },
+        {
+          "file": "code/data set/predictions.csv",
+          "start": 1,
+          "end": 265,
+          "role": "data",
+          "anchor": "dbc804d3a8c7",
+          "first": "bacterium,antibiotic,observed,predicted"
+        }
+      ]
+    },
+    {
+      "id": "pair-picker",
+      "level": "component",
+      "parent": "virtual-lab",
+      "title": "Bacterium and antibiotic dropdowns",
+      "summary": "Two dropdowns choose the organism and the drug, and the matching row is pulled from each table.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/website/pages/Virtual_Lab.py",
+          "start": 54,
+          "end": 63,
+          "role": "markup",
+          "anchor": "7a498bc3ed93",
+          "first": "bacteria = st.selectbox("
+        },
+        {
+          "file": "code/website/pages/Virtual_Lab.py",
+          "start": 22,
+          "end": 31,
+          "role": "logic",
+          "anchor": "8249dc4674d8",
+          "first": "# Pulls from bacteria and antibiotic name for dropdown"
+        }
+      ]
+    },
+    {
+      "id": "estimates-readout",
+      "level": "component",
+      "parent": "virtual-lab",
+      "title": "Formula, model and observed values",
+      "summary": "Shows the formula score, the model prediction and the observed surveillance rate for the chosen pair, or a note that no observed rate exists.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/website/pages/Virtual_Lab.py",
+          "start": 65,
+          "end": 72,
+          "role": "markup",
+          "anchor": "bbf75d5d6462",
+          "first": "st.write('Formula-based Prediction: ', float(formula_model_row['Resistance']))"
+        },
+        {
+          "file": "code/scripts/Build_Dataset.py",
+          "start": 15,
+          "end": 49,
+          "role": "logic",
+          "anchor": "f8ca7b235864",
+          "first": "# Pairs bacteria rows with antibiotic rows and makes the supertable"
+        },
+        {
+          "file": "code/scripts/Model.py",
+          "start": 14,
+          "end": 34,
+          "role": "logic",
+          "anchor": "ce9d2ca75e8d",
+          "first": "# Split into features (X) and target (y)"
+        },
+        {
+          "file": "code/scripts/Model.py",
+          "start": 103,
+          "end": 126,
+          "role": "logic",
+          "anchor": "d533363655cb",
+          "first": "# --- Predict ALL pairs (grounded + ungrounded) ---"
+        },
+        {
+          "file": "code/data set/training_data.csv",
+          "start": 1,
+          "end": 85,
+          "role": "data",
+          "anchor": "bb5b5ab65c5d",
+          "first": "bacterium,antibiotic,n_isolates,observed_resistance,has multidrug efflux pump_bact,performs hydrolysis_bact,porin loss_b"
+        }
+      ]
+    },
+    {
+      "id": "mechanism-donut",
+      "level": "component",
+      "parent": "virtual-lab",
+      "title": "Resistance percentage by mechanism",
+      "summary": "A donut chart that splits the pair's formula score into each mechanism's share, leaving out zero contributions, with the percentage shown on hover.",
+      "views": [
+        "pie chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/website/pages/Virtual_Lab.py",
+          "start": 17,
+          "end": 45,
+          "role": "logic",
+          "symbol": "process_input",
+          "anchor": "9ed7d5c31f57",
+          "first": "def process_input():"
+        },
+        {
+          "file": "code/website/pages/Virtual_Lab.py",
+          "start": 74,
+          "end": 146,
+          "role": "markup",
+          "anchor": "7c31f8158999",
+          "first": "# pulled code from echartsapache.org which creates the pie chart"
+        }
+      ]
+    },
+    {
+      "id": "report",
+      "level": "view",
+      "parent": null,
+      "title": "Research report",
+      "summary": "A long page with the write-up: background, dataset design, the scoring formula, model training and validation, results figures and limitations.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/website/pages/Report.py",
+          "start": 1,
+          "end": 105,
+          "role": "markup",
+          "anchor": "49f69158c8fd",
+          "first": "from pathlib import Path"
+        },
+        {
+          "file": "code/website/pages/Report.py",
+          "start": 137,
+          "end": 272,
+          "role": "markup",
+          "anchor": "dbc91d550164",
+          "first": "# --- Figure 1: Supertable Diagram ---"
+        }
+      ]
+    },
+    {
+      "id": "cross-join-demo",
+      "level": "component",
+      "parent": "report",
+      "title": "Super table construction demo",
+      "summary": "Two small toy tables and their cross-join, to show how every row of one feature table is paired with every row of the other.",
+      "views": [
+        "table view",
+        "side-by-side panes"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/website/pages/Report.py",
+          "start": 107,
+          "end": 135,
+          "role": "markup",
+          "anchor": "7223c3677ef4",
+          "first": "# --- Super Table Section ---"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "pie chart"
+    }
+  ]
+}

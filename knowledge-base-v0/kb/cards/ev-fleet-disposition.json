@@ -1,0 +1,593 @@
+{
+  "schema": "astaui.card/1",
+  "id": "ev-fleet-disposition",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T10:53:40Z"
+  },
+  "app": {
+    "title": "HDV Disposition Optimizer (Heavy-Duty-Vehicle Fleet Disposition Optimizer)",
+    "summary": "A person checks the four input workbooks (fleet, depot, energy prices, orders) and the files derived from them, such as routed trips, price curves and a solar generation curve, and rebuilds the derived files when needed. They set the cost, efficiency, battery, crew-rule and solver parameters, then choose a run type. Disposition plans one dated day for the existing fleet. Asset Sizing picks one fleet and the chargers it needs for a range of days. Scenario Sweep solves every combination of chosen scenario axes for every day. The solver runs in the background, showing its progress and a stop button. The results show cost, energy, grid-peak and crew metrics, a per-step schedule and schedule figures for one solve, along with charts comparing the solves. Each table can be downloaded as CSV, and past run summaries can be opened again from disk.",
+    "task": {
+      "text": "Work out the lowest-cost way to dispatch a mixed diesel and battery truck fleet over a day's orders, including charging and V2G, or size the fleet and chargers a range of days would need, and compare scenarios.",
+      "verbs": [
+        "derive",
+        "decide",
+        "plan",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Spreadsheet workbooks: a vehicle roster with battery and consumption figures, depot charging stations, metered site load and a PV plant, yearly and hourly energy prices, and an order book with pickup, delivery and time windows. These become routed trips and price curves on a 30-minute grid, and each solve produces a schedule and a summary row.",
+      "item": "a transport order routed into a trip on one operating day, assigned to a vehicle on a 30-minute grid",
+      "shapes": [
+        "table",
+        "time series",
+        "geospatial",
+        "events"
+      ]
+    },
+    "stage": {
+      "text": "planning a fleet's day and sizing its assets with an optimization model, then comparing scenarios",
+      "terms": [
+        "plan",
+        "analyze",
+        "decide",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Five numbered tabs lead from inputs through settings to a run, then results. The run tab changes its controls with the run type, starts a background mixed-integer solve, and polls it for progress. The results tab redraws the same metric rows for the current session's run and for any summary CSV read back from disk, and a picker opens any one solve of a range or sweep in detail.",
+      "views": [
+        "table view",
+        "form",
+        "summary stats",
+        "line chart",
+        "bar chart",
+        "heatmap"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "toggle view",
+        "time slider",
+        "multi-select",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail",
+        "side-by-side comparison",
+        "version history"
+      ]
+    },
+    "field": {
+      "text": "mixed-integer optimization of electric truck fleet dispatch and charging in transport and energy systems engineering",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "fleet electrification",
+        "vehicle to grid",
+        "mixed integer optimization"
+      ]
+    },
+    "workflow": {
+      "name": "set up and solve an optimization model, then compare its runs",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Four Excel workbooks are shown sheet by sheet. Rebuild derived inputs regenerates the routed trips, price curves, depot load and PVGIS cache, with an optional forced re-route. A date picker draws a preview of the PV curve against the depot load.",
+          "parts": [
+            "inputs-tab"
+          ]
+        },
+        {
+          "step": "set the model parameters",
+          "here": "Number inputs set the MIP gap, time cap, working hours, demand charge, grid fees, tolls, charging efficiencies, battery degradation, crew rules and penalties. A configuration panel shows the effective parameter set and can download it.",
+          "parts": [
+            "settings-tab"
+          ]
+        },
+        {
+          "step": "choose the case to solve",
+          "here": "A segmented control picks the run type. Disposition takes one date that has trips. Asset Sizing and Scenario Sweep take a day-range slider. The sweep also has multiselects for years, cost scenarios, V2G and external charging, with a count of the solves this will make. Sizing adds a slider for the fleet-search time budget.",
+          "parts": [
+            "run-tab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run Optimization starts a background solver process. A spinner shows how far the run has got, for example '3 of 12', and a stop button ends it. The finished payload is stored in session state.",
+          "parts": [
+            "run-controls"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Metric rows give solver status and gap, operating cost, energy, V2G, degradation, tolls, grid peak, PV use, conversion losses, empty running, drivers and chargers. Below them come the per-step schedule and schedule figures. A selectbox opens any solve of a range.",
+          "parts": [
+            "results-tab",
+            "result-metrics"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "A sweep's solves are listed in one table. A measure picker plots cost against the axes that changed, with year on the x axis and the other axes as series. A sizing run shows the fleet it chose, the chargers needed by rank, and the busiest day.",
+          "parts": [
+            "sweep-charts",
+            "design-result"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Buttons download the schedule, range or sweep summary, charging infrastructure and configuration as CSV. Every run writes a stamped summary CSV, and Previous Results reopens it at full depth together with that run's own figures.",
+          "parts": [
+            "results-tab",
+            "design-result"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The disposition date sets the trips, the depot's seasonal baseline load and the PV yield all at once, so they cannot disagree with each other.",
+        "Asset Sizing picks one shared fleet for a whole range of days, trading ownership cost against operating cost. Chargers are not optimized; they are read off the finished schedules by rank.",
+        "A sweep runs every combination of year, cost scenario, V2G and external charging for every day, and states the number of solves before the run starts.",
+        "Results distinguish proved, gap-optimal and time-limited solves. Steering penalties and driver salary are reported apart from the objective.",
+        "Disposition runs use the daily price sheet as written, and sizing and sweep runs rescale it onto a scenario year and band, so the Disposition tab hides the controls that would change nothing."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "inputs-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Inputs",
+      "summary": "Shows each primary workbook sheet and each derived file, previews a day's PV and depot load curves, and rebuilds the derived inputs on demand.",
+      "views": [
+        "table view",
+        "line chart",
+        "bar chart"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 3933,
+          "end": 4252,
+          "role": "markup",
+          "anchor": "1ae802035dec",
+          "first": "with tab_inputs:"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 240,
+          "end": 268,
+          "role": "logic",
+          "symbol": "prepare_inputs",
+          "anchor": "9214079f7e49",
+          "first": "def prepare_inputs(force_routing: bool = False, make_plots: bool = False) -> Dict[str, Any]:"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 212,
+          "end": 230,
+          "role": "logic",
+          "symbol": "missing_derived_inputs",
+          "anchor": "3171981471ec",
+          "first": "def missing_derived_inputs() -> List[Tuple[Path, str]]:"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 1152,
+          "end": 1229,
+          "role": "logic",
+          "symbol": "trips_overview_figure",
+          "anchor": "7c7d487abc5f",
+          "first": "def trips_overview_figure():"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 864,
+          "end": 882,
+          "role": "logic",
+          "symbol": "depot_day_profiles",
+          "anchor": "3ee9fbb8b771",
+          "first": "def depot_day_profiles(overrides: Dict[str, Any]) -> Dict[str, List[float]]:"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 1710,
+          "end": 1728,
+          "role": "logic",
+          "symbol": "show_table",
+          "anchor": "ee66f0b5a04a",
+          "first": "def show_table(frame, *, rows: int = PREVIEW_ROWS, inline: int = INLINE_ROWS,"
+        }
+      ]
+    },
+    {
+      "id": "settings-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Settings",
+      "summary": "Groups every model parameter in one form: solver, working hours, energy pricing, tolls, efficiencies, battery degradation, crew rules and penalties. It ends with the effective configuration, which can be downloaded.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 2389,
+          "end": 2950,
+          "role": "markup",
+          "anchor": "723e41561ea1",
+          "first": "# ------------------------------------------------------------- 3 · SETTINGS ----"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 3909,
+          "end": 3929,
+          "role": "markup",
+          "anchor": "246b4bf8ed14",
+          "first": "with tab_settings:"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 337,
+          "end": 383,
+          "role": "logic",
+          "symbol": "load_optimization_namespace",
+          "anchor": "53642ddd4577",
+          "first": "def load_optimization_namespace(overrides: Optional[Dict[str, Any]] = None,"
+        }
+      ]
+    },
+    {
+      "id": "run-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Run",
+      "summary": "Chooses between Disposition, Asset Sizing and Scenario Sweep, and sets the date or day range, the scenario axes and the search budget for that run type.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view",
+        "time slider",
+        "multi-select",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 4258,
+          "end": 4511,
+          "role": "markup",
+          "anchor": "ab02ab20d0c1",
+          "first": "with tab_run:"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 457,
+          "end": 491,
+          "role": "logic",
+          "symbol": "scenario_controls",
+          "anchor": "321f87da1eaa",
+          "first": "def scenario_controls(mode_key: str, scenario_years: List[int]) -> None:"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 732,
+          "end": 750,
+          "role": "logic",
+          "symbol": "sweep_combinations",
+          "anchor": "c3cb0adeb19f",
+          "first": "def sweep_combinations(day_dates: List[Tuple[int, str]], years, price_scenarios,"
+        }
+      ]
+    },
+    {
+      "id": "run-controls",
+      "level": "component",
+      "parent": "run-tab",
+      "title": "Run and stop optimization",
+      "summary": "Starts the solve in a background process, shows a spinner with how far a multi-solve run has got, offers a stop button, and stores the result when the solve finishes.",
+      "views": [],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 2951,
+          "end": 3158,
+          "role": "logic",
+          "symbol": "render_run_controls",
+          "anchor": "d8050b66a1fa",
+          "first": "def render_run_controls(mode_key, overrides, headline=None, day_dates=None,"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 535,
+          "end": 576,
+          "role": "logic",
+          "symbol": "_optimization_worker",
+          "anchor": "e42eeabaa6eb",
+          "first": "def _optimization_worker(result_queue, progress_queue, mode_key, overrides, day_dates,"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 579,
+          "end": 596,
+          "role": "logic",
+          "symbol": "_store_optimization_payload",
+          "anchor": "e66aaccf9b9a",
+          "first": "def _store_optimization_payload(mode_key, payload):"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 128,
+          "end": 142,
+          "role": "logic",
+          "symbol": "solver_wait_html",
+          "anchor": "dde00bb986ec",
+          "first": "def solver_wait_html(status: Optional[str] = None) -> str:"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 145,
+          "end": 169,
+          "role": "logic",
+          "symbol": "latest_run_status",
+          "anchor": "e946a01e323a",
+          "first": "def latest_run_status(job: Dict[str, Any], mode_key: str) -> Optional[str]:"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 495,
+          "end": 532,
+          "role": "logic",
+          "symbol": "run_single",
+          "anchor": "07cc5febe4c3",
+          "first": "def run_single(overrides: Dict[str, Any]) -> Tuple[Dict[str, Any], Any, Tuple[bool, str]]:"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 642,
+          "end": 687,
+          "role": "logic",
+          "symbol": "run_design_range",
+          "anchor": "f739d53be362",
+          "first": "def run_design_range(overrides: Dict[str, Any], day_dates: List[Tuple[int, str]],"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 753,
+          "end": 823,
+          "role": "logic",
+          "symbol": "run_scenario_sweep",
+          "anchor": "d28e3d39992d",
+          "first": "def run_scenario_sweep(overrides: Dict[str, Any], day_dates: List[Tuple[int, str]],"
+        }
+      ]
+    },
+    {
+      "id": "results-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Results",
+      "summary": "Shows the latest run in full, with a table of every solve of a range and a picker that opens one solve. It also lists the summary CSVs saved by earlier runs, so any of them can be reopened at the same depth, and offers CSV downloads.",
+      "views": [
+        "table view",
+        "heatmap"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "version history"
+      ],
+      "spans": [
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 4514,
+          "end": 4640,
+          "role": "markup",
+          "anchor": "397f57c0e327",
+          "first": "with tab_results:"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 3491,
+          "end": 3600,
+          "role": "logic",
+          "symbol": "render_latest_result",
+          "anchor": "bcf80ba7b7d6",
+          "first": "def render_latest_result(mode_key, label):"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 3602,
+          "end": 3613,
+          "role": "logic",
+          "symbol": "render_result_schedule",
+          "anchor": "56e3e2edbf07",
+          "first": "def render_result_schedule(schedule_df, download_key):"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 3473,
+          "end": 3489,
+          "role": "logic",
+          "symbol": "render_run_figures",
+          "anchor": "00d790997aaf",
+          "first": "def render_run_figures(plots, note_inputs=True):"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 951,
+          "end": 974,
+          "role": "logic",
+          "symbol": "get_latest_summary_results",
+          "anchor": "9d4ebb84df75",
+          "first": "def get_latest_summary_results(limit: Optional[int] = None) -> List[Dict[str, Any]]:"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 1037,
+          "end": 1061,
+          "role": "logic",
+          "symbol": "find_plots_for_stamp",
+          "anchor": "ab39a07d28de",
+          "first": "def find_plots_for_stamp(stamp: str) -> Dict[str, Path]:"
+        }
+      ]
+    },
+    {
+      "id": "result-metrics",
+      "level": "component",
+      "parent": "results-tab",
+      "title": "Solve metrics",
+      "summary": "Lays out one solve's status, costs, grid peak, PV use, conversion losses, empty running, driver roster, V2V savings and chargers as rows of metrics with explanations, and adds warnings for infeasible or synthetic-data cases.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 3615,
+          "end": 3904,
+          "role": "logic",
+          "symbol": "render_result_metrics",
+          "anchor": "c5023c15da55",
+          "first": "def render_result_metrics(result):"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 1574,
+          "end": 1589,
+          "role": "logic",
+          "symbol": "metric_row",
+          "anchor": "8238117e3409",
+          "first": "def metric_row(*cells):"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 1533,
+          "end": 1540,
+          "role": "logic",
+          "symbol": "fmt_eur",
+          "anchor": "fb0c6ce16cf0",
+          "first": "def fmt_eur(value):"
+        }
+      ]
+    },
+    {
+      "id": "sweep-charts",
+      "level": "component",
+      "parent": "results-tab",
+      "title": "Sweep comparison charts",
+      "summary": "Plots a chosen measure against the sweep axes that actually changed, using year as an ordered x axis and the other axes as coloured series.",
+      "views": [
+        "line chart",
+        "bar chart"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 3440,
+          "end": 3471,
+          "role": "logic",
+          "symbol": "render_sweep_charts",
+          "anchor": "cb63081f2023",
+          "first": "def render_sweep_charts(frame, key_prefix):"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 3319,
+          "end": 3424,
+          "role": "logic",
+          "symbol": "render_sweep_axis_chart",
+          "anchor": "a49a749ea557",
+          "first": "def render_sweep_axis_chart(frame, key_prefix):"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 3298,
+          "end": 3317,
+          "role": "data",
+          "anchor": "c709f25f5848",
+          "first": "# The axes a sweep can move, and how each is read. year is the only ordered one, so it"
+        }
+      ]
+    },
+    {
+      "id": "design-result",
+      "level": "component",
+      "parent": "results-tab",
+      "title": "Fleet and charger sizing result",
+      "summary": "Shows the fleet a sizing run chose and its ownership cost, the chargers needed ranked by power (downloadable as CSV), and the busiest day of the range.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 3161,
+          "end": 3211,
+          "role": "logic",
+          "symbol": "render_design_result",
+          "anchor": "698e727c7307",
+          "first": "def render_design_result(design):"
+        },
+        {
+          "file": "code/src/hdv_web_interface.py",
+          "start": 3213,
+          "end": 3296,
+          "role": "logic",
+          "symbol": "render_range_sizing",
+          "anchor": "24f85d6df91b",
+          "first": "def render_range_sizing(runs):"
+        }
+      ]
+    }
+  ]
+}

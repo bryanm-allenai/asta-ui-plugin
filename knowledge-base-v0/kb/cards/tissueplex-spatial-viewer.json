@@ -1,0 +1,632 @@
+{
+  "schema": "astaui.card/1",
+  "id": "tissueplex-spatial-viewer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T20:29:11Z"
+  },
+  "app": {
+    "title": "TissuePlex: cell-cell communication on the tissue image",
+    "summary": "The person picks a spatial dataset and an edge set, and the tissue image opens with layers that can be switched on: transcript dots, cell outlines and directed cell-to-cell communication edges. They narrow the view by unchecking genes and signalling mechanisms, filtering cells or edges by a metadata column, and colouring cells or edges by gene-set score or by an annotation. Clicking a cell or an edge opens its details, including the cells it connects to and every mechanism with its score. Two panels can be set side by side to compare areas, datasets or edge sets. They can draw regions to export the selected cells as a CSV, measure distances, and frame a high-resolution figure to export as a PNG.",
+    "task": {
+      "text": "Explore which cells signal to which across a tissue section, through which ligand-receptor mechanisms, and export cell selections and figures.",
+      "verbs": [
+        "explore",
+        "filter",
+        "locate",
+        "compare",
+        "identify",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "A spatial transcriptomics dataset (a morphology image, cell or spot outlines, transcript positions and per-cell metadata) with a directed graph between cells that has one score for each ligand-receptor mechanism on each edge.",
+      "item": "a cell (or spot or bin) on the tissue section, and a directed edge between two cells with its scored mechanisms",
+      "shapes": [
+        "image",
+        "geospatial",
+        "network",
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "exploring inferred cell-cell communication on the tissue after it has been scored, before writing up figures",
+      "terms": [
+        "explore",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A pan-and-zoom tissue image carries vector layers for transcripts, cell outlines and directed edges. A sidebar of toggles, filters, colour-by menus and legends drives what is drawn. Clicking a cell or edge opens a floating detail panel, and a second linked panel can be opened for side-by-side comparison.",
+      "views": [
+        "image viewer",
+        "map",
+        "network diagram",
+        "sidebar list",
+        "detail panel",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "toggle view",
+        "filter",
+        "select",
+        "hover for detail",
+        "import",
+        "export",
+        "brush"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "cell-cell communication inferred from spatial transcriptomics, in biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "spatial transcriptomics",
+        "ligand receptor signalling",
+        "cell cell communication"
+      ]
+    },
+    "workflow": {
+      "name": "explore a spatial graph laid over an image, then export selections and figures",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pick a dataset from the folder of instrument outputs, whose platform is detected automatically. If there is more than one edge set, pick one, and choose a morphology channel.",
+          "parts": [
+            "layer-sidebar"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The tissue image pans and zooms, with layers for transcript dots, cell outlines and directed edges with arrowheads, plus autocrine rings. Each layer has a toggle, an opacity and a sampling density.",
+          "parts": [
+            "tissue-viewer",
+            "layer-sidebar"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Uncheck gene species or ligand-receptor mechanisms, either by hand or by importing a list CSV. Filter cells, sending or receiving endpoints, or edges by one metadata column, using categories or a value range.",
+          "parts": [
+            "layer-sidebar",
+            "colour-filter"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Colour cells by a gene-set expression score and edges by their summed score over the visible mechanisms, or colour either by a metadata column. Legends can be clamped and low values faded.",
+          "parts": [
+            "colour-filter"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Clicking a cell shows its metadata and its unfiltered neighbourhood: connected cells, the enclosing radius, the mix of cell types and the top mechanisms. Clicking an edge lists every active mechanism with its score, along with any annotations.",
+          "parts": [
+            "cell-info",
+            "edge-info"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Split into two panels, each with its own dataset, edge set and rotation. A Match button moves one panel to the other's view.",
+          "parts": [
+            "annotation-toolbar",
+            "tissue-viewer"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Draw a polygon region and download its cells as a CSV, or frame a rectangle and export a figure at a chosen size and DPI with a scale bar. Save PNG captures the screen.",
+          "parts": [
+            "annotation-toolbar",
+            "regions-export",
+            "export-dialog"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Edges are directed and carry many scored mechanisms each. Toggling a mechanism recomputes every edge's colour from only the mechanisms still visible.",
+        "Self-signalling is drawn as a ring on each cell, on the same colour scale and mechanism filter as the edges.",
+        "A clicked cell's neighbourhood ignores the viewport, sampling and filters, so it reflects the whole tissue rather than what is on screen.",
+        "Readers for several instrument platforms convert each one to the same pixel space. The interface relabels itself (cell, spot or bin) and hides layers a platform cannot serve.",
+        "Annotation tables dropped into a folder beside the data become colour-by and filter options without changing the source files."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "tissue-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "Tissue viewer panel",
+      "summary": "Shows the tissue image with transcript, cell outline, directed edge and annotation layers drawn in sync on top, and lets the person pan, zoom, rotate and pick cells or edges.",
+      "views": [
+        "image viewer",
+        "map",
+        "network diagram"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "select",
+        "hover for detail",
+        "brush"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/Viewer.jsx",
+          "start": 133,
+          "end": 133,
+          "role": "logic",
+          "symbol": "ViewerPanel",
+          "anchor": "fd997750155f",
+          "first": "function ViewerPanel({ panelIndex }) {"
+        },
+        {
+          "file": "code/frontend/src/components/Viewer.jsx",
+          "start": 1555,
+          "end": 1582,
+          "role": "markup",
+          "symbol": "Viewer",
+          "anchor": "480b75998063",
+          "first": "export default function Viewer() {"
+        },
+        {
+          "file": "code/frontend/src/hooks/useEdges.js",
+          "start": 52,
+          "end": 57,
+          "role": "logic",
+          "symbol": "useEdges",
+          "anchor": "326ea9fca02e",
+          "first": "export function useEdges("
+        },
+        {
+          "file": "code/frontend/src/hooks/useCellBoundaries.js",
+          "start": 72,
+          "end": 206,
+          "role": "logic",
+          "symbol": "useCellBoundaries",
+          "anchor": "54650ed1a7c9",
+          "first": "export function useCellBoundaries("
+        },
+        {
+          "file": "code/frontend/src/hooks/useTranscripts.js",
+          "start": 48,
+          "end": 189,
+          "role": "logic",
+          "symbol": "useTranscripts",
+          "anchor": "719a59b68dd7",
+          "first": "export function useTranscripts(apiBase, dataset, viewport, imageSize, enabled = true, fraction = 1.0, selectedGenes = nu"
+        },
+        {
+          "file": "code/frontend/src/utils/frame.js",
+          "start": 47,
+          "end": 60,
+          "role": "logic",
+          "symbol": "blankTileSource",
+          "anchor": "4a5ef7c0aa74",
+          "first": "export function blankTileSource(frame) {"
+        },
+        {
+          "file": "code/backend/app/readers/edge_reader.py",
+          "start": 910,
+          "end": 919,
+          "role": "data",
+          "symbol": "query_grouped",
+          "anchor": "d6c47992c949",
+          "first": "def query_grouped("
+        }
+      ]
+    },
+    {
+      "id": "layer-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Layer panel",
+      "summary": "A side panel for choosing the dataset, image and edge set, switching each layer on or off with its opacity and sampling, and checking which genes and mechanisms to show, with list import and export.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "toggle view",
+        "filter",
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/LayerPanel.jsx",
+          "start": 99,
+          "end": 187,
+          "role": "markup",
+          "symbol": "LayerPanel",
+          "anchor": "34615b9a177b",
+          "first": "export default function LayerPanel() {"
+        },
+        {
+          "file": "code/frontend/src/components/DatasetPicker.jsx",
+          "start": 35,
+          "end": 35,
+          "role": "markup",
+          "symbol": "DatasetPicker",
+          "anchor": "0769a93ff13b",
+          "first": "export function DatasetPicker({ panelIndex = 0, compact = false }) {"
+        },
+        {
+          "file": "code/frontend/src/components/LayerPanel.jsx",
+          "start": 1289,
+          "end": 1494,
+          "role": "logic",
+          "symbol": "TranscriptSpeciesSection",
+          "anchor": "e4d994666666",
+          "first": "function TranscriptSpeciesSection() {"
+        },
+        {
+          "file": "code/frontend/src/components/LayerPanel.jsx",
+          "start": 1652,
+          "end": 2057,
+          "role": "logic",
+          "symbol": "EdgeSection",
+          "anchor": "67654a54f1b8",
+          "first": "function EdgeSection() {"
+        },
+        {
+          "file": "code/frontend/src/components/LayerPanel.jsx",
+          "start": 1084,
+          "end": 1084,
+          "role": "markup",
+          "symbol": "LayerRowBase",
+          "anchor": "af6e923a973b",
+          "first": "function LayerRowBase({ label, color, visible, opacity, onToggle, onOpacity }) {"
+        },
+        {
+          "file": "code/frontend/src/utils/listImport.js",
+          "start": 151,
+          "end": 174,
+          "role": "logic",
+          "symbol": "readLrmList",
+          "anchor": "aa87fb9f3214",
+          "first": "export function readLrmList(text, catalogue) {"
+        },
+        {
+          "file": "code/frontend/src/utils/listImport.js",
+          "start": 127,
+          "end": 139,
+          "role": "logic",
+          "symbol": "readGeneList",
+          "anchor": "4d336806009b",
+          "first": "export function readGeneList(text, vocab) {"
+        }
+      ]
+    },
+    {
+      "id": "colour-filter",
+      "level": "component",
+      "parent": "layer-sidebar",
+      "title": "Colour-by and metadata filters",
+      "summary": "Colours cells or edges by gene-set score, summed mechanism score or a metadata column, with clampable or editable categorical legends, and limits cells, endpoints or edges to chosen categories or a value range.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "filter",
+        "toggle view"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/LayerPanel.jsx",
+          "start": 221,
+          "end": 221,
+          "role": "markup",
+          "symbol": "ColorBySection",
+          "anchor": "83de42abbe4f",
+          "first": "function ColorBySection({ unitLabel = \"cell\" }) {"
+        },
+        {
+          "file": "code/frontend/src/components/LayerPanel.jsx",
+          "start": 393,
+          "end": 393,
+          "role": "markup",
+          "symbol": "ClampableLegend",
+          "anchor": "ed38a0c72e1e",
+          "first": "function ClampableLegend({ label, palette, vmin, vmax, clamp, setClamp, accentColor = \"#f90\" }) {"
+        },
+        {
+          "file": "code/frontend/src/components/LayerPanel.jsx",
+          "start": 449,
+          "end": 449,
+          "role": "markup",
+          "symbol": "CategoricalLegend",
+          "anchor": "1a0aa3a12f5a",
+          "first": "function CategoricalLegend({ field, categories = [] }) {"
+        },
+        {
+          "file": "code/frontend/src/components/LayerPanel.jsx",
+          "start": 616,
+          "end": 618,
+          "role": "logic",
+          "symbol": "MetadataFilterSection",
+          "anchor": "3383c8b971d5",
+          "first": "function MetadataFilterSection({"
+        },
+        {
+          "file": "code/frontend/src/components/LayerPanel.jsx",
+          "start": 795,
+          "end": 843,
+          "role": "logic",
+          "symbol": "EndpointFilterSection",
+          "anchor": "cdfa5bd1eaa5",
+          "first": "function EndpointFilterSection() {"
+        },
+        {
+          "file": "code/frontend/src/hooks/useEdgeColors.js",
+          "start": 36,
+          "end": 162,
+          "role": "logic",
+          "symbol": "useEdgeColors",
+          "anchor": "6eb812b312ad",
+          "first": "export function useEdgeColors("
+        },
+        {
+          "file": "code/frontend/src/utils/colormap.js",
+          "start": 6,
+          "end": 35,
+          "role": "data",
+          "symbol": "PALETTES",
+          "anchor": "d9c112272980",
+          "first": "const PALETTES = {"
+        },
+        {
+          "file": "code/backend/app/readers/metadata_filter.py",
+          "start": 71,
+          "end": 126,
+          "role": "logic",
+          "symbol": "MetadataFilter",
+          "anchor": "eaa869429a6b",
+          "first": "class MetadataFilter:"
+        }
+      ]
+    },
+    {
+      "id": "cell-info",
+      "level": "component",
+      "parent": "tissue-viewer",
+      "title": "Cell detail and neighbourhood",
+      "summary": "On a cell click, shows its metadata and colour-by value, and summarises every cell it connects to, with the radius, the cell-type mix and the top mechanisms.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/CellInfoPanel.jsx",
+          "start": 13,
+          "end": 135,
+          "role": "markup",
+          "symbol": "CellInfoPanel",
+          "anchor": "6fa6fd6848e0",
+          "first": "export default function CellInfoPanel() {"
+        },
+        {
+          "file": "code/frontend/src/components/CellInfoPanel.jsx",
+          "start": 145,
+          "end": 253,
+          "role": "logic",
+          "anchor": "43cf99cdd664",
+          "first": "function NeighborhoodSection({ dataset, cellId, panelIndex, unitLabel }) {"
+        },
+        {
+          "file": "code/backend/app/readers/edge_reader.py",
+          "start": 677,
+          "end": 764,
+          "role": "data",
+          "symbol": "neighborhood",
+          "anchor": "2c5a3c5c6aef",
+          "first": "def neighborhood(self, cell_id: str, top_lrms: int = 12) -> dict | None:"
+        }
+      ]
+    },
+    {
+      "id": "edge-info",
+      "level": "component",
+      "parent": "tissue-viewer",
+      "title": "Edge detail",
+      "summary": "On an edge or autocrine-ring click, lists the sending and receiving cells, any annotations, and every active mechanism with its score.",
+      "views": [
+        "detail panel",
+        "table view"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/EdgeInfoPanel.jsx",
+          "start": 32,
+          "end": 161,
+          "role": "markup",
+          "anchor": "4a7335fcc01a",
+          "first": "export default function EdgeInfoPanel({ apiBase, dataset, edgeId, edgeFile = \"edges.parquet\", hint = null, onClose }) {"
+        },
+        {
+          "file": "code/backend/app/readers/edge_reader.py",
+          "start": 766,
+          "end": 818,
+          "role": "data",
+          "symbol": "edge_detail",
+          "anchor": "a2a04a8506e3",
+          "first": "def edge_detail(self, edge_id: str, near: Optional[tuple] = None) -> dict | None:"
+        }
+      ]
+    },
+    {
+      "id": "annotation-toolbar",
+      "level": "component",
+      "parent": "tissue-viewer",
+      "title": "Annotation and comparison toolbar",
+      "summary": "Switches between pan, region drawing, measuring and rectangle framing; rotates the panel; splits into two panels and matches their zoom; and saves screenshots.",
+      "views": [
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "toggle view",
+        "brush",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/AnnotationToolbar.jsx",
+          "start": 31,
+          "end": 31,
+          "role": "markup",
+          "symbol": "AnnotationToolbar",
+          "anchor": "9b05646d87e7",
+          "first": "export default function AnnotationToolbar({ onScreenshot, onExport, panelIndex = 0 }) {"
+        },
+        {
+          "file": "code/frontend/src/components/AnnotationToolbar.jsx",
+          "start": 9,
+          "end": 17,
+          "role": "data",
+          "symbol": "MODES",
+          "anchor": "dd0d11421937",
+          "first": "const MODES = ["
+        },
+        {
+          "file": "code/frontend/src/components/AnnotationToolbar.jsx",
+          "start": 31,
+          "end": 201,
+          "role": "logic",
+          "anchor": "4742a3c6a7d6",
+          "first": "export default function AnnotationToolbar({ onScreenshot, onExport, panelIndex = 0 }) {"
+        }
+      ]
+    },
+    {
+      "id": "regions-export",
+      "level": "component",
+      "parent": "layer-sidebar",
+      "title": "Regions list",
+      "summary": "Lists drawn regions with their cell counts and downloads each region's cells as a CSV.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/LayerPanel.jsx",
+          "start": 2080,
+          "end": 2144,
+          "role": "logic",
+          "symbol": "RegionsSection",
+          "anchor": "b477544cbec9",
+          "first": "function RegionsSection() {"
+        },
+        {
+          "file": "code/backend/app/routers/spatial.py",
+          "start": 259,
+          "end": 275,
+          "role": "data",
+          "symbol": "export_cells",
+          "anchor": "0714740eac60",
+          "first": "def export_cells(dataset: str, cell_ids: List[str]):"
+        }
+      ]
+    },
+    {
+      "id": "export-dialog",
+      "level": "component",
+      "parent": "tissue-viewer",
+      "title": "Figure export dialog",
+      "summary": "Renders the framed region offscreen at a chosen output size and background, with a scale bar and a DPI tag, and downloads it as a PNG.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/src/components/ExportDialog.jsx",
+          "start": 63,
+          "end": 302,
+          "role": "markup",
+          "anchor": "800b5463c7b5",
+          "first": "export default function ExportDialog({"
+        },
+        {
+          "file": "code/frontend/src/utils/highResExport.js",
+          "start": 227,
+          "end": 238,
+          "role": "logic",
+          "symbol": "renderRegionToPng",
+          "anchor": "b06ee8b4ce3e",
+          "first": "export async function renderRegionToPng({"
+        },
+        {
+          "file": "code/frontend/src/utils/pngExport.js",
+          "start": 75,
+          "end": 117,
+          "role": "logic",
+          "symbol": "withPngDpi",
+          "anchor": "7cae5c34b67e",
+          "first": "export async function withPngDpi(blob, dpi) {"
+        },
+        {
+          "file": "code/frontend/src/utils/highResExport.js",
+          "start": 181,
+          "end": 211,
+          "role": "logic",
+          "symbol": "drawScaleBar",
+          "anchor": "ed6f51cc65b0",
+          "first": "function drawScaleBar(ctx, opts) {"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "task",
+      "list": "verbs",
+      "term": "filter"
+    }
+  ]
+}

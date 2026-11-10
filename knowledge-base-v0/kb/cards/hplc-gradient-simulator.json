@@ -1,0 +1,736 @@
+{
+  "schema": "astaui.card/1",
+  "id": "hplc-gradient-simulator",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T15:39:31Z"
+  },
+  "app": {
+    "title": "hplcsim — Cockpit",
+    "summary": "A person enters the instrument and column constants, including a required dwell, and types or loads two scouting runs that differ only in gradient time. They enter each compound's retention time in both runs as one row, optionally with areas and half-height widths. The app fits a two-parameter retention model for each peak and shows the fitted parameters with the composition range each peak was calibrated over. The person then types a candidate gradient programme as a table of time and %B rows and reads the predicted chromatogram, the retention times, the widths, the resolution of each adjacent pair and the critical pair, along with warnings when the prediction leaves the calibrated range. They can save the inputs as a session file and reopen it later.",
+    "task": {
+      "text": "Predict how a candidate gradient programme will separate a mixture, using a retention model fitted to two scouting runs, so the person can pick a method to run next.",
+      "verbs": [
+        "derive",
+        "plan",
+        "decide",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "Method constants for one instrument and column, a scouting programme run at two gradient times, a table pairing each compound's measured retention times (with optional areas and widths) across the two runs, and a candidate gradient programme given as time and composition rows.",
+      "item": "a compound's peak, measured once in each of two scouting runs",
+      "shapes": [
+        "table",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "developing a separation method after the scouting runs, before the confirming injection",
+      "terms": [
+        "plan",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar holds the instrument constants and the session file. A left rail holds the scouting and candidate programme tables with a summary of the result beneath them. Tabs hold the peak entry, the fit and the resolution tables, and a pinned chromatogram underneath redraws with every edit, with the programmes overlaid on a %B axis and an axis-range strip below it. Warnings are placed beside the input or output they concern, and stamps mark resolution numbers that are only indicative.",
+      "views": [
+        "form",
+        "table view",
+        "line chart",
+        "summary stats",
+        "detail panel"
+      ],
+      "interactions": [
+        "inline edit",
+        "select",
+        "hover for detail",
+        "zoom and pan",
+        "import",
+        "export",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "gradient retention modelling for HPLC method development in analytical chemistry",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "analytical chemistry",
+        "hplc method development",
+        "linear solvent strength"
+      ]
+    },
+    "workflow": {
+      "name": "fit a model to calibration runs and predict the outcome of a new condition",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Load a session JSON, or fill in the column, flow, dead time (measured with a marker, or estimated from geometry once the packing is chosen) and the required dwell; nothing is predicted until the dwell is entered",
+          "parts": [
+            "sidebar",
+            "session-file"
+          ]
+        },
+        {
+          "step": "enter the calibration conditions and the paired measurements",
+          "here": "The scouting table gives the start %B, hold and end %B at two gradient times; the peak table takes one row per compound with tR in both runs, plus optional area and W½. Rows missing a tR are counted as untracked, and area-share or elution-order mismatches are flagged",
+          "parts": [
+            "programme-rail",
+            "peak-table"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Each peak gets a fitted log10 k0, S and plate count, shown on the fit tab with the calibrated composition window per peak and a warning when the two scouting runs are spaced too closely",
+          "parts": [
+            "results-tabs"
+          ]
+        },
+        {
+          "step": "set the new condition to predict",
+          "here": "Type the candidate programme as time / %B rows; it follows the scouting table until edited, a new row adds a segment, and Reset returns it to the default ramp; extrapolation and start-composition warnings sit directly beneath it",
+          "parts": [
+            "programme-rail"
+          ]
+        },
+        {
+          "step": "read the predicted outcome and its quality",
+          "here": "The pinned chromatogram draws the predicted peaks with the candidate and scouting programmes overlaid and each peak's window as a whisker, and an axis strip crops the view; the rail shows min. Rs, the critical pair, the run time and a selected peak's detail, and the resolution tab lists every pair with an Rs grade",
+          "parts": [
+            "chromatogram",
+            "method-summary",
+            "results-tabs",
+            "status-bar"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Save session downloads the inputs only as JSON, and the fit is recomputed when the file is reopened",
+          "parts": [
+            "session-file"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each peak's prediction is judged against the composition window the two calibration runs actually covered; the chromatogram shows this window as a whisker and a table reports the distance in window-widths",
+        "Resolution and the critical pair are stamped indicative, not decision-grade, when the candidate is far outside the calibrated range, while retention times are still shown as numbers",
+        "The dwell has no default and blocks prediction until entered, and the dead time records where it came from (a measured marker or a geometry estimate) and is stamped on every output when estimated",
+        "The candidate is a multi-segment programme typed as a table and drawn on the detector's time base, so each peak's marker sits on the candidate curve",
+        "The session file holds inputs only, so a reopened session never carries a stale fit"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Method constants",
+      "summary": "Takes the column geometry, flow, temperature, dead time with its source and marker, the required dwell (as a volume or a time) and the plate-count setting, all of which are shared by every run.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 409,
+          "end": 521,
+          "role": "markup",
+          "symbol": "_sidebar",
+          "anchor": "eba9a4bbf1eb",
+          "first": "def _sidebar() -> tuple[MethodEntry | None, object]:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 524,
+          "end": 525,
+          "role": "logic",
+          "symbol": "_autofill_t0",
+          "anchor": "e40f17bc888e",
+          "first": "def _autofill_t0("
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 553,
+          "end": 556,
+          "role": "logic",
+          "symbol": "_t0_source_chosen",
+          "anchor": "fcd3a9daaf8c",
+          "first": "def _t0_source_chosen() -> None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 559,
+          "end": 568,
+          "role": "logic",
+          "symbol": "_t0_typed",
+          "anchor": "be4586240538",
+          "first": "def _t0_typed() -> None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 571,
+          "end": 589,
+          "role": "markup",
+          "symbol": "_estimate_caption",
+          "anchor": "98a5876dc16f",
+          "first": "def _estimate_caption(estimate: DeadTimeEstimate | None) -> None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 592,
+          "end": 627,
+          "role": "markup",
+          "symbol": "_dwell",
+          "anchor": "ea0e49392d27",
+          "first": "def _dwell(flow: float) -> float | None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 630,
+          "end": 647,
+          "role": "markup",
+          "symbol": "_plate_count_knob",
+          "anchor": "1ba88dabe3da",
+          "first": "def _plate_count_knob(method: Method) -> float | None:"
+        },
+        {
+          "file": "code/src/hplcsim/dead_time.py",
+          "start": 137,
+          "end": 155,
+          "role": "logic",
+          "symbol": "estimate_t0",
+          "anchor": "ecdd298d8af4",
+          "first": "def estimate_t0(method: Method) -> DeadTimeEstimate:"
+        }
+      ]
+    },
+    {
+      "id": "session-file",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Session load and save",
+      "summary": "Restores every input from an uploaded JSON session, or explains why the file was refused, and offers a download of the current inputs.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 331,
+          "end": 379,
+          "role": "markup",
+          "symbol": "_load_control",
+          "anchor": "727c9dd4e731",
+          "first": "def _load_control() -> None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 382,
+          "end": 403,
+          "role": "logic",
+          "symbol": "_save_control",
+          "anchor": "17a9c0867ae5",
+          "first": "def _save_control(inputs: CockpitInputs) -> None:"
+        },
+        {
+          "file": "code/src/hplcsim/session.py",
+          "start": 106,
+          "end": 122,
+          "role": "logic",
+          "symbol": "save_session",
+          "anchor": "cb12096cabcc",
+          "first": "def save_session(session: Session) -> str:"
+        },
+        {
+          "file": "code/src/hplcsim/session.py",
+          "start": 125,
+          "end": 148,
+          "role": "logic",
+          "symbol": "load_session",
+          "anchor": "cfa26dcdf694",
+          "first": "def load_session(text: str | bytes) -> Session:"
+        },
+        {
+          "file": "code/app/screen_state.py",
+          "start": 304,
+          "end": 408,
+          "role": "logic",
+          "symbol": "restore",
+          "anchor": "866cc9712e96",
+          "first": "def restore(session: Session) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "programme-rail",
+      "level": "view",
+      "parent": null,
+      "title": "Scouting and candidate programme tables",
+      "summary": "Holds the scouting programme at two gradient times and the editable candidate programme as time / %B rows, with a reset button and warnings beneath the candidate.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 712,
+          "end": 754,
+          "role": "markup",
+          "symbol": "_scouting_table",
+          "anchor": "d5e3bb0e0c56",
+          "first": "def _scouting_table() -> tables.ScoutingRead:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 757,
+          "end": 812,
+          "role": "markup",
+          "symbol": "_candidate_table",
+          "anchor": "0cec280bff19",
+          "first": "def _candidate_table(scouting: ScoutingEntry) -> ProgrammeRead:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 815,
+          "end": 821,
+          "role": "logic",
+          "symbol": "_time_column",
+          "anchor": "c62db96a7cac",
+          "first": "def _time_column(width: int) -> object:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 824,
+          "end": 832,
+          "role": "logic",
+          "symbol": "_percent_column",
+          "anchor": "3d841793b474",
+          "first": "def _percent_column(width: int) -> object:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 835,
+          "end": 837,
+          "role": "logic",
+          "symbol": "_seed_programme",
+          "anchor": "ed5be7e53d43",
+          "first": "def _seed_programme(scouting: ScoutingEntry) -> Programme:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 846,
+          "end": 850,
+          "role": "logic",
+          "symbol": "_reset_candidate",
+          "anchor": "767c6b945eb3",
+          "first": "def _reset_candidate() -> None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 297,
+          "end": 302,
+          "role": "logic",
+          "anchor": "4cc7bc703fa5",
+          "first": "with candidate_slot:"
+        },
+        {
+          "file": "code/app/entry.py",
+          "start": 248,
+          "end": 304,
+          "role": "logic",
+          "symbol": "programme_from_points",
+          "anchor": "2dc1527317ae",
+          "first": "def programme_from_points(points: Sequence[ProgrammePoint]) -> ProgrammeRead:"
+        }
+      ]
+    },
+    {
+      "id": "method-summary",
+      "level": "component",
+      "parent": "programme-rail",
+      "title": "Method summary and selected peak",
+      "summary": "Shows the peaks fitted, the untracked count, the colour-coded minimum Rs and the critical pair, the run time and the minimum k, and lets the person pick one peak to see its tR, width, N, fitted parameters and Rs to each neighbour.",
+      "views": [
+        "summary stats",
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 868,
+          "end": 883,
+          "role": "markup",
+          "symbol": "_summary_panels",
+          "anchor": "1f4893b84b77",
+          "first": "def _summary_panels(cockpit: Cockpit, diagnostics: Diagnostics) -> None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 886,
+          "end": 914,
+          "role": "logic",
+          "symbol": "_summary_rows",
+          "anchor": "e91bf5838a6d",
+          "first": "def _summary_rows(cockpit: Cockpit, indicative: bool) -> list[Row]:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 917,
+          "end": 944,
+          "role": "markup",
+          "symbol": "_peak_detail",
+          "anchor": "d9f5ba5e281d",
+          "first": "def _peak_detail(cockpit: Cockpit, diagnostics: Diagnostics) -> None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 947,
+          "end": 953,
+          "role": "logic",
+          "symbol": "_neighbouring_resolution",
+          "anchor": "f376c9fec671",
+          "first": "def _neighbouring_resolution(cockpit: Cockpit, name: str) -> tuple[float | None, float | None]:"
+        },
+        {
+          "file": "code/app/panels.py",
+          "start": 65,
+          "end": 80,
+          "role": "markup",
+          "symbol": "panel",
+          "anchor": "1deedce368ff",
+          "first": "def panel(title: str, rows: Sequence[Row]) -> str:"
+        },
+        {
+          "file": "code/app/panels.py",
+          "start": 58,
+          "end": 62,
+          "role": "style",
+          "symbol": "resolution_colour",
+          "anchor": "76abde2eb0bb",
+          "first": "def resolution_colour(rs: float) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "results-tabs",
+      "level": "view",
+      "parent": null,
+      "title": "Fit parameters and resolution tabs",
+      "summary": "One tab lists each peak's fitted retention parameters and calibrated composition window, and another lists the predicted retention times with flags and every adjacent pair's Rs with a grade.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 258,
+          "end": 262,
+          "role": "markup",
+          "anchor": "6a77fd952fb0",
+          "first": "with main_view:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 974,
+          "end": 1000,
+          "role": "markup",
+          "symbol": "_fit_tab",
+          "anchor": "2a9f586ff4d6",
+          "first": "def _fit_tab(cockpit: Cockpit, diagnostics: Diagnostics) -> None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 1003,
+          "end": 1037,
+          "role": "markup",
+          "symbol": "_window_readout",
+          "anchor": "e5b2e5b3efd7",
+          "first": "def _window_readout(diagnostics: Diagnostics) -> None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 1040,
+          "end": 1075,
+          "role": "markup",
+          "symbol": "_resolution_tab",
+          "anchor": "b51785bf565b",
+          "first": "def _resolution_tab(cockpit: Cockpit, diagnostics: Diagnostics) -> None:"
+        },
+        {
+          "file": "code/app/tables.py",
+          "start": 179,
+          "end": 205,
+          "role": "logic",
+          "symbol": "fit_frame",
+          "anchor": "46dc84dd9d5a",
+          "first": "def fit_frame(cockpit: Cockpit) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app/tables.py",
+          "start": 290,
+          "end": 315,
+          "role": "logic",
+          "symbol": "composition_window_frame",
+          "anchor": "cb26f1166021",
+          "first": "def composition_window_frame(windows: Sequence[CompositionWindow]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app/tables.py",
+          "start": 250,
+          "end": 275,
+          "role": "logic",
+          "symbol": "resolution_frame",
+          "anchor": "8a477bf1e1f2",
+          "first": "def resolution_frame(cockpit: Cockpit, diagnostics: Diagnostics) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/hplcsim/fit.py",
+          "start": 96,
+          "end": 131,
+          "role": "logic",
+          "symbol": "fit_peak",
+          "anchor": "d7094997599b",
+          "first": "def fit_peak(peak: Peak, method: Method, run1: Run, run2: Run) -> FitResult:"
+        }
+      ]
+    },
+    {
+      "id": "peak-table",
+      "level": "component",
+      "parent": "results-tabs",
+      "title": "Table of peaks",
+      "summary": "An editable table with one row per compound, holding its retention time, area and half-height width in both scouting runs, with the untracked count and pairing checks shown beneath it.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 653,
+          "end": 682,
+          "role": "markup",
+          "symbol": "_peak_table",
+          "anchor": "1195729c67ce",
+          "first": "def _peak_table() -> list[PeakRow]:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 685,
+          "end": 706,
+          "role": "markup",
+          "symbol": "_entry_notes",
+          "anchor": "4d1a46622e3b",
+          "first": "def _entry_notes(cockpit: Cockpit, diagnostics: Diagnostics) -> None:"
+        },
+        {
+          "file": "code/app/tables.py",
+          "start": 164,
+          "end": 176,
+          "role": "logic",
+          "symbol": "peak_rows_from_frame",
+          "anchor": "85b2eceaa8db",
+          "first": "def peak_rows_from_frame(frame: pd.DataFrame) -> list[PeakRow]:"
+        },
+        {
+          "file": "code/app/tables.py",
+          "start": 124,
+          "end": 131,
+          "role": "data",
+          "symbol": "blank_peak_frame",
+          "anchor": "5fba57eb52c1",
+          "first": "def blank_peak_frame(rows: int = 6) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "chromatogram",
+      "level": "view",
+      "parent": null,
+      "title": "Predicted chromatogram with programme overlay",
+      "summary": "A pinned plot of the predicted trace as a sum of Gaussians, with the candidate and scouting programmes on a %B axis, each peak marked at its elution composition with its calibrated window as a whisker, and an always-visible strip for setting the axis range.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 1117,
+          "end": 1118,
+          "role": "markup",
+          "symbol": "_chromatogram",
+          "anchor": "177dc38e3105",
+          "first": "def _chromatogram("
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 1175,
+          "end": 1184,
+          "role": "logic",
+          "symbol": "_axis_request",
+          "anchor": "e2011de69bfb",
+          "first": "def _axis_request() -> chromatogram.AxisRequest:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 1187,
+          "end": 1233,
+          "role": "markup",
+          "symbol": "_axis_controls",
+          "anchor": "e86b17b047cd",
+          "first": "def _axis_controls(view: chromatogram.AxisView) -> None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 1236,
+          "end": 1238,
+          "role": "logic",
+          "symbol": "_mark_axis_touched",
+          "anchor": "f25fe78ec39a",
+          "first": "def _mark_axis_touched() -> None:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 1241,
+          "end": 1250,
+          "role": "logic",
+          "symbol": "_reset_axis_range",
+          "anchor": "b2f8d3dc83df",
+          "first": "def _reset_axis_range() -> None:"
+        },
+        {
+          "file": "code/app/chromatogram.py",
+          "start": 116,
+          "end": 121,
+          "role": "logic",
+          "symbol": "chromatogram",
+          "anchor": "60532e29744c",
+          "first": "def chromatogram("
+        },
+        {
+          "file": "code/app/chromatogram.py",
+          "start": 167,
+          "end": 185,
+          "role": "logic",
+          "symbol": "axis_view",
+          "anchor": "f2587a872b1b",
+          "first": "def axis_view(trace: Chromatogram, request: AxisRequest | None = None) -> AxisView:"
+        },
+        {
+          "file": "code/app/chromatogram.py",
+          "start": 406,
+          "end": 413,
+          "role": "logic",
+          "symbol": "programme_overlay",
+          "anchor": "bad1120364fc",
+          "first": "def programme_overlay("
+        },
+        {
+          "file": "code/app/chromatogram.py",
+          "start": 459,
+          "end": 464,
+          "role": "logic",
+          "symbol": "figure",
+          "anchor": "8102261f8587",
+          "first": "def figure("
+        }
+      ]
+    },
+    {
+      "id": "status-bar",
+      "level": "view",
+      "parent": null,
+      "title": "Status bar",
+      "summary": "A one-line strip at the foot of the screen that gives the candidate, the critical-pair Rs, the programme type and any stamps for an estimated dead time or indicative resolution.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/streamlit_app.py",
+          "start": 1078,
+          "end": 1079,
+          "role": "markup",
+          "symbol": "_status_bar",
+          "anchor": "b34f940e1f72",
+          "first": "def _status_bar("
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 1103,
+          "end": 1107,
+          "role": "logic",
+          "symbol": "_candidate_line",
+          "anchor": "11daf08b7bbd",
+          "first": "def _candidate_line(inputs: CockpitInputs, read: ProgrammeRead) -> str:"
+        },
+        {
+          "file": "code/streamlit_app.py",
+          "start": 1110,
+          "end": 1114,
+          "role": "logic",
+          "symbol": "_programme_kind",
+          "anchor": "5f39a6eb26f1",
+          "first": "def _programme_kind(inputs: CockpitInputs) -> str:"
+        },
+        {
+          "file": "code/app/panels.py",
+          "start": 111,
+          "end": 114,
+          "role": "markup",
+          "symbol": "status_bar",
+          "anchor": "496a301c5a20",
+          "first": "def status_bar(fields: Sequence[str]) -> str:"
+        }
+      ]
+    }
+  ]
+}

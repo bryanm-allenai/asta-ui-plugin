@@ -1,0 +1,467 @@
+{
+  "schema": "astaui.card/1",
+  "id": "exoplanet-cnn-detector",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:50:51Z"
+  },
+  "app": {
+    "title": "ExoPlanet AI | Kepler CNN Detector",
+    "summary": "A person enters a star's catalogue number, or picks a demo star, and runs a pipeline that downloads the star's archived light curve, picks one fixed-length window from it and scores that window with a trained convolutional network. The interface reports whether the score clears a calibrated threshold and which confidence tier it falls in, with the action each tier calls for. If the person supplies an orbital period, it phase-folds the light curve to check for a secondary eclipse and flags the star as a likely eclipsing binary. The full light curve, the scored window and the dips it contains are plotted, and a separate page sets the result against the model's validated performance and known limits.",
+    "task": {
+      "text": "Screen one star's light curve for a transit-like signal with a trained classifier, and vet a candidate against the most common false positive.",
+      "verbs": [
+        "identify",
+        "derive",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "Archived photometric time series for single stars, fetched by catalogue ID and stitched across observing quarters, plus an optional orbital period.",
+      "item": "one star's light curve (brightness over time)",
+      "shapes": [
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "screening archived light curves for planet candidates, before follow-up",
+      "terms": [
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "An input form (ID, demo picker, auto-filled period) starts a staged pipeline whose progress is shown step by step; its outputs fill a verdict box with score and tier, an eclipsing-binary check panel, and two linked line charts in which the scored window is shaded on the full series and repeated close up. Sidebar navigation switches to a performance dashboard of tables, curves and a tabbed results gallery.",
+      "views": [
+        "form",
+        "summary stats",
+        "line chart",
+        "bar chart",
+        "table view",
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "inline edit",
+        "hover for detail",
+        "zoom and pan",
+        "toggle view"
+      ],
+      "patterns": [
+        "focus and context",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "transit photometry classified with a 1D convolutional network, in astronomy",
+      "disciplines": [
+        "astronomy"
+      ],
+      "terms": [
+        "transit photometry",
+        "light curve classification",
+        "eclipsing binary vetting"
+      ]
+    },
+    "workflow": {
+      "name": "score one item with a trained classifier and vet the call against a known false positive",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Type a catalogue number or pick a demo star, then Run downloads quarters 1–8 of long-cadence flux from the public archive, median-normalises each quarter and stitches them, with progress shown and results cached.",
+          "parts": [
+            "detect-input",
+            "pipeline-status"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The light curve is gap-filled, median-subtracted, cut to the highest-variance fixed-length window, normalised and smoothed, then scored 0–1 by the network.",
+          "parts": [
+            "pipeline-status"
+          ]
+        },
+        {
+          "step": "classify the item against a threshold and place it in a tier",
+          "here": "A calibrated threshold gives 'planet candidate' or 'no planet'; a HIGH / MEDIUM / LOW badge points at the tier guide's recommended action, and low scores get a warning naming likely causes.",
+          "parts": [
+            "verdict"
+          ]
+        },
+        {
+          "step": "check the call against a known false-positive cause",
+          "here": "With a period entered (auto-filled for known stars, 0 to skip), the curve is phase-folded, primary and secondary eclipse depths are measured above noise gates, and a secondary/primary ratio over one half flags an eclipsing binary; a doubled-period fold catches equal eclipses.",
+          "parts": [
+            "detect-input",
+            "eb-check"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "The full light curve is drawn faintly with the scored window shaded and overlaid, dips below −2σ marked, and the preprocessed window the network saw drawn on its own.",
+          "parts": [
+            "light-curve-plots"
+          ]
+        },
+        {
+          "step": "set the result against the method's validated performance",
+          "here": "A Performance page shows a results table by evaluation round, ROC curves, score distributions with the threshold, detection rate by signal-to-noise tier, a tabbed figure gallery and a list of known limitations.",
+          "parts": [
+            "sidebar-nav",
+            "performance-page"
+          ]
+        }
+      ],
+      "distinctive": [
+        "the classifier sees only one fixed-length window, chosen as the highest-variance stretch, and the chart shades that window on the full series so the person can see what was actually scored",
+        "vetting is a period-folding test: the depth of a secondary eclipse relative to the primary, gated against out-of-transit scatter, separates eclipsing binaries from planets, with a doubled-period fallback for equal eclipses",
+        "the orbital period is auto-filled from a built-in table for known targets and the vetting step is skipped when it is left at zero",
+        "a calibrated detection threshold sits alongside separate confidence tiers, each with a recommended follow-up action, and below-threshold results come with an explanation of likely failure modes"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar-nav",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar navigation",
+      "summary": "Switches between the Home, Detect, Performance and About pages and shows the model, threshold and filter in use.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 573,
+          "end": 602,
+          "role": "markup",
+          "anchor": "2c617c259b62",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 57,
+          "end": 61,
+          "role": "style",
+          "anchor": "83c9c03fbf15",
+          "first": "[data-testid=\"stSidebar\"] {"
+        }
+      ]
+    },
+    {
+      "id": "detect-page",
+      "level": "view",
+      "parent": null,
+      "title": "Detect page",
+      "summary": "The working page: input, pipeline progress, verdict, eclipsing-binary check and plots for one star.",
+      "views": [
+        "form",
+        "summary stats",
+        "line chart"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 728,
+          "end": 745,
+          "role": "markup",
+          "anchor": "998631634e12",
+          "first": "elif page == \"Detect\":"
+        }
+      ]
+    },
+    {
+      "id": "detect-input",
+      "level": "component",
+      "parent": "detect-page",
+      "title": "Star and period input",
+      "summary": "Takes a catalogue number or a demo-star choice, auto-fills the orbital period for known stars with a note on what to expect, and starts the pipeline.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "inline edit",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 36,
+          "end": 41,
+          "role": "data",
+          "anchor": "277ef6c5073c",
+          "first": "DEMO_STARS = {"
+        },
+        {
+          "file": "code/app.py",
+          "start": 746,
+          "end": 765,
+          "role": "markup",
+          "anchor": "433928c4c7e8",
+          "first": "# ── Input area ──"
+        },
+        {
+          "file": "code/app.py",
+          "start": 766,
+          "end": 784,
+          "role": "data",
+          "anchor": "2ea61cf0d6de",
+          "first": "# ── Known periods for ALL test stars ──"
+        },
+        {
+          "file": "code/app.py",
+          "start": 786,
+          "end": 857,
+          "role": "logic",
+          "anchor": "5aa148646f9c",
+          "first": "# ── Auto-fill: works for both typed KIC AND demo dropdown ──"
+        },
+        {
+          "file": "code/app.py",
+          "start": 155,
+          "end": 165,
+          "role": "style",
+          "anchor": "ef24470cf122",
+          "first": "/* ── warning / info banners ── */"
+        }
+      ]
+    },
+    {
+      "id": "pipeline-status",
+      "level": "component",
+      "parent": "detect-page",
+      "title": "Pipeline run and status",
+      "summary": "Downloads and stitches the light curve, preprocesses it to the network's input window and scores it, reporting each stage and any error as it goes.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 859,
+          "end": 925,
+          "role": "logic",
+          "anchor": "aee55ae02ecf",
+          "first": "if run_btn:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 232,
+          "end": 241,
+          "role": "logic",
+          "symbol": "load_model",
+          "anchor": "75e27bda4732",
+          "first": "def load_model():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 294,
+          "end": 353,
+          "role": "logic",
+          "symbol": "download_light_curve",
+          "anchor": "bcd509aa98b2",
+          "first": "def download_light_curve(kic_id: str):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 358,
+          "end": 414,
+          "role": "logic",
+          "symbol": "preprocess",
+          "anchor": "959d10793a19",
+          "first": "def preprocess(lc):"
+        }
+      ]
+    },
+    {
+      "id": "verdict",
+      "level": "component",
+      "parent": "detect-page",
+      "title": "Detection verdict and tier guide",
+      "summary": "Shows candidate or no-candidate, the score against the threshold and a confidence-tier badge, with a guide to what each tier means and a warning explaining low scores.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 929,
+          "end": 970,
+          "role": "markup",
+          "anchor": "95074f0cf3b8",
+          "first": "# ── Result Box ──"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1144,
+          "end": 1165,
+          "role": "markup",
+          "anchor": "88f65d71b79d",
+          "first": "# ── Tier explanation ──"
+        },
+        {
+          "file": "code/app.py",
+          "start": 550,
+          "end": 556,
+          "role": "logic",
+          "symbol": "get_confidence_tier",
+          "anchor": "d3489aee526e",
+          "first": "def get_confidence_tier(score: float):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 89,
+          "end": 125,
+          "role": "style",
+          "anchor": "8b8cac677930",
+          "first": "/* ── result boxes ── */"
+        },
+        {
+          "file": "code/app.py",
+          "start": 176,
+          "end": 181,
+          "role": "style",
+          "anchor": "e78a362b7bbd",
+          "first": "/* ── pulse animation ── */"
+        }
+      ]
+    },
+    {
+      "id": "eb-check",
+      "level": "component",
+      "parent": "detect-page",
+      "title": "Eclipsing-binary check",
+      "summary": "Phase-folds the light curve at the given period, measures primary and secondary eclipse depths and their ratio, and reports flagged, passed or inconclusive.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 974,
+          "end": 1054,
+          "role": "markup",
+          "anchor": "387546580c86",
+          "first": "# ── EB Check ──"
+        },
+        {
+          "file": "code/app.py",
+          "start": 419,
+          "end": 545,
+          "role": "logic",
+          "symbol": "run_eb_check",
+          "anchor": "281cf5d96db0",
+          "first": "def run_eb_check(lc, period: float):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 102,
+          "end": 107,
+          "role": "style",
+          "anchor": "b2cedf8b7270",
+          "first": ".result-eb {"
+        }
+      ]
+    },
+    {
+      "id": "light-curve-plots",
+      "level": "component",
+      "parent": "detect-page",
+      "title": "Light curve and scored segment",
+      "summary": "Draws the full light curve with the scored window shaded and overlaid and its dips marked, then the preprocessed window the network saw on its own.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1058,
+          "end": 1142,
+          "role": "logic",
+          "anchor": "6a096b907968",
+          "first": "# ── Light Curve Plot ──"
+        },
+        {
+          "file": "code/app.py",
+          "start": 561,
+          "end": 568,
+          "role": "style",
+          "anchor": "479072fe0a97",
+          "first": "PLOT_LAYOUT = dict("
+        }
+      ]
+    },
+    {
+      "id": "performance-page",
+      "level": "view",
+      "parent": null,
+      "title": "Model performance",
+      "summary": "Sets the detector's results in context with a table of evaluation rounds, ROC curves, score distributions with the threshold, detection rate by signal-to-noise tier, a tabbed figure gallery and known limitations.",
+      "views": [
+        "table view",
+        "line chart",
+        "bar chart",
+        "thumbnail grid"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1170,
+          "end": 1495,
+          "role": "markup",
+          "anchor": "bbf7d86f427c",
+          "first": "elif page == \"Performance\":"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1234,
+          "end": 1240,
+          "role": "logic",
+          "symbol": "roc_from_auc",
+          "anchor": "1e73f26dca0b",
+          "first": "def roc_from_auc(auc, n=200, label=\"\"):"
+        }
+      ]
+    }
+  ]
+}

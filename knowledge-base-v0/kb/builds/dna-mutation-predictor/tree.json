@@ -1,0 +1,609 @@
+{
+ "interface": {
+  "title": "DNA Mutation Predictor (DNA Mutation Effect Predictor, ESM-2 + XGBoost)",
+  "field": "Human genetics / clinical variant interpretation (missense variant pathogenicity)",
+  "stage_of_work": "Variant triage and prioritisation, before experimental or clinical follow-up; also checking how far to trust the model",
+  "what_it_is_for": "Score missense variants as pathogenic or benign, one at a time (gene symbol + HGVSp) or from a CSV, using ESM-2 protein-language-model embeddings and an XGBoost classifier, and review the model's held-out performance."
+ },
+ "data": {
+  "source": "built-in example variants plus an uploaded test file",
+  "note": "Inputs were the built-in example variants (the Home 'Try It Now' cards and the Predict page's quick-example buttons), variants typed by hand, the app's own sample CSV template (sample_variants.csv: TP53 C61G, KRAS G12V, BRCA1 G1738R, PTEN R130Q; downloaded but not uploaded), and the test file variants_batch_sample.csv (8 rows, including NOTAREALGENE, the malformed p.Xyz9999Gly and PTEN with no hgvsp). The sandbox has no outbound network, so the UniProt lookup failed and no prediction ever finished. Every single prediction gave 'Prediction failed: UniProt ID not found for gene TP53'. Every batch row came back as 'Error' with empty probability columns. The Performance and About pages are fully offline (data/metrics.json) and worked. According to the Performance page text, the web app scores with ESM-2 only and the population blend is CLI-only, so the evo2_prob and evo2_llr batch columns are not expected to fill in the web app."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Decide which genetic variants are likely harmful enough to follow up, and how far to trust the prediction",
+  "specific": "Classify missense variants as pathogenic or benign with ESM-2 + XGBoost, and check the model's reported hold-out performance",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Learn what the predictor does before using it",
+    "specific": "Home page: model summary stat tiles and the 'How It Works' pipeline",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Read what the predictor does and its headline performance numbers",
+      "specific": "Read the Home stat tiles (81.2% accuracy, 2,792 variants, 150M parameters, 1,280-dim embedding) and the 5-step 'How It Works' pipeline",
+      "screens": [
+       "screens/005.webp",
+       "screens/006.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened http://localhost:8501/ (127.0.0.1 stayed blank at first)",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the Try It Now cards",
+        "screens": [
+         "screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Score a single candidate variant",
+    "specific": "Predict page: gene symbol + HGVSp → CLASSIFY MUTATION",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Start from a curated example variant with a known clinical label instead of typing one",
+      "specific": "Press 'Analyze →' on a Home 'Try It Now' card to open Predict with gene and HGVSp filled in",
+      "screens": [
+       "screens/010.webp",
+       "screens/011.webp",
+       "screens/044.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Analyze → on the TP53 p.Arg175His card",
+        "screens": [
+         "screens/010.webp",
+         "screens/011.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Analyze → on the KRAS p.Gly12Val card",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Compare a known-harmful and a likely-benign variant in the same gene to check calibration",
+      "specific": "Classify the TP53 p.Arg175His hotspot and the TP53 p.Arg50Gln benign quick example, then compare the two scores",
+      "screens": [
+       "screens/012.webp",
+       "screens/013.webp",
+       "screens/014.webp"
+      ],
+      "children": [
+       {
+        "kind": "task",
+        "general": "Score the known-harmful variant",
+        "specific": "Classify TP53 p.Arg175His (pathogenic hotspot)",
+        "screens": [
+         "screens/012.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "pressed CLASSIFY MUTATION (twice; the first click only refocused) → 'Prediction failed: UniProt ID not found for gene TP53'",
+          "screens": [
+           "screens/012.webp"
+          ]
+         }
+        ],
+        "id": "t3",
+        "check": "not_confirmed"
+       },
+       {
+        "kind": "task",
+        "general": "Score the likely-benign variant in the same gene",
+        "specific": "Pick the TP53 p.Arg50Gln quick example and classify it",
+        "screens": [
+         "screens/013.webp",
+         "screens/014.webp"
+        ],
+        "children": [
+         {
+          "kind": "action",
+          "label": "pressed quick example 'TP53 p.Arg50Gln'",
+          "screens": [
+           "screens/013.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "pressed CLASSIFY MUTATION → same 'UniProt ID not found' error",
+          "screens": [
+           "screens/014.webp"
+          ]
+         }
+        ],
+        "id": "t4",
+        "check": "not_confirmed"
+       }
+      ],
+      "id": "n1",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Enter a variant by hand and see how missing or wrongly written protein changes are handled",
+      "specific": "Type a gene and HGVSp, including one-letter notation and empty fields",
+      "screens": [
+       "screens/015.webp",
+       "screens/016.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "typed 'egfr' and 'L858R', pressed CLASSIFY MUTATION → 'Unknown residue: L or R.'",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "cleared both fields, pressed CLASSIFY MUTATION → 'Enter both gene symbol and HGVSp string.'",
+        "screens": [
+         "screens/016.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Screen a list of variants and export the results",
+    "specific": "Batch page: upload a gene,hgvsp CSV, run batch predictions, download predictions.csv",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Get the expected input format for a variant list",
+      "specific": "Download the sample CSV template",
+      "screens": [
+       "screens/018.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed '⬇ Download sample CSV template' → sample_variants.csv (gene,hgvsp; 4 rows)",
+        "screens": [
+         "screens/018.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Load the variant list and check it before running",
+      "specific": "Upload variants_batch_sample.csv and inspect the preview table ('8 variants loaded')",
+      "screens": [
+       "screens/019.webp",
+       "screens/020.webp",
+       "screens/021.webp",
+       "screens/027.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Upload and chose variants_batch_sample.csv",
+        "screens": [
+         "screens/019.webp",
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the 'gene' column header to sort",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed the table Search icon and typed 'TP' (TP53 rows highlighted)",
+        "screens": [
+         "screens/027.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Score every variant in the list",
+      "specific": "Run batch predictions; see the progress bar, results table and Total/Pathogenic/Benign tiles. The results grid has no error-reason column, and apart from sorting the grid no ranking or flagging control was seen.",
+      "screens": [
+       "screens/023.webp",
+       "screens/024.webp",
+       "screens/025.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed RUN BATCH PREDICTIONS (8/8 progress, all rows 'Error', tiles 8/0/0)",
+        "screens": [
+         "screens/023.webp",
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled the results table sideways (columns: prediction, probability, esm_prob, evo2_prob, evo2_llr; no error-reason column)",
+        "screens": [
+         "screens/025.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "not_confirmed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the scored variant list",
+      "specific": "Download the results as predictions.csv",
+      "screens": [
+       "screens/026.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed the download button under the summary tiles → predictions.csv (8 rows, all 'Error'; the results panel then disappeared on rerun)",
+        "screens": [
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Judge how far to trust the model",
+    "specific": "Performance page (offline metrics.json) and About page",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Read the headline accuracy figures",
+      "specific": "Read the Accuracy 81.2%, Precision 82.8%, Recall 79.6%, F1 81.1%, Specificity 82.9%, MCC 0.625, AUC 0.895 and test-set (n=559) tiles",
+      "screens": [
+       "screens/028.webp",
+       "screens/033.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "selected Performance in the sidebar",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the second tile row",
+        "screens": [
+         "screens/033.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Inspect the error breakdown and the trade-off curve",
+      "specific": "Explore the confusion matrix (TN 228, FP 47, FN 58, TP 226) and the ROC curve",
+      "screens": [
+       "screens/029.webp",
+       "screens/030.webp",
+       "screens/031.webp",
+       "screens/032.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered the ROC curve (tooltip FPR 0.116, TPR 0.739)",
+        "screens": [
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged a box on the ROC curve to zoom in on FPR 0–0.3",
+        "screens": [
+         "screens/030.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "double-clicked to zoom back out",
+        "screens": [
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the 'Random' legend entry to hide the diagonal",
+        "screens": [
+         "screens/032.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered a confusion-matrix cell (tooltip x/y/z count)",
+        "screens": [
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "See which inputs drive the model and how it was trained",
+      "specific": "Read the Top Selected Features bar chart (ESM dims) and the Training Details card",
+      "screens": [
+       "screens/034.webp",
+       "screens/035.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered the top bar (ESM dim 107, 0.0379)",
+        "screens": [
+         "screens/034.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to Training Details (XGBoost, 500 estimators, depth 6, lr 0.05, SelectKBest k=400, train 2,233 / test 559)",
+        "screens": [
+         "screens/035.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Read the method, data sources and limits of use",
+      "specific": "About page: How It Works, stack table, data sources (ClinVar 66,210 variants, UniProt, AlphaFold DB, ESM-2), disclaimer",
+      "screens": [
+       "screens/037.webp",
+       "screens/038.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "selected About in the sidebar and scrolled",
+        "screens": [
+         "screens/037.webp",
+         "screens/038.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Example cards that prefill the analysis form",
+   "general": "Offer a gallery of curated example variants, each labelled with its known clinical outcome. Picking one opens the scoring form with the gene and protein change filled in, ready to run.",
+   "specific": "'Try It Now' cards on Home (TP53 C61G, KRAS G12V, TP53 R175H, EGFR L858R, TP53 R50Q benign, BRAF V600E, BRCA1 G1738R) and the Predict page's 4 quick-example buttons. Both set the GENE SYMBOL and HGVSp fields and switch the sidebar radio to Predict. The button labels render white on white, so they look blank.",
+   "steps": [
+    "Browse the cards, each showing gene, protein change, domain note and known label",
+    "Press 'Analyze →' (or a quick-example button)",
+    "Land on Predict with both fields filled in",
+    "Press CLASSIFY MUTATION"
+   ],
+   "serves_tasks": [
+    "Start from a curated example variant with a known clinical label instead of typing one",
+    "Score the likely-benign variant in the same gene"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/010.webp",
+    "screens/011.webp",
+    "screens/013.webp",
+    "screens/044.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Single-variant classify form with input validation",
+   "general": "Enter a gene and a protein change, run a classifier, and get a specific error message when the input is missing, wrongly written or cannot be looked up.",
+   "specific": "Predict page: GENE SYMBOL + HGVSp NOTATION fields → CLASSIFY MUTATION. Errors seen: 'Enter both gene symbol and HGVSp string.', 'Unknown residue: L or R.' for one-letter notation, and 'Prediction failed: UniProt ID not found for gene TP53' when offline. A successful result was never seen in this run.",
+   "steps": [
+    "Type a gene symbol",
+    "Type a three-letter HGVSp change (p.Arg175His)",
+    "Press CLASSIFY MUTATION",
+    "Read the error banner, fix the input and rerun"
+   ],
+   "serves_tasks": [
+    "Score the known-harmful variant",
+    "Enter a variant by hand and see how missing or wrongly written protein changes are handled"
+   ],
+   "screens": [
+    "screens/012.webp",
+    "screens/014.webp",
+    "screens/015.webp",
+    "screens/016.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "CSV batch upload with preview, run and export",
+   "general": "Get a template, upload a table of variants, preview it, score every row with a progress bar, see summary counts, then download the scored table.",
+   "specific": "Batch page: '⬇ Download sample CSV template' → upload a gene,hgvsp CSV (max 500 rows) → preview data grid ('8 variants loaded') → RUN BATCH PREDICTIONS (progress 'n/8: gene hgvsp') → results grid with prediction, probability, esm_prob, evo2_prob and evo2_llr, plus Total/Pathogenic/Benign tiles → download predictions.csv. The results have no error-reason column, so failed rows show only 'Error'. Removing the file returns to the empty drop zone.",
+   "steps": [
+    "Download the sample template",
+    "Upload the CSV and check the preview table",
+    "Press RUN BATCH PREDICTIONS and watch the progress bar",
+    "Read the results table and the summary tiles",
+    "Download predictions.csv"
+   ],
+   "serves_tasks": [
+    "Get the expected input format for a variant list",
+    "Load the variant list and check it before running",
+    "Score every variant in the list",
+    "Export the scored variant list"
+   ],
+   "screens": [
+    "screens/018.webp",
+    "screens/020.webp",
+    "screens/023.webp",
+    "screens/024.webp",
+    "screens/026.webp",
+    "screens/043.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Interactive data grid (sort, search, hide columns)",
+   "general": "Inspect a loaded table: sort by a column, search to highlight matching rows, and hide or show columns.",
+   "specific": "This is the stock Streamlit data grid rather than a component the tool designed; it is reused for the Batch preview, the results and the About stack table. Clicking a header sorts (↑ gene), Search highlights matches (typing 'TP' highlights the TP53 rows), and Show/hide columns has one checkbox per column (hgvsp hidden and restored). The grid's Download as CSV produced no file in the replay, and Fullscreen was not tried.",
+   "steps": [
+    "Click a column header to sort",
+    "Open Search and type a term",
+    "Open Show/hide columns and untick a column",
+    "Re-tick it to restore the column"
+   ],
+   "serves_tasks": [
+    "Load the variant list and check it before running"
+   ],
+   "screens": [
+    "screens/021.webp",
+    "screens/027.webp",
+    "screens/040.webp",
+    "screens/041.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Classifier evaluation panel (metric tiles + confusion matrix + ROC)",
+   "general": "Judge a binary classifier by reading summary metrics next to a hoverable confusion matrix and a ROC curve you can zoom, reset, toggle traces on and export as an image.",
+   "specific": "Performance page: Accuracy/Precision/Recall/F1/Specificity/MCC/Test set/AUC tiles; Plotly confusion heatmap (TN/FP/FN/TP); ROC curve 'XGBoost (AUC = 0.895)' vs 'Random' with box zoom, double-click reset, legend toggle and PNG download.",
+   "steps": [
+    "Read the metric tiles",
+    "Hover confusion cells for counts",
+    "Hover the ROC curve for FPR/TPR points",
+    "Drag a box to zoom the low-FPR region, double-click to reset",
+    "Toggle the Random baseline in the legend",
+    "Download the plot as PNG"
+   ],
+   "serves_tasks": [
+    "Read the headline accuracy figures",
+    "Inspect the error breakdown and the trade-off curve"
+   ],
+   "screens": [
+    "screens/028.webp",
+    "screens/029.webp",
+    "screens/030.webp",
+    "screens/031.webp",
+    "screens/032.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Feature-importance bar chart with training summary",
+   "general": "See which input features the model relies on most, ranked as horizontal bars with hover values, next to a card of the training setup.",
+   "specific": "Top Selected Features chart (15 ESM embedding dims, top: ESM dim 107 at 3.8%, then dim 301 at 2.9%) with the Training Details card (XGBoost, 500 estimators, depth 6, lr 0.05, SelectKBest k=400, StandardScaler, train 2,233 / test 559).",
+   "steps": [
+    "Scroll to Top Selected Features",
+    "Hover a bar for its exact importance",
+    "Read Training Details for the model setup and split sizes"
+   ],
+   "serves_tasks": [
+    "See which inputs drive the model and how it was trained"
+   ],
+   "screens": [
+    "screens/033.webp",
+    "screens/034.webp",
+    "screens/035.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Predict result view (pathogenicity probability gauge, Pathogenic/Benign label): every classification failed with 'UniProt ID not found' because the sandbox has no outbound network",
+  "Residue-level ±128 window view and the AlphaFold 3D structure view coloured by distance from the mutation site: they only render after a successful prediction, which never happened",
+  "Evo2 DNA-level blended opinion (evo2_prob / evo2_llr): appears only as empty columns in the batch results",
+  "Batch results with real probabilities, ranked or flagged: every row came back 'Error'"
+ ],
+ "not_done": [
+  "Goal 1 (triage a single variant): stopped at the error banner. No probability was produced because the UniProt lookup needs network access.",
+  "Goal 2 (compare TP53 R175H with the benign TP53 R50Q): both ran, but both failed the same way, so calibration could not be compared.",
+  "Goal 3 (residue-window and AlphaFold 3D inspection): unreachable without a successful prediction.",
+  "Goal 4 (batch screen to a ranked shortlist): upload, run and download all worked, but every row was 'Error' and the results grid has no error-reason column. Unknown gene, malformed HGVSp and missing hgvsp were not told apart from network failures, so validation behaviour could not be judged. Apart from sorting the grid, no ranking or flagging control was seen, so the shortlist step could not be done in the UI.",
+  "I did not upload the downloaded sample_variants.csv template: only variants_batch_sample.csv is available as an upload file.",
+  "ROC 'Download plot as a PNG': the explorer's trace and kept screens do not record this download (screens/032.webp shows hovers and the legend toggle, not a download), so it was removed from t11. The replay did save plot-image.png, so the feature step stays in f5.",
+  "Data grid 'Download as CSV' (on the About stack table) produced no file in the replay, and Fullscreen was never tried.",
+  "The decorative Home 'DNA Double Helix' Plotly 3D plot: I pressed ▶ ROTATE (it animated and zoomed) and clicked one legend entry with no visible effect. It doesn't connect to any analysis, so I left it out of the tree and features.",
+  "UI note: the 'Analyze →' buttons, quick-example buttons and download buttons show as blank white boxes (their labels are hidden by the theme). Navigating away from Batch clears the uploaded file, and downloading predictions.csv clears the results panel."
+ ],
+ "applied": [
+  "Slimmed the 'Get oriented' phase to the single optional orientation task t1",
+  "Moved t2 into the single-variant phase as an optional way to fill the inputs, and relabelled it as a scientist's aim",
+  "Merged t3 and t4 under a new comparison task n1 (known-harmful vs likely-benign variant in the same gene) with two runs; dropped t4's 'repeat' branch",
+  "Replaced 'item', 'group' and 'analysis screen' with 'variant', 'gene' and 'protein change' in general labels and in feature texts and serves_tasks",
+  "Recorded in t8 and not_done that the results grid has no error-reason column and that no ranking or flagging control was seen, so the shortlist step cannot be done in the UI",
+  "Removed the unseen success-state claims (gauge, structure view) from f2 and its steps",
+  "Marked f4 as a stock Streamlit grid and removed its untested or failed Download as CSV and Fullscreen steps",
+  "Removed the ROC PNG-download action from t11 because no kept screen or trace step shows it; noted this in not_done",
+  "Updated data.source to cover both the built-in examples and the uploaded file, and noted that the web app is ESM-2-only with the blend CLI-only, as the Performance page states"
+ ],
+ "open_fixes": [
+  "Add a 'Read the variant's score and protein context' task (probability card, gauge, bar, Protein Info; app.py:1093-1139): it was never reached offline, so a run with network access to UniProt is needed to show it on a screen.",
+  "Add an 'Inspect where the change sits in the 3D structure' task for goal 3 (AlphaFold view coloured by distance; app.py:1141-1152): it renders only after a successful prediction, which needs a networked run.",
+  "Add result-panel, 3D structure-viewer and Recent Predictions history-strip features: none of them appeared in this run, so they need a networked run before they can be described from screens rather than from code.",
+  "Confirm whether failed batch rows can be told apart (unknown gene vs malformed HGVSp vs missing hgvsp vs network) and whether any ranking or flagging exists: this needs a networked batch run with the same 8-row file."
+ ],
+ "screens_at": "pilot/public/runs/dna-mutation-predictor/20261029-124049/",
+ "screens_filed": {
+  "screens/005.webp": "screens/005.webp",
+  "screens/010.webp": "screens/010.webp",
+  "screens/018.webp": "screens/018.webp",
+  "screens/028.webp": "screens/028.webp"
+ }
+}

@@ -1,0 +1,495 @@
+{
+  "schema": "astaui.card/1",
+  "id": "pyxlms-gui",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T06:02:55Z"
+  },
+  "app": {
+    "title": "pyXLMS web app: convert, validate, filter and export crosslink search results",
+    "summary": "A person uploads one or more result files from a crosslink search engine, says which engine and crosslinker made them, and can choose processing steps: re-annotating protein positions from a FASTA file, keeping unique matches, validating at a target FDR, keeping target matches only, and aggregating to crosslinks. The parsed crosslink-spectrum-matches and crosslinks are shown as tables with summary statistics. The person can then narrow them by protein accession, crosslink type and target-decoy type, look at distribution plots, and export the result in the input format of a chosen downstream tool, adding a FASTA or a structure file where that tool needs one.",
+    "task": {
+      "text": "Turn crosslink search engine output into validated, filtered, summarised results saved in the format a downstream analysis tool needs.",
+      "verbs": [
+        "derive",
+        "clean",
+        "summarize",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "Tables of crosslink identifications from mass spectrometry search engines. Each row is a crosslink-spectrum-match or a crosslink linking two peptides, with sequences, crosslink positions, proteins, scores and decoy flags.",
+      "item": "a crosslink-spectrum-match or crosslink: a pair of crosslinked peptides with their positions in proteins, a score and target/decoy labels",
+      "shapes": [
+        "table",
+        "sequence"
+      ]
+    },
+    "stage": {
+      "text": "cleaning and validating crosslink search results after the database search, before structural or network analysis in other tools",
+      "terms": [
+        "clean",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Tabs run in pipeline order: Load Data, Filter, Visualize, Export. Each tab works on the same parsed result held in session state, and each filter or reload resets earlier exports. Every tab shows its current tables or plots and offers file downloads, and the export forms ask for whatever extra input the chosen target format needs.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "filter",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "status pipeline"
+      ]
+    },
+    "field": {
+      "text": "crosslinking mass spectrometry in proteomics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "crosslinking mass spectrometry",
+        "proteomics",
+        "target decoy fdr"
+      ]
+    },
+    "workflow": {
+      "name": "convert a result table between tool formats after validating and filtering it",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "upload one or more result files, choose the search engine or format and the crosslinker (or enter a custom name and mass), then press 'Read file(s)!'",
+          "parts": [
+            "load-data"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "optional toggles re-annotate protein positions from an uploaded FASTA, keep unique matches, validate at a target FDR with a chosen formula and concatenated or separate intra/inter FDR, keep target matches only, and aggregate to crosslinks grouped by peptide or by protein position",
+          "parts": [
+            "processing-options"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "read crosslink-spectrum-matches, crosslinks and aggregated crosslinks appear as tables with a row of summary statistics, each downloadable as .csv, .xlsx or .json",
+          "parts": [
+            "result-tables"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "a form keeps only chosen protein accessions, intra or inter crosslinks, and target-target, target-decoy or decoy-decoy matches, then shows the current tables",
+          "parts": [
+            "filter-tab"
+          ]
+        },
+        {
+          "step": "summarize the collection as distributions",
+          "here": "bar charts and histograms of target/decoy counts, scores, crosslink type, and the top-N proteins, peptide pairs and residue pairs, plus STRING scores for inter-links once an organism is chosen",
+          "parts": [
+            "visualize-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "pick a downstream tool (xiFDR, xiVIEW, xiNET, ProXL, AlphaLink2, PyXlinkViewer, xlms-tools, XMAS, XlinkDB, IMP-X-FDR, MS Annika), give any extra input it needs such as a FASTA or a PDB code or file, then download the converted file",
+          "parts": [
+            "export-tab",
+            "structure-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "False discovery rate is estimated from target-decoy labels, with a choice of formula, of whether intra and inter links get separate FDRs, and of whether higher or lower scores are better",
+        "Results exist at three levels (spectrum matches, crosslinks, aggregated crosslinks), and each tab handles each level on its own",
+        "Before exporting, the app checks that every field the target tool needs is present, and some exports also need a FASTA or a protein structure file so positions can be mapped to chains",
+        "Inter-links can be annotated with protein interaction scores from the online STRING database for a chosen organism",
+        "Peptides in each pair are reordered into a canonical alpha/beta order so that duplicate crosslinks can be found"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "load-data",
+      "level": "view",
+      "parent": null,
+      "title": "Load Data tab",
+      "summary": "Uploads search engine result files, takes the engine and crosslinker, and parses them into spectrum matches and crosslinks.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 377,
+          "end": 1201,
+          "role": "logic",
+          "symbol": "input_tab",
+          "anchor": "124524538d21",
+          "first": "def input_tab():"
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 419,
+          "end": 482,
+          "role": "markup",
+          "anchor": "7f977debb2d9",
+          "first": "header_1 = st.subheader(\"File Upload\", divider=\"grey\")"
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 117,
+          "end": 122,
+          "role": "logic",
+          "symbol": "read_files",
+          "anchor": "db010f9ae991",
+          "first": "def read_files("
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 4567,
+          "end": 4590,
+          "role": "markup",
+          "symbol": "main_page",
+          "anchor": "6ee4022882ce",
+          "first": "def main_page():"
+        }
+      ]
+    },
+    {
+      "id": "processing-options",
+      "level": "component",
+      "parent": "load-data",
+      "title": "Processing options",
+      "summary": "Toggles and fields for re-annotating positions, keeping unique matches, FDR validation, target-only filtering and aggregation, applied when the files are read.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 483,
+          "end": 668,
+          "role": "markup",
+          "anchor": "c8bffecf84ea",
+          "first": "parse_modifications = st.toggle("
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 670,
+          "end": 967,
+          "role": "logic",
+          "anchor": "aeac61f47b21",
+          "first": "# read in all inputs"
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 167,
+          "end": 169,
+          "role": "logic",
+          "symbol": "reannotating_positions",
+          "anchor": "85a15eeca9da",
+          "first": "def reannotating_positions("
+        }
+      ]
+    },
+    {
+      "id": "result-tables",
+      "level": "component",
+      "parent": "load-data",
+      "title": "Read results with summary statistics",
+      "summary": "Shows the parsed spectrum matches, crosslinks and aggregated crosslinks as tables with summary counts, and offers each one as a .csv, .xlsx or .json download.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 968,
+          "end": 1201,
+          "role": "markup",
+          "anchor": "07757b54dcf9",
+          "first": "# display read data and summary [CSMs]"
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 93,
+          "end": 94,
+          "role": "logic",
+          "symbol": "dataframe_to_csv_stream",
+          "anchor": "19869ba71c5f",
+          "first": "def dataframe_to_csv_stream("
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 103,
+          "end": 104,
+          "role": "logic",
+          "symbol": "dataframe_to_xlsx_stream",
+          "anchor": "c2a3f1b447a6",
+          "first": "def dataframe_to_xlsx_stream("
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 78,
+          "end": 89,
+          "role": "logic",
+          "symbol": "to_json",
+          "anchor": "3fb1b01b7e53",
+          "first": "def to_json(data: Any) -> bytes:"
+        }
+      ]
+    },
+    {
+      "id": "filter-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Filter tab",
+      "summary": "Keeps only matches with chosen proteins, crosslink types and target-decoy types, then shows and offers the current tables for download.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "multi-select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 1205,
+          "end": 1694,
+          "role": "logic",
+          "symbol": "filter_tab",
+          "anchor": "3286e120cf49",
+          "first": "def filter_tab():"
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 1239,
+          "end": 1286,
+          "role": "markup",
+          "anchor": "2a870437535c",
+          "first": "with st.form(\"filter_form\", enter_to_submit=False, border=False):"
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 238,
+          "end": 239,
+          "role": "logic",
+          "symbol": "filter_proteins",
+          "anchor": "bbd7a3970b3b",
+          "first": "def filter_proteins("
+        }
+      ]
+    },
+    {
+      "id": "visualize-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Visualize tab",
+      "summary": "Lays out distribution plots of target/decoy counts, scores, crosslink types, top proteins, peptide pairs, residue pairs and STRING scores, with set bin counts and top-N.",
+      "views": [
+        "bar chart",
+        "small multiples"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 1698,
+          "end": 2090,
+          "role": "logic",
+          "symbol": "visualize_tab",
+          "anchor": "ab3a63f08434",
+          "first": "def visualize_tab():"
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 1702,
+          "end": 1736,
+          "role": "markup",
+          "anchor": "c67622a4757b",
+          "first": "visualization_header = st.subheader(\"Visualization Parameters\", divider=\"grey\")"
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 308,
+          "end": 330,
+          "role": "logic",
+          "symbol": "layout_plots",
+          "anchor": "7dd7962d6973",
+          "first": "def layout_plots(plots: List[Any]) -> None:"
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 365,
+          "end": 373,
+          "role": "logic",
+          "symbol": "reset_string_cache",
+          "anchor": "ea05cc215036",
+          "first": "def reset_string_cache() -> None:"
+        }
+      ]
+    },
+    {
+      "id": "export-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Export tab",
+      "summary": "Picks a downstream tool for each result level, explains what that tool needs, converts the data and offers the file for download.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 2094,
+          "end": 4461,
+          "role": "logic",
+          "symbol": "export_tab",
+          "anchor": "5ffc8d020ac6",
+          "first": "def export_tab():"
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 2114,
+          "end": 2138,
+          "role": "markup",
+          "anchor": "c3f82c304554",
+          "first": "export_csms_header = st.subheader("
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 267,
+          "end": 274,
+          "role": "logic",
+          "symbol": "export_proxl",
+          "anchor": "9275f6f397da",
+          "first": "def export_proxl("
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 249,
+          "end": 250,
+          "role": "logic",
+          "symbol": "export_alphalink2",
+          "anchor": "41b8e0bd884c",
+          "first": "def export_alphalink2("
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 333,
+          "end": 362,
+          "role": "logic",
+          "symbol": "reset_exports",
+          "anchor": "294c84dfedf5",
+          "first": "def reset_exports() -> None:"
+        }
+      ]
+    },
+    {
+      "id": "structure-export",
+      "level": "component",
+      "parent": "export-tab",
+      "title": "Export onto a protein structure",
+      "summary": "Takes a PDB code or structure file, maps crosslink positions onto chains and downloads the files a molecular viewer needs, along with the sequence-mapping metadata.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 2885,
+          "end": 3030,
+          "role": "markup",
+          "anchor": "8c040ccac52b",
+          "first": "\"export_crosslinks_pyxlinkviewer_form\","
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 184,
+          "end": 185,
+          "role": "logic",
+          "symbol": "export_pyxlinkviewer_using_pdbfile",
+          "anchor": "fcb8315ee581",
+          "first": "def export_pyxlinkviewer_using_pdbfile("
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 222,
+          "end": 223,
+          "role": "logic",
+          "symbol": "export_xlmstools_using_pdbfile",
+          "anchor": "ef0ddfe3549b",
+          "first": "def export_xlmstools_using_pdbfile("
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 199,
+          "end": 203,
+          "role": "logic",
+          "symbol": "pyxlinkviewer_get_fasta",
+          "anchor": "ef1a295c9937",
+          "first": "def pyxlinkviewer_get_fasta(sequence: str) -> str:"
+        },
+        {
+          "file": "code/gui/streamlit_app.py",
+          "start": 206,
+          "end": 207,
+          "role": "logic",
+          "symbol": "pyxlinkviewer_get_annotation",
+          "anchor": "fb14ebaf834d",
+          "first": "def pyxlinkviewer_get_annotation("
+        }
+      ]
+    }
+  ]
+}

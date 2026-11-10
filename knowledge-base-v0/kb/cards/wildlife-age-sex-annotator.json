@@ -1,0 +1,610 @@
+{
+  "schema": "astaui.card/1",
+  "id": "wildlife-age-sex-annotator",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T04:42:18Z"
+  },
+  "app": {
+    "title": "WildlifeML: label detected animals in camera-trap images and check the classifier trained on them",
+    "summary": "A person picks a folder of camera-trap images that an object detector has already run over. If the folder has no label scheme yet, they write one as a small table of classes, each with its own list of labels. The interface then shows each unlabelled detection one at a time, with its box drawn on the full photo. The person chooses a label for each class from dropdowns and saves, and each record is added to an annotations file while a progress bar counts the work done. After a model has been trained on those labels, the same app lists the trained models by average accuracy. It shows averaged and per-run metrics, confusion matrices, class distributions and results split by a metadata column, and it steps through slideshows of the model's misclassified and low-confidence images.",
+    "task": {
+      "text": "Label every machine-detected animal in a set of camera-trap images against a fixed set of classes, then judge how well a classifier trained on those labels performs and where it fails.",
+      "verbs": [
+        "annotate",
+        "review",
+        "summarize",
+        "compare",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Camera-trap photographs with bounding boxes from an object detector, a user-defined label scheme of classes and their labels, the per-detection labels saved to JSON, and evaluation outputs from trained models: metric files per run, training specs, and tables of misclassified and uncertain images with true label, predicted label, confidence and metadata.",
+      "item": "one detected animal: a bounding box on a camera-trap photograph, with its detection confidence",
+      "shapes": [
+        "image collection",
+        "categories",
+        "judgements",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "labelling detections in camera-trap images to make training data, then checking the trained model's errors and uncertain predictions",
+      "terms": [
+        "annotate",
+        "review"
+      ]
+    },
+    "mechanism": {
+      "text": "An annotation queue serves one unlabelled detection at a time: the photo with its box sits next to a form with one dropdown per class, and Save/Next adds a record to the annotations file and moves on, with a progress bar. Separate pages, chosen from a sidebar menu, open a trained model's evaluation as a dashboard of metric cards, confusion-matrix heatmaps, class-distribution treemaps and per-stratum results. They also show slideshows of misclassified or low-confidence images with true and predicted labels.",
+      "views": [
+        "image viewer",
+        "form",
+        "table view",
+        "summary stats",
+        "heatmap",
+        "treemap"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "apply label",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "review queue",
+        "category palette",
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "image classification of camera-trap detections with deep learning in wildlife ecology",
+      "disciplines": [
+        "ecology"
+      ],
+      "terms": [
+        "camera trapping",
+        "image classification",
+        "wildlife ecology"
+      ]
+    },
+    "workflow": {
+      "name": "label detected objects in images with a fixed scheme, then evaluate a classifier trained on the labels",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Choose a folder under data/ and press Continue; every md_unlabeled.json from the object detector found beneath it is merged into one list of detections, each tagged with its source file.",
+          "parts": [
+            "annotation-setup"
+          ]
+        },
+        {
+          "step": "define the set of categories to apply",
+          "here": "If the folder has no annotation_config.json yet, edit a table of class names with comma-separated labels (rows can be added), check that names are unique, and save; the scheme is then fixed for that folder.",
+          "parts": [
+            "annotation-setup"
+          ]
+        },
+        {
+          "step": "step through items one at a time",
+          "here": "Each unlabelled detection is shown as the full photo with its box drawn in yellow; Previous and Skip move through the queue, and a progress bar shows how many detections out of the total are annotated.",
+          "parts": [
+            "annotation-queue",
+            "bbox-image"
+          ]
+        },
+        {
+          "step": "label each item with a category from the scheme",
+          "here": "One dropdown per class, with the first label as the default; Save/Next appends the detection's labels with its box, confidence and source to annotations.json and removes it from the queue.",
+          "parts": [
+            "label-form",
+            "annotation-queue"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Pick a trained model from a list sorted by average accuracy; View Results shows accuracy, precision, recall and F1 averaged across evaluation runs, uncertainty counts, a confusion matrix, class-distribution treemaps and the same metrics for each stratum, plus each run and the training specs in expanders.",
+          "parts": [
+            "model-results",
+            "training-specs"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "On the Error Viewing or Uncertainty Viewing page, choose an experiment and step through its misclassified or low-confidence images with First/Previous/Next/Last, reading the true and predicted label, confidence, date and season for each.",
+          "parts": [
+            "prediction-slideshow"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The items are bounding boxes proposed by an object detector, often several per photo, and each one is labelled separately while shown with its box drawn on the whole frame.",
+        "The label scheme is several independent classes, each with its own dropdown, and it is locked for a folder once saved; the first label of each class is the default to speed up the most common case.",
+        "Model metrics are averaged over repeated evaluation runs, and predictions below a confidence threshold are counted as uncertain and can be left out of scoring.",
+        "Results are broken down by a metadata stratum such as season, with a confusion matrix for each stratum.",
+        "The model's misclassified and uncertain images can be browsed as slideshows that set the true label against the predicted one."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "app-shell",
+      "level": "view",
+      "parent": null,
+      "title": "Home and page menu",
+      "summary": "A sidebar menu switches between the home page, annotation, model results, error viewing and uncertainty viewing.",
+      "views": [],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/app.py",
+          "start": 10,
+          "end": 19,
+          "role": "markup",
+          "symbol": "home",
+          "anchor": "98b71c9af1ba",
+          "first": "def home():"
+        },
+        {
+          "file": "code/frontend/app.py",
+          "start": 84,
+          "end": 95,
+          "role": "logic",
+          "anchor": "b81ae2e95103",
+          "first": "st.set_page_config(page_title=\"Wildlife Age-Sex Classification\", page_icon=\"🦌\", layout=\"centered\")"
+        }
+      ]
+    },
+    {
+      "id": "annotation-setup",
+      "level": "view",
+      "parent": null,
+      "title": "Image folder and class definitions",
+      "summary": "Choose the image folder to annotate and, if it has no scheme yet, write the classes and their labels in an editable table that is saved as the folder's annotation config.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "inline edit"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 8,
+          "end": 15,
+          "role": "data",
+          "anchor": "194a4742121b",
+          "first": "ANNOTATION_CONFIG = {"
+        },
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 18,
+          "end": 34,
+          "role": "logic",
+          "symbol": "render_annotation_page",
+          "anchor": "e54929e686b9",
+          "first": "def render_annotation_page():"
+        },
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 37,
+          "end": 89,
+          "role": "markup",
+          "symbol": "render_config_picker",
+          "anchor": "1f4488865376",
+          "first": "def render_config_picker():"
+        },
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 92,
+          "end": 94,
+          "role": "logic",
+          "symbol": "get_image_dirs",
+          "anchor": "13b0493b771c",
+          "first": "def get_image_dirs():"
+        },
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 97,
+          "end": 103,
+          "role": "logic",
+          "symbol": "get_annotation_config",
+          "anchor": "16d73df04f5b",
+          "first": "def get_annotation_config(image_dir: str):"
+        },
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 106,
+          "end": 113,
+          "role": "markup",
+          "symbol": "render_config_info",
+          "anchor": "163fd99c1f26",
+          "first": "def render_config_info(image_dir: str, annotation_config: dict):"
+        },
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 334,
+          "end": 338,
+          "role": "logic",
+          "symbol": "exit_annotation",
+          "anchor": "b93d8f84c259",
+          "first": "def exit_annotation():"
+        }
+      ]
+    },
+    {
+      "id": "annotation-queue",
+      "level": "view",
+      "parent": null,
+      "title": "Detection annotation queue",
+      "summary": "Serves unlabelled detections one at a time with Previous, Save/Next and Skip, appends each saved record to annotations.json, and shows progress against the total.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "review queue"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 116,
+          "end": 178,
+          "role": "markup",
+          "symbol": "render_coding_interface",
+          "anchor": "1d49a994f996",
+          "first": "def render_coding_interface(image_dir: str, annotations_path: str, annotation_config: dict):"
+        },
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 181,
+          "end": 240,
+          "role": "data",
+          "symbol": "load_bbox_results",
+          "anchor": "a0c0b633c4e7",
+          "first": "def load_bbox_results(image_dir: str):"
+        },
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 260,
+          "end": 280,
+          "role": "logic",
+          "symbol": "get_bboxes_to_code",
+          "anchor": "4369d708922c",
+          "first": "def get_bboxes_to_code(annotations_path: str, bboxes: list):"
+        },
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 243,
+          "end": 257,
+          "role": "logic",
+          "symbol": "save_annotation_to_json",
+          "anchor": "7c32051b5a62",
+          "first": "def save_annotation_to_json(annotations_path: str, bbox_annotations: dict):"
+        },
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 341,
+          "end": 348,
+          "role": "logic",
+          "symbol": "get_completed_annotation_count",
+          "anchor": "e05cf95e7cc5",
+          "first": "def get_completed_annotation_count(annotations_path: str):"
+        }
+      ]
+    },
+    {
+      "id": "bbox-image",
+      "level": "component",
+      "parent": "annotation-queue",
+      "title": "Photo with detection box",
+      "summary": "Draws the current detection's bounding box in yellow on the full photograph, accepting either width/height or corner coordinates.",
+      "views": [
+        "image viewer"
+      ],
+      "interactions": [],
+      "patterns": [
+        "focus and context"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 283,
+          "end": 308,
+          "role": "logic",
+          "symbol": "render_bbox_image",
+          "anchor": "7922992a8621",
+          "first": "def render_bbox_image(bbox: dict):"
+        }
+      ]
+    },
+    {
+      "id": "label-form",
+      "level": "component",
+      "parent": "annotation-queue",
+      "title": "Per-class label dropdowns",
+      "summary": "Shows one dropdown per class in the scheme and builds the record of chosen labels together with the detection's id, box, confidence and source file.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "apply label"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/tabs/annotation.py",
+          "start": 311,
+          "end": 331,
+          "role": "logic",
+          "symbol": "render_bbox_annotation_options",
+          "anchor": "e0db5e6c6169",
+          "first": "def render_bbox_annotation_options(bbox: dict, annotation_config: dict):"
+        }
+      ]
+    },
+    {
+      "id": "model-results",
+      "level": "view",
+      "parent": null,
+      "title": "Model results dashboard",
+      "summary": "Lists trained models by average accuracy and, for the chosen one, shows metrics averaged across runs, uncertainty counts, confusion matrices, class-distribution treemaps, per-stratum results and each run.",
+      "views": [
+        "summary stats",
+        "heatmap",
+        "treemap"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/tabs/results.py",
+          "start": 348,
+          "end": 380,
+          "role": "markup",
+          "symbol": "render_results_page",
+          "anchor": "9a419043cbf6",
+          "first": "def render_results_page():"
+        },
+        {
+          "file": "code/frontend/tabs/results.py",
+          "start": 50,
+          "end": 68,
+          "role": "data",
+          "symbol": "get_models",
+          "anchor": "cc6d3d98567f",
+          "first": "def get_models():"
+        },
+        {
+          "file": "code/frontend/tabs/results.py",
+          "start": 71,
+          "end": 86,
+          "role": "data",
+          "symbol": "load_model_results",
+          "anchor": "08f225c67257",
+          "first": "def load_model_results(model_name):"
+        },
+        {
+          "file": "code/frontend/tabs/results.py",
+          "start": 97,
+          "end": 115,
+          "role": "logic",
+          "symbol": "render_results",
+          "anchor": "dbcfec8bf6c7",
+          "first": "def render_results(model):"
+        },
+        {
+          "file": "code/frontend/tabs/results.py",
+          "start": 118,
+          "end": 223,
+          "role": "logic",
+          "symbol": "render_averaged_results",
+          "anchor": "c1017fa8714e",
+          "first": "def render_averaged_results(results, model):"
+        },
+        {
+          "file": "code/frontend/tabs/results.py",
+          "start": 226,
+          "end": 285,
+          "role": "logic",
+          "symbol": "render_individual_results",
+          "anchor": "972881058ff1",
+          "first": "def render_individual_results(results):"
+        },
+        {
+          "file": "code/frontend/tabs/results_metrics.py",
+          "start": 150,
+          "end": 312,
+          "role": "logic",
+          "symbol": "calculate_averaged_metrics",
+          "anchor": "f840078404ff",
+          "first": "def calculate_averaged_metrics(results):"
+        },
+        {
+          "file": "code/frontend/tabs/results_metrics.py",
+          "start": 315,
+          "end": 374,
+          "role": "logic",
+          "symbol": "summarize_overall_runs",
+          "anchor": "4e90552a1297",
+          "first": "def summarize_overall_runs(results):"
+        },
+        {
+          "file": "code/frontend/tabs/results_metrics.py",
+          "start": 24,
+          "end": 27,
+          "role": "logic",
+          "symbol": "plot_confusion_matrix",
+          "anchor": "991618b45d93",
+          "first": "def plot_confusion_matrix("
+        },
+        {
+          "file": "code/frontend/tabs/results_metrics.py",
+          "start": 98,
+          "end": 108,
+          "role": "markup",
+          "symbol": "display_metrics",
+          "anchor": "feb719ad2320",
+          "first": "def display_metrics(metrics_dict, title=\"Metrics\"):"
+        },
+        {
+          "file": "code/frontend/tabs/results_metrics.py",
+          "start": 111,
+          "end": 147,
+          "role": "markup",
+          "symbol": "display_uncertainty_metrics",
+          "anchor": "7097807c4d06",
+          "first": "def display_uncertainty_metrics(metrics_dict, title=\"Uncertainty Metrics\"):"
+        }
+      ]
+    },
+    {
+      "id": "training-specs",
+      "level": "component",
+      "parent": "model-results",
+      "title": "Training specifications",
+      "summary": "Shows the training set's class distribution as a treemap, the settings for the transfer-learning and fine-tuning phases, and the model architecture summary.",
+      "views": [
+        "summary stats",
+        "treemap"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/tabs/results.py",
+          "start": 288,
+          "end": 345,
+          "role": "markup",
+          "symbol": "render_training_specs",
+          "anchor": "e9aef1aff1af",
+          "first": "def render_training_specs(model):"
+        },
+        {
+          "file": "code/frontend/tabs/results.py",
+          "start": 89,
+          "end": 94,
+          "role": "data",
+          "symbol": "load_training_specs",
+          "anchor": "fa0733d21a49",
+          "first": "def load_training_specs(model_name):"
+        }
+      ]
+    },
+    {
+      "id": "prediction-slideshow",
+      "level": "view",
+      "parent": null,
+      "title": "Error and uncertainty slideshows",
+      "summary": "For a chosen experiment, steps through its misclassified or low-confidence images one at a time, showing true and predicted labels, confidence and date or season, with a collapsible summary of the evaluation results.",
+      "views": [
+        "image viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "review queue",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/tabs/error_viewing.py",
+          "start": 10,
+          "end": 51,
+          "role": "markup",
+          "symbol": "render_error_viewing_page",
+          "anchor": "9e729172ae34",
+          "first": "def render_error_viewing_page():"
+        },
+        {
+          "file": "code/frontend/tabs/uncertainty_viewing.py",
+          "start": 10,
+          "end": 56,
+          "role": "markup",
+          "symbol": "render_uncertainty_viewing_page",
+          "anchor": "5b966846da92",
+          "first": "def render_uncertainty_viewing_page():"
+        },
+        {
+          "file": "code/frontend/tabs/image_viewing.py",
+          "start": 37,
+          "end": 62,
+          "role": "data",
+          "symbol": "get_experiments",
+          "anchor": "8fba90b598d0",
+          "first": "def get_experiments():"
+        },
+        {
+          "file": "code/frontend/tabs/image_viewing.py",
+          "start": 65,
+          "end": 153,
+          "role": "logic",
+          "symbol": "render_results_summary",
+          "anchor": "ec1b6b515ae8",
+          "first": "def render_results_summary(experiment_name, additional_metrics=None):"
+        },
+        {
+          "file": "code/frontend/tabs/image_viewing.py",
+          "start": 156,
+          "end": 162,
+          "role": "logic",
+          "symbol": "render_image_slideshow",
+          "anchor": "0f95214d2dda",
+          "first": "def render_image_slideshow("
+        },
+        {
+          "file": "code/frontend/tabs/image_viewing.py",
+          "start": 292,
+          "end": 316,
+          "role": "logic",
+          "symbol": "render_slide_controls",
+          "anchor": "a308cbdb9cb1",
+          "first": "def render_slide_controls(combined_data, session_state_key):"
+        },
+        {
+          "file": "code/frontend/tabs/image_viewing.py",
+          "start": 279,
+          "end": 289,
+          "role": "logic",
+          "symbol": "get_target_column",
+          "anchor": "042072c58fe8",
+          "first": "def get_target_column(experiment_dir):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "treemap"
+    }
+  ]
+}

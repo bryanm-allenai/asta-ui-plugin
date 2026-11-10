@@ -1,0 +1,657 @@
+{
+ "interface": {
+  "title": "Exoplanet Radius Explorer",
+  "field": "Exoplanet astronomy / planetary demographics",
+  "stage_of_work": "Exploratory analysis of a public catalogue (sample selection, visual comparison, simple statistics, export)",
+  "what_it_is_for": "Load the NASA Exoplanet Archive pscomppars composite table, filter it by discovery method, stellar-age group, radius, period, distance and quality cuts, then compare stellar age and orbital period against planet radius using rank correlations, a host-star bootstrap of the young-to-old radius ratio, and a period-detrended radius-valley histogram."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "This repository commit has no src/ or data/ directory. The setup agent wrote stand-in src/config, data, transform, science and plots modules, plus the demo CSV, from app.py's imports (plan.json data.why). All counts, statistics and rendering below therefore come from the author's app.py running on stand-in code and data, not from the author's full tool. With the network unavailable, the app falls back to a seeded synthetic table (42 rows; red 'Synthetic data' banner: screens/004.webp, screens/049.webp). I turned off 'Query the archive over the network' and uploaded sample_pscomppars_export.csv. The app reported 'Loaded sample_pscomppars_export.csv (20 rows)', with 17 planets left after cleaning (screens/007.webp). Later I reloaded the page to get the larger synthetic table back for the valley and bootstrap tests (screens/049.webp onward).",
+  "harness_artefacts": [
+   "Bootstrap hang: whenever the '< 100 Myr' group was selected (upload or synthetic, with or without Imaging), the young-to-old table stayed at 'Bootstrapping the median ratio…' and never finished, which also kept the later tabs from rendering (screens/011.webp, 017.webp, 026.webp, 052.webp, 054.webp; check/screens/045.webp). The review attributes this to the stand-in science code.",
+   "Reference radii drawn at 10^R: with 'Reference radii' on (the default), the radius axis stretches to about 10^10 and the lines sit at roughly 10^R (Earth ~10, Neptune ~10^4, Jupiter ~10^10), squashing the data. The stand-in seed/src/plots.py:70 calls add_hline on a log axis, so Plotly reads y=3.88 as 10^3.88. Turning the overlay off gives a readable plot (screens/028.webp vs 029.webp; check/screens/012.webp, check/screens/016.webp).",
+   "Empty Density view: switching the period plot to Density drew an empty heatmap (count scale ±0.5) with no points (screens/036.webp), produced by the stand-in plotting code."
+  ]
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Explore how planet size relates to host age and orbital period in a catalogue of confirmed planets, check how sample definition and measurement provenance change the apparent trends, and export the selection used",
+  "specific": "Load pscomppars, filter it, compare stellar age vs radius and period vs radius, run the young-vs-old bootstrap (all methods vs transit only), test the radius valley, and export the CSVs",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Get the catalogue into the tool",
+    "specific": "Data source sidebar section",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load a catalogue file you supply and confirm it parses, noting when the tool has fallen back to labelled demonstration data instead",
+      "specific": "Turn off the network query and upload a pscomppars CSV through the sidebar uploader; with the network query on and no connection, the app shows the red 'Synthetic data' banner and the 42-row demo table",
+      "screens": [
+       "screens/007.webp",
+       "screens/004.webp",
+       "screens/049.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "unchecked 'Query the archive over the network'",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Upload and gave sample_pscomppars_export.csv ('Loaded sample_pscomppars_export.csv (20 rows)')",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "alternative outcome: reloaded http://127.0.0.1:8501/ with defaults (network query on); red 'Synthetic data' banner and demo table",
+        "screens": [
+         "screens/049.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Choose which objects to study and how strict to be about measurement quality",
+    "specific": "Sample selection and Data quality sidebar controls; the summary row (Planets selected / With stellar age / With orbital period / Published radius / Host stars) updates after each change",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Restrict the sample by category",
+      "specific": "Remove or re-add discovery methods and stellar-age groups in the multiselects",
+      "branch": "repeat",
+      "screens": [
+       "screens/018.webp",
+       "screens/053.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "removed '< 100 Myr' from Stellar age group",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "removed 'Imaging' from Discovery method",
+        "screens": [
+         "screens/053.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Remove outliers above a size limit",
+      "specific": "Tick 'Drop objects above 20 R⊕'",
+      "screens": [
+       "screens/027.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "checked 'Drop objects above 20 R⊕'",
+        "screens": [
+         "screens/023.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Apply measurement-quality cuts and watch the sample shrink",
+      "specific": "Published radius measurements only, uncertainty caps on age and radius, and a maximum-distance limit",
+      "screens": [
+       "screens/046.webp",
+       "screens/047.webp",
+       "screens/048.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "checked 'Published radius measurements only' (14→13 planets)",
+        "screens": [
+         "screens/046.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged max relative age uncertainty to 30% and max relative radius uncertainty to 7% (→7 planets)",
+        "screens": [
+         "screens/047.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 50 into Maximum distance (pc) and pressed Enter (→4 planets)",
+        "screens": [
+         "screens/048.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Compare host age against object size",
+    "specific": "Stellar age vs radius tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Plot age against size, coloured by data provenance, and read the rank correlation with and without a confounder control",
+      "specific": "Scatter of st_age vs pl_rade coloured by radius provenance; read the raw Spearman rho, the rho controlling for incident flux, and the per-provenance table",
+      "screens": [
+       "screens/008.webp",
+       "screens/009.webp",
+       "screens/019.webp",
+       "screens/051.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to the Rank correlation section (upload: raw rho=-0.025, flux-controlled rho=-0.182, n=15)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "after removing <100 Myr: raw rho=+0.495, flux-controlled rho=+0.317, n=13",
+        "screens": [
+         "screens/019.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Change how the age plot is displayed",
+      "specific": "Age unit Gyr/Myr, radius error bars, reference radii, colour by stellar age group",
+      "branch": "optional",
+      "screens": [
+       "screens/058.webp",
+       "screens/059.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose Age unit 'Myr', checked 'Radius error bars', unchecked 'Reference radii'",
+        "screens": [
+         "screens/058.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Colour by 'Stellar age group'",
+        "screens": [
+         "screens/059.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Compare the size of young and old objects with a cluster bootstrap, across all detection methods and within a single method, to see whether the difference shrinks when one detection method is used (a selection-effect check)",
+      "specific": "Young-to-old median comparison table, resampled by host star, with rows 'All discovery methods' and 'Transit discoveries only' (Young planets, Young host stars, Old planets, Median ratio, 95% CI low/high)",
+      "screens": [
+       "screens/019.webp",
+       "screens/020.webp",
+       "screens/060.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "with <100 Myr removed, the table rendered both rows with 0 young planets and None for the ratio and CI (with <100 Myr included it never finished; see data.harness_artefacts)",
+        "screens": [
+         "screens/020.webp",
+         "screens/060.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Compare orbital period against object size",
+    "specific": "Orbital period vs radius tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Plot period against size with a literature boundary and benchmark objects, and read the rank correlation",
+      "specific": "Scatter of pl_orbper vs pl_rade with the Van Eylen+ 2018 valley line and Solar System markers; hover the valley line and read the Spearman rho for all selected planets",
+      "screens": [
+       "screens/028.webp",
+       "screens/029.webp",
+       "screens/030.webp",
+       "screens/032.webp",
+       "screens/037.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered the radius-valley line",
+        "screens": [
+         "screens/030.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to Rank correlation (rho=+0.521, p=0.056, n=14)",
+        "screens": [
+         "screens/037.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Change how the period plot is displayed",
+      "specific": "Reference radii, Radius valley and Solar System overlays, and Colour by",
+      "branch": "optional",
+      "screens": [
+       "screens/029.webp",
+       "screens/032.webp",
+       "screens/034.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "unchecked 'Reference radii' (the y-axis returns to a readable range)",
+        "screens": [
+         "screens/029.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "unchecked 'Radius valley' and 'Solar System'",
+        "screens": [
+         "screens/032.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Colour by 'Insolation (log10 S⊕)'",
+        "screens": [
+         "screens/034.webp"
+        ]
+       }
+      ],
+      "id": "n2"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Test whether a gap in the small-object size distribution survives quality cuts",
+    "specific": "Radius valley tab: R′ = R(P/10 d)^0.09, radius and period windows, histogram bins, split by radius provenance",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Flatten a diagonal gap with a power-law transform, choose windows on both variables, and histogram the transformed size to look for a trough",
+      "specific": "Open Radius valley, widen the Radius window and Period window sliders, and read the R′ histogram or the 'Only N planets in this window – too few to test' guard",
+      "screens": [
+       "screens/038.webp",
+       "screens/039.webp",
+       "screens/055.webp",
+       "screens/056.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the 'Radius valley' tab (upload data)",
+        "screens": [
+         "screens/038.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "widened the windows; 'Only 12 planets in this window – too few to test'",
+        "screens": [
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "on the synthetic table, opened the tab again and widened the windows to about 0.5–8 R⊕ and 0.8–300 d; 'Only 25 planets in this window – too few to test'",
+        "screens": [
+         "screens/055.webp",
+         "screens/056.webp"
+        ]
+       }
+      ],
+      "id": "n1",
+      "check": "not_confirmed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Save the working sample",
+    "specific": "Table and export tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Review the selected rows and export both the selection and the full cleaned table",
+      "specific": "Read the selection table, then press 'Download the selected planets (CSV)' and 'Download the full cleaned table (CSV)'",
+      "screens": [
+       "screens/040.webp",
+       "screens/042.webp",
+       "screens/043.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed 'Download the selected planets (CSV)' → exoplanet_radius_selection.csv (14 rows, readable column names)",
+        "screens": [
+         "screens/043.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed 'Download the full cleaned table (CSV)' → pscomppars_cleaned.csv (17 rows, raw columns plus st_age_myr, age_group, radius_provenance, log_insol)",
+        "screens": [
+         "screens/043.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Read the method caveats",
+    "specific": "Method notes tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Read where the data come from and how provenance is inferred",
+      "specific": "Method notes: 'Where the numbers come from', 'Radius provenance' (tran_flag used as a proxy)",
+      "note": "The replay found a label mismatch: Method notes tells users to turn on 'Transit-measured radii only', but the sidebar checkbox is labelled 'Published radius measurements only' (check/screens/038.webp).",
+      "screens": [
+       "screens/044.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the 'Method notes' tab",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Catalogue loader with upload / live-query / synthetic fallback",
+   "general": "Choose a data source: query a remote archive, or upload your own export. If neither is available, fall back to a clearly labelled synthetic table and report which source is in use",
+   "specific": "Sidebar 'Use a pscomppars CSV you downloaded yourself' uploader plus a 'Query the archive over the network' checkbox and 'Download a fresh copy' button. A red 'Synthetic data' banner or a green 'Loaded … (N rows)' confirmation shows which source is live, and the footer records the source",
+   "steps": [
+    "Leave the network query on, or uncheck it",
+    "Upload a CSV through the uploader",
+    "Read the status banner (synthetic warning or 'Loaded … rows')",
+    "Check the footer for source and planet counts after cleaning"
+   ],
+   "serves_tasks": [
+    "Load a catalogue file you supply and confirm it parses, noting when the tool has fallen back to labelled demonstration data instead"
+   ],
+   "screens": [
+    "screens/004.webp",
+    "screens/006.webp",
+    "screens/007.webp",
+    "screens/049.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Sample-selection filter panel with live count summary",
+   "general": "Narrow a catalogue with category multiselects, log-scale range sliders, keep-missing toggles and quality cuts, while a row of summary counts shows how many objects remain and the change from the full set",
+   "specific": "Discovery method and Stellar age group multiselects, log-scale Planet radius and Orbital period sliders, 'Keep planets with no published stellar age / no period' toggles, 'Drop objects above 20 R⊕', 'Published radius measurements only', 'Exclude flagged controversial planets', max relative age/radius uncertainty sliders, and a Maximum distance (pc) field. Planets selected / With stellar age / With orbital period / Published radius / Host stars metrics show a delta",
+   "steps": [
+    "Remove or add categories in the multiselects",
+    "Drag range or uncertainty sliders",
+    "Toggle the quality checkboxes",
+    "Type a distance limit",
+    "Read the updated counts and delta"
+   ],
+   "serves_tasks": [
+    "Restrict the sample by category",
+    "Remove outliers above a size limit",
+    "Apply measurement-quality cuts and watch the sample shrink"
+   ],
+   "screens": [
+    "screens/018.webp",
+    "screens/027.webp",
+    "screens/046.webp",
+    "screens/047.webp",
+    "screens/048.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Log-log population scatter with switchable overlays and colour encoding",
+   "general": "Plot two quantities on log axes, colour points by a chosen attribute, switch between scatter and density views, and turn reference overlays (literature boundary line, benchmark objects, reference levels, group dividers, error bars, binned median) on and off",
+   "specific": "Age-vs-radius and period-vs-radius Plotly charts. Colour by: Radius provenance, Stellar age group, Discovery method, Insolation, Equilibrium temperature or None. Scatter/Density view, Gyr/Myr age unit, plus Binned median, Radius error bars, Age-group dividers, Reference radii, Radius valley (Van Eylen+ 2018) and Solar System toggles. In this run the Density view and Reference radii lines were broken by stand-in plotting code (see data.harness_artefacts)",
+   "steps": [
+    "Pick a Colour by option",
+    "Choose Scatter or Density",
+    "Toggle overlays (valley line, Solar System, reference radii, dividers, error bars)",
+    "Hover a point or line to read its values"
+   ],
+   "serves_tasks": [
+    "Plot age against size, coloured by data provenance, and read the rank correlation with and without a confounder control",
+    "Change how the age plot is displayed",
+    "Plot period against size with a literature boundary and benchmark objects, and read the rank correlation",
+    "Change how the period plot is displayed"
+   ],
+   "screens": [
+    "screens/029.webp",
+    "screens/030.webp",
+    "screens/032.webp",
+    "screens/034.webp",
+    "screens/036.webp",
+    "screens/058.webp",
+    "screens/059.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Rank correlation with confounder control and per-subgroup breakdown",
+   "general": "Report a Spearman correlation for the current selection, the same correlation after controlling for a confounding variable, and a per-subgroup table of rho, p and n",
+   "specific": "'Raw rank correlation' and 'Controlling for incident flux' lines under the age plot, a Radius provenance table (Spearman rho, p-value, n; None when n is too small), and the all-planet rho under the period plot",
+   "steps": [
+    "Set the sample in the sidebar",
+    "Scroll to Rank correlation",
+    "Compare raw and flux-controlled rho",
+    "Read the per-provenance rows"
+   ],
+   "serves_tasks": [
+    "Plot age against size, coloured by data provenance, and read the rank correlation with and without a confounder control",
+    "Plot period against size with a literature boundary and benchmark objects, and read the rank correlation"
+   ],
+   "screens": [
+    "screens/009.webp",
+    "screens/019.webp",
+    "screens/037.webp",
+    "screens/051.webp",
+    "screens/060.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Cluster-bootstrap two-group median ratio",
+   "general": "Compare the median of a quantity between two groups, resampling whole clusters (here, host stars) rather than individual items, and report the ratio with a 95% interval for the full sample and for a single-method subsample, so a selection effect shows up as a change between the two rows",
+   "specific": "Young-to-old median comparison table with rows 'All discovery methods' and 'Transit discoveries only' and columns Young planets, Young host stars, Old planets, Median ratio, 95% CI low/high. No ratio or CI was produced in this run",
+   "steps": [
+    "Include the young age group in the selection",
+    "Wait for 'Bootstrapping the median ratio…' to finish",
+    "Read the Young planets count, ratio and 95% CI in each row",
+    "Compare the all-methods row against the transit-only row"
+   ],
+   "serves_tasks": [
+    "Compare the size of young and old objects with a cluster bootstrap, across all detection methods and within a single method, to see whether the difference shrinks when one detection method is used (a selection-effect check)"
+   ],
+   "screens": [
+    "screens/011.webp",
+    "screens/020.webp",
+    "screens/060.webp"
+   ],
+   "id": "f5",
+   "check": "not_confirmed"
+  },
+  {
+   "name": "Detrended 1-D histogram test of a diagonal gap",
+   "general": "Rotate a diagonal feature flat with a power-law transform, choose windows on both variables and a bin count, then histogram the transformed variable (optionally split by provenance) to look for a trough",
+   "specific": "Radius valley tab: R' = R(P/10 d)^0.09 with Radius window, Period window and Histogram bins sliders and a 'Split by radius provenance' toggle. A minimum-sample guard reports 'Only N planets in this window - too few to test'",
+   "steps": [
+    "Open Radius valley",
+    "Drag the radius and period window sliders",
+    "Set the histogram bins",
+    "Toggle the provenance split",
+    "Read the histogram or the too-few warning"
+   ],
+   "serves_tasks": [
+    "Flatten a diagonal gap with a power-law transform, choose windows on both variables, and histogram the transformed size to look for a trough"
+   ],
+   "screens": [
+    "screens/038.webp",
+    "screens/039.webp",
+    "screens/055.webp",
+    "screens/056.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Filtered table with two-level CSV export",
+   "general": "Show the current selection as a sortable table and export either the filtered selection with readable headers or the full cleaned table with derived columns",
+   "specific": "Table and export tab with 'Download the selected planets (CSV)' (exoplanet_radius_selection.csv) and 'Download the full cleaned table (CSV)' (pscomppars_cleaned.csv)",
+   "steps": [
+    "Open Table and export",
+    "Scroll the table",
+    "Download the selected planets",
+    "Download the full cleaned table"
+   ],
+   "serves_tasks": [
+    "Review the selected rows and export both the selection and the full cleaned table"
+   ],
+   "screens": [
+    "screens/040.webp",
+    "screens/042.webp",
+    "screens/043.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Measurement-provenance classifier",
+   "general": "Tag each value as directly measured or derived from another quantity, then reuse that tag to filter the sample, colour plots and split statistics by provenance",
+   "specific": "radius_provenance column ('Published measurement' / 'Calculated from mass'), inferred with tran_flag as a proxy (Method notes). It drives the 'Published radius measurements only' filter, the default Colour by 'Radius provenance', the per-provenance Spearman table, and the radius_provenance column in pscomppars_cleaned.csv",
+   "steps": [
+    "Read how provenance is inferred in Method notes",
+    "Colour a scatter by Radius provenance",
+    "Read the per-provenance correlation rows",
+    "Tick 'Published radius measurements only' and watch the counts change"
+   ],
+   "serves_tasks": [
+    "Plot age against size, coloured by data provenance, and read the rank correlation with and without a confounder control",
+    "Apply measurement-quality cuts and watch the sample shrink",
+    "Read where the data come from and how provenance is inferred"
+   ],
+   "screens": [
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/044.webp",
+    "screens/046.webp"
+   ],
+   "id": "f8"
+  }
+ ],
+ "screens_never_reached": [
+  "The radius-valley histogram itself: the tab only ever showed 'Only 12 planets in this window' (upload) or 'Only 25 planets in this window' (synthetic) – too few to test – even with the radius window widened to 0.5–8 R⊕ and the period window to 0.8–300 d (screens/039.webp, 056.webp)",
+  "A finished young-vs-old bootstrap result with young planets present: whenever '< 100 Myr' was selected the table never finished (a harness artefact of the stand-in code; see data.harness_artefacts; screens/011.webp, 017.webp, 026.webp, 052.webp, 054.webp)",
+  "A usable Density view: the period plot's Density view drew an empty heatmap (a harness artefact of the stand-in code; see data.harness_artefacts; screens/036.webp)",
+  "Live NASA TAP query and 'Download a fresh copy': no network in this sandbox"
+ ],
+ "not_done": [
+  "Testing whether the quality filters sharpen or wash out the radius-valley gap: the valley test never had enough planets on either dataset, so there was no gap contrast to compare",
+  "Checking whether the young-vs-old bootstrap CI excludes 1, and whether the ratio changes between all methods and transit-only: no ratio was ever produced (the bootstrap did not finish with young planets selected, a harness artefact; without them the table reports 0 young and None)",
+  "Binned median overlay: the box was checked on both plots but no median line was visible on these small samples (screens/034.webp, 058.webp)",
+  "Hovering individual planets to read their values and host metadata: only the radius-valley line was hovered",
+  "Colour by Discovery method / Equilibrium temperature / None, the Age-group dividers toggle, the Histogram bins slider, the Split by radius provenance toggle, 'Keep planets with no period/age' and 'Exclude flagged controversial planets' were not each toggled on their own, to stay within the action budget"
+ ],
+ "applied": [
+  "Data note states that src/ and data/ are stand-ins written by the setup agent",
+  "Moved bootstrap hang, reference radii drawn at 10^R and the empty Density view into data.harness_artefacts; removed the display problem from not_done",
+  "Moved the bootstrap-hang action out of t8 and the Density dead end out of the period task",
+  "Added the Radius valley phase with task n1 (not_confirmed; screens 038, 039, 055, 056) and pointed f6 at it",
+  "Reworded t8 and f5 to state the all-methods vs single-method selection-effect question",
+  "Rewrote f5 steps so they no longer assume a result was produced",
+  "Folded t2 into t1 as an alternative outcome and merged its screens into t1",
+  "Split t9 into reading the plot and correlation (t9) and display changes (n2, optional)",
+  "Moved the 'Binned median' click that showed nothing out of the tree (already in not_done)",
+  "Dropped the click-level 're-added < 100 Myr' action from t3",
+  "Revised the goal's general label to cover sample definition and provenance",
+  "Renamed the age and period phases to 'host age' and 'orbital period'",
+  "Added the measurement-provenance classifier feature f8",
+  "Added the Method notes / checkbox label mismatch to t11",
+  "Added hover inspection of individual planets to not_done",
+  "Updated serves_tasks after the relabels",
+  "Corrected .jpg screen references to the kept .webp files"
+ ],
+ "open_fixes": [
+  "Re-run against the author's real src/ and data (or a full pscomppars export), to learn whether the bootstrap, reference radii and Density view work in the actual tool; this run only exercised stand-in code.",
+  "Reach the radius-valley histogram and test whether quality cuts raise the gap contrast (README finding 4, 9%→27%). This needs a catalogue large enough to clear the too-few guard, which neither dataset was.",
+  "Obtain a finished young-vs-old ratio with CI for both the all-methods and transit-only rows, so the selection-effect question can be marked replayed. This needs a bootstrap that completes.",
+  "Hover individual planets on both plots to read their host metadata, and add a hover-inspection feature if it works. This was never tried.",
+  "Toggle the untested controls (other Colour by options, Age-group dividers, bins, provenance split, keep-missing, controversial flag) and confirm the Binned median on a larger sample. These were skipped because of the action budget."
+ ],
+ "screens_at": "pilot/public/runs/exoplanet-radius-explorer/20261030-224539/",
+ "screens_filed": {
+  "screens/007.webp": "screens/007.webp",
+  "screens/018.webp": "screens/018.webp",
+  "screens/008.webp": "screens/008.webp",
+  "screens/028.webp": "screens/028.webp",
+  "screens/038.webp": "screens/038.webp",
+  "screens/040.webp": "screens/040.webp"
+ }
+}

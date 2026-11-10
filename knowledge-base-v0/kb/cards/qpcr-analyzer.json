@@ -1,0 +1,634 @@
+{
+  "schema": "astaui.card/1",
+  "id": "qpcr-analyzer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T08:31:00Z"
+  },
+  "app": {
+    "title": "qPCR Analyzer",
+    "summary": "A person uploads a well-level qPCR export and confirms which columns hold well, target, sample and Cq values, plus optional group and batch. They give each sample a biological group, and a batch if it came from more than one run. They set a replicate tolerance and check which wells are excluded as outliers, then choose one or more housekeeping genes. They run ΔCt and, optionally, batch-aware ΔΔCt against a reference group, which gives bar plots of relative expression per target and a workbook or CSV bundle they can download.",
+    "task": {
+      "text": "Turn raw qPCR cycle-threshold values into relative expression per sample, normalised to housekeeping genes and optionally to a reference group within each batch.",
+      "verbs": [
+        "derive",
+        "clean",
+        "compare",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A table of qPCR wells, one row per well, giving the target gene, sample, Cq value and an optional group and batch, with technical replicates grouped by sample and target.",
+      "item": "a well on a qPCR plate: one technical replicate of one target in one sample",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "analysing instrument Cq exports into relative expression, after the plate run and its replicate check",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A vertical stepper on the left takes the person through upload, mapping, grouping, outlier exclusion, housekeeping choice and the two calculations, and each Continue button stays disabled until the earlier steps are done. Tabs on the right update as data comes in: summary, data preview, excluded replicate blocks, housekeeping exclusions, per-target bar charts and downloads. Any change to an earlier step clears the stale results until the calculation is run again.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats",
+        "bar chart",
+        "small multiples",
+        "list"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "multi-select",
+        "exclude and refit",
+        "select",
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "status pipeline",
+        "small multiples",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "relative quantification of RT-qPCR gene expression (ΔCt / ΔΔCt) in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "molecular biology",
+        "rt qpcr",
+        "gene expression"
+      ]
+    },
+    "workflow": {
+      "name": "normalise replicate measurements to reference controls and compute relative values per group",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload an .xlsx, .xls, .csv, .tsv or .txt file. The header row is found automatically, and columns are matched by fuzzy name to Well, Target, Sample and Cq, plus optional Group and Batch, which the person confirms or reassigns.",
+          "parts": [
+            "setup-steps",
+            "results-tabs"
+          ]
+        },
+        {
+          "step": "assign each item to a condition",
+          "here": "Give each sample a biological group in an editable table. Optionally switch on multi-batch mode and assign batches; a check makes sure each sample belongs to exactly one group and one batch.",
+          "parts": [
+            "groups-batches"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Set a replicate tolerance in cycles. Wells outside the tightest contiguous run of replicates, and wells with no Cq, are pre-selected for exclusion. The person can edit that list, and the excluded-blocks tab shows each replicate set.",
+          "parts": [
+            "outlier-review",
+            "results-tabs"
+          ]
+        },
+        {
+          "step": "choose the reference measures to normalise against",
+          "here": "Pick one or more housekeeping genes and review the samples that lack a usable housekeeping Cq, which are skipped for that gene only. Apply locks in the selection.",
+          "parts": [
+            "housekeeping"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run ΔCt for each housekeeping gene, then optionally choose a reference group and run ΔΔCt, which anchors each batch on its own reference group. Each target gets a bar plot of mean ± SD relative expression with sample dots.",
+          "parts": [
+            "expression-charts"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download an Excel workbook or a zip of CSVs with the raw data, long-format ΔCt/ΔΔCt sheets and grouped wide tables, plus one combined PNG per housekeeping gene.",
+          "parts": [
+            "downloads"
+          ]
+        }
+      ],
+      "distinctive": [
+        "ΔΔCt is batch-aware: each run is normalised to its own reference-group mean before the runs are merged, which removes run-to-run variation",
+        "replicate outliers are flagged by keeping the tightest contiguous run of replicates within a tolerance in cycles, and missing Cq values are always flagged",
+        "several housekeeping genes can be used at once, each giving its own result set, and a sample missing one housekeeping gene is skipped only for that gene",
+        "changing any earlier step clears the plotted results and downloads so that exports never disagree with the settings on screen",
+        "formatted export sheets are checked against the long-format source when they are built, and a mismatch raises an error"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "setup-steps",
+      "level": "view",
+      "parent": null,
+      "title": "Workflow stepper",
+      "summary": "Takes the person through upload, column mapping, groups, outliers, housekeeping, ΔCt and ΔΔCt in order, and keeps each Continue button disabled until the earlier steps are done.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 766,
+          "end": 810,
+          "role": "markup",
+          "anchor": "93c4a3ab8b3d",
+          "first": "with ui.row().classes(\"w-full no-wrap items-stretch gap-0 p-6\"):"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 555,
+          "end": 586,
+          "role": "logic",
+          "symbol": "_new_state",
+          "anchor": "c4ce84962a89",
+          "first": "def _new_state() -> dict:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 589,
+          "end": 629,
+          "role": "logic",
+          "symbol": "_refresh_step_gates",
+          "anchor": "11ff9617a0b3",
+          "first": "def _refresh_step_gates(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 632,
+          "end": 698,
+          "role": "logic",
+          "symbol": "_invalidate_results",
+          "anchor": "aaaa41f5e982",
+          "first": "def _invalidate_results(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 930,
+          "end": 973,
+          "role": "logic",
+          "symbol": "_build_step_upload",
+          "anchor": "717aea1504f9",
+          "first": "def _build_step_upload(state: dict, refs: dict, stepper) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 976,
+          "end": 1081,
+          "role": "logic",
+          "symbol": "_build_step_mapping",
+          "anchor": "434925b5294a",
+          "first": "def _build_step_mapping(state: dict, refs: dict, stepper) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 1659,
+          "end": 1718,
+          "role": "logic",
+          "symbol": "_render_mapping",
+          "anchor": "552e347e9523",
+          "first": "def _render_mapping(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 1721,
+          "end": 1819,
+          "role": "logic",
+          "symbol": "_render_mapping_completeness",
+          "anchor": "69616128442a",
+          "first": "def _render_mapping_completeness(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/core/io.py",
+          "start": 61,
+          "end": 86,
+          "role": "logic",
+          "symbol": "read_table",
+          "anchor": "96ef4b0863a8",
+          "first": "def read_table(source: Union[str, Path, IO[bytes]], filename: str) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/core/columns.py",
+          "start": 118,
+          "end": 205,
+          "role": "logic",
+          "symbol": "detect_columns",
+          "anchor": "0bb5fab8b609",
+          "first": "def detect_columns(df: pd.DataFrame) -> ColumnMapping:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/core/columns.py",
+          "start": 298,
+          "end": 342,
+          "role": "logic",
+          "symbol": "apply_mapping",
+          "anchor": "cb75a7093bb7",
+          "first": "def apply_mapping(df: pd.DataFrame, mapping: ColumnMapping) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "groups-batches",
+      "level": "component",
+      "parent": "setup-steps",
+      "title": "Groups & batches",
+      "summary": "Lets the person assign each sample a biological group and, in multi-batch mode, a batch, and checks that the assignments are consistent.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 1084,
+          "end": 1154,
+          "role": "logic",
+          "symbol": "_build_step_groups",
+          "anchor": "7222b1ecca5b",
+          "first": "def _build_step_groups(state: dict, refs: dict, stepper) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 1822,
+          "end": 1991,
+          "role": "logic",
+          "symbol": "_render_groups",
+          "anchor": "95de4355b20b",
+          "first": "def _render_groups(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/core/columns.py",
+          "start": 208,
+          "end": 223,
+          "role": "logic",
+          "symbol": "validate_sample_groups",
+          "anchor": "b0b52d112f52",
+          "first": "def validate_sample_groups(df: pd.DataFrame) -> list[str]:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/core/columns.py",
+          "start": 226,
+          "end": 244,
+          "role": "logic",
+          "symbol": "validate_sample_batches",
+          "anchor": "b5f2ae83e36b",
+          "first": "def validate_sample_batches(df: pd.DataFrame) -> list[str]:"
+        }
+      ]
+    },
+    {
+      "id": "outlier-review",
+      "level": "component",
+      "parent": "setup-steps",
+      "title": "Outlier review",
+      "summary": "Flags replicate wells outside a tolerance the person sets, pre-selects them for exclusion and lets the person edit the list of excluded wells.",
+      "views": [
+        "list",
+        "table view"
+      ],
+      "interactions": [
+        "multi-select",
+        "exclude and refit",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 1157,
+          "end": 1192,
+          "role": "logic",
+          "symbol": "_build_step_outliers",
+          "anchor": "246541af3fdf",
+          "first": "def _build_step_outliers(state: dict, refs: dict, stepper) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 1994,
+          "end": 2029,
+          "role": "logic",
+          "symbol": "_render_outliers",
+          "anchor": "29c06fdce6f1",
+          "first": "def _render_outliers(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 2032,
+          "end": 2075,
+          "role": "logic",
+          "symbol": "_rebuild_outlier_view",
+          "anchor": "565cf8281e5b",
+          "first": "def _rebuild_outlier_view(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 2479,
+          "end": 2524,
+          "role": "logic",
+          "symbol": "_render_excluded_blocks",
+          "anchor": "67339fab495d",
+          "first": "def _render_excluded_blocks(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/core/outliers.py",
+          "start": 64,
+          "end": 85,
+          "role": "logic",
+          "symbol": "mark_outliers",
+          "anchor": "1d1aca8fa27c",
+          "first": "def mark_outliers(df: pd.DataFrame, tolerance: float = 1.0) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "housekeeping",
+      "level": "component",
+      "parent": "setup-steps",
+      "title": "Housekeeping gene selection",
+      "summary": "Lets the person choose one or more reference genes and shows which samples are skipped for each one because they lack a usable reference Cq.",
+      "views": [
+        "form",
+        "list"
+      ],
+      "interactions": [
+        "multi-select",
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 1195,
+          "end": 1231,
+          "role": "logic",
+          "symbol": "_build_step_housekeeping",
+          "anchor": "15a3ec921e55",
+          "first": "def _build_step_housekeeping(state: dict, refs: dict, stepper) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 2078,
+          "end": 2263,
+          "role": "logic",
+          "symbol": "_render_housekeeping",
+          "anchor": "fbde9e1df68f",
+          "first": "def _render_housekeeping(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 2284,
+          "end": 2476,
+          "role": "logic",
+          "symbol": "_render_excluded_samples_panel",
+          "anchor": "07f846bcacdb",
+          "first": "def _render_excluded_samples_panel(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/core/quant.py",
+          "start": 65,
+          "end": 66,
+          "role": "logic",
+          "symbol": "samples_missing_hk",
+          "anchor": "f0d61dbc9a18",
+          "first": "def samples_missing_hk("
+        }
+      ]
+    },
+    {
+      "id": "results-tabs",
+      "level": "view",
+      "parent": null,
+      "title": "Live results tabs",
+      "summary": "Shows a dataset summary, a banded data preview, the excluded replicate blocks and the housekeeping exclusions, all of which update as the person works through the steps.",
+      "views": [
+        "summary stats",
+        "table view",
+        "list"
+      ],
+      "interactions": [
+        "toggle view",
+        "sort"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 812,
+          "end": 886,
+          "role": "markup",
+          "anchor": "021ffd2fb282",
+          "first": "# ── RIGHT PANE: persistent output tabs ────────────────────────────────"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 1444,
+          "end": 1510,
+          "role": "logic",
+          "symbol": "_render_full_summary",
+          "anchor": "02ab430afdf6",
+          "first": "def _render_full_summary(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 1598,
+          "end": 1656,
+          "role": "logic",
+          "symbol": "_render_data_preview",
+          "anchor": "59afb890d1ff",
+          "first": "def _render_data_preview(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 185,
+          "end": 216,
+          "role": "style",
+          "anchor": "7dac46695d84",
+          "first": "/* Banded data preview — alternating background per Sample × Target block */"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/core/summary.py",
+          "start": 160,
+          "end": 163,
+          "role": "logic",
+          "symbol": "summarize_dataset",
+          "anchor": "9c92609c2dd5",
+          "first": "def summarize_dataset("
+        }
+      ]
+    },
+    {
+      "id": "expression-charts",
+      "level": "component",
+      "parent": "results-tabs",
+      "title": "ΔCt / ΔΔCt results",
+      "summary": "Runs the housekeeping and reference-group normalisation and draws one bar chart per target, showing mean ± SD relative expression for each group with the individual sample values as dots.",
+      "views": [
+        "bar chart",
+        "small multiples",
+        "strip plot"
+      ],
+      "interactions": [
+        "hover for detail",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 1234,
+          "end": 1302,
+          "role": "logic",
+          "symbol": "_build_step_dct",
+          "anchor": "56c52eff82a0",
+          "first": "def _build_step_dct(state: dict, refs: dict, stepper) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 1305,
+          "end": 1375,
+          "role": "logic",
+          "symbol": "_build_step_ddct",
+          "anchor": "0439b7fbef10",
+          "first": "def _build_step_ddct(state: dict, refs: dict, stepper) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 1378,
+          "end": 1413,
+          "role": "logic",
+          "symbol": "_render_ddct_setup",
+          "anchor": "f64f47ae0d49",
+          "first": "def _render_ddct_setup(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 2589,
+          "end": 2627,
+          "role": "logic",
+          "symbol": "_render_dct_results",
+          "anchor": "303c39f191cc",
+          "first": "def _render_dct_results(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 2630,
+          "end": 2668,
+          "role": "logic",
+          "symbol": "_render_ddct_results",
+          "anchor": "34dcbc023b82",
+          "first": "def _render_ddct_results(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 2701,
+          "end": 2707,
+          "role": "logic",
+          "symbol": "_render_figures_for_results",
+          "anchor": "920e5bb388f7",
+          "first": "def _render_figures_for_results("
+        },
+        {
+          "file": "code/src/qpcr_analyzer/core/quant.py",
+          "start": 96,
+          "end": 99,
+          "role": "logic",
+          "symbol": "compute_delta_ct",
+          "anchor": "d12ff45b7271",
+          "first": "def compute_delta_ct("
+        },
+        {
+          "file": "code/src/qpcr_analyzer/core/quant.py",
+          "start": 173,
+          "end": 178,
+          "role": "logic",
+          "symbol": "compute_delta_delta_ct",
+          "anchor": "9ceb218fbb18",
+          "first": "def compute_delta_delta_ct("
+        }
+      ]
+    },
+    {
+      "id": "downloads",
+      "level": "component",
+      "parent": "results-tabs",
+      "title": "Downloads",
+      "summary": "Exports the current results as an Excel workbook, a zip of CSVs, or one combined PNG figure per housekeeping gene.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 2777,
+          "end": 2916,
+          "role": "logic",
+          "symbol": "_render_downloads",
+          "anchor": "3d0bd55f8eee",
+          "first": "def _render_downloads(state: dict, refs: dict) -> None:"
+        },
+        {
+          "file": "code/src/qpcr_analyzer/app/main.py",
+          "start": 2723,
+          "end": 2729,
+          "role": "logic",
+          "symbol": "_build_combined_figure_for_hk",
+          "anchor": "75099f6f3d41",
+          "first": "def _build_combined_figure_for_hk("
+        },
+        {
+          "file": "code/src/qpcr_analyzer/core/export.py",
+          "start": 195,
+          "end": 198,
+          "role": "logic",
+          "symbol": "results_to_xlsx_bytes",
+          "anchor": "cfbc3a989755",
+          "first": "def results_to_xlsx_bytes("
+        },
+        {
+          "file": "code/src/qpcr_analyzer/core/export.py",
+          "start": 221,
+          "end": 224,
+          "role": "logic",
+          "symbol": "results_to_csv_zip_bytes",
+          "anchor": "f8b78529e15d",
+          "first": "def results_to_csv_zip_bytes("
+        }
+      ]
+    }
+  ]
+}

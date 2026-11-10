@@ -1,0 +1,553 @@
+{
+  "schema": "astaui.card/1",
+  "id": "sita-isotope-correction",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T18:41:47Z"
+  },
+  "app": {
+    "title": "SITA — 13C natural-abundance correction",
+    "summary": "The person types a fragment's molecular formula and how many of its carbons carry the tracer label, then computes the natural-abundance correction matrix and reads it as an indexed square table. In a second form they enter the same formula and backbone count plus a measured mass distribution vector as comma-separated values. This gives the corrected vector, normalised to sum to 1. Either result can be copied to the clipboard as CSV for use in later flux calculations.",
+    "task": {
+      "text": "Correct a measured isotopologue distribution of a GC-MS fragment for the natural abundance of heavy isotopes in its non-labelled atoms, giving the correction matrix and the corrected vector.",
+      "verbs": [
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "A fragment's molecular formula and labelled-carbon count, an optional measured mass distribution vector (M+0 … M+n fractions), and a built-in table of natural isotope abundances per element; results are a square correction matrix and a corrected column vector.",
+      "item": "one GC-MS fragment of a labelled compound, with its formula and measured mass distribution vector",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "correcting measured mass isotopomer distributions for natural abundance, before metabolic flux ratio analysis",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Two independent forms each post a formula, backbone carbon count and optionally a measured vector to a server that builds and inverts the per-element abundance matrices. The result appears as an indexed numeric table with the diagonal marked and the zero upper triangle faded, plus a copy-as-CSV button and a status line showing compute time or errors.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": []
+    },
+    "field": {
+      "text": "13C natural-abundance correction of GC-MS mass distribution vectors for metabolic flux analysis",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "metabolic flux analysis",
+        "stable isotope tracing",
+        "gc ms"
+      ]
+    },
+    "workflow": {
+      "name": "compute a correction from parameters and apply it to a measured vector",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "type the fragment's molecular formula and the number of backbone carbons subject to 13C labelling; the help text says the matrix size is backbone_c + 1",
+          "parts": [
+            "matrix-form"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'compute matrix' builds a binomial abundance matrix for each element, using only the non-backbone carbons, multiplies them together and inverts the product. Errors such as an unparsable formula or a backbone count above the carbon count show inline",
+          "parts": [
+            "matrix-form",
+            "status-line"
+          ]
+        },
+        {
+          "step": "look over the result",
+          "here": "the inverted matrix is drawn as a table indexed by mass shift, with the diagonal underlined and the zero upper triangle shown as dots, captioned with its size and compute time",
+          "parts": [
+            "matrix-result"
+          ]
+        },
+        {
+          "step": "apply the correction to a measured vector",
+          "here": "the second form adds a measured MDV as comma-separated fractions whose length must equal backbone_c + 1; 'compute mdv*' multiplies it by the inverse matrix and normalises it to 1",
+          "parts": [
+            "mdv-form",
+            "status-line"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "a '[ copy ]' button on each result puts the matrix or corrected vector on the clipboard as CSV and briefly flashes the figure green or red",
+          "parts": [
+            "matrix-result",
+            "mdv-result"
+          ]
+        }
+      ],
+      "distinctive": [
+        "the labelled backbone carbons are left out of the correction because their labelling is the measured signal, so the person must give the labelled-carbon count separately from the formula",
+        "per-element isotope distributions are expanded as truncated polynomial powers from fixed NIST natural abundances for H, C, N, O, Si, P, S, Cl and Br",
+        "the vector length is tied to the labelled-carbon count (backbone_c + 1), and mismatched input is rejected with a message",
+        "the unlabelled-biomass correction is deliberately not offered in the interface; a note points to the programmatic call instead"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "matrix-form",
+      "level": "component",
+      "parent": "matrix-section",
+      "title": "Correction matrix form",
+      "summary": "Takes a molecular formula and labelled backbone carbon count and asks the server for the inverted natural-abundance correction matrix.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/packages/sita-web/src/sita_web/templates/index.html",
+          "start": 33,
+          "end": 47,
+          "role": "markup",
+          "symbol": "#form-matrix",
+          "anchor": "4d8da47fb7d7",
+          "first": "<form class=\"form\" id=\"form-matrix\" novalidate>"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 179,
+          "end": 194,
+          "role": "style",
+          "symbol": ".field input",
+          "anchor": "3c2e59f86041",
+          "first": ".field input {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 155,
+          "end": 163,
+          "role": "style",
+          "symbol": ".field label",
+          "anchor": "af4334ae2042",
+          "first": ".field label {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 165,
+          "end": 170,
+          "role": "style",
+          "symbol": ".help",
+          "anchor": "e266c9c81ec6",
+          "first": ".help {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 234,
+          "end": 247,
+          "role": "style",
+          "symbol": ".submit",
+          "anchor": "b08e88918e84",
+          "first": ".submit {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 216,
+          "end": 222,
+          "role": "style",
+          "symbol": ".error",
+          "anchor": "d8e6c0b1925e",
+          "first": ".error {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/app.js",
+          "start": 121,
+          "end": 121,
+          "role": "logic",
+          "symbol": "wireForm",
+          "anchor": "20c01c21ed3c",
+          "first": "function wireForm({ prefix, url, responseKey, variant, capLabel, extraFields = [] }) {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/app.js",
+          "start": 170,
+          "end": 176,
+          "role": "logic",
+          "anchor": "bda257694046",
+          "first": "wireForm({"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/app.py",
+          "start": 47,
+          "end": 69,
+          "role": "logic",
+          "symbol": "api_matrix",
+          "anchor": "a0db7fda6b32",
+          "first": "def api_matrix():"
+        },
+        {
+          "file": "code/packages/sita-core/src/sita_core/core.py",
+          "start": 172,
+          "end": 196,
+          "role": "logic",
+          "symbol": "correction_matrix",
+          "anchor": "989ef4ea053e",
+          "first": "def correction_matrix(self):"
+        },
+        {
+          "file": "code/packages/sita-core/src/sita_core/isotope_data.py",
+          "start": 11,
+          "end": 24,
+          "role": "data",
+          "anchor": "0c48e28a9a64",
+          "first": "ISOTOPE_ABUNDANCE_DICT_UNIT_MASS = {"
+        }
+      ]
+    },
+    {
+      "id": "matrix-section",
+      "level": "view",
+      "parent": null,
+      "title": "[01] Correction matrix",
+      "summary": "The section where the person generates and reads the correction matrix for one fragment.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/packages/sita-web/src/sita_web/templates/index.html",
+          "start": 26,
+          "end": 57,
+          "role": "markup",
+          "symbol": "section.block:1",
+          "anchor": "552b2912f723",
+          "first": "<section class=\"block\" aria-labelledby=\"sec-01\">"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 100,
+          "end": 110,
+          "role": "style",
+          "symbol": ".rule",
+          "anchor": "120df5812d52",
+          "first": ".rule {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 130,
+          "end": 135,
+          "role": "style",
+          "symbol": ".prose",
+          "anchor": "c780517c1ae7",
+          "first": ".prose {"
+        }
+      ]
+    },
+    {
+      "id": "matrix-result",
+      "level": "component",
+      "parent": "matrix-section",
+      "title": "Matrix result table",
+      "summary": "Shows the correction matrix as a table indexed by mass shift, with the diagonal marked, the upper-triangle zeros faded, a size and timing caption, and a copy-as-CSV button.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/packages/sita-web/src/sita_web/templates/index.html",
+          "start": 49,
+          "end": 56,
+          "role": "markup",
+          "symbol": "#matrix-result",
+          "anchor": "7201ab02c939",
+          "first": "<figure class=\"result\" id=\"matrix-result\" hidden>"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 267,
+          "end": 274,
+          "role": "style",
+          "symbol": ".result",
+          "anchor": "fd07d2d32f29",
+          "first": ".result {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 286,
+          "end": 295,
+          "role": "style",
+          "symbol": ".cap",
+          "anchor": "43e5b7f44384",
+          "first": ".cap {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 299,
+          "end": 314,
+          "role": "style",
+          "symbol": ".copy",
+          "anchor": "9dec4fe05fd3",
+          "first": ".copy {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 330,
+          "end": 334,
+          "role": "style",
+          "symbol": ".matrix",
+          "anchor": "8f11738d5d11",
+          "first": ".matrix {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 363,
+          "end": 372,
+          "role": "style",
+          "symbol": ".matrix td",
+          "anchor": "a082b4164fe3",
+          "first": ".matrix td {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 378,
+          "end": 381,
+          "role": "style",
+          "symbol": ".matrix td.zero",
+          "anchor": "bfdbe2c2d6c3",
+          "first": ".matrix td.zero {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 382,
+          "end": 387,
+          "role": "style",
+          "symbol": ".matrix td.diag",
+          "anchor": "5a4b2d9893a3",
+          "first": ".matrix td.diag {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/app.js",
+          "start": 13,
+          "end": 65,
+          "role": "logic",
+          "symbol": "renderTable",
+          "anchor": "ad771b9e9615",
+          "first": "function renderTable(container, data, variant) {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/app.js",
+          "start": 68,
+          "end": 100,
+          "role": "logic",
+          "symbol": "attachCopy",
+          "anchor": "c58cc810f659",
+          "first": "function attachCopy(button, getCsv) {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/app.py",
+          "start": 22,
+          "end": 23,
+          "role": "logic",
+          "symbol": "_matrix_to_csv",
+          "anchor": "4f9dbc88d046",
+          "first": "def _matrix_to_csv(matrix):"
+        }
+      ]
+    },
+    {
+      "id": "mdv-section",
+      "level": "view",
+      "parent": null,
+      "title": "[02] Corrected MDV (MDV*)",
+      "summary": "The section where the person applies the correction to a measured mass distribution vector, with a note on what correction it leaves out.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/packages/sita-web/src/sita_web/templates/index.html",
+          "start": 59,
+          "end": 99,
+          "role": "markup",
+          "symbol": "section.block:2",
+          "anchor": "e507cb9be84e",
+          "first": "<section class=\"block\" aria-labelledby=\"sec-02\">"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 137,
+          "end": 144,
+          "role": "style",
+          "symbol": ".note",
+          "anchor": "df49c80ff487",
+          "first": ".note {"
+        }
+      ]
+    },
+    {
+      "id": "mdv-form",
+      "level": "component",
+      "parent": "mdv-section",
+      "title": "Measured MDV form",
+      "summary": "Takes a formula, a backbone carbon count and a comma-separated measured vector, and returns the natural-abundance-corrected vector normalised to 1.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/packages/sita-web/src/sita_web/templates/index.html",
+          "start": 71,
+          "end": 89,
+          "role": "markup",
+          "symbol": "#form-mdv",
+          "anchor": "594f0015b2d6",
+          "first": "<form class=\"form\" id=\"form-mdv\" novalidate>"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/app.js",
+          "start": 177,
+          "end": 184,
+          "role": "logic",
+          "anchor": "6a04fbf21664",
+          "first": "wireForm({"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/app.py",
+          "start": 72,
+          "end": 100,
+          "role": "logic",
+          "symbol": "api_mdv_star",
+          "anchor": "1664d18f1d5e",
+          "first": "def api_mdv_star():"
+        },
+        {
+          "file": "code/packages/sita-core/src/sita_core/core.py",
+          "start": 198,
+          "end": 207,
+          "role": "logic",
+          "symbol": "mdv_star",
+          "anchor": "4a4910487184",
+          "first": "def mdv_star(self):"
+        }
+      ]
+    },
+    {
+      "id": "mdv-result",
+      "level": "component",
+      "parent": "mdv-section",
+      "title": "Corrected vector table",
+      "summary": "Shows the corrected vector as an indexed column with a caption and a copy-as-CSV button.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/packages/sita-web/src/sita_web/templates/index.html",
+          "start": 91,
+          "end": 98,
+          "role": "markup",
+          "symbol": "#mdv-result",
+          "anchor": "3fde5472c274",
+          "first": "<figure class=\"result\" id=\"mdv-result\" hidden>"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/app.js",
+          "start": 13,
+          "end": 65,
+          "role": "logic",
+          "symbol": "renderTable",
+          "anchor": "ad771b9e9615",
+          "first": "function renderTable(container, data, variant) {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/app.js",
+          "start": 68,
+          "end": 100,
+          "role": "logic",
+          "symbol": "attachCopy",
+          "anchor": "c58cc810f659",
+          "first": "function attachCopy(button, getCsv) {"
+        }
+      ]
+    },
+    {
+      "id": "status-line",
+      "level": "component",
+      "parent": null,
+      "title": "Status modeline",
+      "summary": "A footer status that shows computing, ready or error after each request.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/packages/sita-web/src/sita_web/templates/index.html",
+          "start": 122,
+          "end": 129,
+          "role": "markup",
+          "symbol": "footer.modeline",
+          "anchor": "9f979e138c0a",
+          "first": "<footer class=\"modeline\" role=\"contentinfo\">"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/style.css",
+          "start": 418,
+          "end": 430,
+          "role": "style",
+          "symbol": ".modeline",
+          "anchor": "91ca92d90e36",
+          "first": ".modeline {"
+        },
+        {
+          "file": "code/packages/sita-web/src/sita_web/static/app.js",
+          "start": 114,
+          "end": 119,
+          "role": "logic",
+          "symbol": "setStatus",
+          "anchor": "052fab2d610a",
+          "first": "function setStatus(text, color) {"
+        }
+      ]
+    }
+  ]
+}

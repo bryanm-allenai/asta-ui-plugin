@@ -1,0 +1,557 @@
+{
+ "interface": {
+  "title": "FlowScope",
+  "field": "Immunology / flow cytometry",
+  "stage_of_work": "Analysis and quality control of a single acquired sample, then reporting",
+  "what_it_is_for": "Load an FCS file, run a fixed parse→compensate→arcsinh→FlowSOM-style clustering→UMAP pipeline, look over populations through a UMAP, a frequency bar chart, a marker heatmap and a summary table, flag clusters that look like artifacts with a z-score/IsolationForest detector that uses no AI, and export a reproducible report with the file checksum and run settings. An LLM interpretation step is optional."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "Two runs used the bundled real 13-colour BD FACSAria PBMC sample (flowio-demo/pbmc_13color_facsaria.fcs, 65,016 events). The dropdown listed only this file; there was no synthetic file. The uploaded test file synth-a.fcs (1.1 MB) loaded, but the pipeline rejected it because it has no embedded $SPILLOVER compensation matrix (screens/044.webp). No AI key was set, so all AI buttons stayed greyed out."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Find the cell populations in one cytometry sample, flag groups that may be technical artifacts so they can be judged as artifact or real biology, and record the run reproducibly",
+  "specific": "Cluster the PBMC FCS sample, inspect UMAP, frequencies and heatmap, run the deterministic anomaly detector, and download the detection-only LIMS-style report (the AI artifact-vs-real interpretation was locked without an API key)",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Judge how far the automated interpretation can be trusted before relying on it",
+    "specific": "Read the 'How far can the AI step be trusted?' evaluation expander",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Review benchmark accuracy of the optional AI classifier against known answers",
+      "specific": "Open the evaluation expander and read the per-model agreement and 95% CI table, the per-cluster-type correct-calls table and the limits text",
+      "screens": [
+       "screens/005.webp",
+       "screens/006.webp",
+       "screens/007.webp",
+       "screens/008.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked '📊 How far can the AI step be trusted? — evaluation results' expander",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the per-model agreement and 95% CI table",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled through 'Correct calls by true cluster type' table",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to 'Reading it' / 'Limits' notes",
+        "screens": [
+         "screens/008.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Choose the input sample and processing settings, then run the pipeline",
+    "specific": "Sidebar Input and Parameters, then Run analysis",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Pick a sample file to analyse",
+      "specific": "Choose the bundled PBMC file in the 'FCS file' selectbox, or upload an FCS (an upload is only analysable if it carries an embedded $SPILLOVER matrix)",
+      "screens": [
+       "screens/009.webp",
+       "screens/041.webp",
+       "screens/045.webp"
+      ],
+      "branch": "one-of",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened 'FCS file' dropdown (only flowio-demo/pbmc_13color_facsaria.fcs listed)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Upload and gave synth-a.fcs (auto-selected as '⬆ synth-a.fcs (uploaded)')",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "re-selected flowio-demo/pbmc_13color_facsaria.fcs from dropdown",
+        "screens": [
+         "screens/045.webp",
+         "screens/046.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Set transform scale, subsample size, number of populations and random seed",
+      "specific": "Adjust the arcsinh cofactor, Events subsampled and Metaclusters sliders and the Random seed stepper (help tooltips explain cofactor ~150 for conventional fluorescence vs ~5 for CyTOF)",
+      "screens": [
+       "screens/014.webp",
+       "screens/015.webp",
+       "screens/042.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered help icon of arcsinh cofactor",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered help icon of Metaclusters",
+        "screens": [
+         "screens/015.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Home on Events subsampled slider (20000→5000)",
+        "screens": [
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Metaclusters slider 15→10",
+        "screens": [
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed + on Random seed (42→43)",
+        "screens": [
+         "screens/042.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Run the processing and clustering pipeline",
+      "specific": "Click Run analysis to parse, compensate, transform, cluster and embed with UMAP; the header then shows Total events, Analyzed and Metaclusters",
+      "screens": [
+       "screens/011.webp",
+       "screens/027.webp",
+       "screens/044.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Run analysis (PBMC, defaults 150/20000/15/42), which took several minutes",
+        "screens": [
+         "screens/011.webp",
+         "screens/027.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Run analysis (PBMC, 150/5000/10/43)",
+        "screens": [
+         "screens/047.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Characterise the populations found",
+    "specific": "Read the summary metrics, UMAP, cluster frequencies, marker heatmap and per-cluster summary table",
+    "children": [
+     {
+      "kind": "task",
+      "general": "See how populations separate in a 2D embedding",
+      "specific": "Look at the 'UMAP embedding, colored by cluster' image, and open it full screen",
+      "screens": [
+       "screens/028.webp",
+       "screens/048.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to UMAP plot (15 clusters)",
+        "screens": [
+         "screens/028.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked Fullscreen on UMAP (10-cluster run)",
+        "screens": [
+         "screens/048.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Compare the relative size of each population",
+      "specific": "Hover bars in the 'Cluster frequencies' chart and switch it to its data table",
+      "screens": [
+       "screens/029.webp",
+       "screens/030.webp",
+       "screens/031.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered bar for cluster 1 (tooltip frequency_pct 39.175)",
+        "screens": [
+         "screens/030.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked 'Show data' chart toolbar icon (chart became cluster/frequency_pct table)",
+        "screens": [
+         "screens/031.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Identify each population by its marker profile",
+      "specific": "Read the median-arcsinh marker heatmap (clusters × 13 markers such as CD3, CD4, CD8, CD19, VIVID/CD14)",
+      "screens": [
+       "screens/032.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to 'Marker expression heatmap (median, transformed scale)'",
+        "screens": [
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Inspect per-population counts and marker medians, ordered to bring rare groups forward",
+      "specific": "Read the 'Per-cluster summary table' (n_events, frequency_pct, per-marker medians) and sort by n_events",
+      "screens": [
+       "screens/033.webp",
+       "screens/034.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked n_events column header (sorted ascending)",
+        "screens": [
+         "screens/034.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Flag populations that look like technical artifacts",
+    "specific": "Anomaly detection (deterministic) section",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Review which clusters a statistical outlier detector flags and why",
+      "specific": "Read the flagged-cluster table (frequency_pct, freq_zscore, iforest_flag, flagged_by); with 15 clusters 7 were flagged, with 10 clusters 4 were flagged",
+      "screens": [
+       "screens/035.webp",
+       "screens/049.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Anomaly detection (run 1: 7 of 15 flagged)",
+        "screens": [
+         "screens/035.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to Anomaly detection (run 2: 4 of 10 flagged)",
+        "screens": [
+         "screens/049.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Produce a reproducible record of the run",
+    "specific": "AI interpretation & report section, used without an AI key",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Build and export a disclaimered report with input checksum and exact parameters",
+      "specific": "Click 'Build report without AI (detection only)', read the on-page report (Entry, Analysis Provenance with SHA-256, cluster frequencies, flagged clusters), then 'Download report (.md)'",
+      "screens": [
+       "screens/037.webp",
+       "screens/038.webp",
+       "screens/039.webp",
+       "screens/051.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked 'Build report without AI (detection only)'",
+        "screens": [
+         "screens/037.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled through flagged-cluster report sections",
+        "screens": [
+         "screens/038.webp",
+         "screens/039.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked 'Download report (.md)' (flowscope_report.md, 2,675 bytes, SHA-256 733b0f6d…, seed 42)",
+        "screens": [
+         "screens/039.webp",
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked 'Build report without AI (detection only)' again for run 2",
+        "screens": [
+         "screens/051.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Parameterised deterministic clustering run panel",
+   "general": "A sidebar form where you pick an input file, set preprocessing and clustering settings with sliders and a seed, then run a fixed pipeline whose settings are recorded for reproducibility",
+   "specific": "Choose an FCS file or upload one (uploads need an embedded $SPILLOVER matrix), set the arcsinh cofactor (5–500), Events subsampled (5000–50000) and Metaclusters (5–30) sliders and the Random seed stepper, then click Run analysis; the results header shows Total events, Analyzed and Metaclusters",
+   "steps": [
+    "Pick or upload a data file",
+    "Read the help tooltips for each setting",
+    "Adjust the transform, subsample and cluster-count sliders and the seed",
+    "Click Run analysis and wait for the progress status",
+    "Read the summary metrics header"
+   ],
+   "serves_tasks": [
+    "Pick a sample file to analyse",
+    "Set transform scale, subsample size, number of populations and random seed",
+    "Run the processing and clustering pipeline"
+   ],
+   "screens": [
+    "screens/014.webp",
+    "screens/042.webp",
+    "screens/027.webp",
+    "screens/044.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Population size overview: frequency chart and per-cluster summary table",
+   "general": "See how large each population is and what its median marker levels are, reading exact percentages off a chart of group sizes and ordering a table of counts so rare groups come to the top",
+   "specific": "The 'Cluster frequencies' chart (hover a bar for cluster and frequency_pct; 'Show data' flips it to a table) together with the 'Per-cluster summary table' (cluster, n_events, frequency_pct, per-marker medians; click a header to sort; toolbar Show/hide columns, Search, Download as CSV, Fullscreen — the CSV download produced no file in this run)",
+   "steps": [
+    "Hover a bar to read a cluster's exact percentage",
+    "Click Show data to read all frequencies as a table",
+    "Scroll to the per-cluster summary table",
+    "Sort by n_events ascending to bring the rarest clusters to the top",
+    "Read the marker medians of those rare clusters"
+   ],
+   "serves_tasks": [
+    "Compare the relative size of each population",
+    "Inspect per-population counts and marker medians, ordered to bring rare groups forward"
+   ],
+   "screens": [
+    "screens/030.webp",
+    "screens/031.webp",
+    "screens/033.webp",
+    "screens/034.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Cluster-by-marker median heatmap with UMAP companion",
+   "general": "Read the identity of each group from a heatmap of median marker levels next to a 2D embedding coloured by the same group labels",
+   "specific": "The 'UMAP embedding, colored by cluster' image (can open full screen) and the 'Marker expression heatmap (median, transformed scale)' with 13 panel markers",
+   "steps": [
+    "Look at the UMAP to see which clusters sit apart",
+    "Open the UMAP full screen for detail",
+    "Read the heatmap row for that cluster to see which markers are high or low"
+   ],
+   "serves_tasks": [
+    "See how populations separate in a 2D embedding",
+    "Identify each population by its marker profile"
+   ],
+   "screens": [
+    "screens/028.webp",
+    "screens/048.webp",
+    "screens/032.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Rule-plus-model outlier flagging table",
+   "general": "Flag unusual groups with two transparent statistical tests and list which test flagged each group, with the scores, so a person can review them",
+   "specific": "Anomaly detection (deterministic): a frequency z-score and an IsolationForest over per-cluster feature vectors give an 'N of M clusters flagged' line and a table with frequency_pct, freq_zscore, iforest_flag and flagged_by",
+   "steps": [
+    "Run the pipeline",
+    "Read the count of flagged clusters",
+    "For each flagged cluster check whether it came from the z-score or the IsolationForest",
+    "Cross-check flagged clusters against the heatmap and frequencies",
+    "Re-run with other settings and compare the flags"
+   ],
+   "serves_tasks": [
+    "Review which clusters a statistical outlier detector flags and why"
+   ],
+   "screens": [
+    "screens/035.webp",
+    "screens/049.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Provenance-stamped report builder and download",
+   "general": "Turn the current analysis into a disclaimered Markdown report with the input file's checksum, exact parameters, software version and a per-flag section, then download it",
+   "specific": "'Build report without AI (detection only)' renders a FlowScope Analysis Report (Entry, Analysis Provenance with File SHA-256, compensation source, cofactor, subsample, seed and version, a cluster frequency table, and a 'Flagged clusters — interpretation' section), then 'Download report (.md)'. 'Generate AI report' stays disabled without an API key.",
+   "steps": [
+    "Click Build report without AI (detection only)",
+    "Read the provenance section and the flagged-cluster sections on the page",
+    "Click Download report (.md)"
+   ],
+   "serves_tasks": [
+    "Build and export a disclaimered report with input checksum and exact parameters"
+   ],
+   "screens": [
+    "screens/037.webp",
+    "screens/038.webp",
+    "screens/039.webp",
+    "screens/051.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Known-answer evaluation panel for an automated classifier",
+   "general": "An expandable panel that shows how accurate an optional automated judgement step was on a benchmark with known answers, broken down by model and by true category, with confidence intervals and stated limits",
+   "specific": "The 'How far can the AI step be trusted?' expander: a model table (agreement, 95% CI, artifact called real, real called artifact, abstained), a baseline line for the detector alone, a 'Correct calls by true cluster type' grid, and Reading-it / Limits notes",
+   "steps": [
+    "Expand the panel",
+    "Compare models by agreement and CI",
+    "Check per-category correct calls for weak spots (for example Doublet_T_Mono, Plasmablast)",
+    "Read the limits before relying on the AI step"
+   ],
+   "serves_tasks": [
+    "Review benchmark accuracy of the optional AI classifier against known answers"
+   ],
+   "screens": [
+    "screens/005.webp",
+    "screens/007.webp",
+    "screens/008.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Gating-strategy suggestion output ('Suggest gating strategy'): the button stays disabled without ANTHROPIC_API_KEY (screens/027.webp)",
+  "AI interpretation of flagged clusters as artifact or real population ('Generate AI report', model choice, privacy note): the button stays disabled without GEMINI_API_KEY or ANTHROPIC_API_KEY (screens/035.webp)",
+  "Results for an uploaded FCS file: synth-a.fcs has no embedded spillover matrix and the app offers no way to supply a spillover CSV (screens/044.webp)",
+  "Synthetic bundled FCS: the notes said it would be listed, but only the real PBMC file was in the selectbox (screens/009.webp)"
+ ],
+ "not_done": [
+  "Running the pipeline on an uploaded FCS: Run analysis on synth-a.fcs failed with 'no embedded spillover … Supply a spillover CSV' (screens/044.webp), and there is no upload field for a spillover CSV",
+  "Any AI step (gating suggestion, cluster interpretation, AI report): no API key is configured",
+  "Downloading CSVs from the dataframe toolbars: one click on the evaluation table's Download as CSV timed out, and one click on the summary table's download icon produced no file",
+  "Changing the arcsinh cofactor: it was left at 150 in both runs to save actions, so its effect on clustering was not observed",
+  "Downloading the second report (run 2): the report was built (screens/051.webp) but I stopped at the ~100-action limit before downloading it",
+  "Interacting with points on the UMAP or heatmap: both are static matplotlib images with no hover or selection"
+ ],
+ "applied": [
+  "Goal general label now says flagged groups are to be judged as artifact vs real biology; goal specific notes the AI interpretation was locked",
+  "t1: added the scroll-to-model-table action (screens/006.webp) and added 007 to the task screens so task and actions match",
+  "Moved the failed synth-a.fcs run out of t4 into not_done (dead end)",
+  "Noted on t2 and f1 that uploads need an embedded $SPILLOVER matrix",
+  "Merged f2 (frequency chart) and f4 (summary table) into one population-overview feature with a scientific-purpose general label, kept as f2",
+  "t8 general label reworded away from the widget ('sortable table') toward the purpose",
+  "Corrected marker name to VIVID/CD14 in t7 and category names in f7 to match the screens",
+  "f6 specific/steps no longer describe the unobserved AI report path as usable; says it is disabled without a key",
+  "Expanded the screens_never_reached entry for AI interpretation to name artifact-vs-real judgement, model choice and privacy note"
+ ],
+ "open_fixes": [
+  "Add a task and feature for AI interpretation of flagged clusters (artifact vs real with marker evidence, model choice, privacy note, failures sent to manual review): needs a run with GEMINI_API_KEY or ANTHROPIC_API_KEY set, since the run only saw the disabled button (screens/035.webp) and I cannot read the code",
+  "Add a task and feature for the AI gating-strategy proposal (step, marker_pair, gate_type, rationale table): needs a run with ANTHROPIC_API_KEY set; only the disabled button was seen (screens/027.webp)",
+  "Show a successful analysis of an uploaded FCS: needs a test file with an embedded $SPILLOVER matrix, or an app version that accepts a spillover CSV",
+  "Confirm whether per-cluster table CSV export works: needs a fresh attempt, since the one click produced no file",
+  "Observe the effect of changing the arcsinh cofactor on clustering: not tried in either run"
+ ],
+ "screens_at": "pilot/public/runs/flowscope-flow-cytometry/20261031-004433/",
+ "screens_filed": {
+  "screens/005.webp": "screens/005.webp",
+  "screens/009.webp": "screens/009.webp",
+  "screens/028.webp": "screens/028.webp",
+  "screens/035.webp": "screens/035.webp",
+  "screens/037.webp": "screens/037.webp"
+ }
+}

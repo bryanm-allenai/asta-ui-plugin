@@ -1,0 +1,562 @@
+{
+  "schema": "astaui.card/1",
+  "id": "proteinviz-explorer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:02:56Z"
+  },
+  "app": {
+    "title": "ProteinViz",
+    "summary": "A person searches for a disease and picks it from the matches. They get its top associated proteins with association scores, the pathways those proteins share, the interaction network among them, and the drugs already acting on them, filtered by clinical stage. From the shortlist they choose two proteins and open them on the structure page. There they pick an experimentally solved complex, a chain pair and a distance cutoff, and see the contact residues in a 3D viewer and a table. They can export those residues as a CSV, and every result carries a link to its source record.",
+    "task": {
+      "text": "Go from a disease to a ranked set of candidate proteins, their shared pathways, interactions and known drugs, and then to the residues at the contact surface of a chosen protein pair.",
+      "verbs": [
+        "explore",
+        "identify",
+        "derive",
+        "summarize",
+        "lookup"
+      ]
+    },
+    "data": {
+      "text": "Records fetched live from public databases: disease–protein associations with scores, protein interaction networks, pathway enrichment terms with FDR values, drug records with clinical stage, protein sequences and annotations, and 3D atomic coordinates of solved complexes and predicted models.",
+      "item": "a protein associated with a disease, and for a chosen pair, a residue at their contact surface",
+      "shapes": [
+        "table",
+        "network",
+        "sequence",
+        "categories",
+        "molecular structure"
+      ]
+    },
+    "stage": {
+      "text": "exploring public evidence to form hypotheses about disease proteins, before designing experiments",
+      "terms": [
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "On the disease page, a search and a slider for the number of targets feed four tabs: a ranked target table, an enrichment bar chart with a table, a network diagram and a drug table. Two dropdowns there send a protein pair to the structure page by permalink. On that page a list of solved complexes drives a chain-pair choice and a cutoff slider, and from these the contact residues are computed and shown in a 3D viewer and a table side by side.",
+      "views": [
+        "table view",
+        "bar chart",
+        "network diagram",
+        "summary stats",
+        "heatmap",
+        "3d structure viewer"
+      ],
+      "interactions": [
+        "search",
+        "select",
+        "filter",
+        "zoom and pan",
+        "hover for detail",
+        "export",
+        "import"
+      ],
+      "patterns": [
+        "overview and detail",
+        "master-detail",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "disease target discovery and protein interface analysis in structural bioinformatics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "bioinformatics",
+        "structural biology",
+        "protein protein interaction"
+      ]
+    },
+    "workflow": {
+      "name": "narrow a collection to candidates, then compute detail for a chosen pair",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Type a disease name, pick the exact disease from the matches, and set how many top targets to fetch (10 to 50).",
+          "parts": [
+            "disease-explorer"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The top targets appear as a table ranked by association score, with summary counts of associated targets, drug candidates and approved drugs.",
+          "parts": [
+            "disease-explorer",
+            "target-table"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Enrichment finds pathways over-represented among the targets (FDR ≤ 0.05), filtered by category. A network shows interactions among the targets above a chosen confidence level.",
+          "parts": [
+            "pathway-enrichment",
+            "target-network"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Drugs are filtered by maximum clinical stage, and the top targets with no drug for this disease are listed and linked.",
+          "parts": [
+            "drug-table"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Two dropdowns choose Protein A and Protein B from the targets, and a link opens that pair on the structure page. That page lists the solved complexes that contain both proteins, and the person picks an entry and a chain pair.",
+          "parts": [
+            "disease-explorer",
+            "structure-page"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A cutoff slider (3.5 to 8 Å) sets the distance for heavy-atom contacts. The interface residues are computed from the coordinates and shown as red sticks in a 3D viewer, next to a table of each residue's minimum distance and contact count.",
+          "parts": [
+            "interface-viewer"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Download interface (CSV)' saves the residue table for the chosen entry and chain pair.",
+          "parts": [
+            "interface-viewer"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every result carries its source database, a link to the record, the release and the retrieval time. A failed or missing source is reported as missing, never filled in.",
+        "Interface residues are geometric contacts in the deposited coordinates, with crystal symmetry copies excluded. If a named entry has no contact between the two proteins, the page says so instead of showing another chain pair.",
+        "Pages have shareable permalinks, so a disease or a protein pair can be reopened from a URL.",
+        "A predicted model of protein A can be shown instead, coloured by per-residue confidence (pLDDT) with a predicted aligned error (PAE) heatmap, so its reliability is clear."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "disease-explorer",
+      "level": "view",
+      "parent": null,
+      "title": "Disease explorer",
+      "summary": "Finds a disease, shows summary counts for it, and lets the person send a chosen pair of its top targets on to the structure page.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "search",
+        "select"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/proteinviz/app/views/disease.py",
+          "start": 1,
+          "end": 75,
+          "role": "markup",
+          "anchor": "bb2837964893",
+          "first": "import pandas as pd"
+        },
+        {
+          "file": "code/src/proteinviz/app/common.py",
+          "start": 28,
+          "end": 40,
+          "role": "logic",
+          "symbol": "attempt",
+          "anchor": "4b0ec297c450",
+          "first": "def attempt(fn: Callable[..., T], *args: Any, **kwargs: Any) -> T | None:"
+        },
+        {
+          "file": "code/src/proteinviz/app/common.py",
+          "start": 68,
+          "end": 74,
+          "role": "logic",
+          "symbol": "set_params",
+          "anchor": "26ac0f0813e4",
+          "first": "def set_params(**values: str | None) -> None:"
+        },
+        {
+          "file": "code/src/proteinviz/app/common.py",
+          "start": 77,
+          "end": 85,
+          "role": "logic",
+          "symbol": "provenance_caption",
+          "anchor": "ff0795a77e12",
+          "first": "def provenance_caption(*provs: Provenance | None) -> None:"
+        },
+        {
+          "file": "code/src/proteinviz/sources/opentargets.py",
+          "start": 102,
+          "end": 153,
+          "role": "data",
+          "symbol": "disease_profile",
+          "anchor": "03133c26d30b",
+          "first": "def disease_profile(disease_id: str, n_targets: int = 25) -> DiseaseProfile:"
+        },
+        {
+          "file": "code/src/proteinviz/sources/opentargets.py",
+          "start": 62,
+          "end": 67,
+          "role": "data",
+          "symbol": "search_diseases",
+          "anchor": "df37e1bf40b8",
+          "first": "def search_diseases(text: str, size: int = 10) -> list[DiseaseHit]:"
+        }
+      ]
+    },
+    {
+      "id": "target-table",
+      "level": "component",
+      "parent": "disease-explorer",
+      "title": "Top targets",
+      "summary": "Ranks the disease's associated proteins by association score, shown as progress bars, with links to each protein's page.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/proteinviz/app/views/disease.py",
+          "start": 77,
+          "end": 101,
+          "role": "markup",
+          "anchor": "5838ca193f82",
+          "first": "with tab_t:"
+        }
+      ]
+    },
+    {
+      "id": "pathway-enrichment",
+      "level": "component",
+      "parent": "disease-explorer",
+      "title": "Shared pathways",
+      "summary": "Shows the pathway and disease terms over-represented among the targets, filtered by category, as a bar chart and a table with FDR values.",
+      "views": [
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "filter",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/proteinviz/app/views/disease.py",
+          "start": 103,
+          "end": 140,
+          "role": "markup",
+          "anchor": "0f167fd7a6fa",
+          "first": "with tab_p:"
+        },
+        {
+          "file": "code/src/proteinviz/viz/plots.py",
+          "start": 48,
+          "end": 75,
+          "role": "logic",
+          "symbol": "enrichment_bar",
+          "anchor": "7a3e016ed04a",
+          "first": "def enrichment_bar(terms: list[EnrichmentTerm], top: int = 15, height: int | None = None):"
+        },
+        {
+          "file": "code/src/proteinviz/sources/string_db.py",
+          "start": 116,
+          "end": 154,
+          "role": "data",
+          "symbol": "enrichment",
+          "anchor": "b9df40996f0f",
+          "first": "def enrichment(genes: list[str], species: int = 9606, max_fdr: float = 0.05) -> Enrichment:"
+        }
+      ]
+    },
+    {
+      "id": "target-network",
+      "level": "component",
+      "parent": "disease-explorer",
+      "title": "Interaction network",
+      "summary": "Draws the interactions among the top targets above a chosen confidence level, with each link coloured by its strongest type of evidence.",
+      "views": [
+        "network diagram"
+      ],
+      "interactions": [
+        "filter",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/proteinviz/app/views/disease.py",
+          "start": 142,
+          "end": 156,
+          "role": "markup",
+          "anchor": "98b7f00eb7ab",
+          "first": "with tab_n:"
+        },
+        {
+          "file": "code/src/proteinviz/viz/network.py",
+          "start": 31,
+          "end": 90,
+          "role": "logic",
+          "symbol": "network_figure",
+          "anchor": "3f1096b51f28",
+          "first": "def network_figure(net: StringNetwork, highlight: str | None = None, height: int = 620):"
+        },
+        {
+          "file": "code/src/proteinviz/sources/string_db.py",
+          "start": 31,
+          "end": 36,
+          "role": "data",
+          "symbol": "network",
+          "anchor": "98e19df89cc8",
+          "first": "def network("
+        }
+      ]
+    },
+    {
+      "id": "drug-table",
+      "level": "component",
+      "parent": "disease-explorer",
+      "title": "Drugs",
+      "summary": "Lists the drugs and clinical candidates for the disease, filtered by maximum clinical stage, and names the top targets that no drug acts on yet.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/proteinviz/app/views/disease.py",
+          "start": 158,
+          "end": 197,
+          "role": "markup",
+          "anchor": "4a0bffcb6df5",
+          "first": "with tab_d:"
+        }
+      ]
+    },
+    {
+      "id": "structure-page",
+      "level": "view",
+      "parent": null,
+      "title": "Structure & interfaces",
+      "summary": "Takes two proteins, or a PDB ID, finds the experimentally solved complexes that contain both, and lets the person pick an entry to examine.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "search",
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/proteinviz/app/views/structure.py",
+          "start": 11,
+          "end": 44,
+          "role": "markup",
+          "anchor": "71908f8e1ee1",
+          "first": "c.path_label(\"structure\")"
+        },
+        {
+          "file": "code/src/proteinviz/app/views/structure.py",
+          "start": 47,
+          "end": 181,
+          "role": "logic",
+          "symbol": "complexes_tab",
+          "anchor": "320fb9ba5b09",
+          "first": "def complexes_tab():"
+        },
+        {
+          "file": "code/src/proteinviz/sources/rcsb.py",
+          "start": 48,
+          "end": 76,
+          "role": "data",
+          "symbol": "search_entries",
+          "anchor": "f903e7cecbfc",
+          "first": "def search_entries(*accessions: str, rows: int = 25) -> tuple[list[str], int]:"
+        },
+        {
+          "file": "code/src/proteinviz/sources/rcsb.py",
+          "start": 102,
+          "end": 155,
+          "role": "data",
+          "symbol": "get_entries",
+          "anchor": "b2b09b1311cd",
+          "first": "def get_entries(pdb_ids: list[str]) -> list[PdbEntry]:"
+        }
+      ]
+    },
+    {
+      "id": "interface-viewer",
+      "level": "component",
+      "parent": "structure-page",
+      "title": "Interface residues",
+      "summary": "Computes the contact residues between the chosen chains at an adjustable distance cutoff, shows them in a 3D viewer and a table, and exports them as CSV.",
+      "views": [
+        "3d structure viewer",
+        "table view",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/proteinviz/app/views/structure.py",
+          "start": 109,
+          "end": 181,
+          "role": "markup",
+          "anchor": "6b36d42962f4",
+          "first": "# Which chains to compare: by protein identity when both are given, else largest contact."
+        },
+        {
+          "file": "code/src/proteinviz/app/views/structure.py",
+          "start": 32,
+          "end": 33,
+          "role": "logic",
+          "symbol": "interface_for",
+          "anchor": "aae437c64d4e",
+          "first": "def interface_for(pdb_id: str, chain_a: str, chain_b: str, cutoff: float):"
+        },
+        {
+          "file": "code/src/proteinviz/app/views/structure.py",
+          "start": 37,
+          "end": 38,
+          "role": "logic",
+          "symbol": "chain_pairs",
+          "anchor": "a8e4c9d56059",
+          "first": "def chain_pairs(pdb_id: str):"
+        },
+        {
+          "file": "code/src/proteinviz/structure/interface.py",
+          "start": 51,
+          "end": 58,
+          "role": "logic",
+          "symbol": "compute_interface",
+          "anchor": "c24ad3fd23b7",
+          "first": "def compute_interface("
+        },
+        {
+          "file": "code/src/proteinviz/structure/interface.py",
+          "start": 34,
+          "end": 44,
+          "role": "logic",
+          "symbol": "is_deposited_contact",
+          "anchor": "6a06209d82b4",
+          "first": "def is_deposited_contact(c: gemmi.ContactSearch.Result) -> bool:"
+        },
+        {
+          "file": "code/src/proteinviz/viz/molstar.py",
+          "start": 47,
+          "end": 51,
+          "role": "logic",
+          "symbol": "complex_scene",
+          "anchor": "f3d096572886",
+          "first": "def complex_scene("
+        }
+      ]
+    },
+    {
+      "id": "alphafold-confidence",
+      "level": "component",
+      "parent": "structure-page",
+      "title": "AlphaFold model (A)",
+      "summary": "Shows the predicted structure of protein A coloured by per-residue confidence (pLDDT), beside a predicted aligned error (PAE) heatmap for judging how its domains are arranged.",
+      "views": [
+        "3d structure viewer",
+        "heatmap",
+        "summary stats"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/src/proteinviz/app/views/structure.py",
+          "start": 184,
+          "end": 213,
+          "role": "logic",
+          "symbol": "alphafold_tab",
+          "anchor": "97447c0bec0a",
+          "first": "def alphafold_tab():"
+        },
+        {
+          "file": "code/src/proteinviz/viz/molstar.py",
+          "start": 31,
+          "end": 44,
+          "role": "logic",
+          "symbol": "alphafold_scene",
+          "anchor": "0880661ed372",
+          "first": "def alphafold_scene(cif_url: str, plddt_segments: list[tuple[int, int, str]], title: str = \"\"):"
+        },
+        {
+          "file": "code/src/proteinviz/viz/plots.py",
+          "start": 25,
+          "end": 45,
+          "role": "logic",
+          "symbol": "pae_heatmap",
+          "anchor": "4efda9e445f2",
+          "first": "def pae_heatmap(pae: np.ndarray, height: int = 420):"
+        },
+        {
+          "file": "code/src/proteinviz/sources/alphafold.py",
+          "start": 86,
+          "end": 96,
+          "role": "logic",
+          "symbol": "plddt_segments",
+          "anchor": "a1b7c73e0c7b",
+          "first": "def plddt_segments(residues: list[int], scores: list[float]) -> list[tuple[int, int, str]]:"
+        },
+        {
+          "file": "code/src/proteinviz/sources/alphafold.py",
+          "start": 28,
+          "end": 58,
+          "role": "data",
+          "symbol": "get_model",
+          "anchor": "35019c10b7f5",
+          "first": "def get_model(accession: str) -> AlphaFoldModel:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "data",
+      "list": "shapes",
+      "term": "molecular structure"
+    },
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "3d structure viewer"
+    }
+  ]
+}

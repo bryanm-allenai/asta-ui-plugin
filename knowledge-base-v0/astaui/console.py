@@ -27,6 +27,7 @@ from .cards import check_card, part_spans
 from .index import Index
 from .kb import KB, KBError, read_json, write_json
 from .ontology import FACETS, LISTS, Ontology
+from . import memo
 from .privacy import scan_build
 
 
@@ -45,7 +46,8 @@ class Console:
 
     def _stamp(self, kb: KB) -> float:
         newest = 0.0
-        for d in (kb.builds_dir, kb.cards_dir, kb.eval_dir):
+        older = kb.older()
+        for d in (kb.builds_dir, kb.cards_dir, kb.eval_dir) + ((older.cards_dir,) if older else ()):
             if d.exists():
                 for p in d.rglob("*"):
                     if p.is_file():
@@ -107,7 +109,7 @@ class Console:
         lint_block = lint_look = 0
         for b in kb.builds():
             kinds[b.kind or "unknown"] = kinds.get(b.kind or "unknown", 0) + 1
-            for f in scan_build(b):
+            for f in memo.findings(kb, b):
                 if f.level == "block":
                     lint_block += 1
                 else:
@@ -159,9 +161,6 @@ class Console:
         }
 
     def builds(self, embedder: Optional[str]) -> List[Dict[str, Any]]:
-        from .slices import slice_part
-        from .symbols import index_build
-
         kb = self.kb()
         ont = Ontology.load(kb.root / "ontology.json")
         cards = {c["id"]: c for c in kb.cards()}
@@ -178,9 +177,8 @@ class Console:
                 row["lines"] = entry.read_text(encoding="utf-8", errors="replace").count("\n") + 1
             if card:
                 app = card["app"]
-                _, chk = check_card(ont, card, b, made=card.get("made"))
-                syms = index_build(b)
-                sizes = [slice_part(kb, b.id, p, symbols=syms)["lines"] for p in card.get("parts", [])]
+                errors, warnings = memo.card_check(kb, ont, card, b)
+                sizes = memo.slice_lines(kb, b, card)
                 row.update({
                     "field": (app.get("field") or {}).get("text", ""),
                     "discipline": ((app.get("field") or {}).get("disciplines") or [""])[0],
@@ -189,7 +187,7 @@ class Console:
                     "parts": len(card.get("parts", [])),
                     "spans": sum(len(part_spans(p)) for p in card.get("parts", [])),
                     "slice_median": int(statistics.median(sizes)) if sizes else 0,
-                    "problems": len(chk.errors), "notes": len(chk.warnings),
+                    "problems": len(errors), "notes": len(warnings),
                 })
             rows.append(row)
         return rows

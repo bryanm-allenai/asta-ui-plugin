@@ -1,0 +1,460 @@
+{
+  "schema": "astaui.card/1",
+  "id": "curve-curator-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T07:01:55Z"
+  },
+  "app": {
+    "title": "CurveCurator dashboard: explore fitted dose-response curves on a volcano or potency plot",
+    "summary": "A person opens a dashboard of dose-response curves that have already been fitted and tested for significance. Every curve is a dot on a volcano plot (fold change against p-value or relevance score) or on a potency plot (fold change against pEC50), with the significance boundary drawn in. They narrow the dots by regulation class, by pEC50, score and signal range sliders, and by regex search on names, sequences or genes. Then they select curves by clicking, lassoing or searching to see the measured points and fitted sigmoid, where each curve falls in the potency, signal and score distributions, and its fit statistics in a sortable table. What they get is a set of hit curves they have checked, which they can save as figures.",
+    "task": {
+      "text": "Find the curves with a significant, relevant dose response among many fitted curves, and check each one's fit and potency.",
+      "verbs": [
+        "identify",
+        "explore",
+        "filter placeholder"
+      ]
+    },
+    "data": {
+      "text": "A table of fitted dose-response curves: one row per sample or analyte, with response ratios at each dose and fitted parameters (pEC50, slope, front, back), fold change, p-value, relevance score, AUC, R², signal quality and regulation class.",
+      "item": "one fitted dose-response curve for one sample or analyte",
+      "shapes": [
+        "table",
+        "grid of series",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "exploring fitted dose-response curves after the fitting and significance run, to pick out and check hits",
+      "terms": [
+        "explore",
+        "analyze",
+        "confirm"
+      ]
+    },
+    "mechanism": {
+      "text": "A volcano or potency scatter of every curve drives the other views: selecting dots by tap, lasso or regex search draws their measured points and fitted sigmoids in the curve panel, marks them in the pEC50, signal and score histograms, and lists them in the table. The regulation toggle and range sliders hide dots that fail the filters and move the threshold lines on the histograms.",
+      "views": [
+        "scatter plot",
+        "line chart",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "hover for detail",
+        "filter",
+        "search",
+        "sort",
+        "zoom and pan",
+        "toggle view",
+        "undo",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "dose-response curve fitting with significance thresholding in pharmacology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "dose response",
+        "pharmacology",
+        "drug screening"
+      ]
+    },
+    "workflow": {
+      "name": "screen many fitted curves for significant hits and inspect each one",
+      "steps": [
+        {
+          "step": "look over every item at a glance",
+          "here": "every fitted curve is a dot on the volcano plot (log2 curve fold change against -log10 p-value), coloured by pEC50, with the red decision boundary drawn from alpha and the fold-change limit",
+          "parts": [
+            "volcano-plot"
+          ]
+        },
+        {
+          "step": "switch which statistic the overview shows",
+          "here": "a Volcano/Potency dropdown changes the y-axis to pEC50; p-value/Relevance (or adjusted p-value) buttons switch the significance axis and its threshold line",
+          "parts": [
+            "view-toggles",
+            "volcano-plot"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "all/regulated/not-regulated buttons plus pEC50, Score and Signal range sliders hide curves outside the limits; dashed threshold lines move on the matching histograms",
+          "parts": [
+            "view-toggles",
+            "range-sliders",
+            "distribution-panels"
+          ]
+        },
+        {
+          "step": "find items by name or pattern",
+          "here": "regex search boxes for Name, Modified sequence and Gene, with an optional case-sensitive checkbox, select every visible curve whose field matches",
+          "parts": [
+            "regex-search"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "tapping, shift-clicking or lassoing dots draws each selected curve's measured ratios and fitted 4-parameter sigmoid against log concentration, and puts a red line where it falls in the pEC50, signal and score histograms",
+          "parts": [
+            "volcano-plot",
+            "curve-panel",
+            "distribution-panels"
+          ]
+        },
+        {
+          "step": "read and sort the values of the selected items",
+          "here": "the table lists only the selected curves, with pEC50, slope, fold change, AUC, R², relevance and signal quality; headers sort and a row click narrows the selection",
+          "parts": [
+            "curve-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "each plot's save tool writes the current view out as a PNG or SVG figure",
+          "parts": [
+            "volcano-plot",
+            "curve-panel"
+          ]
+        }
+      ],
+      "distinctive": [
+        "significance is judged in two dimensions at once: a curved boundary over fold change and p-value (SAM-style s0 relevance score) instead of a single p-value cutoff",
+        "the potency view shows only significant curves by default, because pEC50 is only meaningful for regulated curves",
+        "the sigmoid is redrawn in the browser from each curve's stored pEC50, slope, front and back, over a log-dose axis padded half a decade beyond the tested doses",
+        "the histograms beside the curve panel place each selected curve within the distributions of potency, control signal and identification score",
+        "searches take regular expressions, so a sequence motif can select every matching analyte at once"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "volcano-plot",
+      "level": "view",
+      "parent": null,
+      "title": "Volcano / potency plot",
+      "summary": "Shows every fitted curve as a dot by fold change and significance (or potency), coloured by pEC50 and drawn with the decision boundary; it is the main place to select curves.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "hover for detail",
+        "zoom and pan",
+        "undo",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 639,
+          "end": 719,
+          "role": "markup",
+          "anchor": "6d11bbe66747",
+          "first": "# All Data in bokeh format"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 504,
+          "end": 521,
+          "role": "logic",
+          "symbol": "get_exponential_limited_space",
+          "anchor": "b2c8494514ef",
+          "first": "def get_exponential_limited_space(start, end, inf_limit=0.0, num=5000, exp=3):"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 1074,
+          "end": 1217,
+          "role": "data",
+          "symbol": "render",
+          "anchor": "6e955a17139e",
+          "first": "def render(df, config):"
+        }
+      ]
+    },
+    {
+      "id": "view-toggles",
+      "level": "component",
+      "parent": "volcano-plot",
+      "title": "View and regulation toggles",
+      "summary": "Switches the overview between volcano and potency axes and between p-value and relevance score, and shows all, regulated or not-regulated curves.",
+      "views": [],
+      "interactions": [
+        "toggle view",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 585,
+          "end": 598,
+          "role": "markup",
+          "anchor": "157c51c56bc5",
+          "first": "# Data Selection Buttons"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 399,
+          "end": 490,
+          "role": "logic",
+          "symbol": "get_js_fig1_yaxis_selection",
+          "anchor": "f505f45f4659",
+          "first": "def get_js_fig1_yaxis_selection():"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 924,
+          "end": 956,
+          "role": "logic",
+          "anchor": "eba4d0e8c86b",
+          "first": "# Change the y axis of the scatter plot"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 982,
+          "end": 997,
+          "role": "logic",
+          "anchor": "378ff631734d",
+          "first": "# Filter data for regulated curves when clicking on the radio buttons"
+        }
+      ]
+    },
+    {
+      "id": "curve-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Dose-response curve panel",
+      "summary": "Draws the measured response ratios and the fitted sigmoid of every selected curve against log concentration, so the person can see whether the fit matches the data.",
+      "views": [
+        "line chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 721,
+          "end": 752,
+          "role": "markup",
+          "anchor": "87c325cffc00",
+          "first": "#"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 32,
+          "end": 287,
+          "role": "logic",
+          "symbol": "get_js_source_selection_code",
+          "anchor": "78b3fab795dc",
+          "first": "def get_js_source_selection_code(cols_ratio):"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 1044,
+          "end": 1057,
+          "role": "logic",
+          "anchor": "91938cb54722",
+          "first": "# Update plots when selecting data points from volcano plot"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 498,
+          "end": 501,
+          "role": "data",
+          "symbol": "draw_default_values",
+          "anchor": "c84f0270363a",
+          "first": "def draw_default_values(n):"
+        }
+      ]
+    },
+    {
+      "id": "distribution-panels",
+      "level": "view",
+      "parent": null,
+      "title": "pEC50, signal and score histograms",
+      "summary": "Shows histograms of regulated-curve potency, log2 control signal and search-engine score, with red lines for the selected curves and dashed lines for the current slider limits.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 754,
+          "end": 876,
+          "role": "markup",
+          "anchor": "946a17874368",
+          "first": "#"
+        }
+      ]
+    },
+    {
+      "id": "range-sliders",
+      "level": "component",
+      "parent": "distribution-panels",
+      "title": "Range sliders",
+      "summary": "pEC50, Score and Signal range sliders hide curves outside the chosen ranges and move the threshold lines on the histograms.",
+      "views": [],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 600,
+          "end": 613,
+          "role": "markup",
+          "anchor": "bcdca01ab084",
+          "first": "# pEC50 Range Slider for subsetting curves by pEC50"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 335,
+          "end": 396,
+          "role": "logic",
+          "symbol": "get_js_visibility_toggle_code",
+          "anchor": "a37739cb380d",
+          "first": "def get_js_visibility_toggle_code():"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 999,
+          "end": 1042,
+          "role": "logic",
+          "anchor": "e53dfb0a9332",
+          "first": "pec50_slider.js_on_change('value_throttled',"
+        }
+      ]
+    },
+    {
+      "id": "regex-search",
+      "level": "component",
+      "parent": null,
+      "title": "Regex search by name, sequence or gene",
+      "summary": "Selects every visible curve whose name, modified sequence or gene matches a typed regular expression, case-sensitive if chosen.",
+      "views": [],
+      "interactions": [
+        "search",
+        "multi-select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 615,
+          "end": 633,
+          "role": "markup",
+          "anchor": "e6abc4e6a2b9",
+          "first": "# Case-sensitive checker"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 290,
+          "end": 330,
+          "role": "logic",
+          "symbol": "get_js_table_selection_code",
+          "anchor": "85e812031d42",
+          "first": "def get_js_table_selection_code(col):"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 958,
+          "end": 980,
+          "role": "logic",
+          "anchor": "6ac953132e3a",
+          "first": "# Select Data points from the volcano based on modified sequence"
+        }
+      ]
+    },
+    {
+      "id": "curve-table",
+      "level": "view",
+      "parent": null,
+      "title": "Selected-curve table",
+      "summary": "Lists the selected curves with their identifiers and fit statistics; columns sort, and clicking a row narrows the selection to it.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "sort",
+        "select"
+      ],
+      "patterns": [
+        "linked views",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 885,
+          "end": 918,
+          "role": "markup",
+          "anchor": "8888ed1fcc19",
+          "first": "#"
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 72,
+          "end": 82,
+          "role": "logic",
+          "anchor": "d0e3e16063b3",
+          "first": "\"\"\""
+        },
+        {
+          "file": "code/curve_curator/dashboard.py",
+          "start": 1059,
+          "end": 1071,
+          "role": "markup",
+          "anchor": "6186968bfdb8",
+          "first": "#"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "task",
+      "list": "verbs",
+      "term": "filter placeholder"
+    }
+  ]
+}

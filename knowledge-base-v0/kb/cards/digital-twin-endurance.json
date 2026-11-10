@@ -1,0 +1,534 @@
+{
+  "schema": "astaui.card/1",
+  "id": "digital-twin-endurance",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T15:47:40Z"
+  },
+  "app": {
+    "title": "Digital Twin — Endurance: training-load model and its out-of-sample evidence",
+    "summary": "A person opens a dashboard over training sessions that have already been processed, checks the data-source banner in the sidebar, and sets the two time constants of the fitness-fatigue load model. They read the daily load curves and the acute:chronic load ratio against its safety threshold, then a rolling-best performance envelope per sport with an adjustable window. They check the computed load score against an external implementation and browse the session table. They then rank model variants by out-of-sample R² against baselines and work through tabs of saved evaluation results: which capabilities the history supports yet, paired skill gains with intervals, detectability floors, replication across a cohort of athletes, hierarchical pooling, safety-rule checks and responder predictors. What they get is a judgement of what the load model can and cannot claim, and for whom.",
+    "task": {
+      "text": "Judge whether a training-load model really predicts an athlete's performance out of sample, and how far that holds across a cohort, before it is trusted for planning.",
+      "verbs": [
+        "derive",
+        "compare",
+        "monitor",
+        "summarize",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "Processed endurance training sessions with daily load and performance observations, plus saved evaluation tables (cross-validation scores, paired bootstrap comparisons, cohort replication, posterior summaries).",
+      "item": "a training session of one athlete, rolled up into a daily load and a performance observation",
+      "shapes": [
+        "time series",
+        "table",
+        "events",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "validating a load model on processed training histories, after ingestion and before planning",
+      "terms": [
+        "analyze",
+        "confirm",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar picks one of five pages and sets the model's time constants, which recompute the load curves and the variant scores shown on the pages. Each page puts headline numbers above line, scatter or bar charts and tables, and the Measures page splits saved evaluation artifacts into tabs; an artifact that is missing shows the command that produces it instead of a chart.",
+      "views": [
+        "sidebar list",
+        "summary stats",
+        "line chart",
+        "scatter plot",
+        "bar chart",
+        "table view",
+        "strip plot"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail",
+        "sort"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "fitness-fatigue training-load modelling with out-of-sample validation in sports science",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "sports science",
+        "training load",
+        "model validation"
+      ]
+    },
+    "workflow": {
+      "name": "judge whether a model predicts out of sample, against baselines",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "reads the processed session, daily-load and performance artifacts, falling back to a frozen demo snapshot; the sidebar banner says whether the sources are real, and an empty store shows the commands to run",
+          "parts": [
+            "sidebar"
+          ]
+        },
+        {
+          "step": "set the model's parameters",
+          "here": "two sliders set the fitness and fatigue time constants in days; fitness must be longer than fatigue or the page stops",
+          "parts": [
+            "sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "exponential moving averages of daily TRIMP give fitness, fatigue and freshness, and a 7-day/28-day acute:chronic ratio is drawn against its upper bound",
+          "parts": [
+            "load-page"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "per-session best efforts are plotted as dots under a rolling-maximum envelope whose window is set by a slider, in a running tab and a cycling-power tab, with lag-1 autocorrelation",
+          "parts": [
+            "performance-page"
+          ]
+        },
+        {
+          "step": "check the measure against an external reference",
+          "here": "the computed TRIMP is regressed on an external tool's TRIMP (slope, intercept, residual SD) over an identity line, above a session table sorted newest first",
+          "parts": [
+            "sessions-page"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "model variants and declared baselines are ranked by out-of-sample R² next to in-sample R² and their gap, for a chosen target",
+          "parts": [
+            "diagnostics-page"
+          ]
+        },
+        {
+          "step": "decide what the result supports",
+          "here": "tabs of saved results: a capability ladder, paired skill gains with 95% intervals, detectability floors, a per-athlete forest plot across the cohort, pooled posterior estimates, and safety-rule and responder verdicts",
+          "parts": [
+            "measures-page",
+            "maturity-ladder",
+            "cohort-forest"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every variant is ranked by its out-of-sample score against baselines declared in advance, including persistence (repeating the last value), and never by its fit.",
+        "A missing evaluation artifact is shown as the command that produces it, not as an empty chart, and a provenance banner flags whether any data is synthetic.",
+        "Performance is a rolling-best envelope over a window rather than each session's effort, because single efforts are noise around a level.",
+        "Null results come with a detectability floor: a known effect is injected to show the smallest one the protocol could see.",
+        "A maturity ladder says which claims the athlete's history supports yet, and how many days or measurements each missing one still needs."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar: provenance, page and time constants",
+      "summary": "Shows whether the loaded sessions come from real sources and their date range, switches between the five pages, and sets the fitness and fatigue time constants used everywhere.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "toggle view",
+        "import"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 66,
+          "end": 82,
+          "role": "logic",
+          "anchor": "b6688668d22f",
+          "first": "# Demo en ligne : data/ n'est pas versionne, donc un deploiement le trouve"
+        },
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 94,
+          "end": 101,
+          "role": "logic",
+          "symbol": "load_store",
+          "anchor": "93a0835be35f",
+          "first": "def load_store() -> dict[str, pd.DataFrame | dict | None]:"
+        },
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 205,
+          "end": 219,
+          "role": "markup",
+          "symbol": "empty_state",
+          "anchor": "afdd902a970b",
+          "first": "def empty_state() -> None:"
+        },
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 222,
+          "end": 277,
+          "role": "markup",
+          "anchor": "91768fd63fae",
+          "first": "store = load_store()"
+        },
+        {
+          "file": "code/src/pipeline/provenance.py",
+          "start": 62,
+          "end": 93,
+          "role": "logic",
+          "symbol": "ProvenanceSummary",
+          "anchor": "51336c646c97",
+          "first": "class ProvenanceSummary:"
+        }
+      ]
+    },
+    {
+      "id": "load-page",
+      "level": "view",
+      "parent": null,
+      "title": "Training load",
+      "summary": "Shows today's fitness, fatigue and freshness as numbers and as curves over time, and the acute:chronic load ratio against its upper bound.",
+      "views": [
+        "summary stats",
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 295,
+          "end": 329,
+          "role": "markup",
+          "anchor": "6ed2c63d075f",
+          "first": "# ── page Charge ───────────────────────────────────────────────────────────"
+        },
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 280,
+          "end": 283,
+          "role": "logic",
+          "symbol": "_line",
+          "anchor": "a53525da2984",
+          "first": "def _line(fig: go.Figure, x, y, name: str, color: str, width: float = 2.0,"
+        },
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 286,
+          "end": 292,
+          "role": "style",
+          "symbol": "_layout",
+          "anchor": "19a6e9a0ba4f",
+          "first": "def _layout(fig: go.Figure, ytitle: str = \"\", height: int = 380) -> go.Figure:"
+        },
+        {
+          "file": "code/src/layer_b_twin/load_model.py",
+          "start": 84,
+          "end": 88,
+          "role": "logic",
+          "symbol": "compute_load_curves",
+          "anchor": "68b14a453b1d",
+          "first": "def compute_load_curves("
+        },
+        {
+          "file": "code/src/layer_b_twin/load_model.py",
+          "start": 123,
+          "end": 134,
+          "role": "logic",
+          "symbol": "acute_chronic_ratio",
+          "anchor": "3c7cdb97a2e0",
+          "first": "def acute_chronic_ratio(daily_load: pd.DataFrame, acute_days: int = 7,"
+        }
+      ]
+    },
+    {
+      "id": "performance-page",
+      "level": "view",
+      "parent": null,
+      "title": "Performance envelope",
+      "summary": "Plots each session's best effort as dots under a rolling-maximum envelope, with a window slider and tabs for running and cycling power.",
+      "views": [
+        "scatter plot",
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "time slider",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 332,
+          "end": 393,
+          "role": "markup",
+          "anchor": "8bef56be3913",
+          "first": "# ── page Performance ──────────────────────────────────────────────────────"
+        },
+        {
+          "file": "code/src/layer_a_signal/envelope.py",
+          "start": 53,
+          "end": 57,
+          "role": "logic",
+          "symbol": "rolling_envelope",
+          "anchor": "4743aeac48ab",
+          "first": "def rolling_envelope("
+        },
+        {
+          "file": "code/src/layer_a_signal/envelope.py",
+          "start": 146,
+          "end": 162,
+          "role": "logic",
+          "symbol": "describe_predictability",
+          "anchor": "a1817320a2fb",
+          "first": "def describe_predictability(series: pd.Series | np.ndarray, lag: int = 1) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "sessions-page",
+      "level": "view",
+      "parent": null,
+      "title": "Sessions and load-score cross-check",
+      "summary": "Counts sessions by sport, regresses the computed load score on an external implementation's score against an identity line, and lists every session newest first.",
+      "views": [
+        "scatter plot",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "sort",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 396,
+          "end": 444,
+          "role": "markup",
+          "anchor": "eba4d1221579",
+          "first": "# ── page Seances ──────────────────────────────────────────────────────────"
+        }
+      ]
+    },
+    {
+      "id": "diagnostics-page",
+      "level": "view",
+      "parent": null,
+      "title": "Model diagnostics",
+      "summary": "Runs time-ordered cross-validation for a chosen target and ranks model variants and baselines by out-of-sample R², with in-sample R² and their gap alongside.",
+      "views": [
+        "bar chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 447,
+          "end": 536,
+          "role": "markup",
+          "anchor": "cc675317713a",
+          "first": "# ── page Diagnostics ──────────────────────────────────────────────────────"
+        },
+        {
+          "file": "code/src/evaluation/report.py",
+          "start": 210,
+          "end": 221,
+          "role": "logic",
+          "symbol": "evaluate",
+          "anchor": "6d764b6d2f8e",
+          "first": "def evaluate(observations: pd.DataFrame, daily_load: pd.DataFrame,"
+        }
+      ]
+    },
+    {
+      "id": "measures-page",
+      "level": "view",
+      "parent": null,
+      "title": "Measured results",
+      "summary": "Reads saved evaluation artifacts into tabs: paired comparisons with intervals, scores by effort duration, detectability floors, pooled estimates, safety-rule verdicts and responder predictors, and shows the command to run when an artifact is missing.",
+      "views": [
+        "bar chart",
+        "line chart",
+        "table view",
+        "strip plot"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 105,
+          "end": 138,
+          "role": "data",
+          "symbol": "load_measurements",
+          "anchor": "bdb4c38ccaa3",
+          "first": "def load_measurements() -> dict[str, pd.DataFrame | None]:"
+        },
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 199,
+          "end": 202,
+          "role": "logic",
+          "symbol": "_missing",
+          "anchor": "4a06379f250d",
+          "first": "def _missing(label: str, command: str) -> None:"
+        },
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 186,
+          "end": 196,
+          "role": "logic",
+          "symbol": "_cibles",
+          "anchor": "1018db9458d7",
+          "first": "def _cibles(table: pd.DataFrame) -> list[str]:"
+        },
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 141,
+          "end": 183,
+          "role": "logic",
+          "symbol": "_fenetre_comparee",
+          "anchor": "68edc8ce427c",
+          "first": "def _fenetre_comparee(publie: pd.DataFrame,"
+        },
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 538,
+          "end": 551,
+          "role": "markup",
+          "anchor": "fdfca72535ea",
+          "first": "# ── page Mesures ──────────────────────────────────────────────────────────"
+        },
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 585,
+          "end": 826,
+          "role": "markup",
+          "anchor": "8d6b27540eac",
+          "first": "# -- appariement par discipline ---------------------------------------"
+        },
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 870,
+          "end": 904,
+          "role": "markup",
+          "anchor": "ff7492bdba49",
+          "first": "# -- mise en commun ---------------------------------------------------"
+        }
+      ]
+    },
+    {
+      "id": "maturity-ladder",
+      "level": "component",
+      "parent": "measures-page",
+      "title": "Maturity ladder",
+      "summary": "Lists each capability as available or not, with progress and what is still missing in days or measurements, and gives the cohort prior until an individual verdict is possible.",
+      "views": [
+        "list",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 553,
+          "end": 583,
+          "role": "markup",
+          "anchor": "a9279a4dbda6",
+          "first": "# -- maturite ---------------------------------------------------------"
+        },
+        {
+          "file": "code/src/evaluation/readiness.py",
+          "start": 125,
+          "end": 134,
+          "role": "logic",
+          "symbol": "assess_readiness",
+          "anchor": "ee4f0a70c14c",
+          "first": "def assess_readiness("
+        }
+      ]
+    },
+    {
+      "id": "cohort-forest",
+      "level": "component",
+      "parent": "measures-page",
+      "title": "Cohort replication forest plot",
+      "summary": "Plots each athlete's paired skill gain over the mean with its 95% interval, sorted by gain, and counts the intervals that exclude zero for and against.",
+      "views": [
+        "strip plot",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/app/main_dashboard.py",
+          "start": 827,
+          "end": 868,
+          "role": "markup",
+          "anchor": "a0722f8376de",
+          "first": "# -- cohorte ----------------------------------------------------------"
+        },
+        {
+          "file": "code/src/evaluation/cohort.py",
+          "start": 341,
+          "end": 378,
+          "role": "logic",
+          "symbol": "detection_contrast",
+          "anchor": "7170dbc6430e",
+          "first": "def detection_contrast(table: pd.DataFrame, reference: str = \"moyenne\") -> pd.DataFrame:"
+        }
+      ]
+    }
+  ]
+}

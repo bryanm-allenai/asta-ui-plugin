@@ -1,0 +1,691 @@
+{
+  "schema": "astaui.card/1",
+  "id": "revseq-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T08:01:21Z"
+  },
+  "app": {
+    "title": "ReVSeq Dashboard: multi-virus sequencing surveillance",
+    "summary": "A person opens an overview of weekly detections for every virus, shown as stacked bars from both sequencing and PCR, and hovers to see how many detections the other method confirmed. They choose one virus from a menu, switch between sequencing and PCR counts, and play a week-by-week map of detections by region. They then check sequencing depth along the annotated genome for all samples, for each subtype or for individual samples, picking a segment for segmented viruses, and see where the samples sit on embedded phylogenetic trees. A separate co-infection page shows which viruses occur together in the same sample as a pair-count heatmap with a co-infection frequency bar, and shows the coverage of each virus in a chosen co-infected sample. What they come away with is a shared, up-to-date picture of what is circulating, where, how well it was sequenced, and what occurs together.",
+    "task": {
+      "text": "Publish and read an up-to-date surveillance overview of pathogen detections by week and region, together with genome coverage quality, phylogenetic placement and co-occurrence for each pathogen.",
+      "verbs": [
+        "monitor",
+        "summarize",
+        "compare",
+        "locate",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "Per-sample detection metadata from two assays (sequencing and PCR) with date, region and agreement flags; per-position read depth for each sample across reference genomes or segments; GenBank gene annotations; and phylogenetic tree datasets.",
+      "item": "a clinical sample with the pathogens detected in it, its collection week and region, and its read depth along the genome",
+      "shapes": [
+        "table",
+        "time series",
+        "geospatial",
+        "sequence",
+        "spans",
+        "hierarchy",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "sharing surveillance results after sequencing and data curation, for exploration by partners",
+      "terms": [
+        "report",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "Server-side services pre-render Plotly charts from harmonised metadata and depth files, and the pages embed them in frames. A menu moves between an all-pathogen overview, one page per pathogen and a co-infection page. Radio buttons switch the data source (sequencing or PCR) and the coverage level (all samples, subtypes or individuals), and dropdowns pick a segment, subtype or co-infected sample, which is fetched without reloading the page.",
+      "views": [
+        "bar chart",
+        "map",
+        "line chart",
+        "sequence track",
+        "heatmap",
+        "summary stats",
+        "dendrogram"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view",
+        "select",
+        "time slider",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail",
+        "small multiples"
+      ]
+    },
+    "field": {
+      "text": "genomic surveillance of respiratory viruses, using read-depth coverage and phylogenetics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "genomic surveillance",
+        "virology",
+        "phylogenetics"
+      ]
+    },
+    "workflow": {
+      "name": "publish a surveillance overview of detections over time and place, with data quality per item",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Curation pipelines turn BAM files and metadata into TSVs and depth JSONs. On load, virus names and region spellings are harmonised to configured canonical names, and charts are re-rendered only when an input file has changed.",
+          "parts": [
+            "home-overview"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The home page shows weekly stacked bars of detections per virus, separately for sequencing and PCR, with total sequence and detection counts. Hovering a bar shows how many detections the other assay matched out of the weekly total.",
+          "parts": [
+            "home-overview"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "A 'Select strain' menu opens one virus's page. Sequencing/PCR radio buttons switch its bar chart, its map and its total-count metric together.",
+          "parts": [
+            "strain-page",
+            "strain-weekly-bars-map"
+          ]
+        },
+        {
+          "step": "locate where and when it happens",
+          "here": "A choropleth of detections per region is animated by week, with a slider to scrub through the weeks.",
+          "parts": [
+            "strain-weekly-bars-map",
+            "home-overview"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "A coverage plot shows depth (log scale) along the genome: median and IQR across all samples, one median per subtype, or individual sample traces capped at a set number. A gene annotation track sits beneath, and a segment selector appears for segmented viruses.",
+          "parts": [
+            "coverage-pileup"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Embedded Nextstrain/Auspice trees place the new samples among public genomes, filtered to show the new nodes.",
+          "parts": [
+            "phylo-tree"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The co-infection page counts the samples that share each pair of viruses in an upper-triangle heatmap, with a bar of each virus's co-infection frequency. Choosing a co-infected sample loads a coverage plot for each virus found in it.",
+          "parts": [
+            "coinfection-heatmap",
+            "coinfection-sample-pileup"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Two detection assays (sequencing and PCR) are kept as separate sources throughout, and each count shows how many detections the other assay matched.",
+        "Data quality is read as sequencing depth along an annotated reference genome, at three levels: all samples, per subtype and per sample. Segmented genomes are handled one segment at a time.",
+        "Co-occurrence of pathogens within one sample is summarised as pair counts, plus a per-pathogen frequency against all detections.",
+        "Pathogens, modules, region map (any GeoJSON) and name aliases are set in one configuration file, so other surveillance projects can reuse it without code changes."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "home-overview",
+      "level": "view",
+      "parent": null,
+      "title": "All-pathogen overview",
+      "summary": "Shows weekly stacked detection counts per virus from sequencing and from PCR, total counts, and a week-animated regional map whose source can be switched.",
+      "views": [
+        "bar chart",
+        "map",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view",
+        "time slider",
+        "select"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/templates/home.html",
+          "start": 136,
+          "end": 183,
+          "role": "markup",
+          "symbol": "main.page",
+          "anchor": "0aea65ce3ada",
+          "first": "<main class=\"page\">"
+        },
+        {
+          "file": "code/dashboard/templates/home.html",
+          "start": 91,
+          "end": 98,
+          "role": "style",
+          "symbol": ".full-width-iframe",
+          "anchor": "71e9242a73af",
+          "first": ".full-width-iframe {"
+        },
+        {
+          "file": "code/dashboard/templates/home.html",
+          "start": 15,
+          "end": 19,
+          "role": "logic",
+          "symbol": "redirect",
+          "anchor": "5cbfefcff52a",
+          "first": "function redirect(goto) {"
+        },
+        {
+          "file": "code/dashboard/services/home.py",
+          "start": 75,
+          "end": 98,
+          "role": "logic",
+          "symbol": "get_home_context",
+          "anchor": "535842e6f668",
+          "first": "def get_home_context():"
+        },
+        {
+          "file": "code/dashboard/services/home.py",
+          "start": 33,
+          "end": 71,
+          "role": "logic",
+          "symbol": "build_home_assets",
+          "anchor": "a80c3d5284b8",
+          "first": "def build_home_assets(bundle):"
+        },
+        {
+          "file": "code/dashboard/services/plots.py",
+          "start": 39,
+          "end": 40,
+          "role": "logic",
+          "symbol": "make_weekly_strain_figure",
+          "anchor": "ccac9dd76a03",
+          "first": "def make_weekly_strain_figure("
+        },
+        {
+          "file": "code/dashboard/services/data.py",
+          "start": 127,
+          "end": 149,
+          "role": "logic",
+          "symbol": "load_dashboard_metadata",
+          "anchor": "3ffdc4961db0",
+          "first": "def load_dashboard_metadata() -> MetadataBundle:"
+        }
+      ]
+    },
+    {
+      "id": "strain-page",
+      "level": "view",
+      "parent": null,
+      "title": "Per-pathogen page",
+      "summary": "One page per virus, built from modules that can be switched on or off, with a navigation menu and a total-count metric for the chosen source.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/templates/strain.html",
+          "start": 147,
+          "end": 175,
+          "role": "markup",
+          "anchor": "4cc3af0e82e3",
+          "first": "<main class=\"page\">"
+        },
+        {
+          "file": "code/dashboard/templates/strain.html",
+          "start": 74,
+          "end": 80,
+          "role": "style",
+          "symbol": ".metric",
+          "anchor": "d1caa9a65921",
+          "first": ".metric {"
+        },
+        {
+          "file": "code/dashboard/templates/strain.html",
+          "start": 14,
+          "end": 18,
+          "role": "logic",
+          "symbol": "redirect",
+          "anchor": "5cbfefcff52a",
+          "first": "function redirect(goto) {"
+        },
+        {
+          "file": "code/dashboard/services/strain.py",
+          "start": 72,
+          "end": 177,
+          "role": "logic",
+          "symbol": "get_strain_context",
+          "anchor": "3b60a9080d15",
+          "first": "def get_strain_context(strain_slug, strain_config):"
+        },
+        {
+          "file": "code/dashboard/config.py",
+          "start": 397,
+          "end": 414,
+          "role": "logic",
+          "symbol": "get_strain_config",
+          "anchor": "12a7870b3587",
+          "first": "def get_strain_config(slug):"
+        },
+        {
+          "file": "code/dashboard/config.py",
+          "start": 10,
+          "end": 144,
+          "role": "data",
+          "anchor": "65c36d2737a0",
+          "first": "DEFAULT_MODULES = {"
+        }
+      ]
+    },
+    {
+      "id": "strain-weekly-bars-map",
+      "level": "component",
+      "parent": "strain-page",
+      "title": "Weekly counts and regional map",
+      "summary": "Shows the virus's weekly detections by subtype next to a week-animated choropleth by region, both switched between sequencing and PCR.",
+      "views": [
+        "bar chart",
+        "map"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail",
+        "time slider"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/templates/strain.html",
+          "start": 176,
+          "end": 252,
+          "role": "markup",
+          "anchor": "8b3a3ec885a0",
+          "first": "{% if modules.barplot_sequencing or modules.barplot_pcr or modules.map %}"
+        },
+        {
+          "file": "code/dashboard/templates/strain.html",
+          "start": 119,
+          "end": 126,
+          "role": "style",
+          "symbol": ".custom-input label",
+          "anchor": "fee15ff1113a",
+          "first": ".custom-input label {"
+        },
+        {
+          "file": "code/dashboard/templates/strain.html",
+          "start": 178,
+          "end": 210,
+          "role": "logic",
+          "symbol": "updateDashboardSource",
+          "anchor": "aac0e7610112",
+          "first": "function updateDashboardSource(source) {"
+        },
+        {
+          "file": "code/dashboard/services/plots.py",
+          "start": 73,
+          "end": 74,
+          "role": "logic",
+          "symbol": "make_weekly_substrain_figure",
+          "anchor": "c8edda8d2e5f",
+          "first": "def make_weekly_substrain_figure("
+        },
+        {
+          "file": "code/dashboard/services/plots.py",
+          "start": 135,
+          "end": 186,
+          "role": "logic",
+          "symbol": "build_weekly_location_map",
+          "anchor": "c9de4e16d940",
+          "first": "def build_weekly_location_map(df: pd.DataFrame, map_config: dict | None = None):"
+        }
+      ]
+    },
+    {
+      "id": "coverage-pileup",
+      "level": "component",
+      "parent": "strain-page",
+      "title": "Genome coverage pileup",
+      "summary": "Plots read depth along the genome above a gene annotation track. It can show all samples (median and IQR), each subtype, or individual samples, with segment and subtype selectors for segmented viruses.",
+      "views": [
+        "line chart",
+        "sequence track"
+      ],
+      "interactions": [
+        "toggle view",
+        "select",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/templates/strain.html",
+          "start": 253,
+          "end": 454,
+          "role": "markup",
+          "anchor": "cbfbcdf6636d",
+          "first": "{% if modules.pileup %}"
+        },
+        {
+          "file": "code/dashboard/templates/strain.html",
+          "start": 288,
+          "end": 321,
+          "role": "logic",
+          "symbol": "refreshSegmentedSelectors",
+          "anchor": "9b07eeaa4e6b",
+          "first": "function refreshSegmentedSelectors() {"
+        },
+        {
+          "file": "code/dashboard/templates/strain.html",
+          "start": 401,
+          "end": 410,
+          "role": "logic",
+          "symbol": "setPileupView",
+          "anchor": "6cf29f1747af",
+          "first": "function setPileupView(view) {"
+        },
+        {
+          "file": "code/dashboard/services/pileup.py",
+          "start": 1060,
+          "end": 1070,
+          "role": "logic",
+          "symbol": "build_pileup_context",
+          "anchor": "af7bcb905f5f",
+          "first": "def build_pileup_context("
+        },
+        {
+          "file": "code/dashboard/services/pileup.py",
+          "start": 435,
+          "end": 436,
+          "role": "logic",
+          "symbol": "build_avg_pileup_figure",
+          "anchor": "878e55bc8ab6",
+          "first": "def build_avg_pileup_figure("
+        },
+        {
+          "file": "code/dashboard/services/pileup.py",
+          "start": 502,
+          "end": 506,
+          "role": "logic",
+          "symbol": "build_multi_avg_pileup_figure",
+          "anchor": "d866855d7840",
+          "first": "def build_multi_avg_pileup_figure("
+        },
+        {
+          "file": "code/dashboard/services/pileup.py",
+          "start": 585,
+          "end": 591,
+          "role": "logic",
+          "symbol": "build_individual_pileup_figure",
+          "anchor": "d2318e6f67ad",
+          "first": "def build_individual_pileup_figure("
+        }
+      ]
+    },
+    {
+      "id": "phylo-tree",
+      "level": "component",
+      "parent": "strain-page",
+      "title": "Phylogenetic trees",
+      "summary": "Embeds the configured Nextstrain/Auspice trees for the virus, filtered to highlight the newly sequenced samples among public genomes.",
+      "views": [
+        "dendrogram"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/templates/strain.html",
+          "start": 455,
+          "end": 478,
+          "role": "markup",
+          "anchor": "6c08979e32fa",
+          "first": "{% if modules.tree %}"
+        }
+      ]
+    },
+    {
+      "id": "coinfection-page",
+      "level": "view",
+      "parent": null,
+      "title": "Co-infection page",
+      "summary": "Gathers what is known about samples with more than one virus, with a sequencing/PCR switch and a count of co-infection pairs.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/templates/mixed.html",
+          "start": 159,
+          "end": 333,
+          "role": "markup",
+          "symbol": "main.page",
+          "anchor": "944cc959c646",
+          "first": "<main class=\"page\">"
+        },
+        {
+          "file": "code/dashboard/services/mixed.py",
+          "start": 229,
+          "end": 253,
+          "role": "logic",
+          "symbol": "get_mixed_context",
+          "anchor": "b9db52de0b4b",
+          "first": "def get_mixed_context(selected_sample: str | None = None):"
+        },
+        {
+          "file": "code/dashboard/services/data.py",
+          "start": 152,
+          "end": 153,
+          "role": "logic",
+          "symbol": "load_mixed_metadata",
+          "anchor": "b898e2985e76",
+          "first": "def load_mixed_metadata("
+        }
+      ]
+    },
+    {
+      "id": "coinfection-heatmap",
+      "level": "component",
+      "parent": "coinfection-page",
+      "title": "Co-infection heatmap",
+      "summary": "Shows a heatmap of how many samples carry each pair of viruses, with a bar of each virus's co-infection frequency. Hovering lists example samples and subtype breakdowns.",
+      "views": [
+        "heatmap",
+        "bar chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/templates/mixed.html",
+          "start": 202,
+          "end": 206,
+          "role": "markup",
+          "symbol": "#mixed_heatmap_seq",
+          "anchor": "86e50fb126c6",
+          "first": "<div id=\"mixed_heatmap_seq\" {% if default_source == \"pcr\" %}style=\"display:none;\"{% endif %}>"
+        },
+        {
+          "file": "code/dashboard/templates/mixed.html",
+          "start": 207,
+          "end": 211,
+          "role": "markup",
+          "symbol": "#mixed_heatmap_pcr",
+          "anchor": "52e90a711628",
+          "first": "<div id=\"mixed_heatmap_pcr\" {% if default_source == \"sequencing\" %}style=\"display:none;\"{% endif %}>"
+        },
+        {
+          "file": "code/dashboard/templates/mixed.html",
+          "start": 213,
+          "end": 232,
+          "role": "logic",
+          "symbol": "setMixedSource",
+          "anchor": "80d479da3987",
+          "first": "function setMixedSource(source) {"
+        },
+        {
+          "file": "code/dashboard/services/mixed.py",
+          "start": 99,
+          "end": 200,
+          "role": "logic",
+          "symbol": "_build_source_matrix",
+          "anchor": "64b48f6f319b",
+          "first": "def _build_source_matrix(events: pd.DataFrame, source_title: str, denominator_df: pd.DataFrame):"
+        },
+        {
+          "file": "code/dashboard/services/plots.py",
+          "start": 253,
+          "end": 259,
+          "role": "logic",
+          "symbol": "build_coinfection_composite_figure",
+          "anchor": "9715ef2f1a1a",
+          "first": "def build_coinfection_composite_figure("
+        }
+      ]
+    },
+    {
+      "id": "coinfection-sample-pileup",
+      "level": "component",
+      "parent": "coinfection-page",
+      "title": "Coverage per virus in a co-infected sample",
+      "summary": "Choosing a co-infected sample fetches and stacks one genome coverage plot for each virus detected in it, and notes any virus whose coverage is unavailable.",
+      "views": [
+        "line chart",
+        "sequence track"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "small multiples",
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/dashboard/templates/mixed.html",
+          "start": 240,
+          "end": 244,
+          "role": "markup",
+          "symbol": "#mixed_pileup_sample",
+          "anchor": "bf3bda14f05a",
+          "first": "<select id=\"mixed_pileup_sample\" name=\"mixed_pileup_sample\">"
+        },
+        {
+          "file": "code/dashboard/templates/mixed.html",
+          "start": 246,
+          "end": 259,
+          "role": "markup",
+          "symbol": "#mixed_pileup_content",
+          "anchor": "7ae0bb3d993f",
+          "first": "<div id=\"mixed_pileup_content\">"
+        },
+        {
+          "file": "code/dashboard/templates/mixed.html",
+          "start": 148,
+          "end": 152,
+          "role": "style",
+          "symbol": ".small-note",
+          "anchor": "ab319507199d",
+          "first": ".small-note {"
+        },
+        {
+          "file": "code/dashboard/templates/mixed.html",
+          "start": 297,
+          "end": 323,
+          "role": "logic",
+          "symbol": "loadPileupForSample",
+          "anchor": "90f4801a51be",
+          "first": "function loadPileupForSample(sample) {"
+        },
+        {
+          "file": "code/dashboard/templates/mixed.html",
+          "start": 266,
+          "end": 295,
+          "role": "logic",
+          "symbol": "renderPileupItems",
+          "anchor": "a0065ea64d6a",
+          "first": "function renderPileupItems(items) {"
+        },
+        {
+          "file": "code/dashboard/views.py",
+          "start": 46,
+          "end": 50,
+          "role": "logic",
+          "symbol": "mixed_pileup_data",
+          "anchor": "ada4123caeb7",
+          "first": "def mixed_pileup_data(request):"
+        },
+        {
+          "file": "code/dashboard/services/mixed.py",
+          "start": 203,
+          "end": 226,
+          "role": "logic",
+          "symbol": "get_mixed_pileup_context",
+          "anchor": "79a82c11c671",
+          "first": "def get_mixed_pileup_context(selected_sample: str | None = None) -> dict:"
+        },
+        {
+          "file": "code/dashboard/services/pileup.py",
+          "start": 943,
+          "end": 1057,
+          "role": "logic",
+          "symbol": "build_mixed_sample_pileup_assets",
+          "anchor": "d4aa038d0fb3",
+          "first": "def build_mixed_sample_pileup_assets(sample_id: str, sample_rows: pd.DataFrame) -> list[dict]:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "dendrogram"
+    }
+  ]
+}

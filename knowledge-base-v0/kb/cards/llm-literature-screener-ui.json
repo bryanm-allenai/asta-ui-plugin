@@ -1,0 +1,475 @@
+{
+  "schema": "astaui.card/1",
+  "id": "llm-literature-screener-ui",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T03:43:42Z"
+  },
+  "app": {
+    "title": "LLM literature screener",
+    "summary": "A person uploads a file of bibliographic records (or turns on a bundled synthetic example), then pastes or uploads a review protocol that sets out the question and the eligibility criteria. They can add a file of decisions their team has already made. In the sidebar they choose a scoring backend and a threshold rule: either a target recall on the known inclusions or a threshold they set themselves. When they run the screening, a progress bar follows the work: duplicates are removed, every record gets a model score, the threshold is calibrated, and each record is marked include, uncertain or exclude. The person gets summary counts and warnings, a report preview, and downloads: a ranked results table, the records written back in their own format with the decisions added, PRISMA counts with a methods paragraph, and a zip of everything.",
+    "task": {
+      "text": "Pre-screen a large set of literature records against eligibility criteria with a model score, and set aside only the records below a threshold calibrated to keep a target share of the inclusions already known, so people read fewer records.",
+      "verbs": [
+        "triage",
+        "derive",
+        "summarize",
+        "decide"
+      ]
+    },
+    "data": {
+      "text": "Bibliographic records (title, abstract, authors, year, journal, DOI, PMID) exported from databases or reference managers, a structured protocol of eligibility criteria, and a partial set of human include/exclude decisions",
+      "item": "a bibliographic record with its title and abstract",
+      "shapes": [
+        "text corpus",
+        "table",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "deciding which search results to set aside before people screen titles and abstracts",
+      "terms": [
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "A single-page form takes the records, the protocol and the known decisions in numbered sections, while a sidebar holds the backend and threshold settings. One run button scores and calibrates with a progress bar, then fills a results area with count tiles, warnings, download buttons and an embedded HTML report.",
+      "views": [
+        "form",
+        "text editor",
+        "summary stats",
+        "document reader"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "export",
+        "inline edit"
+      ],
+      "patterns": []
+    },
+    "field": {
+      "text": "title and abstract screening for systematic reviews in medicine",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "systematic review",
+        "title and abstract screening",
+        "evidence synthesis"
+      ]
+    },
+    "workflow": {
+      "name": "rank items by a model score and set aside those below a threshold calibrated on items already labelled",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload records as RIS, PubMed .nbib, CSV, TSV, Excel, or a Rayyan or Covidence export. The format can be picked or detected automatically, and spreadsheet columns can be mapped with FIELD=Column lines. A checkbox loads the bundled synthetic example instead and turns off these inputs.",
+          "parts": [
+            "inputs-form"
+          ]
+        },
+        {
+          "step": "state the criteria items are judged against",
+          "here": "Paste or upload a protocol YAML with the question, population, intervention, comparator, outcomes, study designs and exclusions, starting from a template.",
+          "parts": [
+            "protocol-editor"
+          ]
+        },
+        {
+          "step": "supply the decisions already made on some items",
+          "here": "Optionally upload a labels file that matches records by id, DOI, PMID or title. Without known inclusions, the run requires a threshold set by hand.",
+          "parts": [
+            "inputs-form"
+          ]
+        },
+        {
+          "step": "choose how items are scored and where the cut-off goes",
+          "here": "In the sidebar, pick a backend (local transformers model, OpenAI-compatible server, or keyword mock) and its settings. Then set a target recall slider or a fixed exclusion threshold, an include threshold, one-line reasons, and duplicate removal.",
+          "parts": [
+            "backend-picker",
+            "threshold-controls"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run screening removes duplicates and scores every record as logit(Yes) minus logit(No). It calibrates the threshold on the known inclusions and marks each record include, uncertain or exclude, with a progress bar for scoring and reasons.",
+          "parts": [
+            "run-progress"
+          ]
+        },
+        {
+          "step": "track progress toward a target or a total",
+          "here": "Tiles count records screened, records left for people, records excluded by the tool, and known inclusions kept. Calibration warnings are listed below them, and the full HTML report is previewed.",
+          "parts": [
+            "results-panel",
+            "report-preview"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download a zip of all outputs, or one at a time: the ranked results CSV, the HTML report, PRISMA counts with a methods paragraph in Markdown, and the records back in their input format with the decisions added.",
+          "parts": [
+            "results-panel"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The threshold is the highest score that still keeps a target share of the known inclusions, so recall on human decisions sets how many records the tool may set aside.",
+        "There are three outcomes rather than keep or drop: records between the calibrated threshold and an include threshold are marked uncertain and still go to people.",
+        "Records are written back in the format they came in (RIS, MEDLINE, spreadsheet, Rayyan, Covidence) with score, probability, decision and reason added, so they can go back into the team's screening tool.",
+        "PRISMA 2020 counts and a methods paragraph are produced for reporting the automation step.",
+        "The scoring backend can be swapped among a local model, a remote server and a keyword mock, and the mock is labelled as unfit for real screening."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Settings sidebar",
+      "summary": "Keeps the backend and threshold settings beside the main form, so they apply to every run.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 247,
+          "end": 248,
+          "role": "logic",
+          "anchor": "b3e05c1d1682",
+          "first": "backend, model, settings = backend_settings()"
+        }
+      ]
+    },
+    {
+      "id": "backend-picker",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Model backend",
+      "summary": "Chooses the scoring backend and shows only that backend's settings: model, device, precision and token budget, or server URL, key and concurrency. Each configuration's model is cached so it loads once.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 124,
+          "end": 153,
+          "role": "logic",
+          "symbol": "backend_settings",
+          "anchor": "4de245da1d1e",
+          "first": "def backend_settings() -> tuple[str, str, tuple[tuple[str, Any], ...]]:"
+        },
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 119,
+          "end": 121,
+          "role": "logic",
+          "symbol": "describe_backend",
+          "anchor": "0f989b9facc3",
+          "first": "def describe_backend(name: str) -> str:"
+        },
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 114,
+          "end": 116,
+          "role": "logic",
+          "symbol": "load_scorer",
+          "anchor": "ef7a8b0efd91",
+          "first": "def load_scorer(backend: str, model: str, settings: tuple[tuple[str, Any], ...]) -> Scorer:"
+        },
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 59,
+          "end": 64,
+          "role": "data",
+          "anchor": "8a7a379487ba",
+          "first": "BACKEND_LABELS = {"
+        },
+        {
+          "file": "code/src/llm_literature_screener/backends/__init__.py",
+          "start": 42,
+          "end": 53,
+          "role": "logic",
+          "symbol": "create_scorer",
+          "anchor": "32791505e634",
+          "first": "def create_scorer("
+        }
+      ]
+    },
+    {
+      "id": "threshold-controls",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Threshold and decisions",
+      "summary": "Sets the target recall on known inclusions, or a fixed exclusion threshold instead, plus the include threshold and switches for one-line reasons and duplicate removal.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 156,
+          "end": 181,
+          "role": "logic",
+          "symbol": "decision_settings",
+          "anchor": "3f5097bdc4a8",
+          "first": "def decision_settings() -> ScreeningOptions:"
+        }
+      ]
+    },
+    {
+      "id": "inputs-form",
+      "level": "view",
+      "parent": null,
+      "title": "Records, protocol and known decisions",
+      "summary": "Numbered sections take the records file with its format and column mapping, the protocol, and an optional labels file, or a checkbox that loads the bundled example.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 250,
+          "end": 285,
+          "role": "markup",
+          "anchor": "496a01bdd595",
+          "first": "examples = example_dir()"
+        },
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 78,
+          "end": 84,
+          "role": "logic",
+          "symbol": "example_dir",
+          "anchor": "b0bf99a76248",
+          "first": "def example_dir() -> Path | None:"
+        },
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 94,
+          "end": 98,
+          "role": "logic",
+          "symbol": "save_upload",
+          "anchor": "52a21ad4c055",
+          "first": "def save_upload(upload: Any, folder: Path) -> Path:"
+        },
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 101,
+          "end": 110,
+          "role": "logic",
+          "symbol": "parse_columns",
+          "anchor": "744e06bb4667",
+          "first": "def parse_columns(text: str) -> dict[str, str]:"
+        },
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 87,
+          "end": 91,
+          "role": "logic",
+          "symbol": "session_dir",
+          "anchor": "0b7f1c5e2453",
+          "first": "def session_dir() -> Path:"
+        },
+        {
+          "file": "code/examples/labels.csv",
+          "start": 1,
+          "end": 16,
+          "role": "data",
+          "anchor": "c189946b9e47",
+          "first": "id,label"
+        }
+      ]
+    },
+    {
+      "id": "protocol-editor",
+      "level": "component",
+      "parent": "inputs-form",
+      "title": "Review protocol",
+      "summary": "A text area pre-filled with a protocol template (or the example's protocol) that the person edits, or replaces by uploading a YAML file.",
+      "views": [
+        "text editor"
+      ],
+      "interactions": [
+        "import",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 268,
+          "end": 278,
+          "role": "markup",
+          "anchor": "21d9de1577a9",
+          "first": "st.subheader(\"2. Review protocol\")"
+        },
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 65,
+          "end": 75,
+          "role": "data",
+          "anchor": "e7637f8976e9",
+          "first": "PROTOCOL_TEMPLATE = \"\"\"question: <the review question>"
+        },
+        {
+          "file": "code/src/llm_literature_screener/criteria.py",
+          "start": 135,
+          "end": 147,
+          "role": "logic",
+          "symbol": "from_yaml_text",
+          "anchor": "11605653533c",
+          "first": "def from_yaml_text(cls, text: str) -> Criteria:"
+        }
+      ]
+    },
+    {
+      "id": "run-progress",
+      "level": "component",
+      "parent": "inputs-form",
+      "title": "Run screening",
+      "summary": "Loads and labels the records, checks that a threshold can be set, then scores, calibrates and decides, with a progress bar per stage and errors shown inline.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 287,
+          "end": 339,
+          "role": "logic",
+          "anchor": "89bad68095c1",
+          "first": "if st.button(\"Run screening\", type=\"primary\"):"
+        },
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 292,
+          "end": 295,
+          "role": "logic",
+          "symbol": "progress",
+          "anchor": "828f271c43a9",
+          "first": "def progress(stage: str, done: int, total: int) -> None:"
+        },
+        {
+          "file": "code/src/llm_literature_screener/pipeline.py",
+          "start": 225,
+          "end": 234,
+          "role": "logic",
+          "symbol": "run_screening",
+          "anchor": "aace9ac740f5",
+          "first": "def run_screening("
+        }
+      ]
+    },
+    {
+      "id": "results-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Results",
+      "summary": "Shows count tiles for screened, left for people, excluded, and known inclusions kept, then the warnings, a primary zip download and one download button per output file.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 207,
+          "end": 235,
+          "role": "markup",
+          "symbol": "show_results",
+          "anchor": "7620fa6478e7",
+          "first": "def show_results(outputs: dict[str, Any]) -> None:"
+        },
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 340,
+          "end": 369,
+          "role": "logic",
+          "anchor": "aecd07ab8c2f",
+          "first": "files = {"
+        },
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 184,
+          "end": 191,
+          "role": "logic",
+          "symbol": "zip_folder",
+          "anchor": "b019157b5597",
+          "first": "def zip_folder(folder: Path) -> bytes:"
+        },
+        {
+          "file": "code/src/llm_literature_screener/pipeline.py",
+          "start": 331,
+          "end": 336,
+          "role": "logic",
+          "symbol": "write_outputs",
+          "anchor": "825d02fa52d2",
+          "first": "def write_outputs("
+        }
+      ]
+    },
+    {
+      "id": "report-preview",
+      "level": "component",
+      "parent": "results-panel",
+      "title": "Report preview",
+      "summary": "Embeds the self-contained HTML report (summary, decisions, recall curve, calibration, PRISMA, uncertain records) in an expander.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/llm_literature_screener/ui/app.py",
+          "start": 194,
+          "end": 204,
+          "role": "markup",
+          "symbol": "show_page",
+          "anchor": "1520518108b9",
+          "first": "def show_page(page: str, height: int) -> None:"
+        },
+        {
+          "file": "code/src/llm_literature_screener/report.py",
+          "start": 558,
+          "end": 597,
+          "role": "logic",
+          "symbol": "build_report",
+          "anchor": "abc72c31d894",
+          "first": "def build_report(data: ReportData) -> str:"
+        }
+      ]
+    }
+  ]
+}

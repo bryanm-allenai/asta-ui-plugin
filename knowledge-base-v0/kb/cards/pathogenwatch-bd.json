@@ -1,0 +1,515 @@
+{
+  "schema": "astaui.card/1",
+  "id": "pathogenwatch-bd",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T19:42:41Z"
+  },
+  "app": {
+    "title": "PathogenWatch BD: influenza surveillance (WHO FluNet)",
+    "summary": "A person picks a country or area and a range of years, and the interface cleans and aggregates the surveillance file into one weekly series. An overview shows the latest complete week, weekly positivity with a confidence band over the number of specimens tested, and an annual table. Further tabs split the series into trend, seasonal and residual parts and test for seasonality. Others mark the weeks that the chosen aberration detectors flag, with a threshold the person can adjust and alert counts for the period. The last tabs compare detector and forecast performance against simple baselines and show the data-quality audit behind the series.",
+    "task": {
+      "text": "Screen a weekly surveillance series for its seasonal pattern and for unusual weeks, and check how well detectors and forecasts do against simple baselines.",
+      "verbs": [
+        "identify",
+        "derive",
+        "summarize",
+        "compare",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "Weekly aggregated laboratory surveillance counts per country: specimens processed, positives by type, and the source they were reported under. These are reduced to one positivity series per country with flagged gaps and a provisional last week.",
+      "item": "a country-week of tested specimens and positive detections",
+      "shapes": [
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "analysing a cleaned weekly surveillance series for seasonality and aberrations, after auditing the source",
+      "terms": [
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar country selector and year-range slider drive every tab. Each tab recomputes one analysis on the selected series (positivity with a CI band, STL decomposition, detector alerts overlaid as markers, a forecast versus baselines) and shows it as linked charts and tables. On the detector tab, a multiselect and an optional threshold slider re-score the alerts live.",
+      "views": [
+        "line chart",
+        "bar chart",
+        "table view",
+        "summary stats",
+        "sidebar list"
+      ],
+      "interactions": [
+        "select",
+        "filter",
+        "time slider",
+        "multi-select",
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "prospective aberration detection and seasonality analysis on weekly test-positivity series in infectious disease epidemiology",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "disease surveillance",
+        "epidemiology",
+        "aberration detection"
+      ]
+    },
+    "workflow": {
+      "name": "screen a weekly series for unusual periods against its seasonal baseline",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "The raw surveillance file is de-duplicated, missing totals are recovered from subtype sums, and rows are collapsed to one row per country-week under a source policy. The person then picks a country or area from the sidebar.",
+          "parts": [
+            "series-controls"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "A range slider in the sidebar limits the years shown in the charts and alert counts.",
+          "parts": [
+            "series-controls"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Metric cards show the latest complete week, its positivity, the specimens processed and the count of gap weeks. Below them sit weekly positivity with a 95% band over a bar chart of specimens, and an annual table with type shares.",
+          "parts": [
+            "overview-tab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The series is split into trend, seasonal and residual panels. A harmonic GLM is tested against a null model, a Kruskal-Wallis test compares calendar months, and a table lists each year's peak week.",
+          "parts": [
+            "seasonality-tab"
+          ]
+        },
+        {
+          "step": "flag the unusual items with a chosen rule",
+          "here": "The person picks C1/C2/C3/CUSUM detectors and can re-score EARS with a custom z threshold. Alert weeks appear as diamonds on the positivity line, with alert counts for the period.",
+          "parts": [
+            "anomaly-tab"
+          ]
+        },
+        {
+          "step": "compare against a simple baseline",
+          "here": "Detector performance is shown against proxy episodes and a simulation. A one-week-ahead Random Forest is compared with a last-week baseline on a chronological holdout, with MAE, RMSE and R².",
+          "parts": [
+            "evaluation-tab",
+            "forecast-tab"
+          ]
+        },
+        {
+          "step": "keep a record of changes",
+          "here": "The generated data-quality report lists the duplicates removed, the source policy, missingness and consistency checks.",
+          "parts": [
+            "quality-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Positivity is always shown with its denominator, and weeks with no specimens tested are left undefined rather than set to zero.",
+        "The most recent week is treated as provisional and is never alerted on. Weeks with too few specimens are not scored.",
+        "Detectors are prospective, using only past data. CUSUM runs on residuals from a seasonal model refit on history and needs three years of history.",
+        "With no labelled outbreaks, detection performance is judged against proxy episodes and injected simulated outbreaks, and labelled as such.",
+        "Complex forecasts are always benchmarked against a naive last-week baseline on a chronological split."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "series-controls",
+      "level": "view",
+      "parent": null,
+      "title": "Country and year controls",
+      "summary": "Loads and cleans the surveillance data, then lets the person pick a country and a year range that drive every tab.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "select",
+        "time slider",
+        "filter"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 19,
+          "end": 24,
+          "role": "logic",
+          "symbol": "load_clean",
+          "anchor": "6b2c6ba5570e",
+          "first": "def load_clean() -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 28,
+          "end": 31,
+          "role": "logic",
+          "symbol": "detect",
+          "anchor": "08de77e9ca18",
+          "first": "def detect(country: str):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 39,
+          "end": 56,
+          "role": "markup",
+          "anchor": "678cd103e1c3",
+          "first": "agg = load_clean()"
+        },
+        {
+          "file": "code/src/pathogenwatch/cleaning.py",
+          "start": 56,
+          "end": 72,
+          "role": "logic",
+          "symbol": "aggregate_fast",
+          "anchor": "d342ae2c6b6b",
+          "first": "def aggregate_fast(df: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/pathogenwatch/cleaning.py",
+          "start": 81,
+          "end": 98,
+          "role": "logic",
+          "symbol": "country_series",
+          "anchor": "7e75d01e7ef0",
+          "first": "def country_series(agg: pd.DataFrame, country: str = C.COUNTRY) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "overview-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Overview",
+      "summary": "Shows the latest complete week as metrics, weekly positivity with a 95% band above the specimens processed, and an annual positivity table.",
+      "views": [
+        "summary stats",
+        "line chart",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 58,
+          "end": 77,
+          "role": "markup",
+          "anchor": "593f8f52c553",
+          "first": "with tab_ov:"
+        },
+        {
+          "file": "code/src/pathogenwatch/epi.py",
+          "start": 20,
+          "end": 28,
+          "role": "logic",
+          "symbol": "weekly_table",
+          "anchor": "492f807cc880",
+          "first": "def weekly_table(s: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/pathogenwatch/epi.py",
+          "start": 31,
+          "end": 48,
+          "role": "logic",
+          "symbol": "annual_table",
+          "anchor": "2422631cf68d",
+          "first": "def annual_table(s: pd.DataFrame) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/pathogenwatch/epi.py",
+          "start": 10,
+          "end": 17,
+          "role": "logic",
+          "symbol": "wilson",
+          "anchor": "90aadd78d1ec",
+          "first": "def wilson(pos, n, alpha=0.05):"
+        }
+      ]
+    },
+    {
+      "id": "seasonality-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Seasonality",
+      "summary": "Splits the series into trend, seasonal and residual panels, reports seasonality tests, and lists each year's peak week.",
+      "views": [
+        "line chart",
+        "small multiples",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 79,
+          "end": 93,
+          "role": "markup",
+          "anchor": "4b15f47f7d2c",
+          "first": "with tab_se:"
+        },
+        {
+          "file": "code/src/pathogenwatch/seasonality.py",
+          "start": 66,
+          "end": 74,
+          "role": "logic",
+          "symbol": "stl_decompose",
+          "anchor": "b63b34aac017",
+          "first": "def stl_decompose(s: pd.DataFrame):"
+        },
+        {
+          "file": "code/src/pathogenwatch/seasonality.py",
+          "start": 51,
+          "end": 63,
+          "role": "logic",
+          "symbol": "harmonic_lr_test",
+          "anchor": "1e89014379aa",
+          "first": "def harmonic_lr_test(s: pd.DataFrame, k: int = 2) -> dict:"
+        },
+        {
+          "file": "code/src/pathogenwatch/seasonality.py",
+          "start": 77,
+          "end": 83,
+          "role": "logic",
+          "symbol": "month_effect",
+          "anchor": "d49b3de278ff",
+          "first": "def month_effect(s: pd.DataFrame) -> dict:"
+        },
+        {
+          "file": "code/src/pathogenwatch/seasonality.py",
+          "start": 86,
+          "end": 96,
+          "role": "logic",
+          "symbol": "peak_weeks",
+          "anchor": "bf74874b72f3",
+          "first": "def peak_weeks(s: pd.DataFrame) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "anomaly-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Anomaly detection",
+      "summary": "Overlays the alert weeks from chosen detectors on the positivity line, with an optional custom threshold and alert counts for the period.",
+      "views": [
+        "line chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "multi-select",
+        "toggle view",
+        "score",
+        "hover for detail"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 95,
+          "end": 113,
+          "role": "markup",
+          "anchor": "cd8820fbfcdb",
+          "first": "with tab_an:"
+        },
+        {
+          "file": "code/src/pathogenwatch/anomaly.py",
+          "start": 100,
+          "end": 107,
+          "role": "logic",
+          "symbol": "run_all",
+          "anchor": "744ebf62cb87",
+          "first": "def run_all(s: pd.DataFrame) -> dict:"
+        },
+        {
+          "file": "code/src/pathogenwatch/anomaly.py",
+          "start": 21,
+          "end": 47,
+          "role": "logic",
+          "symbol": "ears",
+          "anchor": "acc469939316",
+          "first": "def ears(s: pd.DataFrame, method: str = \"C2\", k: float = C.EARS_K,"
+        },
+        {
+          "file": "code/src/pathogenwatch/anomaly.py",
+          "start": 73,
+          "end": 97,
+          "role": "logic",
+          "symbol": "cusum_seasonal",
+          "anchor": "22ec743fcb20",
+          "first": "def cusum_seasonal(s: pd.DataFrame, k: float = C.CUSUM_K, h: float = C.CUSUM_H,"
+        }
+      ]
+    },
+    {
+      "id": "evaluation-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Detector evaluation",
+      "summary": "Shows detector sensitivity, delay and false-alert rates against proxy episodes and a simulation, or the proxy episodes for any other country.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 34,
+          "end": 36,
+          "role": "logic",
+          "symbol": "table",
+          "anchor": "5382794e7712",
+          "first": "def table(name):"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 115,
+          "end": 128,
+          "role": "markup",
+          "anchor": "fc8436301486",
+          "first": "with tab_ev:"
+        },
+        {
+          "file": "code/src/pathogenwatch/evaluation.py",
+          "start": 21,
+          "end": 52,
+          "role": "logic",
+          "symbol": "reference_episodes",
+          "anchor": "65a417f63e6e",
+          "first": "def reference_episodes(s: pd.DataFrame, q: float = 0.75, min_len: int = 3, merge_gap: int = 2) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/reports/tables/eval_real_proxy.csv",
+          "start": 1,
+          "end": 5,
+          "role": "data",
+          "anchor": "4ea39a8c3892",
+          "first": "detector,episodes_evaluated,episodes_detected_by_peak,sensitivity,median_delay_weeks_from_onset,mean_delay_weeks,total_a"
+        }
+      ]
+    },
+    {
+      "id": "forecast-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Forecast benchmark",
+      "summary": "Fits a one-week-ahead Random Forest on a chronological holdout and compares its predictions and error metrics with a last-week baseline.",
+      "views": [
+        "line chart",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 131,
+          "end": 200,
+          "role": "markup",
+          "anchor": "6be497516058",
+          "first": "with tab_ml:"
+        },
+        {
+          "file": "code/src/pathogenwatch/modeling.py",
+          "start": 54,
+          "end": 58,
+          "role": "logic",
+          "symbol": "evaluate_forecast",
+          "anchor": "f6f4c081e922",
+          "first": "def evaluate_forecast("
+        },
+        {
+          "file": "code/src/pathogenwatch/modeling.py",
+          "start": 15,
+          "end": 51,
+          "role": "logic",
+          "symbol": "build_forecasting_frame",
+          "anchor": "85910eb31f7e",
+          "first": "def build_forecasting_frame(series: pd.DataFrame, target: str = \"INF_ALL\") -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "quality-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Data quality",
+      "summary": "Shows the generated audit of duplicates, source policy, missingness and consistency checks behind the cleaned series.",
+      "views": [
+        "document reader"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 203,
+          "end": 208,
+          "role": "markup",
+          "anchor": "adae3dc712c9",
+          "first": "with tab_dq:"
+        },
+        {
+          "file": "code/src/pathogenwatch/reporting.py",
+          "start": 97,
+          "end": 140,
+          "role": "logic",
+          "symbol": "write_dq_report",
+          "anchor": "90c791a1650c",
+          "first": "def write_dq_report(ctx):"
+        },
+        {
+          "file": "code/src/pathogenwatch/quality.py",
+          "start": 58,
+          "end": 87,
+          "role": "logic",
+          "symbol": "consistency_checks",
+          "anchor": "01e2d6cfe760",
+          "first": "def consistency_checks(df: pd.DataFrame) -> pd.DataFrame:"
+        }
+      ]
+    }
+  ]
+}

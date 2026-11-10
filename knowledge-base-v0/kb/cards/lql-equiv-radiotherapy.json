@@ -1,0 +1,403 @@
+{
+  "schema": "astaui.card/1",
+  "id": "lql-equiv-radiotherapy",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T18:04:28Z"
+  },
+  "app": {
+    "title": "LQL-Equiv 3.0 — Equivalent doses in radiotherapy",
+    "summary": "A person picks an organ at risk and a tumour site from a built-in parameter library, sets the reference fraction size and model options, and enters one or more successive treatment courses as dose per fraction, number of fractions and the gap before each course. The interface computes equivalent doses for both tissues, complication and control probabilities, and a per-course table. It can also show a range for each result when the α/β ratio is varied. The person then varies the last course along a curve, or checks which fraction size best spares one tissue while holding the effect on the other fixed. Finally they save named scenarios to a comparison table and download it as CSV or JSON.",
+    "task": {
+      "text": "Convert treatment schedules into biologically equivalent doses for a target and an organ at risk, so schedules with different fractionation can be compared and the alternatives exported.",
+      "verbs": [
+        "derive",
+        "compare",
+        "plan",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A prescription made of successive courses, each with a dose per fraction, a fraction count and a preceding gap, evaluated against a fixed library of tissue parameters; the computed results are tables of doses and probabilities.",
+      "item": "a treatment schedule (one or more courses) evaluated for one organ and one target tissue",
+      "shapes": [
+        "table",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "designing and comparing fractionation schedules before a protocol is settled",
+      "terms": [
+        "plan",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar choices and course inputs feed one model computation that fills summary metrics and a per-course table. Tabs then sweep the last course to draw isoeffect curves with optional α/β uncertainty bands, plot a therapeutic window that holds one tissue's effect fixed and highlights the best fraction size, and gather saved scenarios into a table for export.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view",
+        "line chart",
+        "scatter plot",
+        "sidebar list"
+      ],
+      "interactions": [
+        "select",
+        "inline edit",
+        "toggle view",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "biologically equivalent dose modelling (linear-quadratic-linear) in radiation oncology",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "radiobiology",
+        "radiation oncology",
+        "fractionation"
+      ]
+    },
+    "workflow": {
+      "name": "compute model outputs for alternative input scenarios and compare them",
+      "steps": [
+        {
+          "step": "choose the model and its parameters",
+          "here": "Select an organ at risk and a tumour site from the tissue library, then set the reference dose per fraction, two fractions a day, the TCP sigmoid (logistic or Poisson) and slider or typed entry; the tabulated parameters and their models can be expanded",
+          "parts": [
+            "settings-sidebar"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "Set the number of successive courses; each course takes a dose per fraction, a fraction count and the treatment days missed before it, and shows its total physical dose",
+          "parts": [
+            "course-inputs"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Metrics show the equivalent dose for the organ and the target, NTCP and TCP, with a per-course table of overall time, BED and EQD. An optional α/β ±% spread adds a range",
+          "parts": [
+            "results-panel",
+            "settings-sidebar"
+          ]
+        },
+        {
+          "step": "vary one input and see how the result responds",
+          "here": "Isoeffect tab sweeps the last course's fraction count or dose per fraction and draws the cumulative equivalent dose for both tissues, with the entered schedule marked and optional α/β bands",
+          "parts": [
+            "isoeffect-chart"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Therapeutic-window tab holds the target (or organ) effect fixed, solves whole-fraction schedules at each fraction size, and plots the other tissue's dose with α/β bars. The best point is named only when its uncertainty clears all the others",
+          "parts": [
+            "therapeutic-window"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Save the current schedule as a named scenario into a session table of doses, NTCP and TCP, then download it as CSV or JSON or clear it",
+          "parts": [
+            "scenarios"
+          ]
+        }
+      ],
+      "distinctive": [
+        "two tissues are evaluated together, the tumour and an organ at risk, each with its own proliferation model",
+        "successive courses are added up in order, each with its own gap, and only the last course is varied, because the earlier ones count as already delivered",
+        "parameter uncertainty is shown as a band from varying α/β by a chosen percentage, and a 'best' schedule is claimed only when its band clears every other",
+        "results past the model's range are flagged as bounds rather than solutions, and invalid combinations are reported as not computable"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "settings-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Tissues, reference and model settings",
+      "summary": "Picks the organ at risk and tumour from the library, sets the reference fractionation, model choices and α/β sensitivity, and shows the parameter table with its provenance.",
+      "views": [
+        "sidebar list",
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 340,
+          "end": 437,
+          "role": "markup",
+          "anchor": "cfd38fa1f1de",
+          "first": "# ---------------------------------------------------------------- sidebar"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 226,
+          "end": 246,
+          "role": "logic",
+          "symbol": "_alpha_beta_band",
+          "anchor": "d717680e04d2",
+          "first": "def _alpha_beta_band(oar, tum, prescription, options, library, spread: float):"
+        },
+        {
+          "file": "code/src/lqlequiv/tissues.py",
+          "start": 170,
+          "end": 183,
+          "role": "data",
+          "symbol": "load_library",
+          "anchor": "b9b84158b9f9",
+          "first": "def load_library() -> Library:"
+        }
+      ]
+    },
+    {
+      "id": "course-inputs",
+      "level": "component",
+      "parent": "main-panel",
+      "title": "Treatment courses",
+      "summary": "Lets the person set how many successive courses there are and enter each one's dose per fraction, fraction count and preceding gap.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 439,
+          "end": 462,
+          "role": "markup",
+          "anchor": "608e1d782c86",
+          "first": "# ----------------------------------------------------------------- inputs"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 172,
+          "end": 189,
+          "role": "logic",
+          "symbol": "_course_inputs",
+          "anchor": "784867b698ee",
+          "first": "def _course_inputs(position: int, use_sliders: bool) -> Course:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 161,
+          "end": 169,
+          "role": "logic",
+          "symbol": "_value_input",
+          "anchor": "dc42d4d15fa1",
+          "first": "def _value_input(label: str, key: str, low: float, high: float, step: float,"
+        }
+      ]
+    },
+    {
+      "id": "results-panel",
+      "level": "component",
+      "parent": "main-panel",
+      "title": "Results",
+      "summary": "Shows the equivalent doses, NTCP and TCP as metrics, warnings for saturated or not-computable cases, the α/β range, and a per-course BED/EQD table.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 464,
+          "end": 557,
+          "role": "markup",
+          "anchor": "eeb2ca62a5dc",
+          "first": "# ---------------------------------------------------------------- results"
+        },
+        {
+          "file": "code/src/lqlequiv/model.py",
+          "start": 497,
+          "end": 502,
+          "role": "logic",
+          "symbol": "compute",
+          "anchor": "98522b486cda",
+          "first": "def compute("
+        }
+      ]
+    },
+    {
+      "id": "isoeffect-chart",
+      "level": "component",
+      "parent": "main-panel",
+      "title": "Isoeffect curves",
+      "summary": "Sweeps the last course's fraction count or fraction size and draws the cumulative equivalent dose for both tissues, marking the entered schedule and optional α/β bands.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 559,
+          "end": 675,
+          "role": "logic",
+          "anchor": "9d6be49629b6",
+          "first": "# ------------------------------------------------------------------ tabs"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 192,
+          "end": 199,
+          "role": "logic",
+          "symbol": "_vertical_axis",
+          "anchor": "6c26657778a7",
+          "first": "def _vertical_axis(title: str):"
+        }
+      ]
+    },
+    {
+      "id": "therapeutic-window",
+      "level": "component",
+      "parent": "main-panel",
+      "title": "Therapeutic window",
+      "summary": "Holds one tissue's effect constant, finds whole-fraction schedules at each fraction size, plots the other tissue's dose with uncertainty bars and transition-dose lines, and names a best schedule only when it is resolved.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 677,
+          "end": 795,
+          "role": "logic",
+          "anchor": "5c75072f50a8",
+          "first": "with window_tab:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 272,
+          "end": 274,
+          "role": "logic",
+          "symbol": "_fractions_matching",
+          "anchor": "48705b9d56cc",
+          "first": "def _fractions_matching("
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 265,
+          "end": 269,
+          "role": "logic",
+          "symbol": "_swap_last_course",
+          "anchor": "a50f7199afe8",
+          "first": "def _swap_last_course(courses, dose: float, count: float):"
+        }
+      ]
+    },
+    {
+      "id": "scenarios",
+      "level": "component",
+      "parent": "main-panel",
+      "title": "Scenarios",
+      "summary": "Saves the current schedule and its results under a name into a comparison table, which can be downloaded as CSV or JSON or cleared.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 797,
+          "end": 827,
+          "role": "logic",
+          "anchor": "b255631ecc64",
+          "first": "with scenario_tab:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 249,
+          "end": 262,
+          "role": "logic",
+          "symbol": "_schedule_label",
+          "anchor": "466ae20d1557",
+          "first": "def _schedule_label(prescription: Prescription) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "main-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Main panel",
+      "summary": "Holds the course inputs, the results and the tabs for curves, therapeutic window, scenarios and background information.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 312,
+          "end": 938,
+          "role": "markup",
+          "symbol": "main",
+          "anchor": "494280698d09",
+          "first": "def main() -> None:"
+        },
+        {
+          "file": "code/app/streamlit_app.py",
+          "start": 136,
+          "end": 158,
+          "role": "style",
+          "anchor": "c193b3d89d2b",
+          "first": "STYLE = \"\"\""
+        }
+      ]
+    }
+  ]
+}

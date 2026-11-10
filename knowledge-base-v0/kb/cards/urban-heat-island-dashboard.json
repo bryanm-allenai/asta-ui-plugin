@@ -1,0 +1,846 @@
+{
+  "schema": "astaui.card/1",
+  "id": "urban-heat-island-dashboard",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T03:34:22Z"
+  },
+  "app": {
+    "title": "Heatwise — Urban Heat Mitigation dashboard",
+    "summary": "A person opens a city's grid of surface temperature cells, or drops in a grid they built, and sees it as a continuous thermal surface on a map. They narrow the scope by priority tier or by dragging a box over an area. Then they set a budget and switch types of measure on or off, and the interface fills the budget with eligible cells in a fixed priority order. A divider on the map shows the current and the projected surface side by side, charts show the plan against the current state, and clicking a cell explains why it is or is not funded. The result is a costed, budget-capped plan of where to intervene, which can be exported as a printable report.",
+    "task": {
+      "text": "Decide which grid cells of a city to fund for cooling measures under a fixed budget, and see what the plan costs and how much cooling it is projected to give.",
+      "verbs": [
+        "decide",
+        "plan",
+        "derive",
+        "compare",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A regular spatial grid over a study area. Each cell carries a satellite-derived surface temperature, vegetation and built-up indices, a land-cover class, a heat-priority tier, an assigned measure with its estimated cost and assumed cooling, an exclusion reason, and a precomputed funding rank.",
+      "item": "a grid cell of roughly 100 m with its temperature, land cover and costed recommended measure",
+      "shapes": [
+        "geospatial",
+        "field",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "choosing where to spend a cooling budget after the heat mapping and rule-based recommendations are done, before writing up the plan",
+      "terms": [
+        "decide"
+      ]
+    },
+    "mechanism": {
+      "text": "Every change to the scope (priority tier, a box drawn on the map), the budget or the enabled measures re-runs one greedy fill in the precomputed rank order. The map surfaces, the plan panel, the metrics strip and the charts all read that one shared result. A draggable divider splits the map into the current and the projected surface, and clicking a cell opens an inspector explaining its drivers and its funding status.",
+      "views": [
+        "map",
+        "summary stats",
+        "detail panel",
+        "bar chart",
+        "scatter plot",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "brush",
+        "select",
+        "zoom and pan",
+        "search",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "linked views",
+        "overview and detail",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "satellite land-surface-temperature mapping for urban heat mitigation planning",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "remote sensing",
+        "urban planning",
+        "land surface temperature"
+      ]
+    },
+    "workflow": {
+      "name": "allocate a fixed budget across ranked candidate sites and report the plan",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pick a prebuilt city from the dropdown, or load or drag in a grid.geojson file, which is read in the browser; a Data menu downloads the city's files",
+          "parts": [
+            "app-bar"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "The grid is drawn as a smoothed thermal surface or as cells, with layers for temperature, interventions, priority and labels, a legend and a key-metrics strip",
+          "parts": [
+            "map-region",
+            "analytics"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "All / High / Medium / Low priority buttons, plus 'Select area' to drag a box on the map that narrows the scope; 'Clear area' resets it",
+          "parts": [
+            "scope-bar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "A budget slider and presets (₹10–100 Cr) re-run a greedy fill of eligible cells in the precomputed rank order; checkboxes include or drop each measure type; the panel shows sites funded, cost, committed and unspent, and projected mean cooling",
+          "parts": [
+            "budget-control",
+            "intervention-list",
+            "plan-panel"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Dragging a divider across the map shows the current surface on one side and the post-plan surface on the other; charts set the temperature distribution before and after against each other, with vegetation against temperature and cooling per crore",
+          "parts": [
+            "map-region",
+            "analytics"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Clicking a cell opens an inspector with its place name, its temperature drivers, a 'why' text, and its recommended measure marked funded or excluded with the reason",
+          "parts": [
+            "inspector"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Export report' opens a printable plan with the scope, the budget, a table of measures, the projected impact, a snapshot of the map surface, the method and the caveats",
+          "parts": [
+            "app-bar"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The funding order is a rank computed upstream (cooling per rupee, then temperature) and carried in the data, so any filtered plan keeps the same relative order; the greedy fill skips cells that do not fit and keeps filling.",
+        "Which measure a cell can receive depends on its land cover (water and wetland are never touched, built-up cells get roof measures only), and cells left out carry an explicit reason that the inspector shows.",
+        "A swipe divider sets the current surface against the projected one on the same map, and a click inspects the cell on whichever side the person is looking at.",
+        "Budget presets frame 'what would more money buy' scenarios, with a committed/unspent bar against the cost of treating every eligible cell.",
+        "Cooling figures are labelled as planning assumptions throughout, and rupee figures carry a cost-basis banner for cities where the rates do not apply."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "app-bar",
+      "level": "view",
+      "parent": null,
+      "title": "City loader and report export",
+      "summary": "Chooses or loads the city grid to work on, offers its data files for download, and exports the current plan as a printable report.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/index.html",
+          "start": 25,
+          "end": 74,
+          "role": "markup",
+          "symbol": "header.appbar",
+          "anchor": "cccf8c4f0e56",
+          "first": "<header class=\"appbar\">"
+        },
+        {
+          "file": "code/frontend/index.html",
+          "start": 182,
+          "end": 188,
+          "role": "markup",
+          "symbol": "#drop-overlay",
+          "anchor": "a2581f2e62a5",
+          "first": "<div id=\"drop-overlay\" class=\"drop-overlay\" hidden>"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 89,
+          "end": 98,
+          "role": "style",
+          "symbol": ".appbar",
+          "anchor": "76b1c441d328",
+          "first": ".appbar {"
+        },
+        {
+          "file": "code/frontend/js/cityPicker.js",
+          "start": 249,
+          "end": 274,
+          "role": "logic",
+          "symbol": "setupCityPicker",
+          "anchor": "4a93b891112a",
+          "first": "function setupCityPicker(cities) {"
+        },
+        {
+          "file": "code/frontend/js/cityPicker.js",
+          "start": 190,
+          "end": 228,
+          "role": "logic",
+          "symbol": "readCityFile",
+          "anchor": "047f8e7a20f5",
+          "first": "function readCityFile(file) {"
+        },
+        {
+          "file": "code/frontend/js/cityPicker.js",
+          "start": 355,
+          "end": 414,
+          "role": "logic",
+          "symbol": "setupDropZone",
+          "anchor": "ce3a0c657b1e",
+          "first": "function setupDropZone() {"
+        },
+        {
+          "file": "code/frontend/js/cityPicker.js",
+          "start": 303,
+          "end": 322,
+          "role": "logic",
+          "symbol": "setupDownloadMenu",
+          "anchor": "67b66c4a2c23",
+          "first": "function setupDownloadMenu() {"
+        },
+        {
+          "file": "code/frontend/js/report.js",
+          "start": 168,
+          "end": 181,
+          "role": "logic",
+          "symbol": "exportReport",
+          "anchor": "5bf2d946f20d",
+          "first": "function exportReport() {"
+        },
+        {
+          "file": "code/frontend/js/report.js",
+          "start": 68,
+          "end": 215,
+          "role": "logic",
+          "symbol": "reportHtml",
+          "anchor": "4a0b597416d4",
+          "first": "function reportHtml() {"
+        }
+      ]
+    },
+    {
+      "id": "map-region",
+      "level": "view",
+      "parent": null,
+      "title": "Thermal map with current/mitigation divider",
+      "summary": "Draws the grid as a continuous temperature surface with switchable layers, and a draggable divider shows the current and the projected surface side by side.",
+      "views": [
+        "map"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "select",
+        "toggle view",
+        "search"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/index.html",
+          "start": 79,
+          "end": 108,
+          "role": "markup",
+          "symbol": "#map-region",
+          "anchor": "c959018cab67",
+          "first": "<section class=\"map-region\" id=\"map-region\">"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 167,
+          "end": 167,
+          "role": "style",
+          "symbol": ".map-region",
+          "anchor": "25dc0e280f73",
+          "first": ".map-region { position: relative; min-width: 0; background: var(--bg); }"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 273,
+          "end": 277,
+          "role": "style",
+          "symbol": ".compare-handle",
+          "anchor": "564b377274d8",
+          "first": ".compare-handle {"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 212,
+          "end": 217,
+          "role": "style",
+          "symbol": "#layer-control",
+          "anchor": "5a3cd8c1a360",
+          "first": "#layer-control {"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 236,
+          "end": 241,
+          "role": "style",
+          "symbol": "#legend",
+          "anchor": "0801fb5dd6bf",
+          "first": "#legend {"
+        },
+        {
+          "file": "code/frontend/js/mapView.js",
+          "start": 43,
+          "end": 65,
+          "role": "logic",
+          "symbol": "initMap",
+          "anchor": "693fbaffe3d8",
+          "first": "function initMap(containerId, center) {"
+        },
+        {
+          "file": "code/frontend/js/mapView.js",
+          "start": 69,
+          "end": 76,
+          "role": "logic",
+          "symbol": "initSurfaces",
+          "anchor": "274c53d72823",
+          "first": "function initSurfaces(cells) {"
+        },
+        {
+          "file": "code/frontend/js/mapView.js",
+          "start": 107,
+          "end": 128,
+          "role": "logic",
+          "symbol": "renderSurfaces",
+          "anchor": "75c8e5b7eea3",
+          "first": "function renderSurfaces() {"
+        },
+        {
+          "file": "code/frontend/js/mapView.js",
+          "start": 287,
+          "end": 326,
+          "role": "logic",
+          "symbol": "initCompareControl",
+          "anchor": "154b9b98909d",
+          "first": "function initCompareControl(handleId, mapId) {"
+        },
+        {
+          "file": "code/frontend/js/mapView.js",
+          "start": 84,
+          "end": 104,
+          "role": "logic",
+          "symbol": "applyCompareClip",
+          "anchor": "f2a151374454",
+          "first": "function applyCompareClip() {"
+        },
+        {
+          "file": "code/frontend/js/mapView.js",
+          "start": 252,
+          "end": 283,
+          "role": "logic",
+          "symbol": "renderLayerControl",
+          "anchor": "55b5d664ef72",
+          "first": "function renderLayerControl(containerId) {"
+        },
+        {
+          "file": "code/frontend/js/mapView.js",
+          "start": 211,
+          "end": 242,
+          "role": "logic",
+          "symbol": "renderLegend",
+          "anchor": "f58e8e8d4c2c",
+          "first": "function renderLegend(containerId) {"
+        },
+        {
+          "file": "code/frontend/js/heatField.js",
+          "start": 345,
+          "end": 347,
+          "role": "logic",
+          "symbol": "heatField",
+          "anchor": "b5ccd055dd6b",
+          "first": "function heatField(cells, options) {"
+        },
+        {
+          "file": "code/frontend/js/main.js",
+          "start": 120,
+          "end": 145,
+          "role": "logic",
+          "symbol": "setupMapInteraction",
+          "anchor": "18a7040e4bce",
+          "first": "function setupMapInteraction() {"
+        }
+      ]
+    },
+    {
+      "id": "scope-bar",
+      "level": "component",
+      "parent": "map-region",
+      "title": "Priority filter and area selection",
+      "summary": "Narrows the cells under consideration to a priority tier and to a box dragged on the map, and labels the current scope.",
+      "views": [],
+      "interactions": [
+        "filter",
+        "brush"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/index.html",
+          "start": 83,
+          "end": 92,
+          "role": "markup",
+          "symbol": "#scope-bar",
+          "anchor": "00030dfbca17",
+          "first": "<div class=\"chip-row\" id=\"scope-bar\">"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 193,
+          "end": 199,
+          "role": "style",
+          "symbol": ".seg",
+          "anchor": "dff5642d0bcd",
+          "first": ".seg {"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 292,
+          "end": 297,
+          "role": "style",
+          "symbol": ".sel-band",
+          "anchor": "82663674d432",
+          "first": ".sel-band {"
+        },
+        {
+          "file": "code/frontend/js/planner.js",
+          "start": 194,
+          "end": 200,
+          "role": "logic",
+          "symbol": "setupScopeControls",
+          "anchor": "b087034c6d60",
+          "first": "function setupScopeControls() {"
+        },
+        {
+          "file": "code/frontend/js/planner.js",
+          "start": 177,
+          "end": 192,
+          "role": "logic",
+          "symbol": "renderScope",
+          "anchor": "7b66c483dab1",
+          "first": "function renderScope() {"
+        },
+        {
+          "file": "code/frontend/js/main.js",
+          "start": 147,
+          "end": 170,
+          "role": "logic",
+          "symbol": "setupSelector",
+          "anchor": "2b5654a5a9e0",
+          "first": "function setupSelector() {"
+        },
+        {
+          "file": "code/frontend/js/selection.js",
+          "start": 4,
+          "end": 117,
+          "role": "logic",
+          "symbol": "createAreaSelector",
+          "anchor": "5b097ba102af",
+          "first": "function createAreaSelector(map, paneEl, callbacks) {"
+        },
+        {
+          "file": "code/frontend/js/state.js",
+          "start": 74,
+          "end": 79,
+          "role": "logic",
+          "symbol": "recomputeScope",
+          "anchor": "7c4b09455b3c",
+          "first": "function recomputeScope() {"
+        }
+      ]
+    },
+    {
+      "id": "plan-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Mitigation plan panel",
+      "summary": "Holds the budget and the measure controls and shows what the plan funds, what it costs and the projected mean cooling against the current state.",
+      "views": [
+        "summary stats",
+        "form"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/index.html",
+          "start": 110,
+          "end": 133,
+          "role": "markup",
+          "symbol": "#plan-panel",
+          "anchor": "3a1380c4a76e",
+          "first": "<aside class=\"plan-panel\" id=\"plan-panel\">"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 300,
+          "end": 306,
+          "role": "style",
+          "symbol": ".plan-panel",
+          "anchor": "adf41be00f9a",
+          "first": ".plan-panel {"
+        },
+        {
+          "file": "code/frontend/js/planner.js",
+          "start": 10,
+          "end": 15,
+          "role": "logic",
+          "symbol": "renderPlanner",
+          "anchor": "29756765c8a3",
+          "first": "function renderPlanner() {"
+        },
+        {
+          "file": "code/frontend/js/planner.js",
+          "start": 133,
+          "end": 147,
+          "role": "logic",
+          "symbol": "renderPlanResult",
+          "anchor": "3d053dbed138",
+          "first": "function renderPlanResult() {"
+        },
+        {
+          "file": "code/frontend/js/planner.js",
+          "start": 151,
+          "end": 200,
+          "role": "logic",
+          "symbol": "renderDecisionSummary",
+          "anchor": "34782547f955",
+          "first": "function renderDecisionSummary() {"
+        },
+        {
+          "file": "code/frontend/js/state.js",
+          "start": 155,
+          "end": 160,
+          "role": "logic",
+          "symbol": "refresh",
+          "anchor": "47e7746de867",
+          "first": "function refresh(reason) {"
+        }
+      ]
+    },
+    {
+      "id": "budget-control",
+      "level": "component",
+      "parent": "plan-panel",
+      "title": "Budget slider and presets",
+      "summary": "Sets the available budget by slider or preset and re-runs the greedy fill of eligible cells in rank order, showing committed and unspent amounts.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/index.html",
+          "start": 116,
+          "end": 116,
+          "role": "markup",
+          "symbol": "#budget-control",
+          "anchor": "83d96b83c521",
+          "first": "<div id=\"budget-control\" class=\"budget\"></div>"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 317,
+          "end": 317,
+          "role": "style",
+          "symbol": ".budget",
+          "anchor": "b6a76315266b",
+          "first": ".budget { margin-top: 12px; }"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 329,
+          "end": 335,
+          "role": "style",
+          "symbol": ".preset-row button",
+          "anchor": "7c1db990445a",
+          "first": ".preset-row button {"
+        },
+        {
+          "file": "code/frontend/js/planner.js",
+          "start": 19,
+          "end": 74,
+          "role": "logic",
+          "symbol": "renderBudget",
+          "anchor": "0162b96d5865",
+          "first": "function renderBudget() {"
+        },
+        {
+          "file": "code/frontend/js/state.js",
+          "start": 101,
+          "end": 119,
+          "role": "logic",
+          "symbol": "optimisePlan",
+          "anchor": "ed6c33847123",
+          "first": "function optimisePlan() {"
+        },
+        {
+          "file": "code/frontend/js/state.js",
+          "start": 174,
+          "end": 177,
+          "role": "logic",
+          "symbol": "setBudget",
+          "anchor": "63ef6ad8fd8b",
+          "first": "function setBudget(rupees) {"
+        },
+        {
+          "file": "code/frontend/js/state.js",
+          "start": 53,
+          "end": 58,
+          "role": "data",
+          "symbol": "BUDGET_PRESETS",
+          "anchor": "81150a804e99",
+          "first": "const BUDGET_PRESETS = ["
+        }
+      ]
+    },
+    {
+      "id": "intervention-list",
+      "level": "component",
+      "parent": "plan-panel",
+      "title": "Measures list",
+      "summary": "Lists each type of measure with how many of its eligible sites are funded, their cost and cooling, and a checkbox to include or drop it from the plan.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/frontend/index.html",
+          "start": 121,
+          "end": 121,
+          "role": "markup",
+          "symbol": "#intervention-list",
+          "anchor": "fea12128ccbc",
+          "first": "<ul id=\"intervention-list\" class=\"iv-list\"></ul>"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 341,
+          "end": 348,
+          "role": "style",
+          "symbol": ".iv",
+          "anchor": "28e6ba0e650c",
+          "first": ".iv {"
+        },
+        {
+          "file": "code/frontend/js/planner.js",
+          "start": 78,
+          "end": 129,
+          "role": "logic",
+          "symbol": "renderInterventions",
+          "anchor": "2579d624e6ae",
+          "first": "function renderInterventions() {"
+        },
+        {
+          "file": "code/frontend/js/state.js",
+          "start": 179,
+          "end": 182,
+          "role": "logic",
+          "symbol": "toggleIntervention",
+          "anchor": "002b9c3424ee",
+          "first": "function toggleIntervention(action, on) {"
+        },
+        {
+          "file": "code/frontend/js/config.js",
+          "start": 76,
+          "end": 123,
+          "role": "data",
+          "symbol": "INTERVENTIONS",
+          "anchor": "1273a5483a92",
+          "first": "const INTERVENTIONS = {"
+        }
+      ]
+    },
+    {
+      "id": "inspector",
+      "level": "view",
+      "parent": null,
+      "title": "Cell inspector",
+      "summary": "For a clicked cell, shows where it is, what drives its temperature, its recommended measure and whether the plan funds it or why it is excluded.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/index.html",
+          "start": 136,
+          "end": 136,
+          "role": "markup",
+          "symbol": "#inspector",
+          "anchor": "56d543fd1d34",
+          "first": "<aside class=\"inspector\" id=\"inspector\" hidden></aside>"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 393,
+          "end": 400,
+          "role": "style",
+          "symbol": ".inspector",
+          "anchor": "81de05306466",
+          "first": ".inspector {"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 422,
+          "end": 422,
+          "role": "style",
+          "symbol": ".rec",
+          "anchor": "8b1bfb20632f",
+          "first": ".rec { margin-top: 4px; padding: 10px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(-"
+        },
+        {
+          "file": "code/frontend/js/inspector.js",
+          "start": 152,
+          "end": 248,
+          "role": "logic",
+          "symbol": "openInspector",
+          "anchor": "bc87ba029a2e",
+          "first": "function openInspector(cell) {"
+        },
+        {
+          "file": "code/frontend/js/inspector.js",
+          "start": 250,
+          "end": 255,
+          "role": "logic",
+          "symbol": "closeInspector",
+          "anchor": "198cfa78840e",
+          "first": "function closeInspector() {"
+        }
+      ]
+    },
+    {
+      "id": "analytics",
+      "level": "view",
+      "parent": null,
+      "title": "Metrics strip and analytics drawer",
+      "summary": "Shows key figures for the current scope and plan, and a drawer of charts: the temperature distribution before and after, vegetation against temperature, and cooling efficiency per crore.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/frontend/index.html",
+          "start": 140,
+          "end": 140,
+          "role": "markup",
+          "symbol": "#metrics-strip",
+          "anchor": "c2cd077e969f",
+          "first": "<section class=\"metrics\" id=\"metrics-strip\" aria-label=\"Key metrics\"></section>"
+        },
+        {
+          "file": "code/frontend/index.html",
+          "start": 143,
+          "end": 165,
+          "role": "markup",
+          "symbol": "#analytics",
+          "anchor": "29b59bb61b88",
+          "first": "<section class=\"drawer\" id=\"analytics\" hidden>"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 452,
+          "end": 459,
+          "role": "style",
+          "symbol": ".metrics",
+          "anchor": "db037750ba47",
+          "first": ".metrics {"
+        },
+        {
+          "file": "code/frontend/style.css",
+          "start": 470,
+          "end": 476,
+          "role": "style",
+          "symbol": ".drawer",
+          "anchor": "d38175759a9c",
+          "first": ".drawer {"
+        },
+        {
+          "file": "code/frontend/js/analytics.js",
+          "start": 35,
+          "end": 54,
+          "role": "logic",
+          "symbol": "renderMetrics",
+          "anchor": "32ee8f3e455c",
+          "first": "function renderMetrics() {"
+        },
+        {
+          "file": "code/frontend/js/analytics.js",
+          "start": 89,
+          "end": 225,
+          "role": "logic",
+          "symbol": "renderCharts",
+          "anchor": "da0e189a2eb7",
+          "first": "function renderCharts() {"
+        },
+        {
+          "file": "code/frontend/js/analytics.js",
+          "start": 227,
+          "end": 235,
+          "role": "logic",
+          "symbol": "renderAnalytics",
+          "anchor": "85b8ae0c5e03",
+          "first": "function renderAnalytics() {"
+        },
+        {
+          "file": "code/frontend/js/main.js",
+          "start": 174,
+          "end": 201,
+          "role": "logic",
+          "symbol": "setupDrawers",
+          "anchor": "ec9da3251406",
+          "first": "function setupDrawers() {"
+        }
+      ]
+    }
+  ]
+}

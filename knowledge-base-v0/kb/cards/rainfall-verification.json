@@ -1,0 +1,656 @@
+{
+  "schema": "astaui.card/1",
+  "id": "rainfall-verification",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T05:06:20Z"
+  },
+  "app": {
+    "title": "Rainfall Verification Dashboard",
+    "summary": "The person points the sidebar at a folder of gridded forecast files and an observation file, picks one or more models, lead times, a rain threshold and a single day or a seasonal date range, then draws a box on the observed map (or types its bounds) and presses Run. Each forecast is regridded onto the observation grid, and the dashboard shows observed and forecast maps, box-mean rainfall against valid date, and a table of categorical and continuous scores per model and lead, plotted against lead time with optional bootstrap confidence intervals. Further panels give per-grid-cell score maps, a Taylor diagram and Q–Q plot, neighbourhood and displacement diagnostics, and probabilistic diagnostics for ensembles. The score tables download as CSV and every figure exports as an image.",
+    "task": {
+      "text": "Score gridded forecasts against gridded observations over a chosen region, threshold and period, so models and lead times can be compared on matched samples.",
+      "verbs": [
+        "derive",
+        "compare",
+        "summarize",
+        "locate"
+      ]
+    },
+    "data": {
+      "text": "Gridded daily fields on a latitude-longitude grid: one observation file with a time axis, and forecast files per model and lead time, either deterministic or with ensemble members stored as separate variables, in NetCDF or GRIB2.",
+      "item": "a forecast field for one model, lead time and valid date, paired with the observed field for that date",
+      "shapes": [
+        "field",
+        "geospatial",
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "verifying model forecasts against observations after the forecasts are archived, before writing them up",
+      "terms": [
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "The sidebar sets the files, models, leads, threshold, period and options, and nothing is recomputed until Run is pressed. A box drawn on the observed heatmap, kept in sync with numeric bounds, sets the scoring region and is drawn as a rectangle on every map panel. Results then appear in a stack of panels: forecast maps with shared zoom and pan, a score table, score-versus-lead plots with confidence bars, score maps per cell, and diagnostic plots, each with a CSV or figure export.",
+      "views": [
+        "heatmap",
+        "map",
+        "small multiples",
+        "line chart",
+        "table view",
+        "bar chart",
+        "scatter plot",
+        "form"
+      ],
+      "interactions": [
+        "brush",
+        "zoom and pan",
+        "select",
+        "multi-select",
+        "time slider",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "small multiples",
+        "dashboard",
+        "side-by-side comparison",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "forecast verification of gridded precipitation in meteorology",
+      "disciplines": [
+        "earth science"
+      ],
+      "terms": [
+        "forecast verification",
+        "meteorology",
+        "ensemble forecasting"
+      ]
+    },
+    "workflow": {
+      "name": "score model outputs against observations and compare models",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "type a models base directory and an observation file path; models are found as sub-folders or filename prefixes, lead times are read from dayN tokens in filenames, and units are read from file attributes or set by hand",
+          "parts": [
+            "run-sidebar"
+          ]
+        },
+        {
+          "step": "choose which models, conditions and period to score",
+          "here": "pick a single model or several to compare, the lead times, ensemble mean or probabilistic verification, a rain threshold in mm, matched samples only, and a Daily date or a Seasonal date-range slider",
+          "parts": [
+            "run-sidebar"
+          ]
+        },
+        {
+          "step": "select a region to score",
+          "here": "drag a box on the observed rainfall map or type lon/lat bounds; the box is drawn in red on every map and applied when Run is pressed",
+          "parts": [
+            "observed-map",
+            "run-sidebar"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run regrids each forecast bilinearly onto the observation grid, sums contingency counts and running sums over the box and dates, and computes POD/FAR/CSI/BIAS/ETS/HSS and extremal scores, ME/MAE/RMSE/CORR, or Brier/BSS/CRPS, with optional date-resampling bootstrap CIs",
+          "parts": [
+            "scores-panel",
+            "run-sidebar"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "forecast maps in a model × lead grid with shared zoom and pan, box-mean rainfall against valid date per model, scores plotted against lead with one line per model, and a Taylor diagram and Q–Q plot",
+          "parts": [
+            "forecast-maps",
+            "observed-map",
+            "scores-panel",
+            "taylor-qq"
+          ]
+        },
+        {
+          "step": "see where in space the result holds",
+          "here": "per-grid-cell maps of a chosen continuous, categorical or probabilistic score for each model and lead; FSS against neighbourhood width and a CRA displacement/volume/pattern breakdown; reliability, ROC, economic value, PIT and spread–skill for ensembles",
+          "parts": [
+            "score-maps",
+            "fss-cra",
+            "prob-diagnostics"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "score and CRA tables download as CSV, every figure exports as PNG/JPEG/SVG/PDF, and each run is appended to an audit log",
+          "parts": [
+            "scores-panel",
+            "fss-cra"
+          ]
+        }
+      ],
+      "distinctive": [
+        "forecasts on any grid are bilinearly regridded onto the observation grid before scoring, so models with different resolutions are scored on the same cells",
+        "a matched-samples option scores every model only on the valid dates all models and the observations share, so the comparison across models is fair",
+        "scores are pooled from summed contingency counts and running sums over dates rather than averaged daily, and the bootstrap resamples whole dates so spatial correlation within a day is kept",
+        "an event is defined by one rain threshold applied as ≥ to both fields, and the same threshold drives the categorical scores, FSS and the event probabilities for Brier score",
+        "nothing recomputes while settings change; one Run button triggers the whole computation, so large gridded archives are read one time-slice at a time"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "run-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Data source and verification settings",
+      "summary": "The sidebar where the person sets the forecast folder, observation file, units, models, leads, threshold, period, optional diagnostics and box bounds, plus the Run button that triggers the computation.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "time slider",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1222,
+          "end": 1243,
+          "role": "markup",
+          "anchor": "7bf59fcabc3b",
+          "first": "def run_app():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 669,
+          "end": 747,
+          "role": "markup",
+          "anchor": "c1994e97b8ff",
+          "first": "def _run_multimodel(st, sb, submitted, ensemble=False, single=False):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 651,
+          "end": 667,
+          "role": "logic",
+          "symbol": "discover_models",
+          "anchor": "c6a767d63eff",
+          "first": "def discover_models(base):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 630,
+          "end": 637,
+          "role": "logic",
+          "symbol": "scan_files",
+          "anchor": "5e2f10238867",
+          "first": "def scan_files(paths):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 171,
+          "end": 178,
+          "role": "logic",
+          "symbol": "file_units",
+          "anchor": "b0ae9d252c07",
+          "first": "def file_units(path):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 185,
+          "end": 190,
+          "role": "logic",
+          "symbol": "catalog",
+          "anchor": "853e71096906",
+          "first": "def catalog(path):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 532,
+          "end": 537,
+          "role": "logic",
+          "symbol": "lead_of",
+          "anchor": "0a0b987b28d7",
+          "first": "def lead_of(path):"
+        }
+      ]
+    },
+    {
+      "id": "observed-map",
+      "level": "view",
+      "parent": null,
+      "title": "Observed rainfall map with box selection",
+      "summary": "A heatmap of observed rainfall with coastlines on which the person drags a box to set the scoring region, shown beside box-mean rainfall against valid date for each model's leads when a season is chosen.",
+      "views": [
+        "heatmap",
+        "map",
+        "line chart"
+      ],
+      "interactions": [
+        "brush",
+        "zoom and pan",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 738,
+          "end": 747,
+          "role": "logic",
+          "anchor": "3164f3c5ce88",
+          "first": "d0=(float(np.floor(olon.min())),float(np.ceil(olon.max())),float(np.floor(olat.min())),float(np.ceil(olat.max())))"
+        },
+        {
+          "file": "code/app.py",
+          "start": 873,
+          "end": 908,
+          "role": "markup",
+          "anchor": "8fd5711aaf44",
+          "first": "US={\"ME\",\"MAE\",\"RMSE\",\"CRPS\"}                 # unit-bearing scores -> scaled to the display unit"
+        },
+        {
+          "file": "code/app.py",
+          "start": 885,
+          "end": 897,
+          "role": "logic",
+          "symbol": "_ts_fig",
+          "anchor": "abbb500325f7",
+          "first": "def _ts_fig(m,h):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 279,
+          "end": 301,
+          "role": "logic",
+          "symbol": "coastlines",
+          "anchor": "26d7ea059fb6",
+          "first": "def coastlines(lon0, lon1, lat0, lat1, res=\"50m\"):"
+        }
+      ]
+    },
+    {
+      "id": "forecast-maps",
+      "level": "view",
+      "parent": null,
+      "title": "Forecast spatial maps",
+      "summary": "A grid of regridded forecast heatmaps with models as rows and chosen leads as columns, with shared zoom and pan and the selection box drawn on each.",
+      "views": [
+        "small multiples",
+        "heatmap",
+        "map"
+      ],
+      "interactions": [
+        "multi-select",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "small multiples",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 917,
+          "end": 937,
+          "role": "markup",
+          "anchor": "03486abce69c",
+          "first": "# ---- forecast spatial maps: rows=models, cols=chosen leads (smooth, regridded, box) ----"
+        },
+        {
+          "file": "code/app.py",
+          "start": 221,
+          "end": 231,
+          "role": "logic",
+          "symbol": "regrid",
+          "anchor": "09d55939b696",
+          "first": "def regrid(flon, flat, fslice, olon, olat):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 573,
+          "end": 592,
+          "role": "logic",
+          "symbol": "fc_read",
+          "anchor": "46ba78218933",
+          "first": "def fc_read(path, tidx=0):"
+        }
+      ]
+    },
+    {
+      "id": "scores-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Verification scores table and score-vs-lead plot",
+      "summary": "Computes and lists every score per model and lead over the box and dates, plots the picked continuous and categorical scores against lead time with optional bootstrap error bars, and exports the table and figure.",
+      "views": [
+        "table view",
+        "line chart",
+        "small multiples"
+      ],
+      "interactions": [
+        "multi-select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 748,
+          "end": 872,
+          "role": "logic",
+          "anchor": "f6259368dde1",
+          "first": "if submitted:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 938,
+          "end": 1012,
+          "role": "markup",
+          "anchor": "569c35751e84",
+          "first": "# ---- verification (scores) ----"
+        },
+        {
+          "file": "code/app.py",
+          "start": 975,
+          "end": 982,
+          "role": "logic",
+          "symbol": "_eb",
+          "anchor": "977ea4592c02",
+          "first": "def _eb(m,leads,scn):                                   # bootstrap error bars for (model, leads, score)"
+        },
+        {
+          "file": "code/app.py",
+          "start": 308,
+          "end": 323,
+          "role": "logic",
+          "symbol": "scores_from_counts",
+          "anchor": "c0a644577aa5",
+          "first": "def scores_from_counts(a, b, c, d):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 303,
+          "end": 306,
+          "role": "logic",
+          "symbol": "counts",
+          "anchor": "fde3f1cdd1d3",
+          "first": "def counts(F, O, thr):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 399,
+          "end": 406,
+          "role": "logic",
+          "symbol": "boot_ci",
+          "anchor": "0a739b73aa89",
+          "first": "def boot_ci(perdate, name, nboot, ci=95, seed=0):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 384,
+          "end": 398,
+          "role": "logic",
+          "symbol": "prob_boot_ci",
+          "anchor": "ab1e31551c25",
+          "first": "def prob_boot_ci(pr, name, nboot, ci=95, seed=0):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 607,
+          "end": 610,
+          "role": "logic",
+          "symbol": "_dl_table",
+          "anchor": "4344b88c6e09",
+          "first": "def _dl_table(st, df, key):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 611,
+          "end": 622,
+          "role": "logic",
+          "symbol": "_export_fig",
+          "anchor": "12abdafa2377",
+          "first": "def _export_fig(st, fig, key):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 43,
+          "end": 57,
+          "role": "logic",
+          "symbol": "audit",
+          "anchor": "b099cbf92381",
+          "first": "def audit(record):"
+        }
+      ]
+    },
+    {
+      "id": "taylor-qq",
+      "level": "view",
+      "parent": null,
+      "title": "Taylor diagram and Q–Q plot",
+      "summary": "Places each model and lead on a Taylor diagram by correlation and normalised standard deviation, and plots forecast against observed quantiles, so models can be compared at a glance.",
+      "views": [
+        "scatter plot",
+        "line chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1013,
+          "end": 1043,
+          "role": "markup",
+          "anchor": "2bc7e197f249",
+          "first": "# ---- Taylor diagram + Q–Q plot (special plots) ----"
+        }
+      ]
+    },
+    {
+      "id": "score-maps",
+      "level": "view",
+      "parent": null,
+      "title": "Score maps per grid cell",
+      "summary": "Maps a chosen continuous, categorical or probabilistic score cell by cell for each model and lead, masking cells with too few samples, so the person sees where a model does well or badly.",
+      "views": [
+        "small multiples",
+        "heatmap",
+        "map"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "toggle view",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1044,
+          "end": 1083,
+          "role": "markup",
+          "anchor": "bd7a4cdd78b9",
+          "first": "# ---- score maps (per grid cell): continuous/categorical (mean) OR BS/BSS/CRPS (probabilistic) ----"
+        },
+        {
+          "file": "code/app.py",
+          "start": 426,
+          "end": 432,
+          "role": "logic",
+          "symbol": "cell_maps",
+          "anchor": "dfc7e67d1b2c",
+          "first": "def cell_maps(acc, minn=3):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 494,
+          "end": 500,
+          "role": "logic",
+          "symbol": "crps_grid",
+          "anchor": "d3ab82a5cd07",
+          "first": "def crps_grid(ens, obs):"
+        }
+      ]
+    },
+    {
+      "id": "fss-cra",
+      "level": "view",
+      "parent": null,
+      "title": "Spatial diagnostics: FSS and CRA",
+      "summary": "For a chosen lead, plots the Fractions Skill Score against neighbourhood width per model, stacks the CRA displacement, volume and pattern error components, and lists CRA statistics in a downloadable table.",
+      "views": [
+        "line chart",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1084,
+          "end": 1123,
+          "role": "markup",
+          "anchor": "3f84f5da3a52",
+          "first": "# ---- spatial diagnostics: FSS + CRA (box, mean forecast) ----"
+        },
+        {
+          "file": "code/app.py",
+          "start": 329,
+          "end": 337,
+          "role": "logic",
+          "symbol": "fss_accum",
+          "anchor": "e02f223049df",
+          "first": "def fss_accum(BF, BO, ns):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 338,
+          "end": 354,
+          "role": "logic",
+          "symbol": "cra_decomp",
+          "anchor": "f5339d4f14a9",
+          "first": "def cra_decomp(F, O, maxs=8, thr=0.1):"
+        }
+      ]
+    },
+    {
+      "id": "prob-diagnostics",
+      "level": "view",
+      "parent": null,
+      "title": "Probabilistic ensemble diagnostics",
+      "summary": "For ensembles scored probabilistically, overlays each model's reliability diagram, ROC curve with AUC, relative economic value, PIT histogram and spread–skill for a chosen lead, with bootstrap bands when enabled.",
+      "views": [
+        "line chart",
+        "bar chart",
+        "small multiples"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1124,
+          "end": 1166,
+          "role": "markup",
+          "anchor": "8aed27829af0",
+          "first": "# ---- probabilistic diagnostics: reliability / ROC / REV / PIT / spread–skill (overlaid per model) ----"
+        },
+        {
+          "file": "code/app.py",
+          "start": 459,
+          "end": 466,
+          "role": "logic",
+          "symbol": "reliability_curve",
+          "anchor": "306578591857",
+          "first": "def reliability_curve(p, obin, nb=10):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 468,
+          "end": 474,
+          "role": "logic",
+          "symbol": "roc_curve",
+          "anchor": "b3c96da02e84",
+          "first": "def roc_curve(p, obin):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 476,
+          "end": 487,
+          "role": "logic",
+          "symbol": "rev_curve",
+          "anchor": "6e328aca2588",
+          "first": "def rev_curve(p, obin, rs):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 489,
+          "end": 493,
+          "role": "logic",
+          "symbol": "pit_values",
+          "anchor": "c7fbc486229e",
+          "first": "def pit_values(ens, obs):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 509,
+          "end": 516,
+          "role": "logic",
+          "symbol": "spread_skill",
+          "anchor": "947b32c1d0a4",
+          "first": "def spread_skill(ens, obs, nbin=8):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 593,
+          "end": 605,
+          "role": "logic",
+          "symbol": "fc_members",
+          "anchor": "64b799443eed",
+          "first": "def fc_members(path, tidx=0):"
+        }
+      ]
+    }
+  ]
+}

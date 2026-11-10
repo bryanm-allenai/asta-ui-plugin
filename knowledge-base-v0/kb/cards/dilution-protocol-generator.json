@@ -1,0 +1,742 @@
+{
+  "schema": "astaui.card/1",
+  "id": "dilution-protocol-generator",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T12:35:46Z"
+  },
+  "app": {
+    "title": "Dilution Protocol Generator",
+    "summary": "The person first sets out a multi-stage dilution protocol as a row of tube cards. Each card gives the fraction of the first stock and the diluent added at that stage. They then enter the compound's molecular weight and solubility, a list of target concentrations, the volume needed per target, a reserve, a minimum pipetting volume and a maximum dilution factor. Generating the protocol works backwards from what each target needs. It calculates a common stock and how much compound to weigh, chains the targets as a serial dilution, and inserts intermediate tubes wherever one step would exceed the maximum factor. The result is a materials list and a step-by-step tube procedure, which can be exported as CSV or PDF. A separate 96-well plate planner lets the person paint wells by group and export the layout with the protocol.",
+    "task": {
+      "text": "Turn a set of target concentrations into a practical bench procedure for preparing them: the stock, how much compound to weigh, every transfer and diluent volume, and a plate layout.",
+      "verbs": [
+        "plan",
+        "derive"
+      ]
+    },
+    "data": {
+      "text": "A small set of user-entered parameters: compound properties, target concentrations, volume rules and the stages of a dilution protocol. From these the tool computes a table of tubes and transfers, and a 96-well plate layout coloured by group.",
+      "item": "a tube in the dilution scheme, with its source, concentration, transfer volume and diluent volume",
+      "shapes": [
+        "table",
+        "per element",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "planning compound dilutions at the bench, before running a plate assay",
+      "terms": [
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "An editable chain of tube cards defines the protocol stages, and parameter forms set the targets and volume limits. Generating the protocol computes volumes backwards from the last stage and draws each target's tubes as filled Eppendorf diagrams beside a transfer table and a materials total. The plate planner beside them is a fixed-layout grid where wells are painted with a chosen group colour.",
+      "views": [
+        "form",
+        "table view",
+        "fixed-layout grid",
+        "summary stats",
+        "list"
+      ],
+      "interactions": [
+        "inline edit",
+        "apply label",
+        "brush",
+        "select",
+        "export",
+        "toggle view"
+      ],
+      "patterns": [
+        "category palette",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "serial dilution and stock preparation for compound-treatment assays in cell and molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "serial dilution",
+        "solution preparation",
+        "96 well plate"
+      ]
+    },
+    "workflow": {
+      "name": "plan the preparation of a set of solutions from targets and constraints",
+      "steps": [
+        {
+          "step": "lay out the stages of the procedure",
+          "here": "Tube cards set each stage's fraction of the first stock and the diluent added; stages can be added or removed, and the carrier solvent named on the first card carries through to the others",
+          "parts": [
+            "protocol-editor"
+          ]
+        },
+        {
+          "step": "enter the properties and limits of the material",
+          "here": "Compound name, molecular weight, solubility in mg/mL or mM and a source note, with an optional fixed stock concentration or volume; the required starting concentration is shown as soon as targets are entered",
+          "parts": [
+            "stock-form"
+          ]
+        },
+        {
+          "step": "set the targets and the practical constraints",
+          "here": "Up to 20 target concentrations with a unit, the usable volume per target, the reserve per tube, the minimum pipetting volume, the maximum dilution factor and an automatic-intermediate switch",
+          "parts": [
+            "targets-form"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Generate checks the inputs against solubility and integer volumes, chains the targets from highest to lowest, works volumes backwards from use plus reserve, and inserts AUTO intermediate tubes wherever a step exceeds the maximum factor",
+          "parts": [
+            "targets-form",
+            "auto-plan-panel",
+            "result"
+          ]
+        },
+        {
+          "step": "review the procedure and the material totals",
+          "here": "A summary of stock volume and compound mass, a materials table, and for each target a row of filled Eppendorf diagrams with a transfer table",
+          "parts": [
+            "result"
+          ]
+        },
+        {
+          "step": "lay out the samples on the plate",
+          "here": "Choose a colour group, then click or drag across wells to paint them; a counter shows how many of the 96 wells are marked",
+          "parts": [
+            "well-planner"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "CSV of every tube, a print/PDF of protocol, materials and procedure with the plate, or only the sections that are ticked",
+          "parts": [
+            "export-controls"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Volumes are computed backwards from final use plus a per-tube reserve, so each upstream tube is prepared with enough to supply everything below it.",
+        "Intermediate dilutions are inserted automatically whenever one transfer would exceed a maximum dilution factor, and transfers are kept above a minimum pipetting volume.",
+        "The common stock concentration is derived from the highest target and the protocol's total dilution, and is checked against the compound's solubility limit.",
+        "Each tube's solvent composition is drawn as a coloured fill in an Eppendorf diagram, so stages that change the carrier fraction are visible."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "protocol-editor",
+      "level": "view",
+      "parent": null,
+      "title": "Protocol stage editor",
+      "summary": "Sets out the dilution stages as a chain of tube cards, each with its fraction of the first stock and its diluent, with stages that can be added or removed.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 159,
+          "end": 174,
+          "role": "markup",
+          "symbol": "#protocolEditorSection",
+          "anchor": "b4ebcb022354",
+          "first": "<section class=\"controls\" id=\"protocolEditorSection\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 26,
+          "end": 26,
+          "role": "style",
+          "symbol": ".protocol-editor",
+          "anchor": "fce8ec441c2e",
+          "first": ".protocol-editor{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}.stage-wrap{display:flex;align-items:center"
+        },
+        {
+          "file": "code/index.html",
+          "start": 49,
+          "end": 49,
+          "role": "style",
+          "symbol": ".stage-card",
+          "anchor": "b99b105037cd",
+          "first": ".stage-card{width:154px;min-height:225px;padding:0 2px 5px}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 51,
+          "end": 51,
+          "role": "style",
+          "symbol": ".stage-connector",
+          "anchor": "457a4f632a3c",
+          "first": ".stage-connector{width:76px}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 50,
+          "end": 50,
+          "role": "style",
+          "symbol": ".tube-viz",
+          "anchor": "02d4da3c0b2e",
+          "first": ".tube-viz{width:92px;height:151px}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 302,
+          "end": 306,
+          "role": "data",
+          "symbol": "initialProtocol",
+          "anchor": "dff1ac154d4d",
+          "first": "const initialProtocol=["
+        },
+        {
+          "file": "code/index.html",
+          "start": 356,
+          "end": 370,
+          "role": "logic",
+          "symbol": "renderProtocolEditor",
+          "anchor": "a9785859a9bd",
+          "first": "function renderProtocolEditor(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 372,
+          "end": 372,
+          "role": "logic",
+          "symbol": "addProtocolStage",
+          "anchor": "b4acc8816466",
+          "first": "function addProtocolStage(){syncProtocolState();const last=protocolState.at(-1),shared=protocolState[0]?.reagent||'DMSO'"
+        },
+        {
+          "file": "code/index.html",
+          "start": 373,
+          "end": 373,
+          "role": "logic",
+          "symbol": "removeProtocolStage",
+          "anchor": "c64cf3596856",
+          "first": "function removeProtocolStage(id){syncProtocolState();if(protocolState.length<=2){alert('至少保留 2 層 protocol。');return;}pro"
+        },
+        {
+          "file": "code/index.html",
+          "start": 374,
+          "end": 382,
+          "role": "logic",
+          "symbol": "onProtocolInput",
+          "anchor": "94203550b2ae",
+          "first": "function onProtocolInput(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 354,
+          "end": 354,
+          "role": "logic",
+          "symbol": "renderTubeLegend",
+          "anchor": "99136ede9ba1",
+          "first": "function renderTubeLegend(p){const box=$('tubeLegend');if(!box)return;const map=tubeComponentMap(p);box.innerHTML='<span"
+        },
+        {
+          "file": "code/index.html",
+          "start": 349,
+          "end": 353,
+          "role": "logic",
+          "symbol": "drawTubeComposition",
+          "anchor": "8b37de97602b",
+          "first": "function drawTubeComposition(canvas,comps,colorMap){"
+        }
+      ]
+    },
+    {
+      "id": "stock-form",
+      "level": "view",
+      "parent": null,
+      "title": "Stock and solubility",
+      "summary": "Takes the compound's molecular weight, solubility and source note and shows the automatically derived stock concentration, with options to fix the stock concentration or volume.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 176,
+          "end": 190,
+          "role": "markup",
+          "symbol": "section.controls:1",
+          "anchor": "d6b941ba96e0",
+          "first": "<section class=\"controls\"><h2>1. 原始 stock 與溶解度</h2><div class=\"grid\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 40,
+          "end": 40,
+          "role": "style",
+          "symbol": ".option-row",
+          "anchor": "c3e9a2b6af38",
+          "first": ".option-row{min-width:0;padding:12px;gap:12px;display:flex;flex-direction:column}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 390,
+          "end": 390,
+          "role": "logic",
+          "symbol": "chooseAutoStock",
+          "anchor": "bc5dec62dfef",
+          "first": "function chooseAutoStock(){const values=list($('targets').value);if(!values.length)return NaN;return Math.max(...values)"
+        },
+        {
+          "file": "code/index.html",
+          "start": 391,
+          "end": 391,
+          "role": "logic",
+          "symbol": "selectedStock",
+          "anchor": "02195087e7e5",
+          "first": "function selectedStock(autoStock){if(!$('fixedStockConcOn').checked)return autoStock;const v=num('fixedStockConc');retur"
+        },
+        {
+          "file": "code/index.html",
+          "start": 392,
+          "end": 399,
+          "role": "logic",
+          "symbol": "refreshDerived",
+          "anchor": "c6a5cb094a9d",
+          "first": "function refreshDerived(){"
+        }
+      ]
+    },
+    {
+      "id": "targets-form",
+      "level": "view",
+      "parent": null,
+      "title": "Targets and intermediate steps",
+      "summary": "Takes the target concentrations and the volume, reserve, minimum-pipetting and maximum-dilution limits, and holds the button that generates the procedure.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 192,
+          "end": 216,
+          "role": "markup",
+          "symbol": "section.controls:2",
+          "anchor": "953d07510af6",
+          "first": "<section class=\"controls\"><h2>2. 濃度與中間步驟</h2><div class=\"grid\">"
+        },
+        {
+          "file": "code/index.html",
+          "start": 86,
+          "end": 86,
+          "role": "style",
+          "symbol": ".auto-toggle",
+          "anchor": "6c1e79be5bd4",
+          "first": ".auto-toggle{display:flex;align-items:center;gap:9px;min-height:42px;padding:9px 11px;border:1px solid #c8d8d8;border-ra"
+        },
+        {
+          "file": "code/index.html",
+          "start": 446,
+          "end": 446,
+          "role": "logic",
+          "symbol": "setValidationMessage",
+          "anchor": "af847c3c4d9b",
+          "first": "function setValidationMessage(message,bad=true){const box=$('validationWarning');box.hidden=false;box.classList.toggle('"
+        },
+        {
+          "file": "code/index.html",
+          "start": 449,
+          "end": 449,
+          "role": "logic",
+          "symbol": "bindInputs",
+          "anchor": "028d2c0cf7a7",
+          "first": "function bindInputs(){document.querySelectorAll('#drug,#mw,#solubility,#solunit,#source,#targets,#unit,#need,#reserve,#m"
+        }
+      ]
+    },
+    {
+      "id": "auto-plan-panel",
+      "level": "component",
+      "parent": "targets-form",
+      "title": "Automatic intermediate plan",
+      "summary": "Shows where intermediate dilution tubes were inserted because a step exceeded the maximum factor, with the chain of factors used.",
+      "views": [
+        "list"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 204,
+          "end": 204,
+          "role": "markup",
+          "symbol": "#autoPlanPanel",
+          "anchor": "62d048ee1874",
+          "first": "<div id=\"autoPlanPanel\" class=\"auto-plan-panel\" hidden><div class=\"auto-plan-title\"><span class=\"auto-badge\">AUTO</span>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 88,
+          "end": 88,
+          "role": "style",
+          "symbol": ".auto-plan-panel",
+          "anchor": "016e3c0b8080",
+          "first": ".auto-plan-panel{grid-column:1/-1;background:rgba(237,245,245,.82);border:2px solid #6f9fa0;border-radius:12px;padding:1"
+        },
+        {
+          "file": "code/index.html",
+          "start": 90,
+          "end": 90,
+          "role": "style",
+          "symbol": ".auto-route-list",
+          "anchor": "470d9798edce",
+          "first": ".auto-route-list{display:grid;gap:8px}.auto-route-item{background:rgba(255,255,255,.68);border:1px solid #9cbcbc;border-"
+        },
+        {
+          "file": "code/index.html",
+          "start": 280,
+          "end": 289,
+          "role": "logic",
+          "symbol": "planDilutionFactors",
+          "anchor": "e889384353ad",
+          "first": "function planDilutionFactors(ratio,maxDilution,autoOn=true){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 271,
+          "end": 279,
+          "role": "logic",
+          "symbol": "integerFactorRoute",
+          "anchor": "52c8f73154c3",
+          "first": "function integerFactorRoute(ratio,maxDilution,steps){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 331,
+          "end": 338,
+          "role": "logic",
+          "symbol": "buildExpandedProtocol",
+          "anchor": "88201eea99e0",
+          "first": "function buildExpandedProtocol(p,maxDilution,autoOn=true){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 340,
+          "end": 342,
+          "role": "logic",
+          "symbol": "renderProtocolAutoPreview",
+          "anchor": "fa0a10d55c26",
+          "first": "function renderProtocolAutoPreview(expanded,p){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 460,
+          "end": 462,
+          "role": "logic",
+          "anchor": "4fd253fed43e",
+          "first": "const startAutoPlans=plans.filter(x=>x.routeFactors.length>1),protocolAutoGroups=expandedProtocol.groups.filter(g=>g.fac"
+        }
+      ]
+    },
+    {
+      "id": "result",
+      "level": "view",
+      "parent": null,
+      "title": "Preparation summary, materials and procedure",
+      "summary": "Computes and shows the stock volume and compound mass, the total materials needed, and for each target a row of Eppendorf diagrams with a transfer table.",
+      "views": [
+        "summary stats",
+        "table view",
+        "list"
+      ],
+      "interactions": [],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 226,
+          "end": 226,
+          "role": "markup",
+          "symbol": "#result",
+          "anchor": "8d44db8e145c",
+          "first": "<div id=\"result\" aria-live=\"polite\"><section><p>請填入分子量、最大溶解度及目標濃度，所有計算均在此程式完成</p></section></div>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 91,
+          "end": 91,
+          "role": "style",
+          "symbol": ".tube-step.auto-step",
+          "anchor": "5d570180b8e5",
+          "first": ".tube-step.auto-step{background:rgba(237,245,245,.82);border:2px solid #6f9fa0}.tube-step.auto-step .big{color:#315f60}."
+        },
+        {
+          "file": "code/index.html",
+          "start": 253,
+          "end": 261,
+          "role": "logic",
+          "symbol": "volumePlan",
+          "anchor": "7008a711a7c0",
+          "first": "function volumePlan(required,ratio,min){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 291,
+          "end": 298,
+          "role": "logic",
+          "symbol": "buildStartRoute",
+          "anchor": "9efe9945e178",
+          "first": "function buildStartRoute(sourceC,targetC,factors,requiredFinal,minimum,reserve,targetIndex,origin,finalUse){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 343,
+          "end": 347,
+          "role": "logic",
+          "symbol": "buildProtocolRouteForTarget",
+          "anchor": "c8ecaa172a8a",
+          "first": "function buildProtocolRouteForTarget(target,p,expanded,need,minimum,reserve,targetIndex){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 451,
+          "end": 475,
+          "role": "logic",
+          "anchor": "827fd23ffd5c",
+          "first": "$('generate').onclick=()=>{exportRows=[];$('csv').disabled=true;$('exportAll').disabled=true;clearValidationMessage();tr"
+        },
+        {
+          "file": "code/index.html",
+          "start": 355,
+          "end": 355,
+          "role": "logic",
+          "symbol": "renderAllTubeViz",
+          "anchor": "218992ed9f05",
+          "first": "function renderAllTubeViz(){let p;try{p=protocolData(false);}catch{return;}if(!p.length)return;const comps=protocolCompo"
+        },
+        {
+          "file": "code/index.html",
+          "start": 450,
+          "end": 450,
+          "role": "logic",
+          "symbol": "buildRules",
+          "anchor": "d269e3fd9867",
+          "first": "function buildRules(p){const factor=p[0].pct/p.at(-1).pct,autoOn=$('autoIntermediate')?.checked!==false;const li=[`共同母 s"
+        }
+      ]
+    },
+    {
+      "id": "well-planner",
+      "level": "view",
+      "parent": null,
+      "title": "96-well plate planner",
+      "summary": "Paints wells of a 96-well plate in a chosen group's colour by clicking or dragging, and counts how many wells are marked.",
+      "views": [
+        "fixed-layout grid"
+      ],
+      "interactions": [
+        "apply label",
+        "brush",
+        "select",
+        "inline edit"
+      ],
+      "patterns": [
+        "category palette"
+      ],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 218,
+          "end": 223,
+          "role": "markup",
+          "symbol": "#wellPlannerSection",
+          "anchor": "fb622f021e23",
+          "first": "<section class=\"controls\" id=\"wellPlannerSection\"><h2>3. 96孔盤規劃</h2>"
+        },
+        {
+          "file": "code/index.html",
+          "start": 28,
+          "end": 28,
+          "role": "style",
+          "symbol": ".group-tools",
+          "anchor": "119284d9cfa4",
+          "first": ".group-tools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:stretch}.group-chip{position:relative;d"
+        },
+        {
+          "file": "code/index.html",
+          "start": 59,
+          "end": 59,
+          "role": "style",
+          "symbol": ".group-chip",
+          "anchor": "9dadeade0b9c",
+          "first": ".group-chip{width:100%;grid-template-columns:34px minmax(0,1fr) 28px}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 62,
+          "end": 62,
+          "role": "style",
+          "symbol": ".plate-wrap",
+          "anchor": "8f40d6135b9f",
+          "first": ".plate-wrap{min-width:680px}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 402,
+          "end": 402,
+          "role": "data",
+          "symbol": "palette",
+          "anchor": "8d1704b4e1e0",
+          "first": "const palette=['#ff7b7b','#5aa7ff','#63c58f','#f2bd4f','#ad7be9','#ff9c5a','#4fc4c9','#d889b6'];"
+        },
+        {
+          "file": "code/index.html",
+          "start": 403,
+          "end": 403,
+          "role": "data",
+          "symbol": "PLATE_CONFIG",
+          "anchor": "27d774b26558",
+          "first": "const PLATE_CONFIG={width:1536,height:1024,columns:[212,314,417,519,621,723,825,927,1029,1131,1233,1335],rows:[146,255,3"
+        },
+        {
+          "file": "code/index.html",
+          "start": 406,
+          "end": 410,
+          "role": "logic",
+          "symbol": "renderGroups",
+          "anchor": "eb7dc71f8b4f",
+          "first": "function renderGroups(){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 411,
+          "end": 411,
+          "role": "logic",
+          "symbol": "addGroup",
+          "anchor": "7f3eb0e38045",
+          "first": "function addGroup(){const id=++groupSeq;groups.push({id,name:'Group '+id,color:palette[(id-1)%palette.length]});selected"
+        },
+        {
+          "file": "code/index.html",
+          "start": 412,
+          "end": 412,
+          "role": "logic",
+          "symbol": "removeGroup",
+          "anchor": "afb7608c8c48",
+          "first": "function removeGroup(id){assignments=assignments.map(x=>x===id?null:x);groups=groups.filter(g=>g.id!==id);if(selectedGro"
+        },
+        {
+          "file": "code/index.html",
+          "start": 413,
+          "end": 413,
+          "role": "logic",
+          "symbol": "setupWells",
+          "anchor": "32d2e25ded8f",
+          "first": "function setupWells(){const box=$('wellOverlay');box.innerHTML='';for(let r=0;r<8;r++)for(let c=0;c<12;c++){const idx=r*"
+        },
+        {
+          "file": "code/index.html",
+          "start": 414,
+          "end": 414,
+          "role": "logic",
+          "symbol": "paintWell",
+          "anchor": "e384c7afd596",
+          "first": "function paintWell(idx){assignments[idx]=selectedGroup;updateWellVisual(idx);updateWellCount();schedulePlateRender();}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 417,
+          "end": 417,
+          "role": "logic",
+          "symbol": "updateWellCount",
+          "anchor": "855af2d04a80",
+          "first": "function updateWellCount(){$('wellCount').textContent='已標示 '+assignments.filter(x=>x!==null).length+' / 96 孔';}"
+        },
+        {
+          "file": "code/index.html",
+          "start": 433,
+          "end": 437,
+          "role": "logic",
+          "symbol": "renderPlate",
+          "anchor": "557f10f8cce3",
+          "first": "function renderPlate(){"
+        }
+      ]
+    },
+    {
+      "id": "export-controls",
+      "level": "component",
+      "parent": "targets-form",
+      "title": "Export options",
+      "summary": "Downloads every tube as CSV, prints the full protocol with the plate to PDF, or exports only the ticked sections; the CSV and print buttons stay disabled until a procedure has been generated.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/index.html",
+          "start": 30,
+          "end": 30,
+          "role": "markup",
+          "symbol": ".export-options",
+          "anchor": "ddf6fb8690bb",
+          "first": ".export-options{display:flex;flex-wrap:wrap;gap:9px 18px;align-items:center;margin-top:14px;padding:13px 14px;border:1px"
+        },
+        {
+          "file": "code/index.html",
+          "start": 30,
+          "end": 30,
+          "role": "style",
+          "symbol": ".export-options",
+          "anchor": "ddf6fb8690bb",
+          "first": ".export-options{display:flex;flex-wrap:wrap;gap:9px 18px;align-items:center;margin-top:14px;padding:13px 14px;border:1px"
+        },
+        {
+          "file": "code/index.html",
+          "start": 479,
+          "end": 479,
+          "role": "logic",
+          "anchor": "71f5c32623c6",
+          "first": "$('csv').onclick=()=>{if(!exportRows.length)return;const header=['藥物','目標mM','管號','類型','來源管','來源mM','完成mM','稀釋倍數','取來源液µ"
+        },
+        {
+          "file": "code/index.html",
+          "start": 487,
+          "end": 497,
+          "role": "logic",
+          "symbol": "makePdf",
+          "anchor": "52666d0b28b6",
+          "first": "function makePdf(pageCanvases,filename){"
+        },
+        {
+          "file": "code/index.html",
+          "start": 507,
+          "end": 512,
+          "role": "logic",
+          "anchor": "c3eaeaf26557",
+          "first": "$('exportSelected').onclick=async()=>{try{const wantWell=$('exportWellCheck').checked,wantProtocol=$('exportProtocolChec"
+        }
+      ]
+    }
+  ]
+}

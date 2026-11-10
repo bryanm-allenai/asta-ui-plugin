@@ -4,10 +4,11 @@ Everything in the knowledge base is a plain file in git. The vectors are not: th
 
 ```
 kb/
-  kb.json            settings: the default embedder, the search weights
+  kb.json            settings: the default embedder, the search weights, which builds are set aside
   ontology.json      the facets and their vocabularies, with a log of changes
   builds/<id>/       what a scientist made: prompts, code, a screenshot
-  cards/<id>.json    what the build is, in the ontology's terms
+  cards/<id>.json    what the build is, in the ontology's terms, written from its code alone
+  cards-prompts/     the older cards, written from the prompts and the code; the map can still be drawn from them
   eval/queries.jsonl requests with the builds you would want back
   eval/pairs.jsonl   pairs of builds you judged by eye
 ```
@@ -44,7 +45,9 @@ An id is lowercase letters, digits and hyphens, for example `transcript-coder`.
 ```
 
 - `sources` uses the Workspace's list: `prompt log`, `repo`, `skill file`, `Claude artifact`, `Marble app`.
-- `provenance.kind` is one of `seed` (written for the prototype), `study` (from a formative-study participant), `contributed` (filed by a scientist through `ui-to-workflow`), `paper` (a figure from a paper, usually with no prompts).
+- `provenance.kind` is one of `seed` (written for the prototype), `study` (from a formative-study participant), `contributed` (filed by a scientist through `ui-to-workflow`), `paper` (a figure from a paper, usually with no prompts), `public` (an open-source interface found in a public repository and run by a computer-use agent; see below).
+- `provenance.batch` (optional) names the collection a build came in with, so collections can be told apart: the prototype's seeds, the study's builds, `public-1` for the first sweep of public repositories.
+- `fetch` (only in the plugin's public copy) is how a build found in a public repository comes without its code: `{"from": "https://raw.githubusercontent.com/<owner>/<repo>/<commit>/", "files": {"code/app.js": {"sha256": "…", "bytes": 1234, "lines": 56}}}`. The first time anything reads one of those files (a search with code, a slice, `astaui show`), the tool downloads the build's files at that commit, checks each against its sha256 and keeps them in the build's folder. A file the agent that ran the build had to change, or one the repository never had, ships as it is. In this repository a public build's folder has a `.gitignore` saying `code/`, so its code is never committed.
 - `source` (optional) says where the full code lives when it came from a repository: `{"repo": "git@github.com:lab/app.git", "commit": "…", "path": "ui/"}`. A build with a source can be slimmed (`astaui slim`) to the files its card points at; `slimmed` then lists what was dropped, with sizes and fingerprints.
 - `provenance.consent` says what the person agreed to: `synthetic`, `team` (people on this project may see it), `public`.
 - `author.name` is a pseudonym (`P07`) unless the person asked to be named.
@@ -58,9 +61,21 @@ An id is lowercase letters, digits and hyphens, for example `transcript-coder`.
 
 `at` is optional. Keep the words as the person typed them, typos included. Leave out pasted logs and tool output.
 
+## Builds set aside
+
+A public build's `run.json` keeps what the reviewing model said of the agent's tree: `review.point` (1-5), `review.verdict` (`yes`, `fix`, `no`), `review.depth` (`right`, `shallow`, `deep`), `review.coverage` (1-5), plus `replay.tasks_replayed` and `data.source`. `set_aside` in `kb.json` leaves out the builds whose run fails a rule:
+
+```json
+"set_aside": {"depth": ["shallow", "deep"]}
+```
+
+The rules are `depth`, `verdict` and `data` (lists of words to leave out), `point_below`, `coverage_below` and `replayed_below` (a number), and `builds` (`{"id": "why"}`, set aside by hand). A build with no run is never set aside by a rule. Set-aside builds stay on disk; the index, search, the console and every command leave them out unless given `--with-set-aside` (or `ASTAUI_WITH_SET_ASIDE=1`). `astaui aside` lists them, shows how many each rule would leave out, tries a mix with `--try` and saves it with `--set`; run `astaui index` after.
+
 ## A card: `kb/cards/<id>.json`
 
 One card file per build. It holds the card for the whole app and a card for each view and component inside it, each linked to its parent. The extractor writes it (`astaui extract`), and `astaui card put` checks it before saving.
+
+Since `extract/4` (28 October 2026) a card is written from the build's code alone, so a build found in a repository, with no conversation behind it, is described the same way as one filed with its prompts. `made.from` says which: `code`, or `prompts` for a card written with `astaui extract --with-prompts`. The prompts are still filed with a build; they are just not read to write its card. `kb/eval/code-only/` has the comparison that led to the change. The cards written before it, from the prompts and the code, are kept in `cards-prompts/`, named by `older_cards` in `kb.json`, and the console's map can be drawn from them.
 
 ```json
 {

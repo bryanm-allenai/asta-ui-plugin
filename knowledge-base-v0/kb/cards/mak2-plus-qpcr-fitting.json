@@ -1,0 +1,488 @@
+{
+  "schema": "astaui.card/1",
+  "id": "mak2-plus-qpcr-fitting",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T04:25:20Z"
+  },
+  "app": {
+    "title": "qPCR Model Fitting with MAK2+",
+    "summary": "A person loads raw amplification curves from a qPCR instrument, along with an optional plate metadata file. They choose which wells to fit, set how much of each curve around the steepest point is used, and pick how starting amounts are turned into copy numbers. A batch run fits a mechanistic amplification model to every well. It skips wells with no signal, stamps each fit pass or fail, and fills a results table. The person then checks calibration and replicate statistics and opens individual fits. At the end they download a multi-sheet spreadsheet of per-well starting amounts, Ct values and copy numbers.",
+    "task": {
+      "text": "Fit a mechanistic amplification model to every well of a qPCR plate to estimate each well's starting template amount, and convert it to absolute copy numbers with a quality verdict per well.",
+      "verbs": [
+        "derive",
+        "clean",
+        "summarize",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "Fluorescence readings per cycle for each well of a qPCR run, from vendor export formats, with optional per-well metadata: sample names, task (standard or unknown), known quantities and instrument thresholds.",
+      "item": "a well's amplification curve: fluorescence over thermal cycles in one dye channel",
+      "shapes": [
+        "grid of series",
+        "time series",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "quantifying raw instrument amplification curves into per-well template amounts, before downstream comparison",
+      "terms": [
+        "analyze",
+        "clean"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar holds the data input, fit-window and calibration settings, which drive a batch fit. The results show up as a formatted table with summary metrics, followed by calibration curves, replicate statistics tabs and a selector that opens any one well's fitted curve over its raw data.",
+      "views": [
+        "table view",
+        "line chart",
+        "scatter plot",
+        "summary stats",
+        "form",
+        "detail panel"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "filter",
+        "toggle view",
+        "export",
+        "exclude and refit",
+        "hover for detail"
+      ],
+      "patterns": [
+        "overview and detail",
+        "master-detail"
+      ]
+    },
+    "field": {
+      "text": "mechanistic qPCR curve fitting for absolute quantification in molecular biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "qpcr",
+        "absolute quantification",
+        "standard curve"
+      ]
+    },
+    "workflow": {
+      "name": "fit a model to each curve in a batch and convert the fitted values to calibrated amounts",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pick an example dataset, upload a CSV or Excel file in one of several instrument formats, enter data by hand, or reload previous results. An optional plate metadata CSV adds sample names, standards and thresholds.",
+          "parts": [
+            "data-input"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Choose the wells, targets or dye channels to fit, then press 'Ready to Fit Selected Samples'.",
+          "parts": [
+            "data-input"
+          ]
+        },
+        {
+          "step": "set how the computation runs",
+          "here": "Sliders set the first cycle to fit and how many cycles before and after the steepest point to use. A radio picks the calibration method: auto-detected standards, limited dilution, a manual factor, single-copy D0, or none.",
+          "parts": [
+            "fit-settings"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Batch Fit All Samples' triages out wells with no signal, fits the model to each remaining well, retries weak fits using channel priors, and applies pass/fail quality gates.",
+          "parts": [
+            "fit-settings",
+            "batch-results"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Group wells into replicates by a name pattern or by hand, optionally as a dilution series with groups left out. Tabs show mean, SD and CV, overlaid replicate curves, the precision of D0 against Ct, and dilution linearity.",
+          "parts": [
+            "replicate-setup",
+            "replicate-analysis",
+            "calibration"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Select any well to see its raw fluorescence with the fitted curve and its pass/fail status. Skipped wells can also be viewed.",
+          "parts": [
+            "fit-viewer"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download a multi-sheet .xlsx containing batch results, settings, replicate and dilution sheets and native standard-curve charts, or a CSV.",
+          "parts": [
+            "batch-results"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each well's starting amount comes from fitting a mechanistic primer-depletion kinetic model. Ct comes from threshold crossing.",
+        "The fit window is cut around the cycle of maximum slope, so late-plateau artefacts are left out.",
+        "Wells are classified by quality gates (R² floor, window width, sigmoid versus linear, inflection, plateau overshoot), and wells with no signal are triaged before fitting.",
+        "Starting amounts become copy numbers through several calibration routes, including on-plate standards and a limited-dilution Poisson panel.",
+        "Interrupted batches can be resumed from a checkpoint saved after each well."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-input",
+      "level": "view",
+      "parent": null,
+      "title": "Data Input sidebar",
+      "summary": "Loads qPCR curves from examples, uploaded instrument files, manual entry or saved results, plus plate metadata, and lets the person choose which wells to fit.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 499,
+          "end": 1240,
+          "role": "logic",
+          "anchor": "1c4ecc747c16",
+          "first": "# Sidebar for data input"
+        },
+        {
+          "file": "code/qpcr_data_converter.py",
+          "start": 85,
+          "end": 130,
+          "role": "logic",
+          "symbol": "detect_format",
+          "anchor": "08883fa0f908",
+          "first": "def detect_format(self, df: pd.DataFrame) -> str:"
+        },
+        {
+          "file": "code/qpcr_data_converter.py",
+          "start": 1355,
+          "end": 1474,
+          "role": "logic",
+          "symbol": "load_abi_results_csv",
+          "anchor": "7b45040de5ec",
+          "first": "def load_abi_results_csv(file) -> Dict:"
+        },
+        {
+          "file": "code/sample_selector_ui.py",
+          "start": 21,
+          "end": 342,
+          "role": "logic",
+          "symbol": "SampleSelector",
+          "anchor": "4d94522b300c",
+          "first": "class SampleSelector:"
+        },
+        {
+          "file": "code/example_data_loader.py",
+          "start": 18,
+          "end": 218,
+          "role": "logic",
+          "symbol": "ExampleDataLoader",
+          "anchor": "9c610b16ec40",
+          "first": "class ExampleDataLoader:"
+        }
+      ]
+    },
+    {
+      "id": "fit-settings",
+      "level": "component",
+      "parent": "data-input",
+      "title": "Fitting options and copy-number conversion",
+      "summary": "Sets the fit window around the steepest cycle, chooses the calibration method, and starts the batch fit.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1425,
+          "end": 1600,
+          "role": "logic",
+          "anchor": "f2cfc96ceebc",
+          "first": "st.sidebar.header(\"Fitting Options\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 1812,
+          "end": 1830,
+          "role": "logic",
+          "anchor": "cf80d92459cc",
+          "first": "# Fit button(s)"
+        },
+        {
+          "file": "code/fit_well.py",
+          "start": 275,
+          "end": 291,
+          "role": "logic",
+          "symbol": "fit_well",
+          "anchor": "023f0a9ba511",
+          "first": "def fit_well("
+        },
+        {
+          "file": "code/run_batch.py",
+          "start": 603,
+          "end": 880,
+          "role": "logic",
+          "symbol": "run_quality_gates",
+          "anchor": "f93002bcc2c6",
+          "first": "def run_quality_gates(results_list, cycles, gates=None):"
+        },
+        {
+          "file": "code/data_processing.py",
+          "start": 93,
+          "end": 98,
+          "role": "logic",
+          "symbol": "detect_no_signal_samples",
+          "anchor": "bd411003f9b2",
+          "first": "def detect_no_signal_samples("
+        }
+      ]
+    },
+    {
+      "id": "replicate-setup",
+      "level": "component",
+      "parent": "data-input",
+      "title": "Replicate grouping",
+      "summary": "Groups wells into replicates by a name pattern, by file sample names or by a typed list. It can also declare them a dilution series with fold factors and leave groups out.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1602,
+          "end": 1811,
+          "role": "logic",
+          "anchor": "d4e88ee37732",
+          "first": "# Replicate Analysis Options (only show for batch mode)"
+        },
+        {
+          "file": "code/replicate_analysis.py",
+          "start": 27,
+          "end": 81,
+          "role": "logic",
+          "symbol": "parse_sample_groups",
+          "anchor": "dcb3c64c7d2a",
+          "first": "def parse_sample_groups(sample_names: List[str], pattern: Optional[str] = None) -> Dict[str, List[str]]:"
+        }
+      ]
+    },
+    {
+      "id": "batch-results",
+      "level": "view",
+      "parent": null,
+      "title": "Batch Fitting Results",
+      "summary": "Shows every well's fitted parameters, Ct, R² and pass/fail in a formatted table, with summary metrics, a target filter, the list of skipped wells and spreadsheet export.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "filter",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 2643,
+          "end": 2986,
+          "role": "logic",
+          "anchor": "d8eb252c752e",
+          "first": "if 'batch_results' in st.session_state:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 3434,
+          "end": 3442,
+          "role": "logic",
+          "anchor": "7cea8f2e6fe7",
+          "first": "# CSV export (always available immediately)"
+        },
+        {
+          "file": "code/app.py",
+          "start": 255,
+          "end": 315,
+          "role": "logic",
+          "symbol": "_build_excel_download",
+          "anchor": "a0805c6c8870",
+          "first": "def _build_excel_download(results_df, extra_sheets=None, chart_sheets=None):"
+        }
+      ]
+    },
+    {
+      "id": "calibration",
+      "level": "view",
+      "parent": null,
+      "title": "Standard curve and limited-dilution calibration",
+      "summary": "Fits standard curves of known copies against D0 and against Ct for each channel or target, or derives a limited-dilution factor, then adds copy-number columns to the results.",
+      "views": [
+        "scatter plot",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 2987,
+          "end": 3433,
+          "role": "logic",
+          "anchor": "88c09386ff08",
+          "first": "# ============================================================================"
+        },
+        {
+          "file": "code/calibration.py",
+          "start": 46,
+          "end": 49,
+          "role": "logic",
+          "symbol": "build_standard_curve",
+          "anchor": "23bb01238a93",
+          "first": "def build_standard_curve("
+        },
+        {
+          "file": "code/calibration.py",
+          "start": 786,
+          "end": 930,
+          "role": "logic",
+          "symbol": "plot_calibration",
+          "anchor": "5d069728e872",
+          "first": "def plot_calibration(calibration: Dict, channel_label: str = \"\") -> go.Figure:"
+        },
+        {
+          "file": "code/calibration.py",
+          "start": 506,
+          "end": 511,
+          "role": "logic",
+          "symbol": "build_limited_dilution_calibration",
+          "anchor": "f9ae39ff00f1",
+          "first": "def build_limited_dilution_calibration("
+        }
+      ]
+    },
+    {
+      "id": "replicate-analysis",
+      "level": "view",
+      "parent": null,
+      "title": "Replicate Analysis tabs",
+      "summary": "Shows statistics for each replicate group, overlaid replicate curves, the precision of D0 compared with Ct, and dilution-series linearity, each in its own tab.",
+      "views": [
+        "table view",
+        "line chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "toggle view",
+        "select",
+        "export"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3444,
+          "end": 3836,
+          "role": "logic",
+          "anchor": "a12fef974853",
+          "first": "# ============================================================================"
+        },
+        {
+          "file": "code/replicate_analysis.py",
+          "start": 487,
+          "end": 538,
+          "role": "logic",
+          "symbol": "compare_precision",
+          "anchor": "1179961ec5d5",
+          "first": "def compare_precision(stats_df: pd.DataFrame, efficiency: float = 0.95) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/replicate_analysis.py",
+          "start": 289,
+          "end": 484,
+          "role": "logic",
+          "symbol": "plot_dilution_series_comparison",
+          "anchor": "cb78d9845b2e",
+          "first": "def plot_dilution_series_comparison(analysis_results: Dict) -> go.Figure:"
+        },
+        {
+          "file": "code/calibration.py",
+          "start": 1228,
+          "end": 1233,
+          "role": "logic",
+          "symbol": "plot_replicate_overlay",
+          "anchor": "dc273a6d1da4",
+          "first": "def plot_replicate_overlay("
+        }
+      ]
+    },
+    {
+      "id": "fit-viewer",
+      "level": "view",
+      "parent": null,
+      "title": "Visualize Individual Fits",
+      "summary": "Opens one selected well's raw fluorescence with the fitted model curve and its pass/fail status. Wells skipped for no signal can be viewed too.",
+      "views": [
+        "line chart",
+        "detail panel"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 3837,
+          "end": 4262,
+          "role": "logic",
+          "anchor": "64095c8439c2",
+          "first": "# Batch visualization section (outside button block, always visible if results exist)"
+        },
+        {
+          "file": "code/mak2_model.py",
+          "start": 80,
+          "end": 280,
+          "role": "logic",
+          "symbol": "MAK2Model",
+          "anchor": "1f4e027058ce",
+          "first": "class MAK2Model:"
+        }
+      ]
+    }
+  ]
+}

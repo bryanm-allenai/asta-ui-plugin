@@ -1,0 +1,464 @@
+{
+  "schema": "astaui.card/1",
+  "id": "luxplate-analyzer",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T08:59:28Z"
+  },
+  "app": {
+    "title": "LuxPlate Analyzer",
+    "summary": "A person uploads one or more plate-reader workbooks and maps each file to a biological replicate. If each file holds a single time point, they also give the real hours for each time index. They choose which media and strains to analyse and whether to correct optical cross-talk between wells, then check the raw, blank and corrected curves and tick off individual points, whole curves, or every point at chosen times in one experiment. One button runs blank correction, OD normalisation and kinetic extraction. They then build publication figures, set up a stack of planned pairwise hypotheses tested on biological replicates, and download the final data, kinetic metrics, exclusion decisions, statistics, figures and a reloadable project file.",
+    "task": {
+      "text": "Turn raw plate-reader growth and luminescence readings into blank-corrected, OD-normalised kinetic metrics, with recorded exclusions, planned paired tests and publication figures.",
+      "verbs": [
+        "derive",
+        "clean",
+        "compare",
+        "summarize",
+        "identify"
+      ]
+    },
+    "data": {
+      "text": "Repeated optical density and luminescence readings from every well of a 96-well plate over time, from one or more workbooks, with a plate plan that marks samples and blanks by strain and medium.",
+      "item": "the time course of one well on a 96-well plate: optical density and luminescence at each reading",
+      "shapes": [
+        "grid of series",
+        "time series",
+        "per element",
+        "table",
+        "judgements"
+      ]
+    },
+    "stage": {
+      "text": "quality-controlling and analysing plate-reader kinetics from raw export, through to tested comparisons and figures",
+      "terms": [
+        "clean",
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "The page is a linear guided pipeline: each section stays hidden until the one before it has been explicitly validated (replicate mapping, then selection), and a radio switch shows QC curves at each correction stage above an editable table for excluding points. After one run, tabbed results hold the computed tables, a gallery of figures redrawn from display controls and a validated hypothesis stack, and download buttons.",
+      "views": [
+        "table view",
+        "line chart",
+        "small multiples",
+        "form",
+        "summary stats",
+        "strip plot"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "multi-select",
+        "filter",
+        "toggle view",
+        "exclude and refit",
+        "drag to arrange",
+        "export",
+        "select"
+      ],
+      "patterns": [
+        "status pipeline",
+        "small multiples",
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "plate-reader growth and luminescence reporter kinetics in microbiology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "microbiology",
+        "plate reader",
+        "reporter kinetics"
+      ]
+    },
+    "workflow": {
+      "name": "process instrument time courses into corrected metrics and tested comparisons",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Choose an import mode: one file holds all times, one file per time, or mixed. Upload workbooks and pick the luminescence sheet when there are several. For per-time files, type the real hours for each tX index in an editable table that flags missing or duplicate time points.",
+          "parts": [
+            "import-panel"
+          ]
+        },
+        {
+          "step": "assign each file to its independent replicate",
+          "here": "An editable table suggests a biological replicate ID for each file from rep1/rep2 markers. Nothing below opens until the person validates it.",
+          "parts": [
+            "replicate-mapping"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "A form selects media and strains and toggles matrix cross-talk deconvolution. Nothing is computed until 'Valider la sélection' is clicked.",
+          "parts": [
+            "selection-form"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A radio switch shows rows of small curve panels, one row per biological replicate: blanks, samples, after cross-talk correction, deconvolved blanks, blank residual, and corrected luminescence.",
+          "parts": [
+            "qc-curves"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Tick 'Supprimer' on single readings in a long table, pick whole curves to drop, or exclude chosen times in one experiment for blanks, samples or both. Set the minimum OD, consecutive points, growth window and minimum R², then 'Lancer toute l'analyse' runs blank correction, normalisation and kinetics.",
+          "parts": [
+            "exclusion-editor"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Pick figure families (growth, luminescence, dual axis, peak, AUC, doubling time, fold change vs control). Set panel layout, scales, size and the order of media and strains by drag and drop. Build a stack of A > B hypotheses by hand or in bulk, then validate it to run paired t-tests on biological replicates with Holm correction.",
+          "parts": [
+            "results-gallery",
+            "hypothesis-stack"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download the final data, kinetic metrics, exclusion decisions and statistics as CSV, the figures as PNG, TIF or SVG at a chosen dpi or as one ZIP, and the whole analysis as a reloadable .luxplate project.",
+          "parts": [
+            "exports"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Biological replicates, not wells or files, are the unit of N: technical wells are averaged within each replicate before any mean, SD or test, and the file-to-replicate mapping must be confirmed by hand.",
+        "Luminescence is corrected for optical cross-talk between wells with a fixed, pre-calibrated deconvolution matrix before blanks from the same medium and time are subtracted.",
+        "Normalised AUC is computed over a common time window and can be capped at a chosen maximum OD. Series that never reach that OD are reported and left out, not extrapolated.",
+        "Comparisons are planned before the results are shown: hypotheses are stacked and only take effect when validated, with shortcuts for 'all strains, medium A > medium B' and 'all strains > control'.",
+        "Each correction stage has its own QC view, so the person can judge the optical model and blank residuals before excluding readings."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "import-panel",
+      "level": "view",
+      "parent": null,
+      "title": "Workbook import and time mapping",
+      "summary": "Uploads plate-reader workbooks in one of three modes and, for one-file-per-time imports, maps time indices to real hours, warning about missing or duplicate time points.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "inline edit",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 777,
+          "end": 924,
+          "role": "logic",
+          "anchor": "40ddf5ba6929",
+          "first": "with guided_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 52,
+          "end": 54,
+          "role": "logic",
+          "symbol": "cached_workbook_sheets",
+          "anchor": "1a094a49cc85",
+          "first": "def cached_workbook_sheets(payload: bytes) -> tuple[str, list[str]]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 58,
+          "end": 60,
+          "role": "logic",
+          "symbol": "cached_kinetic_workbook",
+          "anchor": "37aa48d8943a",
+          "first": "def cached_kinetic_workbook(payload: bytes, luminescence_sheet: str) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 64,
+          "end": 66,
+          "role": "logic",
+          "symbol": "cached_single_time_workbook",
+          "anchor": "c4d5bdde1ce7",
+          "first": "def cached_single_time_workbook(payload: bytes, luminescence_sheet: str) -> pd.DataFrame:"
+        }
+      ]
+    },
+    {
+      "id": "replicate-mapping",
+      "level": "component",
+      "parent": "import-panel",
+      "title": "Biological replicate mapping",
+      "summary": "An editable table of files with a suggested biological replicate ID for each; it must be validated before analysis can continue.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 926,
+          "end": 985,
+          "role": "logic",
+          "anchor": "efe845cc9de4",
+          "first": "time_identity = ()"
+        }
+      ]
+    },
+    {
+      "id": "selection-form",
+      "level": "component",
+      "parent": "import-panel",
+      "title": "Analysis selection",
+      "summary": "A form for choosing media, strains and cross-talk correction. Nothing is computed until it is submitted.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "multi-select",
+        "filter"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 987,
+          "end": 1077,
+          "role": "logic",
+          "anchor": "004514f558f1",
+          "first": "strain_options = sorted("
+        }
+      ]
+    },
+    {
+      "id": "qc-curves",
+      "level": "view",
+      "parent": null,
+      "title": "QC curve previews",
+      "summary": "Switches between grids of curve panels (raw blanks, raw samples, after cross-talk, deconvolved blanks, blank residual, corrected luminescence), one row per biological replicate.",
+      "views": [
+        "small multiples",
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1078,
+          "end": 1143,
+          "role": "logic",
+          "anchor": "a3bb3b03589c",
+          "first": "tab_names = [\"Courbes des blancs\", \"Courbes des échantillons\"]"
+        },
+        {
+          "file": "code/app.py",
+          "start": 95,
+          "end": 97,
+          "role": "logic",
+          "symbol": "cached_guided_raw_figures",
+          "anchor": "5c85e50594b2",
+          "first": "def cached_guided_raw_figures(data: pd.DataFrame, sample_type: str):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 101,
+          "end": 102,
+          "role": "logic",
+          "symbol": "cached_guided_corrected_figures",
+          "anchor": "214f2ae89c18",
+          "first": "def cached_guided_corrected_figures("
+        },
+        {
+          "file": "code/app.py",
+          "start": 112,
+          "end": 114,
+          "role": "logic",
+          "symbol": "cached_guided_crosstalk_figures",
+          "anchor": "1676f9cc5605",
+          "first": "def cached_guided_crosstalk_figures(data: pd.DataFrame, sample_type: str):"
+        }
+      ]
+    },
+    {
+      "id": "exclusion-editor",
+      "level": "view",
+      "parent": null,
+      "title": "Points and curves to remove",
+      "summary": "Records exclusions of single readings, whole curves, or chosen times in one experiment, sets the computation parameters, and runs the full correction and kinetics pipeline.",
+      "views": [
+        "table view",
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "multi-select",
+        "exclude and refit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1145,
+          "end": 1248,
+          "role": "logic",
+          "anchor": "2bb85f5bd4d9",
+          "first": "st.subheader(\"Points et courbes à supprimer\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 70,
+          "end": 76,
+          "role": "logic",
+          "symbol": "cached_complete_analysis",
+          "anchor": "181e9dd35e54",
+          "first": "def cached_complete_analysis("
+        }
+      ]
+    },
+    {
+      "id": "results-gallery",
+      "level": "view",
+      "parent": null,
+      "title": "Complete results and final figures",
+      "summary": "Shows summary counts, tabs of computed tables, and a gallery of figures redrawn from controls for strains, figure families, panel layout, scales, size, drag-and-drop order and an OD cap on the AUC, each figure with its statistics table.",
+      "views": [
+        "summary stats",
+        "table view",
+        "line chart",
+        "strip plot",
+        "small multiples"
+      ],
+      "interactions": [
+        "multi-select",
+        "filter",
+        "toggle view",
+        "drag to arrange"
+      ],
+      "patterns": [
+        "dashboard",
+        "small multiples"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 385,
+          "end": 688,
+          "role": "logic",
+          "anchor": "3a4ba3e09f37",
+          "first": "def render_guided_results(complete, base: str) -> None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 117,
+          "end": 133,
+          "role": "logic",
+          "symbol": "build_current_publication_figures",
+          "anchor": "0d639bfa9aef",
+          "first": "def build_current_publication_figures("
+        },
+        {
+          "file": "code/app.py",
+          "start": 202,
+          "end": 237,
+          "role": "logic",
+          "symbol": "select_display_order",
+          "anchor": "e5dec73cb9ce",
+          "first": "def select_display_order(media: list[str], reporters: list[str]) -> tuple[tuple[str, ...], tuple[str, ...]]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 168,
+          "end": 198,
+          "role": "logic",
+          "symbol": "select_auc_lum_norm_do_cutoff",
+          "anchor": "bcf61c7d236f",
+          "first": "def select_auc_lum_norm_do_cutoff(data: pd.DataFrame) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "hypothesis-stack",
+      "level": "component",
+      "parent": "results-gallery",
+      "title": "Planned comparison stack",
+      "summary": "Builds a list of directional A > B hypotheses by hand or with shortcuts (one medium against another for every strain, or every strain against the control), and applies them to the tests only when validated.",
+      "views": [
+        "list",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 241,
+          "end": 382,
+          "role": "logic",
+          "symbol": "select_directional_comparisons",
+          "anchor": "ebc7684f56fb",
+          "first": "def select_directional_comparisons(data: pd.DataFrame, *, key: str) -> tuple[tuple[str, str], ...]:"
+        }
+      ]
+    },
+    {
+      "id": "exports",
+      "level": "view",
+      "parent": null,
+      "title": "Exports and project file",
+      "summary": "Downloads the final data, kinetic metrics, exclusion decisions and figures (PNG, TIF, SVG or ZIP at a chosen dpi), and saves or restores the whole analysis as a project file.",
+      "views": [],
+      "interactions": [
+        "export",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 689,
+          "end": 736,
+          "role": "logic",
+          "anchor": "1720804282a0",
+          "first": "with result_tabs[4]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 741,
+          "end": 773,
+          "role": "logic",
+          "anchor": "a0de9becad04",
+          "first": "with st.sidebar:"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,600 @@
+{
+  "schema": "astaui.card/1",
+  "id": "robustprint-virtual-lab",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T06:54:13Z"
+  },
+  "app": {
+    "title": "RobustPrint Virtual Lab",
+    "summary": "A person sets the input material's distribution (the mean fraction of each component, how consistent batches are, and moisture) and a set of process settings on a ticket that every step shares. A bench view shows the simulated outcome for the average batch and for many random batches. The person then runs a simulated campaign or imports and validates their own CSV of runs, and trains a surrogate model for strength plus a print-success classifier, scored on held-out batches. Next, they optimise settings under several risk objectives, deploy them on fresh batches and compare the results. Finally they propose the next runs, either printing them in the simulator and retraining or copying them out as a CSV template.",
+    "task": {
+      "text": "Choose process settings that hold up across a variable input material, and plan the most informative next experiments, using a surrogate model trained on past runs.",
+      "verbs": [
+        "decide",
+        "derive",
+        "plan",
+        "compare",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A table of experimental runs, one row per job. Each row holds the input's measured composition (fractions that sum to one), its moisture, eight process settings, whether the job succeeded, and the mean and SD of the measured strength over replicate specimens. The input material is also described as a Dirichlet distribution over composition.",
+      "item": "a print job: one feedstock batch printed at one set of process settings, with its replicate strength measurements and success flag",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "modelling a run campaign to pick robust process settings and plan the next round of experiments",
+      "terms": [
+        "analyze",
+        "decide",
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "A shared sidebar ticket holds the input distribution and the process settings, and every step reads it. Steps numbered along a top bar move from generating or importing data, to training and scoring a model, to optimising and deploying settings, to proposing the next runs. A 'Use' button on a recommendation writes its settings back to the ticket and opens the bench.",
+      "views": [
+        "sidebar list",
+        "form",
+        "summary stats",
+        "table view",
+        "bar chart",
+        "line chart",
+        "scatter plot"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "select",
+        "toggle view",
+        "hover for detail",
+        "filter"
+      ],
+      "patterns": [
+        "linked views",
+        "side-by-side comparison",
+        "dashboard",
+        "status pipeline"
+      ]
+    },
+    "field": {
+      "text": "uncertainty-aware process optimisation and active learning for fused-filament 3D printing of recycled feedstock",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "additive manufacturing",
+        "uncertainty quantification",
+        "active learning"
+      ]
+    },
+    "workflow": {
+      "name": "fit a model to experimental runs, choose robust settings, and plan the next runs",
+      "steps": [
+        {
+          "step": "describe the input's variability and the settings to try",
+          "here": "Sliders on the job ticket set each component's mean fraction (the others rescale to keep the sum at one), a Dirichlet concentration for batch-to-batch consistency, median moisture and eight print settings. A stream preset loads a nominal or a shifted feedstock.",
+          "parts": [
+            "job-ticket"
+          ]
+        },
+        {
+          "step": "look at the outcome across many draws of the input",
+          "here": "The bench shows strength, modulus, clogging and warping risk for the average batch, a waterfall of where strength is lost, a strip of the next batches drawn from the stream, and response curves for one chosen setting with 5–95 % bands across batches.",
+          "parts": [
+            "bench"
+          ]
+        },
+        {
+          "step": "bring the data in",
+          "here": "Run a simulated campaign (batches × settings × specimens over a Latin hypercube), or choose or paste a CSV and press Validate, which lists errors and warnings row by row, before 'Use N valid jobs'.",
+          "parts": [
+            "campaign"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "'Train model' fits a physics-residual Gaussian process for log strength and a boosted-tree success classifier. It is disabled until there are 5 jobs with a strength. The model is scored on held-out batches with RMSE, CRPS, 90 % coverage and Brier score, plus parity and calibration plots and input relevance.",
+          "parts": [
+            "model"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Tick the objectives to run (nominal, expected, 5 % quantile, CVaR, chance-constrained) and decide with the learned model, the hidden truth, or both. 'Optimise and deploy' prints each recommendation on fresh batches and compares failure rate, expected utility and strength distributions.",
+          "parts": [
+            "optimise"
+          ]
+        },
+        {
+          "step": "propose the next runs and iterate",
+          "here": "Choose an acquisition strategy and a number of jobs, then 'Propose experiments'. 'Print them and retrain' appends the simulated results and refits, and a regret chart tracks the true quality of each round's recommendation.",
+          "parts": [
+            "next-experiments"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Copy CSV' exports the campaign, and 'Copy as a CSV template' writes the proposed jobs in the import schema, ready to fill in after printing.",
+          "parts": [
+            "campaign",
+            "next-experiments"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The input is a probability distribution over a composition simplex rather than a fixed value, so settings are chosen for the next, uncharacterised batch.",
+        "Risk objectives (quantile, CVaR, chance constraint) are compared with a nominal objective under a minimum print-success constraint.",
+        "A hidden ground-truth simulator lets the person reveal true values and score recommendations by regret. With imported real data, scoring is turned off and only model predictions are shown.",
+        "Each recommendation reports what share of its predictive variance comes from the feedstock rather than from the model or noise.",
+        "Proposed experiments carry a cost (setup plus relative print time), and a cost-aware strategy can be chosen."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "job-ticket",
+      "level": "view",
+      "parent": null,
+      "title": "Job ticket",
+      "summary": "A sidebar of sliders that set the feedstock composition distribution, batch consistency, moisture and the eight print settings that every step uses.",
+      "views": [
+        "sidebar list",
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/web/src/ui/Rail.tsx",
+          "start": 37,
+          "end": 133,
+          "role": "markup",
+          "anchor": "7b308f825e91",
+          "first": "return ("
+        },
+        {
+          "file": "code/web/src/ui/Rail.tsx",
+          "start": 15,
+          "end": 134,
+          "role": "logic",
+          "symbol": "Rail",
+          "anchor": "34e69796e958",
+          "first": "export function Rail() {"
+        },
+        {
+          "file": "code/web/src/ui/Rail.tsx",
+          "start": 28,
+          "end": 35,
+          "role": "logic",
+          "symbol": "setPart",
+          "anchor": "3242ee286546",
+          "first": "const setPart = (i: number, value: number) => {"
+        },
+        {
+          "file": "code/web/src/ui/controls.tsx",
+          "start": 7,
+          "end": 7,
+          "role": "logic",
+          "symbol": "Slider",
+          "anchor": "b8ad6439e3e8",
+          "first": "export function Slider({ id, label, value, min, max, step, onChange, format, hint }: { id: string; label: ReactNode; val"
+        },
+        {
+          "file": "code/web/src/ui/controls.tsx",
+          "start": 42,
+          "end": 42,
+          "role": "logic",
+          "symbol": "CompositionBar",
+          "anchor": "30fad69f76f6",
+          "first": "export function CompositionBar({ composition, title }: { composition: number[]; title?: string }) {"
+        },
+        {
+          "file": "code/web/src/styles.css",
+          "start": 151,
+          "end": 155,
+          "role": "style",
+          "symbol": ".rail",
+          "anchor": "c6a807293ee5",
+          "first": ".rail {"
+        },
+        {
+          "file": "code/web/src/styles.css",
+          "start": 171,
+          "end": 171,
+          "role": "style",
+          "symbol": ".field",
+          "anchor": "a41aa4595ed9",
+          "first": ".field { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; }"
+        },
+        {
+          "file": "code/web/src/styles.css",
+          "start": 177,
+          "end": 177,
+          "role": "style",
+          "symbol": ".comp-bar",
+          "anchor": "1ef36845cc7e",
+          "first": ".comp-bar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; gap: 1px; background: var(--surface); }"
+        },
+        {
+          "file": "code/web/src/state.tsx",
+          "start": 68,
+          "end": 98,
+          "role": "logic",
+          "symbol": "reducer",
+          "anchor": "4b9e8586fcc5",
+          "first": "function reducer(state: AppState, action: Action): AppState {"
+        }
+      ]
+    },
+    {
+      "id": "bench",
+      "level": "view",
+      "parent": null,
+      "title": "Print bench",
+      "summary": "Shows the simulated outcome at the ticket's settings for the average batch, how strength is lost factor by factor, a strip of random batches, and response curves for one chosen setting with bands across batches.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "line chart"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/web/src/views/Bench.tsx",
+          "start": 182,
+          "end": 230,
+          "role": "logic",
+          "symbol": "Bench",
+          "anchor": "dad50e550f43",
+          "first": "export function Bench() {"
+        },
+        {
+          "file": "code/web/src/views/Bench.tsx",
+          "start": 18,
+          "end": 18,
+          "role": "logic",
+          "symbol": "Waterfall",
+          "anchor": "b81973b4814b",
+          "first": "function Waterfall({ factors, final }: { factors: ReturnType<typeof trueOutcome>[\"factors\"]; final: number }) {"
+        },
+        {
+          "file": "code/web/src/views/Bench.tsx",
+          "start": 61,
+          "end": 61,
+          "role": "logic",
+          "symbol": "BatchStrip",
+          "anchor": "3a9eb9ffed03",
+          "first": "function BatchStrip({ seed }: { seed: number }) {"
+        },
+        {
+          "file": "code/web/src/views/Bench.tsx",
+          "start": 126,
+          "end": 180,
+          "role": "logic",
+          "symbol": "ResponseCurves",
+          "anchor": "39d4dc76d675",
+          "first": "function ResponseCurves() {"
+        },
+        {
+          "file": "code/web/src/styles.css",
+          "start": 273,
+          "end": 273,
+          "role": "style",
+          "symbol": ".waterfall",
+          "anchor": "1426d74337f6",
+          "first": ".waterfall { display: flex; flex-direction: column; gap: 4px; }"
+        },
+        {
+          "file": "code/web/src/styles.css",
+          "start": 269,
+          "end": 269,
+          "role": "style",
+          "symbol": ".batch-strip",
+          "anchor": "66ec07713bcd",
+          "first": ".batch-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(13px, 1fr)); gap: 3px; }"
+        },
+        {
+          "file": "code/web/src/styles.css",
+          "start": 193,
+          "end": 193,
+          "role": "style",
+          "symbol": ".readouts",
+          "anchor": "7294dd5a03d7",
+          "first": ".readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }"
+        }
+      ]
+    },
+    {
+      "id": "campaign",
+      "level": "view",
+      "parent": null,
+      "title": "Virtual print campaign",
+      "summary": "Runs a simulated campaign or imports and validates a CSV of real runs, then shows a lab notebook of jobs with summary counts, a strength histogram, an optional reveal of the true values, and CSV copy.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/web/src/views/Campaign.tsx",
+          "start": 114,
+          "end": 214,
+          "role": "logic",
+          "symbol": "Campaign",
+          "anchor": "d87da5fe8f82",
+          "first": "export function Campaign() {"
+        },
+        {
+          "file": "code/web/src/views/Campaign.tsx",
+          "start": 11,
+          "end": 11,
+          "role": "logic",
+          "symbol": "JobsTable",
+          "anchor": "bcec3c8ba505",
+          "first": "function JobsTable({ jobs, showTruth }: { jobs: Job[]; showTruth: boolean }) {"
+        },
+        {
+          "file": "code/web/src/views/Campaign.tsx",
+          "start": 56,
+          "end": 112,
+          "role": "logic",
+          "symbol": "ImportPanel",
+          "anchor": "69a78ad27798",
+          "first": "function ImportPanel() {"
+        },
+        {
+          "file": "code/web/src/engine/campaign.ts",
+          "start": 62,
+          "end": 67,
+          "role": "logic",
+          "symbol": "generateCampaign",
+          "anchor": "f6fa438a840f",
+          "first": "export function generateCampaign("
+        },
+        {
+          "file": "code/web/src/engine/campaign.ts",
+          "start": 150,
+          "end": 237,
+          "role": "logic",
+          "symbol": "parseCsv",
+          "anchor": "8f71b5cfb5f2",
+          "first": "export function parseCsv(text: string): ParseResult {"
+        },
+        {
+          "file": "code/web/src/engine/campaign.ts",
+          "start": 96,
+          "end": 116,
+          "role": "logic",
+          "symbol": "toCsv",
+          "anchor": "6c32fd571059",
+          "first": "export function toCsv(jobs: Job[]): string {"
+        },
+        {
+          "file": "code/web/src/styles.css",
+          "start": 234,
+          "end": 234,
+          "role": "style",
+          "symbol": ".table-wrap",
+          "anchor": "6e05ff008c2f",
+          "first": ".table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }"
+        },
+        {
+          "file": "code/web/src/styles.css",
+          "start": 228,
+          "end": 228,
+          "role": "style",
+          "symbol": ".callout",
+          "anchor": "7ae0d09643c4",
+          "first": ".callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 9px 12px; border-radius: 0 var"
+        }
+      ]
+    },
+    {
+      "id": "model",
+      "level": "view",
+      "parent": null,
+      "title": "Learn from the campaign",
+      "summary": "Trains the strength model and success classifier, and scores them on held-out batches with metrics, a predicted-vs-measured plot, a calibration curve, input relevance and a check of the noise the model believes in.",
+      "views": [
+        "summary stats",
+        "scatter plot",
+        "line chart",
+        "bar chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/web/src/views/ModelView.tsx",
+          "start": 148,
+          "end": 185,
+          "role": "logic",
+          "symbol": "ModelView",
+          "anchor": "e25f6db88434",
+          "first": "export function ModelView() {"
+        },
+        {
+          "file": "code/web/src/views/ModelView.tsx",
+          "start": 32,
+          "end": 32,
+          "role": "logic",
+          "symbol": "Results",
+          "anchor": "9b7926590bae",
+          "first": "function Results({ r, synthetic }: { r: TrainResult; synthetic: boolean }) {"
+        },
+        {
+          "file": "code/web/src/views/ModelView.tsx",
+          "start": 11,
+          "end": 30,
+          "role": "logic",
+          "symbol": "useTrainer",
+          "anchor": "f728dacc5ffc",
+          "first": "export function useTrainer() {"
+        },
+        {
+          "file": "code/web/src/worker/compute.ts",
+          "start": 48,
+          "end": 126,
+          "role": "logic",
+          "symbol": "train",
+          "anchor": "ef69b2857cf8",
+          "first": "export function train(state: ComputeState, req: TrainRequest, progress: Progress): TrainResult {"
+        }
+      ]
+    },
+    {
+      "id": "optimise",
+      "level": "view",
+      "parent": null,
+      "title": "Optimise and deploy",
+      "summary": "Optimises settings under the chosen risk objectives with the learned model, the hidden truth, or both, then compares failure rate, expected utility and the strength distributions of the recommendations on fresh batches. 'Use' sends a recommendation to the ticket.",
+      "views": [
+        "form",
+        "bar chart",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "side-by-side comparison",
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/web/src/views/Optimise.tsx",
+          "start": 96,
+          "end": 265,
+          "role": "logic",
+          "symbol": "Optimise",
+          "anchor": "8aefe51d3f41",
+          "first": "export function Optimise() {"
+        },
+        {
+          "file": "code/web/src/views/Optimise.tsx",
+          "start": 23,
+          "end": 23,
+          "role": "logic",
+          "symbol": "RecommendationTable",
+          "anchor": "0b4f6a73ca35",
+          "first": "function RecommendationTable({ recs, onApply, scored }: { recs: Recommendation[]; onApply: (r: Recommendation) => void; "
+        },
+        {
+          "file": "code/web/src/views/Optimise.tsx",
+          "start": 17,
+          "end": 21,
+          "role": "logic",
+          "symbol": "shares",
+          "anchor": "049c5ecd6190",
+          "first": "function shares(r: Recommendation) {"
+        },
+        {
+          "file": "code/web/src/worker/compute.ts",
+          "start": 138,
+          "end": 153,
+          "role": "logic",
+          "symbol": "optimise",
+          "anchor": "dbbb3dfeaf8d",
+          "first": "export function optimise(state: ComputeState, req: OptimiseRequest, progress: Progress): OptimiseResult {"
+        }
+      ]
+    },
+    {
+      "id": "next-experiments",
+      "level": "view",
+      "parent": null,
+      "title": "Next experiments",
+      "summary": "Proposes the next jobs with an acquisition strategy, lists them with a target blend, settings, predicted strength and cost, and can print them in the simulator and retrain. A regret curve tracks each round, and the jobs can be copied out as a CSV template.",
+      "views": [
+        "form",
+        "table view",
+        "line chart"
+      ],
+      "interactions": [
+        "export",
+        "hover for detail"
+      ],
+      "patterns": [
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/web/src/views/Experiments.tsx",
+          "start": 21,
+          "end": 197,
+          "role": "logic",
+          "symbol": "Experiments",
+          "anchor": "aeda0100e232",
+          "first": "export function Experiments() {"
+        },
+        {
+          "file": "code/web/src/views/Experiments.tsx",
+          "start": 32,
+          "end": 46,
+          "role": "logic",
+          "symbol": "propose",
+          "anchor": "a7338e57c33d",
+          "first": "const propose = async () => {"
+        },
+        {
+          "file": "code/web/src/views/Experiments.tsx",
+          "start": 48,
+          "end": 62,
+          "role": "logic",
+          "symbol": "printProposals",
+          "anchor": "7c0526cdcadf",
+          "first": "const printProposals = async () => {"
+        },
+        {
+          "file": "code/web/src/views/Experiments.tsx",
+          "start": 64,
+          "end": 78,
+          "role": "logic",
+          "symbol": "copyTemplate",
+          "anchor": "3632b13c6d64",
+          "first": "const copyTemplate = async () => {"
+        },
+        {
+          "file": "code/web/src/engine/acquisition.ts",
+          "start": 39,
+          "end": 105,
+          "role": "logic",
+          "symbol": "selectExperiments",
+          "anchor": "61b41c1d5108",
+          "first": "export function selectExperiments("
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,438 @@
+{
+  "schema": "astaui.card/1",
+  "id": "asms-pooling-calculator",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T22:32:56Z"
+  },
+  "app": {
+    "title": "ASMS Compound Pooling Panels",
+    "summary": "A person enters a plate-name prefix and loads a structure library file. They can also load a master map of where each compound sits on its stock plates, which they can first flatten from a visual grid and clear of wells with too little volume left. The tool predicts each compound's ionisation mode and target m/z, then spreads compounds into mixed pools. Similar masses go to different wells, and the tool works out source-well top-up volumes and transfer volumes to the assay plates. It checks that the pools fit the well volume and keeps far enough apart in mass, and it exports source and assay manifests, liquid-handler picklists and a standalone clickable plate map. After the run, the person loads the handler's exception report, and the tool drops the transfers that failed, recalculates the pools and top-ups, and exports corrected files.",
+    "task": {
+      "text": "Design pooled compound plates for a mass-spectrometry screen so that no two compounds in a well have clashing masses, produce the transfer files a liquid handler needs, and correct them after the run.",
+      "verbs": [
+        "plan",
+        "derive",
+        "organize",
+        "clean",
+        "reconcile"
+      ]
+    },
+    "data": {
+      "text": "A library of chemical structures with computed masses, matched to stock-plate locations and measured well volumes. It is laid out as pools on 384-well source plates and 96-well assay plates, with per-transfer tables for a liquid handler.",
+      "item": "a compound, assigned to a pooled well on a source plate and a well on an assay plate",
+      "shapes": [
+        "table",
+        "per element",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "planning plate layouts and liquid transfers for a pooled screen before it runs, then correcting them after the dispense",
+      "terms": [
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar of volume, concentration and pool-size settings drives four tabbed tools: a pooling engine, a map flattener, a volume pre-filter and a post-run reconciler. Each tool takes uploaded files, shows summary counts, warnings and a table preview, and offers downloads. One download is a standalone plate map where a person switches between source and assay plates, steps through plates, and clicks a coloured well to see its compounds and structures.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view",
+        "fixed-layout grid",
+        "detail panel"
+      ],
+      "interactions": [
+        "import",
+        "export",
+        "select",
+        "toggle view",
+        "filter",
+        "exclude and refit"
+      ],
+      "patterns": [
+        "overview and detail",
+        "master-detail"
+      ]
+    },
+    "field": {
+      "text": "compound pooling and plate design for affinity selection mass spectrometry screening in drug discovery",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "affinity selection mass spectrometry",
+        "high throughput screening",
+        "cheminformatics"
+      ]
+    },
+    "workflow": {
+      "name": "pack items into pooled wells on plates and generate transfer lists",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Enter a required plate-name prefix, upload a structure library file and, optionally, a master map of where each compound sits on its stock plates. Pool size, volumes and concentrations are set in the sidebar.",
+          "parts": [
+            "config-sidebar",
+            "pooling-engine"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Flatten 2D grid sheets of the stock plates into a list of compound, plate and well. Join that list to a volume survey and drop wells below a dispense cutoff, which produces a cleaned map and a reorder list.",
+          "parts": [
+            "map-unpivoter",
+            "survey-prefilter"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Parse each structure, keep the largest fragment, and predict positive or negative mode from substructure patterns to get the target m/z. Sort by m/z within each mode, stride the compounds into pools, and compute the solvent top-up and transfer volumes.",
+          "parts": [
+            "pooling-engine"
+          ]
+        },
+        {
+          "step": "check the result against constraints",
+          "here": "Block the run if the pool would overflow the source well. Show counts of compounds, pools, plates and top-up actions, list skipped records with reasons, and warn about pools whose smallest m/z gap is below the threshold.",
+          "parts": [
+            "pooling-engine"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download a stock-to-source consolidation picklist, a source prep workbook, an assay run manifest, a dispenser picklist and a standalone HTML plate map, with a preview of the combined table.",
+          "parts": [
+            "campaign-downloads"
+          ]
+        },
+        {
+          "step": "look over every item at a glance, then open one in detail",
+          "here": "In the exported map, switch between 384-well source plates and 96-well assay plates and page through the plates. Wells are coloured by mode, and dashed borders mark wells that need a top-up or have an incomplete pool. Clicking a well lists its compounds with mass, m/z and a drawn structure.",
+          "parts": [
+            "plate-navigator",
+            "well-inspector"
+          ]
+        },
+        {
+          "step": "exclude bad items and recompute",
+          "here": "Upload the source manifest and the dispenser's exception report. Failed transfers are dropped, then pool sizes, top-up volumes, status and transfer volumes are recalculated, and the tool exports a full top-up picklist, a top-up for the failed transfers only, and corrected deliverables.",
+          "parts": [
+            "post-run-reconciler"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Compounds are sorted by predicted m/z within each ionisation mode and assigned to wells by a modular stride, so compounds that share a well are far apart in mass. Pools whose smallest m/z gap falls below a set threshold are flagged.",
+        "Each compound's ionisation mode is predicted from substructure patterns, and negative-mode and positive-mode pools are placed in separate blocks so the instrument runs each polarity without switching.",
+        "Volumes are tracked through the whole transfer chain: stock plate to source well to assay well. Each pool is topped up with solvent to a fixed volume, and the transfer volume is computed from stock concentration and target concentration.",
+        "After the run, the dispenser's exception report drives the corrections: failed transfers are removed, and the top-up and pool status are recalculated for each affected well.",
+        "The plate map is exported as a single self-contained HTML file with the data and structure drawings embedded, so it opens without a server."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "config-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Configuration panel",
+      "summary": "Holds the pool size, minimum m/z gap, stock concentration, aliquot and source-well volumes, and assay volume and concentration that every tab uses.",
+      "views": [
+        "form"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 12,
+          "end": 40,
+          "role": "markup",
+          "anchor": "dd107cc6c924",
+          "first": "st.set_page_config(page_title=\"ASMS Pooling Panels\", page_icon=\"⚜\", layout=\"wide\")"
+        }
+      ]
+    },
+    {
+      "id": "pooling-engine",
+      "level": "view",
+      "parent": null,
+      "title": "Pooling engine",
+      "summary": "Takes a structure library file and optional stock map, predicts mode and m/z, strides compounds into pooled wells, computes volumes, and reports counts, skipped records and m/z-gap warnings.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 319,
+          "end": 346,
+          "role": "markup",
+          "anchor": "8a8465bd70c9",
+          "first": "with tab1:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 348,
+          "end": 433,
+          "role": "logic",
+          "symbol": "process_sdf",
+          "anchor": "987e5572af3a",
+          "first": "def process_sdf(file_path):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 435,
+          "end": 503,
+          "role": "logic",
+          "symbol": "assign_wells_advanced",
+          "anchor": "4a63bd775760",
+          "first": "def assign_wells_advanced(df, target_size, prefix, vol_comp, target_source_vol_ul, lib_stock_uM, assay_vol, assay_conc):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 505,
+          "end": 586,
+          "role": "logic",
+          "anchor": "544e593a4cb3",
+          "first": "# Main Pipeline Execution"
+        }
+      ]
+    },
+    {
+      "id": "campaign-downloads",
+      "level": "component",
+      "parent": "pooling-engine",
+      "title": "Campaign downloads",
+      "summary": "Builds the consolidation picklist, source and assay workbooks, HTML plate map and dispenser picklist, and previews the combined table.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 587,
+          "end": 715,
+          "role": "logic",
+          "anchor": "5dfd89ae6e13",
+          "first": "st.markdown(\"### Download Campaign Assets\")"
+        }
+      ]
+    },
+    {
+      "id": "map-unpivoter",
+      "level": "view",
+      "parent": null,
+      "title": "Plate map unpivoter",
+      "summary": "Turns grid-shaped spreadsheet sheets of plate contents into a flat list of compound, plate and well, then previews and exports it.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 717,
+          "end": 752,
+          "role": "logic",
+          "anchor": "b88b30685649",
+          "first": "# =========================================="
+        }
+      ]
+    },
+    {
+      "id": "survey-prefilter",
+      "level": "view",
+      "parent": null,
+      "title": "Survey volume pre-filter",
+      "summary": "Joins the flat stock map to a measured-volume survey, splits wells at a volume cutoff, and exports a cleaned map and a reorder list of depleted compounds.",
+      "views": [
+        "form",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 754,
+          "end": 849,
+          "role": "logic",
+          "anchor": "20a018f34658",
+          "first": "# =========================================="
+        }
+      ]
+    },
+    {
+      "id": "post-run-reconciler",
+      "level": "view",
+      "parent": null,
+      "title": "Post-run reconciler",
+      "summary": "Removes failed transfers listed in the dispenser's exception report from the manifest, recalculates pool sizes, top-up and transfer volumes, and exports top-up picklists and corrected deliverables.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "exclude and refit",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 851,
+          "end": 872,
+          "role": "markup",
+          "anchor": "64ee75d3d716",
+          "first": "# =========================================="
+        },
+        {
+          "file": "code/app.py",
+          "start": 873,
+          "end": 880,
+          "role": "logic",
+          "symbol": "normalize_well",
+          "anchor": "0fe1b3eb41b9",
+          "first": "def normalize_well(well_str):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 882,
+          "end": 1119,
+          "role": "logic",
+          "anchor": "03611225cf52",
+          "first": "if manifest_up is not None and report_up is not None:"
+        }
+      ]
+    },
+    {
+      "id": "plate-navigator",
+      "level": "view",
+      "parent": null,
+      "title": "Exported plate map navigator",
+      "summary": "A standalone page that draws one source or assay plate as a well grid coloured by mode, with dashed borders for wells needing a top-up or holding an incomplete pool, and lets the person switch plate type and step through plates.",
+      "views": [
+        "fixed-layout grid"
+      ],
+      "interactions": [
+        "toggle view",
+        "select"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 42,
+          "end": 88,
+          "role": "logic",
+          "symbol": "generate_dual_interactive_html",
+          "anchor": "a1fe9d36c691",
+          "first": "def generate_dual_interactive_html(df, target_pool_max):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 94,
+          "end": 129,
+          "role": "style",
+          "anchor": "6971eeb0d872",
+          "first": "body { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Arial, sans-serif; background-color: #f8f9fa;"
+        },
+        {
+          "file": "code/app.py",
+          "start": 146,
+          "end": 164,
+          "role": "markup",
+          "anchor": "a15a36e42d3e",
+          "first": "<div class=\"header\">"
+        },
+        {
+          "file": "code/app.py",
+          "start": 174,
+          "end": 272,
+          "role": "logic",
+          "anchor": "cd8c4f257030",
+          "first": "const masterDataset = {js_data_payload};"
+        },
+        {
+          "file": "code/app.py",
+          "start": 310,
+          "end": 315,
+          "role": "logic",
+          "anchor": "bd5accf60c09",
+          "first": "setViewType('source');"
+        }
+      ]
+    },
+    {
+      "id": "well-inspector",
+      "level": "component",
+      "parent": "plate-navigator",
+      "title": "Well pool inspector",
+      "summary": "When a well is clicked, lists every compound in it with its ID, exact mass, target m/z, SMILES and a drawn structure, and tags the top-up volume or incomplete-pool status.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 131,
+          "end": 141,
+          "role": "style",
+          "anchor": "4d8eecf90e77",
+          "first": ".display-panel { flex: 1; min-width: 400px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px"
+        },
+        {
+          "file": "code/app.py",
+          "start": 165,
+          "end": 170,
+          "role": "markup",
+          "anchor": "e873c05cb3da",
+          "first": "<div class=\"display-panel\">"
+        },
+        {
+          "file": "code/app.py",
+          "start": 274,
+          "end": 308,
+          "role": "logic",
+          "anchor": "91dd15c8a17c",
+          "first": "function selectWell(wellName, compounds, element) {"
+        }
+      ]
+    }
+  ]
+}

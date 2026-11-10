@@ -16,11 +16,11 @@ from .cards import card_text, facet_text, part_spans, slug, structure_text, work
 from .index import Index
 from .kb import KB
 from .ontology import FACETS, LISTS, Ontology
-from .vec import Vector, dot, place_by_neighbours, project_2d
+from .vec import Vector, VecSet, dot, place_by_neighbours, project_2d
 
 # The representations a build can be placed by, with the short key each is stored under.
 CHANNELS: List[Tuple[str, str, str, str]] = [
-    ("c", "card", "Card", "The whole card: summary, workflow and the five facets"),
+    ("c", "card", "All", "Every part of the card together, its summary, workflow and five facets"),
     ("w", "workflow", "Workflow", "The general workflow: its name and steps, in words any science could use"),
     ("s", "structure", "Structure", "The ontology's words for task, data, stage and mechanism, with nothing from the field"),
     ("d", "data", "Data", "The data facet: what the data is and what one item is"),
@@ -30,6 +30,9 @@ CHANNELS: List[Tuple[str, str, str, str]] = [
     ("p", "prompt", "Prompts", "The prompts alone"),
 ]
 KEY = {name: key for key, name, _, _ in CHANNELS}
+# The representations made from the card, so the ones the older card set places
+# differently. Prompts and code, and Prompts, are the same under either set.
+CARD_KEYS = ("c", "w", "s", "d", "t", "m")
 
 # The lists of words a card is described with, as the Types view shows them.
 TERM_LISTS: List[Tuple[str, str, str, str]] = [
@@ -93,9 +96,34 @@ def fit_box(pts: Sequence[Tuple[float, float]], margin: float = 0.06) -> List[Tu
 
 def cluster_order(ids: List[str], sim: Dict[Tuple[str, str], float]) -> List[str]:
     """An order for the similarity matrix that puts alike builds next to each other:
-    average-linkage clustering, read off leaf by leaf."""
+    average-linkage clustering, read off leaf by leaf. With numpy it keeps each pair
+    of clusters' summed similarity and merges in the same order as the plain loop
+    below, which takes minutes past a few hundred builds."""
     def s(a: str, b: str) -> float:
         return sim.get((a, b), sim.get((b, a), 0.0))
+
+    try:
+        import numpy as np
+    except ImportError:
+        np = None
+    if np is not None and len(ids) > 2:
+        n = len(ids)
+        tot = np.array([[s(a, b) if a != b else 0.0 for b in ids] for a in ids], dtype=float)
+        size = np.ones(n)
+        members: List[List[str]] = [[i] for i in ids]
+        while len(members) > 1:
+            k = len(members)
+            avg = tot / np.outer(size, size)
+            avg[np.tril_indices(k)] = -np.inf
+            x, y = divmod(int(np.argmax(avg)), k)
+            row = tot[x] + tot[y]
+            keep = [c for c in range(k) if c not in (x, y)]
+            merged = members[x] + members[y]
+            members = [members[c] for c in keep] + [merged]
+            tot = np.pad(tot[np.ix_(keep, keep)], ((0, 1), (0, 1)))
+            tot[-1, :-1] = tot[:-1, -1] = row[keep]
+            size = np.append(size[keep], size[x] + size[y])
+        return members[0]
 
     clusters: List[List[str]] = [[i] for i in ids]
     while len(clusters) > 1:
@@ -124,6 +152,16 @@ class Atlas:
         self.ids = sorted(self.builds)
         self.space = space or StepSpace(index, self.cards)
         self._families = None
+        self._grams: Dict[str, Dict[str, Dict[str, float]]] = {}
+
+    def _sims(self, name: str) -> Dict[str, Dict[str, float]]:
+        """Every pair's similarity in one channel, worked out once: sims[a][b]."""
+        if name not in self._grams:
+            vecs = self.index.channel(name)
+            ids = [i for i in self.ids if i in vecs]
+            g = VecSet([vecs[i] for i in ids]).gram()
+            self._grams[name] = {a: dict(zip(ids, row)) for a, row in zip(ids, g)}
+        return self._grams[name]
 
     # -- families --------------------------------------------------------------------------
     def families(self) -> Dict[str, Any]:
@@ -141,18 +179,26 @@ class Atlas:
         return out
 
     # -- the map ------------------------------------------------------------------------------
-    def layouts(self) -> Dict[str, Dict[str, Tuple[float, float]]]:
+    def layouts(self, align_to: Optional[Dict[str, Dict[str, Tuple[float, float]]]] = None,
+                keys: Optional[Sequence[str]] = None) -> Dict[str, Dict[str, Tuple[float, float]]]:
         """Every build's place under every representation. Each layout is turned to sit
         as close as it can to the card's, so switching representation moves the
-        builds that really move and does not spin the whole picture."""
+        builds that really move and does not spin the whole picture. With
+        ``align_to`` (another card set's layouts), each layout is turned to sit as
+        close as it can to that set's layout of the same representation instead, so
+        switching card sets moves only the builds whose cards moved."""
         out: Dict[str, Dict[str, Tuple[float, float]]] = {}
         ref: Optional[Dict[str, Tuple[float, float]]] = None
         for key, name, _, _ in CHANNELS:
+            if keys is not None and key not in keys:
+                continue
             vecs = self.index.channel(name)
             ids = [i for i in self.ids if i in vecs]
             if len(ids) < 2:
                 continue
             pts, _ = project_2d([vecs[i] for i in ids])
+            if align_to is not None:
+                ref = align_to.get(key)
             if ref is not None:
                 common = [k for k, i in enumerate(ids) if i in ref]
                 if len(common) >= 3:
@@ -161,7 +207,7 @@ class Atlas:
             pts = fit_box(pts)
             layout = {i: (_round(p[0]), _round(p[1])) for i, p in zip(ids, pts)}
             out[key] = layout
-            if ref is None:
+            if ref is None and align_to is None:
                 ref = layout
         return out
 
@@ -169,10 +215,11 @@ class Atlas:
         out: Dict[str, Dict[str, List[Tuple[str, float]]]] = {}
         for key, name, _, _ in CHANNELS:
             vecs = self.index.channel(name)
+            sim = self._sims(name)
             for i in self.ids:
                 if i not in vecs:
                     continue
-                sims = sorted(((dot(vecs[i], vecs[j]), j) for j in self.ids if j != i and j in vecs), reverse=True)[:k]
+                sims = sorted(((sim[i][j], j) for j in self.ids if j != i and j in vecs), reverse=True)[:k]
                 out.setdefault(i, {})[key] = [(j, _round(s)) for s, j in sims]
         return out
 
@@ -223,8 +270,9 @@ class Atlas:
             if len(ids) <= k:
                 continue
             kept = 0
+            sim = self._sims(name)
             for i in ids:
-                full = sorted((j for j in ids if j != i), key=lambda j: -dot(vecs[i], vecs[j]))[:k]
+                full = sorted((j for j in ids if j != i), key=lambda j: -sim[i][j])[:k]
                 xi, yi = layouts[key][i]
                 flat = sorted((j for j in ids if j != i), key=lambda j: (layouts[key][j][0] - xi) ** 2 + (layouts[key][j][1] - yi) ** 2)[:k]
                 kept += len(set(full) & set(flat))
@@ -263,7 +311,7 @@ class Atlas:
         wa = [s for s in (self.cards[a]["app"].get("workflow") or {}).get("steps") or [] if s.get("step")]
         wb = [s for s in (self.cards[b]["app"].get("workflow") or {}).get("steps") or [] if s.get("step")]
         va, vb = self.space.vecs.get(a, []), self.space.vecs.get(b, [])
-        pairs = self.space.align(va, vb) if va and vb else []
+        pairs = self.space.align(va, vb, a, b) if va and vb else []
         shared = []
         for i, j, sim in sorted(pairs):
             shared.append({"a": wa[i]["step"], "b": wb[j]["step"], "a_here": wa[i].get("here", ""), "b_here": wb[j].get("here", ""),
@@ -278,11 +326,12 @@ class Atlas:
         raw: Dict[str, Dict[Tuple[str, str], float]] = {}
         for key, name, _, _ in CHANNELS:
             vecs = self.index.channel(name)
+            sim = self._sims(name)
             vals = {}
             for i in self.ids:
                 for j in self.ids:
                     if i < j and i in vecs and j in vecs:
-                        vals[(i, j)] = dot(vecs[i], vecs[j])
+                        vals[(i, j)] = sim[i][j]
             raw[key] = vals
         scaled: Dict[str, Dict[Tuple[str, str], float]] = {}
         for key, vals in raw.items():
@@ -337,7 +386,7 @@ class Atlas:
             for m in members:
                 if m == central:
                     continue
-                pairs = {i: j for i, j, _ in self.space.align(self.space.vecs.get(central, []), self.space.vecs.get(m, []))}
+                pairs = {i: j for i, j, _ in self.space.align(self.space.vecs.get(central, []), self.space.vecs.get(m, []), central, m)}
                 taken = set()
                 for i, j in pairs.items():
                     rows[i]["cells"][m] = steps_of[m][j].get("here", "")
@@ -350,9 +399,7 @@ class Atlas:
                     for row in rows:
                         if row["anchor"][0] != central and m not in row["cells"]:
                             a, ai = row["anchor"]
-                            av = self.space.vecs.get(a, [])[ai][0] if self.space.vecs.get(a) else None
-                            bv = self.space.vecs.get(m, [])[j][0] if self.space.vecs.get(m) else None
-                            if av is not None and bv is not None and dot(av, bv) >= self.space.tau:
+                            if self.space.same_move(a, ai, m, j):
                                 row["cells"][m] = st.get("here", "")
                                 placed = True
                                 break
@@ -372,9 +419,10 @@ class Atlas:
         """What the knowledge base is made of: how many builds have each value of each
         fact, and how much code each build has, by role, against the size of the slice
         a search hands back for one part."""
-        from .slices import slice_part
-        from .symbols import index_build
+        from . import memo
 
+        if getattr(self, "_composition", None) is not None:
+            return self._composition
         facts = self.facts()
 
         def count(key: str) -> List[Tuple[str, List[str]]]:
@@ -393,7 +441,6 @@ class Atlas:
             sizes: List[int] = []
             card = self.cards.get(i)
             if card:
-                syms = index_build(b)
                 seen = set()
                 for p in card.get("parts", []):
                     for sp in part_spans(p):
@@ -401,11 +448,12 @@ class Atlas:
                             if (sp["file"], n) not in seen:
                                 seen.add((sp["file"], n))
                                 roles[sp["role"]] = roles.get(sp["role"], 0) + 1
-                    sizes.append(slice_part(self.kb, i, p, symbols=syms)["lines"])
+                sizes = list(memo.slice_lines(self.kb, b, card))
             sizes.sort()
             code.append({"id": i, "lines": lines, "roles": roles, "slice_median": sizes[len(sizes) // 2] if sizes else 0,
                          "parts": len(card.get("parts", [])) if card else 0})
-        return {key: count(key) for key in ("d", "f", "k", "c", "s", "t", "g", "p")} | {"code": code}
+        self._composition = {key: count(key) for key in ("d", "f", "k", "c", "s", "t", "g", "p")} | {"code": code}
+        return self._composition
 
     # -- colours --------------------------------------------------------------------------------------
     def colour_slots(self) -> Dict[str, Dict[str, Any]]:

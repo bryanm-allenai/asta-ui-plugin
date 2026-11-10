@@ -1,0 +1,522 @@
+{
+  "schema": "astaui.card/1",
+  "id": "population-pulse",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T19:25:03Z"
+  },
+  "app": {
+    "title": "population-pulse",
+    "summary": "The person picks a date range, then checks whether the latest week of the outcome series is high, normal or low for the time of year, and how fresh each source is. They look at all the weekly series together as z-scores on one timeline, with event markers. Then they choose one candidate driver and scan lags 0 to 8 weeks for cross-correlation, corrected for multiple comparisons. At the chosen lag they fit a surge logistic regression and a count regression, and check those fits out of sample with walk-forward validation. Finally they check whether the drivers are confounded with each other, correct every driver-lag test together, and can download the aligned weekly table as CSV.",
+    "task": {
+      "text": "Find out which candidate weekly signals lead an outcome series, at which lag and how robustly, before running confirmatory studies.",
+      "verbs": [
+        "derive",
+        "explore",
+        "compare",
+        "monitor",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Several sources of time series, each brought to one weekly timeline, plus a dated list of events. One series is the outcome and the others are candidate drivers.",
+      "item": "one week's aggregated value for one signal",
+      "shapes": [
+        "time series",
+        "events",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "exploring and analysing candidate leading indicators of an outcome series, before confirmatory event studies",
+      "terms": [
+        "explore",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar date range filters every view. Three tabs follow: an overview of status and data freshness, a z-scored multi-series timeline with event rules, and an analysis tab. In the analysis tab, choosing a driver drives a lag-correlation bar chart, regressions at a lag set with a slider, walk-forward validation, a driver-by-driver correlation heatmap with VIF, and a correction table covering every driver and lag.",
+      "views": [
+        "summary stats",
+        "line chart",
+        "bar chart",
+        "heatmap",
+        "table view"
+      ],
+      "interactions": [
+        "time slider",
+        "filter",
+        "multi-select",
+        "select",
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "dashboard",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "lagged cross-correlation and count regression of weekly syndromic surveillance data in epidemiology",
+      "disciplines": [
+        "medicine"
+      ],
+      "terms": [
+        "epidemiology",
+        "syndromic surveillance",
+        "lagged cross correlation"
+      ]
+    },
+    "workflow": {
+      "name": "test which candidate series lead an outcome series, and at what lag",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pre-ingested weekly signals load automatically: local Parquet first, then a remote data branch, then synthetic samples. The person picks a city.",
+          "parts": [
+            "date-range-sidebar"
+          ]
+        },
+        {
+          "step": "filter to the period that matters",
+          "here": "1Y / 2Y / 5Y / All preset buttons, or From and To dates, restrict every signal before it is aligned to weeks.",
+          "parts": [
+            "date-range-sidebar"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "Metrics show the latest outcome week against its seasonal baseline, with an elevated, normal or below banner, a table of events and a per-signal freshness table. A multi-select chooses which series to overlay as z-scores, with dashed event rules and a provisional-data line.",
+          "parts": [
+            "overview-status",
+            "signal-timeline"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The person picks a driver and can choose to deseasonalize first. Bars show the correlation at each lag from 0 to 8 weeks, with 95% Fisher CIs. The best lag is reported with raw and Benjamini-Hochberg-corrected p-values, and warnings appear when it fails correction or overlaps the runner-up lag.",
+          "parts": [
+            "lag-scan-chart"
+          ]
+        },
+        {
+          "step": "fit a model at the chosen lag and check it out of sample",
+          "here": "Sliders set the driver lag and the surge quantile, and a select picks a Poisson or Negative-Binomial family. The tab fits a surge logistic regression (AUC, pseudo-R²) and a count GLM (coefficient, p, AIC), then compares in-sample and walk-forward out-of-sample AUC and MAE.",
+          "parts": [
+            "surge-regression"
+          ]
+        },
+        {
+          "step": "check the drivers against each other and correct across every test",
+          "here": "A heatmap of deseasonalized correlations between drivers, with a VIF table, shows confounding. A table applies Benjamini-Hochberg correction to every driver-lag test together.",
+          "parts": [
+            "confounding-and-full-scan"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "An expander shows the aligned weekly table, with a Download as CSV button.",
+          "parts": [
+            "aligned-table-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Each series is judged against its own seasonal baseline (a rolling seasonal residual), so 'elevated' means high for the time of year, and correlations are deseasonalized by default to avoid spurious winter co-trends.",
+        "The most recent outcome weeks are provisional and get revised upward, so they are marked on the timeline and masked out of every correlation and regression automatically.",
+        "Multiple-comparisons correction happens at two levels: across one driver's lag sweep, and across the full driver-by-lag family. Lag picks whose confidence intervals overlap the runner-up are flagged as ambiguous.",
+        "Overdispersed weekly counts are fitted with Negative-Binomial as the default rather than Poisson, and in-sample fits are set against expanding-window walk-forward scores to expose overfitting.",
+        "Signals with different units are z-scored only for display; the analysis uses the raw values, and sub-series on different scales (one per pathogen) are split out before weekly summing."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "date-range-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "City and date range sidebar",
+      "summary": "Loads the signals and restricts all of them to a chosen period, using preset spans or explicit dates, before they are aligned to weeks.",
+      "views": [],
+      "interactions": [
+        "time slider",
+        "filter",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 77,
+          "end": 109,
+          "role": "logic",
+          "symbol": "_load_signals",
+          "anchor": "066e454d6e66",
+          "first": "def _load_signals(city: str, fingerprint: tuple[float, ...]) -> dict[str, pd.DataFrame]:"
+        },
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 60,
+          "end": 73,
+          "role": "logic",
+          "symbol": "_local_data_fingerprint",
+          "anchor": "3c1995adfb58",
+          "first": "def _local_data_fingerprint(city: str) -> tuple[float, ...]:"
+        },
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 112,
+          "end": 115,
+          "role": "logic",
+          "symbol": "_filter_by_date",
+          "anchor": "2ce957a11073",
+          "first": "def _filter_by_date("
+        },
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 127,
+          "end": 164,
+          "role": "logic",
+          "symbol": "_build_numeric_signals",
+          "anchor": "6883bf063a68",
+          "first": "def _build_numeric_signals(signals: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:"
+        },
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 702,
+          "end": 704,
+          "role": "logic",
+          "symbol": "_set_date_range",
+          "anchor": "bb6a5dee4dbb",
+          "first": "def _set_date_range(start, end) -> None:"
+        },
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 679,
+          "end": 754,
+          "role": "markup",
+          "anchor": "9fbc2486fcc4",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/src/analysis/correlate.py",
+          "start": 31,
+          "end": 33,
+          "role": "logic",
+          "symbol": "align",
+          "anchor": "522f22352894",
+          "first": "def align("
+        }
+      ]
+    },
+    {
+      "id": "overview-status",
+      "level": "view",
+      "parent": null,
+      "title": "Overview: status vs. seasonal baseline",
+      "summary": "Shows the latest outcome week, how far it sits from the seasonal baseline with an elevated, normal or below banner, the events in the window, and how fresh each signal's data is.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 183,
+          "end": 187,
+          "role": "logic",
+          "symbol": "_render_overview",
+          "anchor": "c7f0db98d710",
+          "first": "def _render_overview("
+        },
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 167,
+          "end": 180,
+          "role": "logic",
+          "symbol": "_signal_freshness",
+          "anchor": "7f5bc671b8bb",
+          "first": "def _signal_freshness(raw_signals: dict[str, pd.DataFrame]) -> pd.DataFrame:"
+        },
+        {
+          "file": "code/src/analysis/correlate.py",
+          "start": 69,
+          "end": 95,
+          "role": "logic",
+          "symbol": "seasonal_residual",
+          "anchor": "60bbd2367765",
+          "first": "def seasonal_residual(series: pd.Series, window: int | None = None, causal: bool = False) -> pd.Series:"
+        }
+      ]
+    },
+    {
+      "id": "signal-timeline",
+      "level": "view",
+      "parent": null,
+      "title": "Z-scored signal timeline",
+      "summary": "Overlays the chosen weekly series as z-scores on one zoomable line chart, with dashed event rules and a line marking where provisional data starts; hovering shows raw values.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "multi-select",
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 257,
+          "end": 334,
+          "role": "logic",
+          "anchor": "7767cd7e2777",
+          "first": "def _render_timeline("
+        }
+      ]
+    },
+    {
+      "id": "aligned-table-export",
+      "level": "component",
+      "parent": "signal-timeline",
+      "title": "Aligned weekly table and CSV download",
+      "summary": "Shows the aligned weekly table, one column per signal, and downloads it as CSV.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 336,
+          "end": 343,
+          "role": "logic",
+          "anchor": "8aba1c980ee1",
+          "first": "with st.expander(\"Aligned weekly data table\"):"
+        }
+      ]
+    },
+    {
+      "id": "correlation-regression",
+      "level": "view",
+      "parent": null,
+      "title": "Correlation & Regression tab",
+      "summary": "Masks the provisional outcome weeks, then lets the person pick one driver and decide whether to deseasonalize; that choice drives every analysis below it.",
+      "views": [],
+      "interactions": [
+        "select",
+        "toggle view"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 346,
+          "end": 383,
+          "role": "logic",
+          "anchor": "bf379b0dcb3a",
+          "first": "def _render_correlation_and_regression("
+        },
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 756,
+          "end": 769,
+          "role": "markup",
+          "anchor": "f85e80f01956",
+          "first": "tab_overview, tab_timeline, tab_corr = st.tabs("
+        }
+      ]
+    },
+    {
+      "id": "lag-scan-chart",
+      "level": "component",
+      "parent": "correlation-regression",
+      "title": "Lagged cross-correlation scan",
+      "summary": "Draws the correlation at each lag from 0 to 8 weeks with confidence-interval error bars, reports the strongest lag with raw and BH-corrected p-values, and warns when that lag fails correction or is ambiguous.",
+      "views": [
+        "bar chart",
+        "summary stats"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 385,
+          "end": 459,
+          "role": "logic",
+          "anchor": "6f2c66513317",
+          "first": "try:"
+        },
+        {
+          "file": "code/src/analysis/correlate.py",
+          "start": 178,
+          "end": 183,
+          "role": "logic",
+          "symbol": "lagged_cross_correlation",
+          "anchor": "ca91730cb3f5",
+          "first": "def lagged_cross_correlation("
+        },
+        {
+          "file": "code/src/analysis/multiple_comparisons.py",
+          "start": 46,
+          "end": 49,
+          "role": "logic",
+          "symbol": "apply_correction",
+          "anchor": "871984e66181",
+          "first": "def apply_correction("
+        }
+      ]
+    },
+    {
+      "id": "surge-regression",
+      "level": "component",
+      "parent": "correlation-regression",
+      "title": "Lagged surge and count regression with walk-forward validation",
+      "summary": "Fits a surge logistic regression and a Poisson or Negative-Binomial count regression at a lag the person sets with a slider, then sets the in-sample metrics against walk-forward out-of-sample ones.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 461,
+          "end": 570,
+          "role": "logic",
+          "anchor": "a02e14b85ad8",
+          "first": "st.markdown(\"#### Lagged regression: does this driver predict a surge?\")"
+        },
+        {
+          "file": "code/src/analysis/regression.py",
+          "start": 198,
+          "end": 202,
+          "role": "logic",
+          "symbol": "fit_logistic_regression",
+          "anchor": "881fba02d652",
+          "first": "def fit_logistic_regression("
+        },
+        {
+          "file": "code/src/analysis/regression.py",
+          "start": 92,
+          "end": 96,
+          "role": "logic",
+          "symbol": "fit_count_regression",
+          "anchor": "fb4de105039e",
+          "first": "def fit_count_regression("
+        },
+        {
+          "file": "code/src/analysis/regression.py",
+          "start": 409,
+          "end": 415,
+          "role": "logic",
+          "symbol": "walk_forward_validate_logistic",
+          "anchor": "7ea9ec671285",
+          "first": "def walk_forward_validate_logistic("
+        },
+        {
+          "file": "code/src/analysis/regression.py",
+          "start": 337,
+          "end": 343,
+          "role": "logic",
+          "symbol": "walk_forward_validate_count",
+          "anchor": "0d9f7c32cacf",
+          "first": "def walk_forward_validate_count("
+        }
+      ]
+    },
+    {
+      "id": "confounding-and-full-scan",
+      "level": "component",
+      "parent": "correlation-regression",
+      "title": "Driver confounding matrix and full-scan correction",
+      "summary": "Shows a heatmap of deseasonalized correlations between drivers with a VIF table, and a table of every driver-lag test after Benjamini-Hochberg correction across the whole scan.",
+      "views": [
+        "heatmap",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 573,
+          "end": 623,
+          "role": "logic",
+          "symbol": "_render_driver_correlation_matrix",
+          "anchor": "f6d7b5de24b7",
+          "first": "def _render_driver_correlation_matrix(aligned: pd.DataFrame) -> None:"
+        },
+        {
+          "file": "code/src/dashboard/app.py",
+          "start": 626,
+          "end": 662,
+          "role": "logic",
+          "symbol": "_render_wide_correction_summary",
+          "anchor": "9a777974946e",
+          "first": "def _render_wide_correction_summary(aligned: pd.DataFrame) -> None:"
+        },
+        {
+          "file": "code/src/analysis/correlate.py",
+          "start": 98,
+          "end": 101,
+          "role": "logic",
+          "symbol": "driver_correlation_matrix",
+          "anchor": "28fca6566416",
+          "first": "def driver_correlation_matrix("
+        },
+        {
+          "file": "code/src/analysis/correlate.py",
+          "start": 262,
+          "end": 267,
+          "role": "logic",
+          "symbol": "scan_drivers",
+          "anchor": "f248600c147f",
+          "first": "def scan_drivers("
+        },
+        {
+          "file": "code/src/analysis/multiple_comparisons.py",
+          "start": 91,
+          "end": 94,
+          "role": "logic",
+          "symbol": "summarize_scan",
+          "anchor": "aaa5df7678de",
+          "first": "def summarize_scan("
+        },
+        {
+          "file": "code/src/analysis/regression.py",
+          "start": 258,
+          "end": 262,
+          "role": "logic",
+          "symbol": "driver_vif",
+          "anchor": "951a32a290c4",
+          "first": "def driver_vif("
+        }
+      ]
+    }
+  ]
+}

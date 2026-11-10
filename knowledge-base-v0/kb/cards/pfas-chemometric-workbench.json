@@ -1,0 +1,438 @@
+{
+  "schema": "astaui.card/1",
+  "id": "pfas-chemometric-workbench",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T17:43:42Z"
+  },
+  "app": {
+    "title": "Chemometric Workbench (RUO)",
+    "summary": "A person loads a table of samples with numeric features, either an uploaded CSV or generated demo spectra, and chooses the feature columns, a preprocessing method, the number of principal components and a confidence level. They explore the PCA model through scree, score and loading plots, then check every sample against Hotelling's T² and Q-residual limits and download the outlier diagnostics. Next they choose a numeric target and fit a PLS regression with a train/test split and cross-validation. For that model they see error metrics, a component sweep, a ranking of the features with the most influence, applicability-domain checks and uncertainty levels. Last, they export the predictions with in-domain and review-required flags, and they can also save the fitted model.",
+    "task": {
+      "text": "Build a PCA and PLS model on multivariate analytical measurements, flag samples that fall outside it, and export predictions that carry applicability-domain, uncertainty and review flags.",
+      "verbs": [
+        "derive",
+        "identify",
+        "explore",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A table of samples with many numeric features, such as absorbance at each wavelength of a spectrum, plus optional metadata columns: an id, a group and a numeric target property.",
+      "item": "one sample: a row holding its spectrum or analytical measurements",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "exploring and modelling multivariate analytical measurements, before an analyst reviews the flagged samples",
+      "terms": [
+        "analyze",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar controls set the data, feature columns, preprocessing, number of components and confidence level, and every tab recomputes when they change. The tabs show the data table, the PCA plots, the T²/Q influence plot with its control limits, and the PLS results: metrics, plots, applicability domain and uncertainty. Each tab ends in a CSV download.",
+      "views": [
+        "form",
+        "table view",
+        "summary stats",
+        "scatter plot",
+        "bar chart",
+        "line chart"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "hover for detail",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "PCA outlier diagnostics and PLS multivariate calibration in chemometrics",
+      "disciplines": [
+        "chemistry"
+      ],
+      "terms": [
+        "chemometrics",
+        "multivariate calibration",
+        "analytical chemistry"
+      ]
+    },
+    "workflow": {
+      "name": "fit a multivariate model, flag samples outside it, and export predictions with review flags",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "The sidebar offers a synthetic NIR-like spectra demo (sample count and seed) or a CSV upload. The person then picks the feature columns and a column to colour points by.",
+          "parts": [
+            "setup-sidebar",
+            "data-tab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "The person chooses a preprocessing method (mean-center, autoscale, SNV, MSC or Savitzky-Golay), the number of PCA components and the confidence limit, then reads the scree plot, a score plot with selectable axes, and loadings for chosen components.",
+          "parts": [
+            "setup-sidebar",
+            "pca-explorer"
+          ]
+        },
+        {
+          "step": "identify the items that break a limit",
+          "here": "Each sample is plotted as Hotelling's T² against Q-residual, with F-distribution and Jackson-Mudholkar limits, and gets a verdict. Flagged samples are listed with their counts, and the diagnostics download as a CSV.",
+          "parts": [
+            "outlier-detection"
+          ]
+        },
+        {
+          "step": "fit a predictive model and check its error",
+          "here": "The person picks a target column, test fraction, CV folds and number of PLS components. The tab shows test and CV RMSE and R², predicted-vs-actual and residual plots, a CV RMSE component sweep, and a predictions table.",
+          "parts": [
+            "pls-regression"
+          ]
+        },
+        {
+          "step": "judge how far each prediction can be trusted",
+          "here": "Features are ranked by standardized coefficient, with a top-N slider. Mahalanobis distance and leverage set each sample in or out of domain. Uncertainty from CV residuals gives each sample a LOW, MEDIUM or HIGH level, and a review-required flag is set when a sample is out of domain or HIGH.",
+          "parts": [
+            "pls-trust"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Downloads cover the predictions CSV, the fitted model as a PKL, the feature influence CSV, and one consolidated CSV of predictions with domain and uncertainty fields.",
+          "parts": [
+            "pls-regression",
+            "pls-trust"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Outliers are split by kind: high T² means extreme but consistent with the model, high Q means a poor fit to the model, and samples high on both are strong outliers. Both limits are derived statistically at the chosen confidence level.",
+        "Spectral preprocessing options (SNV, MSC, Savitzky-Golay derivative) are applied before both PCA and PLS.",
+        "Every prediction carries an applicability-domain flag (Mahalanobis distance and leverage limits) and an uncertainty level, which combine into a review-required flag.",
+        "A component sweep plots CV RMSE against the number of PLS components so the person can pick model complexity.",
+        "The demo data comes with injected T² and Q outliers so the diagnostics have something to find."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "setup-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Data, columns and model settings",
+      "summary": "Loads demo spectra or a CSV and sets the feature columns, colour column, preprocessing, number of PCA components and confidence limit, all of which drive every tab.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 38,
+          "end": 54,
+          "role": "logic",
+          "symbol": "load_dataframe",
+          "anchor": "24999828a521",
+          "first": "def load_dataframe() -> pd.DataFrame | None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 57,
+          "end": 100,
+          "role": "logic",
+          "anchor": "97f566071059",
+          "first": "df = load_dataframe()"
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 81,
+          "end": 97,
+          "role": "logic",
+          "symbol": "apply_preprocess",
+          "anchor": "0d7e004fc621",
+          "first": "def apply_preprocess(X: np.ndarray, method: str) -> np.ndarray:"
+        },
+        {
+          "file": "code/sample_data.py",
+          "start": 18,
+          "end": 21,
+          "role": "data",
+          "symbol": "make_spectral_dataset",
+          "anchor": "32403213e1ae",
+          "first": "def make_spectral_dataset("
+        }
+      ]
+    },
+    {
+      "id": "data-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Dataset",
+      "summary": "Shows counts of samples and features, the preprocessing in use, and the first rows of the table.",
+      "views": [
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 102,
+          "end": 114,
+          "role": "markup",
+          "anchor": "7c6d34b3a852",
+          "first": "tab_data, tab_pca, tab_out, tab_pls, tab_about = st.tabs("
+        }
+      ]
+    },
+    {
+      "id": "pca-explorer",
+      "level": "view",
+      "parent": null,
+      "title": "PCA explorer",
+      "summary": "Shows explained and cumulative variance per component, a score plot on any two chosen components coloured by a column, and loading curves for the chosen components.",
+      "views": [
+        "bar chart",
+        "scatter plot",
+        "line chart"
+      ],
+      "interactions": [
+        "select",
+        "multi-select",
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 117,
+          "end": 177,
+          "role": "markup",
+          "anchor": "19c74f9b92c2",
+          "first": "with tab_pca:"
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 181,
+          "end": 186,
+          "role": "logic",
+          "symbol": "run_pca",
+          "anchor": "c38bfdb74e43",
+          "first": "def run_pca("
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 106,
+          "end": 146,
+          "role": "logic",
+          "symbol": "PCAResult",
+          "anchor": "b9fc6e8ebdcd",
+          "first": "class PCAResult:"
+        }
+      ]
+    },
+    {
+      "id": "outlier-detection",
+      "level": "view",
+      "parent": null,
+      "title": "Hotelling's T² vs Q-residual outlier detection",
+      "summary": "Plots each sample's T² against its Q-residual with control limits, gives each sample a verdict, lists and counts the flagged samples, and downloads the diagnostics as a CSV.",
+      "views": [
+        "scatter plot",
+        "summary stats",
+        "table view"
+      ],
+      "interactions": [
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 180,
+          "end": 219,
+          "role": "markup",
+          "anchor": "8628aecb8009",
+          "first": "with tab_out:"
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 123,
+          "end": 146,
+          "role": "logic",
+          "symbol": "flag_table",
+          "anchor": "0240e0b87df0",
+          "first": "def flag_table(self) -> list[dict]:"
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 149,
+          "end": 155,
+          "role": "logic",
+          "symbol": "_t2_limit",
+          "anchor": "6ce46d2e27d2",
+          "first": "def _t2_limit(n_samples: int, n_components: int, confidence: float) -> float:"
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 158,
+          "end": 178,
+          "role": "logic",
+          "symbol": "_q_limit",
+          "anchor": "ea5a8bcc81f0",
+          "first": "def _q_limit(residual_eigenvalues: np.ndarray, confidence: float) -> float:"
+        }
+      ]
+    },
+    {
+      "id": "pls-regression",
+      "level": "view",
+      "parent": null,
+      "title": "PLS regression",
+      "summary": "Fits a PLS model to a chosen target with a train/test split and k-fold CV. It reports RMSE and R², plots predicted vs actual, residuals and a CV component sweep, and exports the predictions and the model.",
+      "views": [
+        "summary stats",
+        "scatter plot",
+        "line chart",
+        "table view"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 222,
+          "end": 354,
+          "role": "markup",
+          "anchor": "2377dfab6ded",
+          "first": "with tab_pls:"
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 338,
+          "end": 346,
+          "role": "logic",
+          "symbol": "run_pls_regression",
+          "anchor": "156ce7aa8e92",
+          "first": "def run_pls_regression("
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 255,
+          "end": 260,
+          "role": "logic",
+          "symbol": "_metrics",
+          "anchor": "fac916b79f93",
+          "first": "def _metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "pls-trust",
+      "level": "component",
+      "parent": "pls-regression",
+      "title": "Feature influence, applicability domain and uncertainty",
+      "summary": "Ranks the most influential features, flags samples outside the model's applicability domain, gives each sample an uncertainty level and a review-required flag, and exports one consolidated CSV.",
+      "views": [
+        "bar chart",
+        "scatter plot",
+        "summary stats"
+      ],
+      "interactions": [
+        "select",
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 356,
+          "end": 432,
+          "role": "markup",
+          "anchor": "2e9756475497",
+          "first": "st.markdown(\"### Model explainability (PLS coefficient influence)\")"
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 307,
+          "end": 310,
+          "role": "logic",
+          "symbol": "pls_feature_influence",
+          "anchor": "10f568ca49e1",
+          "first": "def pls_feature_influence("
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 263,
+          "end": 278,
+          "role": "logic",
+          "symbol": "mahalanobis_scores",
+          "anchor": "d09ed69ed8ea",
+          "first": "def mahalanobis_scores(S: np.ndarray) -> np.ndarray:"
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 281,
+          "end": 288,
+          "role": "logic",
+          "symbol": "leverage_scores",
+          "anchor": "d41a6ad0d649",
+          "first": "def leverage_scores(S: np.ndarray) -> np.ndarray:"
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 291,
+          "end": 297,
+          "role": "logic",
+          "symbol": "ad_thresholds",
+          "anchor": "10f6ed61530e",
+          "first": "def ad_thresholds(n_samples: int, n_components: int, confidence: float = 0.95) -> dict:"
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 300,
+          "end": 304,
+          "role": "logic",
+          "symbol": "uncertainty_from_cv_residuals",
+          "anchor": "9f050aa50f37",
+          "first": "def uncertainty_from_cv_residuals(residuals_cv: np.ndarray, z: float = 1.96) -> dict:"
+        },
+        {
+          "file": "code/chemometrics_core.py",
+          "start": 432,
+          "end": 472,
+          "role": "logic",
+          "anchor": "5ed9cee3b5ef",
+          "first": "scores_all = model.transform(Xp)"
+        }
+      ]
+    }
+  ]
+}

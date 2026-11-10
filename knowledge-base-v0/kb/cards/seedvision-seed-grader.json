@@ -1,0 +1,561 @@
+{
+  "schema": "astaui.card/1",
+  "id": "seedvision-seed-grader",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T10:04:17Z"
+  },
+  "app": {
+    "title": "SeedVision AI | Seed Quality Grader",
+    "summary": "A person picks a trained classifier and uploads one seed photograph, or chooses a demo sample. They get a predicted quality grade with its confidence, a bar chart of the probability for each class, a warning when the model is uncertain, and a three-panel Grad-CAM view whose target class they can change. On a separate review page they go through photographs grouped by physical specimen. For each specimen they see every view side by side and can run an image-quality screen and model suggestion that only advise. They then save one label, status, confidence, reviewer and diagnostic note for all of that specimen's views in the staging manifest, which is backed up before each save and can be reverted or restored. A benchmark page sets the trained architectures against each other with metrics, confusion matrices and calibration plots.",
+    "task": {
+      "text": "Grade a seed photograph into a fixed set of defect classes, show which image regions drove the call, and have a person confirm the label of each multi-view specimen before it is admitted to a training set.",
+      "verbs": [
+        "annotate",
+        "identify",
+        "review",
+        "compare",
+        "curate"
+      ]
+    },
+    "data": {
+      "text": "Photographs of single seeds, grouped into physical specimens with several views each, listed in a staging manifest. Each specimen has a candidate defect class from a fixed four-class taxonomy, a review status, a confidence, a reviewer and notes. Alongside these are model checkpoints and their saved evaluation metrics.",
+      "item": "a physical seed specimen photographed from several angles, or one seed photograph",
+      "shapes": [
+        "image collection",
+        "image",
+        "categories",
+        "judgements",
+        "notes",
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "verifying labels on incoming specimen photographs before they join a training set, with model checks alongside",
+      "terms": [
+        "annotate",
+        "review",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "A sidebar radio switches between pages. The analysis page runs the selected checkpoint on one image and shows grade metrics, a probability bar chart and an original / heatmap / overlay triplet. The staging page shows a specimen picker over summary counts, then a gallery of the chosen specimen's views, an optional advisory panel, a review form that writes to every view at once, and revert and restore controls.",
+      "views": [
+        "sidebar list",
+        "summary stats",
+        "bar chart",
+        "image viewer",
+        "side-by-side panes",
+        "form",
+        "detail panel",
+        "table view",
+        "heatmap"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "toggle view",
+        "apply label",
+        "write notes",
+        "accept or reject",
+        "undo"
+      ],
+      "patterns": [
+        "master-detail",
+        "status pipeline",
+        "side-by-side comparison",
+        "dashboard",
+        "category palette"
+      ]
+    },
+    "field": {
+      "text": "CNN image classification with Grad-CAM attribution for seed quality grading in agricultural computer vision",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "computer vision",
+        "explainable ai",
+        "seed quality grading"
+      ]
+    },
+    "workflow": {
+      "name": "confirm the label of each multi-view specimen before it enters a training set",
+      "steps": [
+        {
+          "step": "look over every item at a glance",
+          "here": "Metric cards count specimens, photographic views, and approved and pending views, and warn about image files missing from disk.",
+          "parts": [
+            "staging-review"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "A specimen dropdown shows each specimen's status, label and view count. Choosing one opens an information card and a gallery of all its views side by side, with pixel sizes.",
+          "parts": [
+            "staging-review"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "An opt-in checkbox runs blur, brightness and contrast screening, near-duplicate hashing across the views, and an optional class suggestion from a compatible checkpoint. It shows whether the views agree and gives an advisory recommendation, but never sets the label.",
+          "parts": [
+            "assist-panel"
+          ]
+        },
+        {
+          "step": "select a stretch and label it with a category",
+          "here": "The review form sets a target defect label from the fixed taxonomy, a review status, the reviewer's confidence, the reviewer's identity and morphological notes, and saves them to every view of the specimen. Low confidence keeps the specimen pending.",
+          "parts": [
+            "review-form"
+          ]
+        },
+        {
+          "step": "keep a record of changes",
+          "here": "Each save first backs up the manifest. One button reverts the current specimen to pending; ticking a confirmation box enables a button that restores the whole manifest from the backup.",
+          "parts": [
+            "revert-rollback"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "On the analysis page the person picks a checkpoint and uploads or chooses one image. It is validated and graded, with confidence, latency, an uncertainty advisory, a softmax bar chart, and a Grad-CAM triplet whose target class can be changed.",
+          "parts": [
+            "seed-analysis",
+            "gradcam-triplet"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "A benchmark table and comparison chart cover all architectures. Choosing one architecture shows its accuracy, macro F1, calibration error (ECE), latency, confusion matrices and reliability curve, with a banner saying whether the run is real, unverified or synthetic.",
+          "parts": [
+            "benchmark"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Labels are given per physical specimen, not per image: one decision is written to every photographic view of the same seed, so views cannot split across labels or data partitions.",
+        "Model and image-quality help is strictly advisory: automatic approval is disabled by policy, and views whose suggestions conflict are flagged for human inspection.",
+        "Near-duplicate views of one specimen are detected by image hashing and flagged as a single observation, not independent evidence.",
+        "Grad-CAM can explain any class hypothesis, not only the top prediction, so the person can see what would support an alternative grade.",
+        "Checkpoints and evaluation runs are tagged by data provenance (real, synthetic or unverified), and the provenance is shown next to every metric."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "nav-sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Navigation and model availability sidebar",
+      "summary": "Switches between the analysis, staging review, benchmark and methodology pages, and lists the trained checkpoints, each tagged as trained on real or synthetic data.",
+      "views": [
+        "sidebar list"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 417,
+          "end": 487,
+          "role": "markup",
+          "anchor": "5275aabe1b46",
+          "first": "# Sidebar Navigation"
+        },
+        {
+          "file": "code/app.py",
+          "start": 97,
+          "end": 206,
+          "role": "style",
+          "anchor": "cd7eae0da551",
+          "first": "/* Sidebar Container */"
+        },
+        {
+          "file": "code/app.py",
+          "start": 406,
+          "end": 411,
+          "role": "logic",
+          "symbol": "get_available_checkpoints",
+          "anchor": "502d2287b081",
+          "first": "def get_available_checkpoints() -> list:"
+        }
+      ]
+    },
+    {
+      "id": "seed-analysis",
+      "level": "view",
+      "parent": null,
+      "title": "Seed quality analysis",
+      "summary": "Loads a chosen checkpoint, takes an uploaded or demo seed image and checks it, then shows the predicted grade badge, confidence, latency and architecture, an uncertainty advisory, and a softmax probability bar chart.",
+      "views": [
+        "summary stats",
+        "bar chart",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 581,
+          "end": 718,
+          "role": "markup",
+          "anchor": "8ae2f226a7aa",
+          "first": "elif page == \"Seed Quality Analysis\":"
+        },
+        {
+          "file": "code/app.py",
+          "start": 257,
+          "end": 283,
+          "role": "style",
+          "anchor": "2fd8bce6a90d",
+          "first": "/* Quality Class Badges - Explicit Accessible Contrast */"
+        },
+        {
+          "file": "code/app.py",
+          "start": 401,
+          "end": 403,
+          "role": "logic",
+          "symbol": "get_cached_predictor",
+          "anchor": "6adf0663c2cc",
+          "first": "def get_cached_predictor(checkpoint_path_str: str) -> SeedPredictor:"
+        },
+        {
+          "file": "code/src/seedvision/inference/predictor.py",
+          "start": 55,
+          "end": 239,
+          "role": "logic",
+          "symbol": "SeedPredictor",
+          "anchor": "9d5b699c9986",
+          "first": "class SeedPredictor:"
+        },
+        {
+          "file": "code/src/seedvision/inference/validation.py",
+          "start": 24,
+          "end": 112,
+          "role": "logic",
+          "symbol": "InferenceInputValidator",
+          "anchor": "ddb94fe74125",
+          "first": "class InferenceInputValidator:"
+        }
+      ]
+    },
+    {
+      "id": "gradcam-triplet",
+      "level": "component",
+      "parent": "seed-analysis",
+      "title": "Grad-CAM explainability triplet",
+      "summary": "Shows the original image, the class-activation heatmap and a blended overlay side by side for a target class the person picks, either the top prediction or any other class.",
+      "views": [
+        "side-by-side panes",
+        "heatmap",
+        "image viewer"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 654,
+          "end": 662,
+          "role": "markup",
+          "anchor": "fa904952dee4",
+          "first": "# Explainability Class Target Selector"
+        },
+        {
+          "file": "code/app.py",
+          "start": 720,
+          "end": 744,
+          "role": "markup",
+          "anchor": "e1b3780c0c35",
+          "first": "# Grad-CAM Visualization Gallery"
+        },
+        {
+          "file": "code/src/seedvision/explainability/gradcam.py",
+          "start": 15,
+          "end": 120,
+          "role": "logic",
+          "symbol": "GradCAM",
+          "anchor": "eaa1b8f2bcd4",
+          "first": "class GradCAM:"
+        },
+        {
+          "file": "code/src/seedvision/explainability/gradcam.py",
+          "start": 123,
+          "end": 127,
+          "role": "logic",
+          "symbol": "generate_gradcam_overlay",
+          "anchor": "0c622ee0ac81",
+          "first": "def generate_gradcam_overlay("
+        }
+      ]
+    },
+    {
+      "id": "staging-review",
+      "level": "view",
+      "parent": null,
+      "title": "Real data staging review",
+      "summary": "Loads the staging manifest, shows intake counts, and lets the person choose a physical specimen to see its information card and a gallery of all its photographic views.",
+      "views": [
+        "summary stats",
+        "detail panel",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail",
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 749,
+          "end": 850,
+          "role": "markup",
+          "anchor": "d986a518424b",
+          "first": "elif page == \"Real Data Staging Review\":"
+        },
+        {
+          "file": "code/app.py",
+          "start": 233,
+          "end": 272,
+          "role": "style",
+          "anchor": "b1583b7f3022",
+          "first": "/* Metric & Feature Cards - Adaptive Secondary Background */"
+        },
+        {
+          "file": "code/src/seedvision/data/real_review.py",
+          "start": 52,
+          "end": 54,
+          "role": "logic",
+          "symbol": "load_staging_manifest",
+          "anchor": "267bf47e1365",
+          "first": "def load_staging_manifest("
+        }
+      ]
+    },
+    {
+      "id": "assist-panel",
+      "level": "component",
+      "parent": "staging-review",
+      "title": "AI-assisted review (advisory only)",
+      "summary": "Optionally screens each view for blur, brightness and contrast, finds near-duplicate views, gets a class suggestion from a compatible checkpoint, checks whether the views agree, and gives a recommendation without changing the label.",
+      "views": [
+        "summary stats",
+        "detail panel"
+      ],
+      "interactions": [
+        "toggle view",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 852,
+          "end": 1023,
+          "role": "markup",
+          "anchor": "8b470f22f02a",
+          "first": "# AI-Assisted Review (Advisory Only)"
+        },
+        {
+          "file": "code/src/seedvision/data/review_assist.py",
+          "start": 712,
+          "end": 723,
+          "role": "logic",
+          "symbol": "assist_specimen",
+          "anchor": "1fa96f87fd36",
+          "first": "def assist_specimen("
+        },
+        {
+          "file": "code/src/seedvision/data/review_assist.py",
+          "start": 373,
+          "end": 376,
+          "role": "logic",
+          "symbol": "inspect_checkpoint_compatibility",
+          "anchor": "ed9b9fa201f9",
+          "first": "def inspect_checkpoint_compatibility("
+        },
+        {
+          "file": "code/src/seedvision/data/review_assist.py",
+          "start": 211,
+          "end": 213,
+          "role": "logic",
+          "symbol": "find_near_duplicate_groups",
+          "anchor": "d95fe2d8f45f",
+          "first": "def find_near_duplicate_groups("
+        },
+        {
+          "file": "code/src/seedvision/data/review_assist.py",
+          "start": 189,
+          "end": 199,
+          "role": "logic",
+          "symbol": "compute_average_hash",
+          "anchor": "21d46f7da57e",
+          "first": "def compute_average_hash(image: Image.Image, hash_size: int = HASH_SIZE) -> str:"
+        }
+      ]
+    },
+    {
+      "id": "review-form",
+      "level": "component",
+      "parent": "staging-review",
+      "title": "Human review and verification decision",
+      "summary": "A form that sets the defect label, review status, confidence, reviewer and diagnostic notes for a specimen. It checks the input and writes the decision to every view in the manifest after making a backup.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "apply label",
+        "accept or reject",
+        "write notes"
+      ],
+      "patterns": [
+        "category palette",
+        "status pipeline"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1025,
+          "end": 1119,
+          "role": "markup",
+          "anchor": "fb4cd8f76c8a",
+          "first": "# Review Form"
+        },
+        {
+          "file": "code/app.py",
+          "start": 322,
+          "end": 326,
+          "role": "style",
+          "anchor": "591877fe4cfb",
+          "first": ".safeguard-notice {"
+        },
+        {
+          "file": "code/src/seedvision/data/real_review.py",
+          "start": 268,
+          "end": 277,
+          "role": "logic",
+          "symbol": "save_specimen_review",
+          "anchor": "772175593f1f",
+          "first": "def save_specimen_review("
+        },
+        {
+          "file": "code/src/seedvision/data/real_review.py",
+          "start": 155,
+          "end": 160,
+          "role": "logic",
+          "symbol": "validate_review_decision",
+          "anchor": "c1cc1f58bbef",
+          "first": "def validate_review_decision("
+        }
+      ]
+    },
+    {
+      "id": "revert-rollback",
+      "level": "component",
+      "parent": "staging-review",
+      "title": "Specimen revert and manifest rollback",
+      "summary": "Resets the current specimen to pending across all its views, or, once a confirmation box is ticked, restores the whole staging manifest from its latest backup.",
+      "views": [],
+      "interactions": [
+        "undo"
+      ],
+      "patterns": [
+        "version history"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1121,
+          "end": 1155,
+          "role": "markup",
+          "anchor": "97997064de30",
+          "first": "# Revert & Rollback Tools"
+        },
+        {
+          "file": "code/src/seedvision/data/real_review.py",
+          "start": 334,
+          "end": 338,
+          "role": "logic",
+          "symbol": "revert_specimen_review",
+          "anchor": "d2bdb1d3cb67",
+          "first": "def revert_specimen_review("
+        },
+        {
+          "file": "code/src/seedvision/data/real_review.py",
+          "start": 253,
+          "end": 265,
+          "role": "logic",
+          "symbol": "restore_manifest_backup",
+          "anchor": "370b5fa9a192",
+          "first": "def restore_manifest_backup(manifest_path: str | Path, backup_path: Optional[str | Path] = None) -> Path:"
+        }
+      ]
+    },
+    {
+      "id": "benchmark",
+      "level": "view",
+      "parent": null,
+      "title": "Model evaluation and benchmark",
+      "summary": "Compares the trained architectures in a metrics table and chart, then shows the chosen architecture's accuracy, macro F1, calibration error, latency, confusion matrices, per-class metrics and reliability curve, under a banner giving its data provenance.",
+      "views": [
+        "table view",
+        "summary stats",
+        "heatmap",
+        "bar chart",
+        "line chart"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "dashboard",
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 1160,
+          "end": 1283,
+          "role": "markup",
+          "anchor": "9d70861cb224",
+          "first": "elif page == \"Model Evaluation & Benchmark\":"
+        },
+        {
+          "file": "code/app.py",
+          "start": 297,
+          "end": 321,
+          "role": "style",
+          "anchor": "2440c92ed296",
+          "first": "/* Benchmark Notice Cards */"
+        },
+        {
+          "file": "code/src/seedvision/evaluation/compare.py",
+          "start": 14,
+          "end": 16,
+          "role": "logic",
+          "symbol": "compare_models",
+          "anchor": "c8afe0c299b1",
+          "first": "def compare_models("
+        }
+      ]
+    }
+  ]
+}

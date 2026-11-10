@@ -1,0 +1,233 @@
+"""
+Earth Intelligence Platform
+Satellite Engine
+
+Main
+
+Orchestrates the complete Satellite Engine workflow.
+"""
+
+from .build_grid import build_grid
+from .cloud_mask import build_cloud_mask
+from .false_colour import build_false_colour
+from .group_acquisitions import group_acquisitions
+from .load_imagery import load_imagery
+from .metadata import build_metadata
+from .prepare_imagery import prepare_imagery
+from .quality import compute_quality
+from .rank_acquisitions import rank_acquisitions
+from .rgb import build_rgb
+from .satellite_product import SatelliteProduct
+from .search_scenes import search_scenes
+from .select_acquisition import select_acquisition
+from .validation import validate_request
+
+# ============================================================
+# Deployment Mode
+#
+# When True, skips generating False Colour, Cloud Mask, and
+# the SWIR bands (B11/B12) — reduces peak memory usage for
+# free-tier hosting. Set to False on the "main" branch for the
+# full local experience; True on "deploy".
+#
+# NOTE: forced True here because models/cloud_classifier.joblib
+# ships as a Git LFS pointer in this environment (the real
+# binary isn't fetched), and build_cloud_mask() has no fallback
+# for a missing/corrupt model file.
+# ============================================================
+
+DEPLOY_LITE = True
+
+DEFAULT_BANDS = ["B02", "B03", "B04", "B08"]
+
+FULL_BANDS = ["B02", "B03", "B04", "B08", "B11", "B12"]
+
+# ============================================================
+# Run Satellite Engine
+# ============================================================
+
+
+def run_satellite_engine(
+    aoi,
+    collection="sentinel-2-l2a",
+    start_date=None,
+    end_date=None,
+    max_cloud_cover=20,
+    resolution=10,
+    bands=None,
+):
+    """
+    Run the complete Satellite Engine.
+
+    Parameters
+    ----------
+    aoi : dict
+        Area of Interest produced by the Location Engine.
+
+    collection : str
+
+    start_date : str
+
+    end_date : str
+
+    max_cloud_cover : float
+
+    resolution : float
+
+    bands : list[str], optional
+        If not provided, defaults to DEFAULT_BANDS (4 bands)
+        when DEPLOY_LITE is True, or FULL_BANDS (6 bands,
+        including SWIR) otherwise.
+
+    Returns
+    -------
+    SatelliteProduct
+    """
+
+    # ---------------------------------------------------------
+    # Validate Request
+    # ---------------------------------------------------------
+
+    request = validate_request(
+        aoi=aoi,
+        collection=collection,
+        start_date=start_date,
+        end_date=end_date,
+        max_cloud_cover=max_cloud_cover,
+        resolution=resolution,
+    )
+
+    # ---------------------------------------------------------
+    # Create Product
+    # ---------------------------------------------------------
+
+    product = SatelliteProduct(
+        request=request,
+    )
+
+    # ---------------------------------------------------------
+    # Search Scenes
+    # ---------------------------------------------------------
+
+    inventory = search_scenes(
+        request,
+    )
+
+    # ---------------------------------------------------------
+    # Group + Rank + Select Acquisition
+    # ---------------------------------------------------------
+
+    geometry = request.aoi["geometry"]["geometry"]
+
+    acquisitions = group_acquisitions(
+        inventory,
+        geometry,
+    )
+
+    ranked_acquisitions = rank_acquisitions(
+        acquisitions,
+    )
+
+    scene = select_acquisition(
+        ranked_acquisitions,
+    )
+
+    product.scene = scene
+
+    # ---------------------------------------------------------
+    # Build Grid
+    # ---------------------------------------------------------
+
+    grid = build_grid(
+        request,
+    )
+
+    product.grid = grid
+
+    # ---------------------------------------------------------
+    # Load Imagery
+    # ---------------------------------------------------------
+
+    if bands is None:
+
+        bands = DEFAULT_BANDS if DEPLOY_LITE else FULL_BANDS
+
+    imagery = load_imagery(
+        scene,
+        grid,
+        bands=bands,
+    )
+
+    product.imagery.raw = imagery
+
+    # ---------------------------------------------------------
+    # Prepare Imagery
+    # ---------------------------------------------------------
+
+    prepared = prepare_imagery(
+        imagery,
+        request,
+    )
+
+    product.imagery.aoi = prepared
+
+    # ---------------------------------------------------------
+    # Cloud Mask
+    # ---------------------------------------------------------
+
+    if DEPLOY_LITE:
+
+        product.cloud_mask = None
+
+        ml_cloud_percentage = None
+
+    else:
+
+        cloud_mask, ml_cloud_percentage = build_cloud_mask(
+            prepared,
+        )
+
+        product.cloud_mask = cloud_mask
+
+    # ---------------------------------------------------------
+    # Build Visualizations
+    # ---------------------------------------------------------
+
+    product.visualizations.rgb = build_rgb(
+        prepared,
+    )
+
+    if DEPLOY_LITE:
+
+        product.visualizations.false_colour = None
+
+    else:
+
+        product.visualizations.false_colour = build_false_colour(
+            prepared,
+        )
+
+    # ---------------------------------------------------------
+    # Metadata
+    # ---------------------------------------------------------
+
+    product.metadata = build_metadata(
+        prepared,
+        scene,
+    )
+
+    # ---------------------------------------------------------
+    # Quality Assessment
+    # ---------------------------------------------------------
+
+    product.quality = compute_quality(
+        prepared,
+        scene,
+        ml_cloud_percentage=ml_cloud_percentage,
+    )
+
+    # ---------------------------------------------------------
+    # Return Product
+    # ---------------------------------------------------------
+
+    return product

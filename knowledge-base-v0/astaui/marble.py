@@ -4,8 +4,8 @@ knowledge base, finding anything in it, and changing it by hand.
 It is laid out like the drive's own apps, panes on a well, and like the tools
 people already curate collections with: a catalog of the knowledge base's objects
 on the left (builds, words, test requests, judged pairs), a lens in the middle
-(Home, where the builds come from, the map, the similarity grid, word
-coverage, workflows, evaluation, search), and an inspector on the right for
+(Home, where the builds come from, the map, word coverage, workflows,
+evaluation, search), and an inspector on the right for
 whatever is picked. No lens scrolls: Home fits its pane (marble_home_fit), and
 every other lens is two panes, a bar
 with what to know and what to choose, and a stage its picture is sized to
@@ -18,10 +18,16 @@ jumps to anything. Changes made in the inspector wait at its foot until Apply
 makes them, all or none. On a narrower page the panes fold: the list and the
 inspector share a column, and on a phone one pane shows at a time.
 
-A Marble document cannot run Python, so the page holds what it shows as its own
-markup, and its buttons carry briefs the Drive runs: Refresh, Search, Run the
-evaluation and Apply each start an agent that runs one command from here and lands
-what it prints with apply_ops.
+A Marble document cannot run Python, so its buttons carry briefs the Drive runs:
+Refresh, Search, Run the evaluation and Apply each start an agent that runs one
+command from here and lands what it prints with apply_ops. What the page shows
+comes two ways. What people do in it (the looks, the changes waiting, notes,
+verdicts, the triggers, search and evaluation results) is its own markup. What
+the knowledge base says (the list, the map, every view's tables, and each build's,
+pair's and request's detail) grows with every build filed, so marble_data.py
+writes it to files beside the knowledge base on every refresh, and the page's
+script draws it from there, unfiled. That keeps the page about the same size
+however many builds there are, and a refresh's edits few.
 
     astaui marble-doc --out "Ai2/AstaUI/AstaUI Console.mrbl"     the whole page, once
     astaui marble-ops refresh --doc "<the page>"                  what changed since, and any part
@@ -29,8 +35,9 @@ what it prints with apply_ops.
     astaui manage apply --doc "<the page>"                        make the queued changes
 
 The skeleton below has slots, and every slot holds blocks with stable ids
-(marble_views.py), so a refresh compares each slot with what it should hold
-(mdiff.py) and lands only the difference. What is open, picked and filtered are
+(marble_views.py), so a refresh compares each slot the page keeps with what it
+should hold (mdiff.py) and lands only the difference; a data slot is left empty
+and marked transient. What is open, picked and filtered are
 attributes on small elements, set by the page and filed as looks; the rules that
 follow them are generated here, in state_css().
 """
@@ -39,14 +46,15 @@ from __future__ import annotations
 
 import html as _html
 import json
+import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from . import mdiff
+from . import marble_data, mdiff
 from .atlas import CHANNELS, COLOURS, TERM_LISTS
-from .marble_views import APPLY, CLI, DOC, DOC_HINT, Block, Views, esc, search_blocks
+from .marble_views import APPLY, CLI, CLUSTER_BY, DOC, DOC_HINT, FIELD, Block, Views, esc, search_blocks
 
 HERE = Path(__file__).parent
 
@@ -55,24 +63,47 @@ LENSES: List[Tuple[str, str, str, str]] = [
     ("home", "Home", "What needs a decision", ""),
     ("sources", "Sharing", "Where the builds come from",
      "Once a scientist has run the line below, what they build with Claude Code comes here by itself."),
-    ("map", "Map", "The embedding space",
+    ("map", "Embedding Space", "The embedding space",
      "Near means alike. Place the builds by what they share, and pick one to see its true nearest neighbours, which a flat map only approximates."),
-    ("similar", "Similarity", "How alike every pair is",
-     "Brighter green is more alike, and alike builds sit together. Pick a cell to compare two builds and judge them by eye."),
-    ("coverage", "Coverage", "Which builds use which words",
+    ("coverage", "Coverage Matrix", "Which builds use which words",
      "Each word of a list against every build. Pick a word to see what it means and to rename, merge, retire or reassign it."),
-    ("workflows", "Workflows", "Workflow families, step by step",
+    ("workflows", "Workflow Alignment", "Workflow families, step by step",
      "Builds whose workflows share their moves, lined up: the same step on one row, how each build does it in its column."),
-    ("eval", "Evaluation", "How well search finds what it should",
+    ("compare", "Compare Two", "Two builds, workflow against workflow",
+     "Pick two builds to see their screens and the workflow trees an agent wrote of each, side by side. Matched steps are joined; "
+     "What could move across lists the features one build has for a shared step that the other lacks, which an agent could take."),
+    ("runs", "Agent Runs", "What an agent did in each build",
+     "An agent opened each build in a browser and used it on the build's own data. Its account is a tree: the phases of the work, "
+     "the tasks in each, and the actions and screenshots that show each task was done. Pick a build to read its tree."),
+    ("check", "Check Runs", "Check what the agent did",
+     "Every interface the computer-use agent ran. Pick one to read the tree it wrote, step through the browser calls it made "
+     "with the screens it kept, and compare the reviewer's scores; then give your own verdict, which is saved with this page."),
+    ("features", "Features", "Features across the builds",
+     "Each agent run named the features it found: a widget and the small workflow around it. Here they are grouped by what "
+     "they let a person do, whatever the field. Pick a group to see its features, and a build to see which groups it is in."),
+    ("eval", "Score Tables", "How well search finds what it should",
      "Where each representation puts the builds every test request should find, and how well similarity agrees with pairs judged by eye."),
     ("search", "Search", "Try a request",
      "An agent describes your request as a query card, runs the plugin's search, and writes below what came back, with the code for each step."),
 ]
+# Features joins once its groups are made (kb/features.json): until then a refresh,
+# the hourly one too, leaves it out rather than land a lens with nothing grouped.
+FEATURES_ON = bool(os.environ.get("ASTAUI_FEATURES_AT")) or (HERE.parent / "kb" / "features.json").is_file()
+if not FEATURES_ON:
+    LENSES = [l for l in LENSES if l[0] != "features"]
+# Compare Two joins once its data is written (python3 -m astaui.compare); until
+# then a refresh leaves it out rather than land a lens with nothing to read.
+COMPARE_ON = bool(os.environ.get("ASTAUI_COMPARE_AT")) or (HERE.parent / "console-data" / "compare" / "index.json").is_file()
+if not COMPARE_ON:
+    LENSES = [l for l in LENSES if l[0] != "compare"]
 # Each lens's button keeps the number it was given when it joined, wherever it sits.
-LENS_NUM = {"home": 0, "map": 1, "similar": 2, "coverage": 3, "workflows": 4, "eval": 5, "search": 6, "sources": 7}
+# 2 was the similarity grid's, taken out on 2026-10-27; it is not given again.
+LENS_NUM = {"home": 0, "map": 1, "coverage": 3, "workflows": 4, "eval": 5, "search": 6, "sources": 7, "runs": 8, "features": 9, "check": 10, "compare": 11}
 # Lenses that joined after pages were written keep the rules for showing them in
 # their own kept block (Sharing: marble_sources.css), so a refresh brings them.
-OWN_RULES = ("sources",)
+OWN_RULES = ("sources", "runs", "features", "check", "compare")
+COMPARE_JS = ("marble_compare.js", "marble_compare_draw.js", "marble_compare_move.js", "marble_compare_pick.js")
+COMPARE_IDS = ("kb-compare-js", "kb-compare-draw-js", "kb-compare-move-js", "kb-compare-pick-js")
 CATALOGS: List[Tuple[str, str]] = [("builds", "Builds"), ("words", "Words"), ("reqs", "Requests"), ("pairs", "Pairs")]
 LISTS = [(f"{f}-{l}", label) for f, l, label, _ in TERM_LISTS]
 KINDS = [("b", "Build"), ("t", "Word"), ("p", "Two builds"), ("q", "Test request")]
@@ -81,6 +112,7 @@ COV_PARTS = [("words", "Words"), ("weights", "Weights"), ("changes", "Changes")]
 EVAL_PARTS = [("reps", "By representation"), ("pairs", "Pairs judged by eye"), ("requests", "Request by request")]
 SEARCH_PARTS = [("match", "Results"), ("code", "Code for each step"), ("log", "Plugin searches")]
 SOURCE_PARTS = [("ask", "Coming in"), ("all", "Every build")]
+RUN_PARTS = [("tree", "Tree"), ("feats", "Features"), ("gaps", "What it could not do")]
 FAMILIES_AT_MOST = 16
 # Who may see a build the owner adds: the skill's two answers, the narrower first.
 CONSENTS = [("team", "People on this project"), ("public", "Anyone")]
@@ -116,9 +148,20 @@ BRIEFS = {
             "and title, the workflow family it joined, and what was taken out. Then answer in one sentence."),
     "look": ("Take in the builds scientists have sent. From the drive's folder run `{cli} intake`: it takes every build sent to this "
              "drive's Builds sent in page that passes the checks into the knowledge base and its index, and says which it held and why. "
-             f"Then run `{CLI} incoming --fetch`, which looks on the AstaUI repository too. Then refresh this console: run "
+             f"Then run `{CLI} incoming --fetch`, which looks on the AstaUI repository too. If any build came in, also run "
+             "`cd Ai2/AstaUI/knowledge-base-v0 && python3 -m astaui.compare` from the drive's folder, so Compare Two can line it up. "
+             "Then refresh this console: run "
              f"`{CLI} marble-ops refresh {DOC}`. {APPLY} Do not commit or push. Then answer in one sentence: which builds came in "
              "and which are waiting, by name, or that none did.").replace("{cli}", CLI),
+    "check": ("Bring the computer-use runs up to date in this console's Check Runs view. From the drive's folder run "
+              "`cd Ai2/AstaUI/knowledge-base-v0 && python3 -m astaui.checkruns`. It rewrites the files the view reads (pilot/public/inspect, "
+              "beside the run records) and copies the owner's verdicts out of this page into pilot/public/verdicts.jsonl and each run's "
+              "folder. Change nothing on this page: the view reads the new files the next time it is opened. Then answer in one sentence: "
+              "how many runs it now lists and how many verdicts were copied."),
+    "compare": ("Bring this console's Compare Two view up to date. From the drive's folder run "
+                "`cd Ai2/AstaUI/knowledge-base-v0 && python3 -m astaui.compare`. It rewrites the files the view reads (console-data/compare: "
+                "every build's workflow tree and features, with vectors to match them by). Change nothing on this page: the view reads the "
+                "new files the next time it is opened. Then answer in one sentence: how many builds it now covers."),
     "refresh": f"Refresh this console from the AstaUI knowledge base. From the drive's folder run `{CLI} marble-ops refresh {DOC}`. "
                f"{APPLY} Then answer in one sentence.",
     "apply": f"Apply the changes waiting in this console's queue to the AstaUI knowledge base. From the drive's folder run "
@@ -190,10 +233,6 @@ def state_css() -> str:
         r.append(_rule(p, f' ~ #kb-map-chan .cap[data-k="{key}"]', "display: block;"))
         r.append(_rule(p, f' [data-set="channel"][data-to="{key}"]', PRESSED))
         r.append(_rule(_when("kb-map-tools", "data-channel", key, "c", ".app"), f' .near tr[data-k="{key}"] th', "color: var(--text); font-weight: 600;"))
-        p = _when("kb-mx-tools", "data-channel", key, "w")
-        r.append(_rule(p, " ~ .mxbody .cell", f"--v: var(--v{key});"))
-        r.append(_rule(p, f' ~ .mlgs .mlg[data-k="{key}"]', "display: flex;"))
-        r.append(_rule(p, f' [data-set="channel"][data-to="{key}"]', PRESSED))
     for opt, _ in COLOURS:
         p = _when("kb-map-tools", "data-colour", opt, COLOUR_DEFAULT)
         for n in (1, 2, 3):
@@ -209,6 +248,71 @@ def state_css() -> str:
     for key in ("lens", "list"):
         p = _when("kb-thumb", "data-pane", key, "lens", ".app")
         r.append(_rule(p, f' #kb-thumb [data-to="{key}"]', "color: var(--link); font-weight: 600;"))
+    return "\n  ".join(r) + "\n"
+
+
+# The cards the map is drawn from: the cards written from the code alone (the
+# default), or the older ones written from the prompts and the code.
+CARD_SETS = [("code", "Code"), ("prompts", "Code and prompts (older)")]
+# The map's one "Cluster by" choice (CLUSTER_BY in marble_views): none, the
+# flat map under the whole card (the default), or islands by discipline or by
+# the clusters found in one dimension. The choice is data-arrange on
+# kb-map-tools, holding the key; a press also points data-channel at that
+# dimension, so neighbour lines follow it (marble_by.js). "Cards from" and
+# "Dimension" stay on the page only as looks, their rows hidden
+# (marble_groups.css).
+CLUSTER_NONE = "none"
+
+
+def _cluster_by() -> str:
+    opts = [(CLUSTER_NONE, "None")] + list(CLUSTER_BY)
+    return "".join(f'<button type="button" data-marble-id="kb-map-by-{k}" data-by="{k}"' + (" data-default" if k == CLUSTER_NONE else "")
+                   + f">{esc(label)}</button>" for k, label in opts)
+
+
+def groups_css() -> str:
+    """The rules for the map's Cluster by that follow the looks, in their own
+    style block (kb-map-groups) with marble_groups.css: for the choice made,
+    each dot goes to its island (or stays put if it has none), the islands and
+    their caption show, and the test requests, placed among the flat
+    neighbours, stand down. The older cards are only ever flat."""
+    r: List[str] = [(HERE / "marble_groups.css").read_text(encoding="utf-8").rstrip("\n"),
+                    "/* Generated with the page: which choice's islands show, and which is pressed. */"]
+    keys = [k for k, _ in CLUSTER_BY]
+    for key in keys:
+        p = [f'#kb-map-tools[data-arrange="{key}"]:not([data-cards="prompts"])']
+        flat = "c" if key == FIELD else key
+        r.append(_rule(p, " ~ .plotwrap .pt", f"--x: var(--g{key}x, var(--{flat}x)); --y: var(--g{key}y, var(--{flat}y));"))
+        r.append(_rule(p, f' ~ .plotwrap .isles[data-k="{key}"]', "display: block;"))
+        r.append(_rule(p, " ~ #kb-map-chan .cap[data-k]", "display: none;"))
+        r.append(_rule(p, f' ~ #kb-map-chan .gcap[data-g="{key}"]', "display: block;"))
+        r.append(_rule(p, " ~ .plotwrap .rq", "display: none;"))
+        r.append(_rule(p, f' [data-by="{key}"]', PRESSED))
+    none = "#kb-map-tools" + "".join(f':not([data-arrange="{k}"])' for k in keys)
+    r.append(_rule([none, '#kb-map-tools[data-cards="prompts"]'], f' [data-by="{CLUSTER_NONE}"]', PRESSED))
+    return "\n  ".join(r) + "\n"
+
+
+def cards_css() -> str:
+    """The rules that move the map's points to where the older cards put them, in
+    their own style block (kb-map-cards), so a page that predates them takes them
+    as one insert. Lines to the nearest neighbours follow the code's cards, so they
+    stand down while the older cards are shown."""
+    from .atlas import CARD_KEYS
+
+    r: List[str] = ["  /* Generated with the page: where the older cards put each build. */"]
+    older = '#kb-map-tools[data-cards="prompts"]'
+    for key, _, _, _ in CHANNELS:
+        if key not in CARD_KEYS:
+            continue
+        p = [f'{older}[data-channel="{key}"]'] + ([f"{older}:not([data-channel])"] if key == "c" else [])
+        r.append(_rule(p, " ~ .plotwrap :is(.pt, .rq)", f"--x: var(--o{key}x, var(--{key}x)); --y: var(--o{key}y, var(--{key}y));"))
+        r.append(_rule(p, f' ~ #kb-map-chan .cap[data-k="{key}"]', "display: none;"))
+        r.append(_rule(p, f' ~ #kb-map-chan .cap[data-k="o{key}"]', "display: block;"))
+    r.append(_rule([older], " ~ .plotwrap svg.lines", "display: none;"))
+    r.append(_rule([older], " ~ .plotwrap .pt.marble-near .dot", "box-shadow: 0 0 0 1px var(--raised);"))
+    for key, _ in CARD_SETS:
+        r.append(_rule(_when("kb-map-tools", "data-cards", key, "code"), f' [data-set="cards"][data-to="{key}"]', PRESSED))
     return "\n  ".join(r) + "\n"
 
 
@@ -270,10 +374,14 @@ def _run(key: str, label: str, scope: str, idx: str, cls: str = "run", on: str =
             f'data-marble-scope="{scope}" data-marble-run="{esc(BRIEFS[key])}">{esc(label)}</button>')
 
 
-def skeleton(slots: Dict[str, List[Block]], stamp: str) -> str:
+def skeleton(slots: Dict[str, List[Block]], stamp: str, data_js: str = "") -> str:
     def slot(sid: str, tag: str = "div", cls: str = "", extra: str = "") -> str:
-        inner = "".join(h for _, h in slots.get(sid, []))
+        # What the knowledge base says lives in files beside the page (marble_data.py):
+        # its slot is empty here, and the page's script draws it without filing it.
         c = f' class="{cls}"' if cls else ""
+        if marble_data.is_data(sid):
+            return f'<{tag}{c} id="{sid}" data-marble-id="{sid}"{extra} data-marble-transient></{tag}>'
+        inner = "".join(h for _, h in slots.get(sid, []))
         return f'<{tag}{c} id="{sid}" data-marble-id="{sid}"{extra}>{inner}</{tag}>'
 
     def head(key: str, tools: str = "", extra: str = "") -> str:
@@ -311,6 +419,46 @@ def skeleton(slots: Dict[str, List[Block]], stamp: str) -> str:
     # Sharing: its layout and the rules that show it, and the Copy button's script.
     sources_css = (HERE / "marble_sources.css").read_text(encoding="utf-8")
     copy_js = (HERE / "marble_copy.js").read_text(encoding="utf-8")
+    # Agent Runs: its layout and the rules that show it, and its one press.
+    runs_css = (HERE / "marble_runs.css").read_text(encoding="utf-8")
+    runs_js = (HERE / "marble_runs.js").read_text(encoding="utf-8")
+    # Check Runs: its layout and the rules that show it, and its four scripts. It
+    # draws from files beside the run records, so it has no slots.
+    check_css = (HERE / "marble_check.css").read_text(encoding="utf-8")
+    check_steps_css = (HERE / "marble_check_steps.css").read_text(encoding="utf-8")
+    check_js = [(HERE / n).read_text(encoding="utf-8") for n in ("marble_check.js", "marble_check_one.js", "marble_check_steps.js", "marble_check_review.js")]
+    # Compare Two: its layout and the rules that show it, and its four scripts. Like
+    # Check Runs it draws from files beside the knowledge base, so it has no slots.
+    compare_css = [(HERE / n).read_text(encoding="utf-8") for n in ("marble_compare.css", "marble_compare_move.css")]
+    compare_js = [(HERE / n).read_text(encoding="utf-8") for n in COMPARE_JS]
+    compare_section = (f"""<section class="view" id="kb-v-compare" data-marble-id="kb-v-compare">
+        {head("compare", extra=_run("compare", "Bring in new builds", "kb-v-compare", "kb-run-compare"))}
+        <div class="cmtools" id="kb-cm-tools" data-marble-id="kb-cm-tools"></div>
+        <div class="cmstage" id="kb-cm-stage" data-marble-id="kb-cm-stage"></div>
+      </section>
+
+      """ if COMPARE_ON else "")
+    compare_tail = ((f'<style data-marble-id="kb-compare">\n{compare_css[0]}</style>\n<style data-marble-id="kb-compare-move">\n{compare_css[1]}</style>\n'
+                     + "".join(f'<script data-marble-id="{i}">\n{js}</script>\n' for i, js in zip(COMPARE_IDS, compare_js)))
+                    if COMPARE_ON else "")
+    # Features: its layout and the rules that show it.
+    feats_css = (HERE / "marble_features.css").read_text(encoding="utf-8")
+    features_section = (f"""<section class="view" id="kb-v-features" data-marble-id="kb-v-features">
+        {head("features")}
+        <div class="festage" id="kb-fe-stage" data-marble-id="kb-fe-stage">
+          <nav class="fetools" id="kb-fe-tools" data-marble-id="kb-fe-tools" data-tools aria-label="Feature groups">{slot("kb-fe-groups", cls="fegroups")}</nav>
+          <div class="feone" id="kb-fe-one" data-marble-id="kb-fe-one">
+            {slot("kb-fe-heads", cls="feheads")}
+            {slot("kb-fe-cards", cls="fecards")}
+          </div>
+        </div>
+        {slot("kb-fe-rules", extra=" hidden")}
+      </section>
+
+      """ if FEATURES_ON else "")
+    feats_style = f'<style data-marble-id="kb-feats">\n{feats_css}</style>\n' if FEATURES_ON else ""
+    # The top bar on one line: the long tab names fold into the menu sooner.
+    top_css = (HERE / "marble_top.css").read_text(encoding="utf-8")
     place = (f'<button type="button" data-marble-id="kb-map-colour-{COLOUR_DEFAULT}" data-set="colour" '
              f'data-to="{COLOUR_DEFAULT}" data-default>Place</button>')
     return f"""
@@ -386,26 +534,17 @@ def skeleton(slots: Dict[str, List[Block]], stamp: str) -> str:
       <section class="view" id="kb-v-map" data-marble-id="kb-v-map">
         {head("map")}
         <div class="tools" id="kb-map-tools" data-marble-id="kb-map-tools" data-tools>
-          <div class="grp" data-marble-id="kb-map-g1"><span class="tl" data-marble-id="kb-map-l1">Placed by</span><div class="seg" data-marble-id="kb-map-s1">{_seg("map", "channel", channels, "c")}</div></div>
+          <div class="grp" data-marble-id="kb-map-g4"><span class="tl" data-marble-id="kb-map-l4">Show</span>{slot("kb-map-from", cls="checks")}</div>
+          <div class="grp" data-marble-id="kb-map-g0"><span class="tl" data-marble-id="kb-map-l0">Cards from</span><div class="seg" data-marble-id="kb-map-s0">{_seg("map", "cards", CARD_SETS, "code")}</div></div>
+          <div class="grp" data-marble-id="kb-map-g1"><span class="tl" data-marble-id="kb-map-l1">Dimension</span><div class="seg" data-marble-id="kb-map-s1">{_seg("map", "channel", channels, "c")}</div></div>
+          <div class="grp" data-marble-id="kb-map-g3"><span class="tl" data-marble-id="kb-map-l3">Cluster by</span><div class="seg" data-marble-id="kb-map-s3">{_cluster_by()}</div></div>
           <div class="grp" data-marble-id="kb-map-g2"><span class="tl" data-marble-id="kb-map-l2">Colour by</span><div class="seg" data-marble-id="kb-map-s2">{place}{_seg("map", "colour", COLOURS, COLOUR_DEFAULT)}</div>{slot("kb-map-legend", cls="lgs")}</div>
           <button type="button" class="toggle" data-marble-id="kb-map-req" data-set="req" data-to="on" data-toggle>Show test requests</button>
         </div>
         <div class="plotwrap" data-marble-id="kb-map-wrap">{slot("kb-map-pts", cls="plot")}</div>
         {slot("kb-map-chan")}
         {slot("kb-map-pos", extra=" hidden")}
-      </section>
-
-      <section class="view" id="kb-v-similar" data-marble-id="kb-v-similar">
-        {head("similar")}
-        <div class="tools" id="kb-mx-tools" data-marble-id="kb-mx-tools" data-tools>
-          <div class="grp" data-marble-id="kb-mx-g1"><span class="tl" data-marble-id="kb-mx-l1">Alike by</span><div class="seg" data-marble-id="kb-mx-s1">{_seg("mx", "channel", channels, "w")}</div></div>
-        </div>
-        {slot("kb-mx-legend", cls="mlgs")}
-        <div class="mxbody" data-marble-id="kb-mx-body">
-          <div class="mxwrap" data-marble-id="kb-mx-wrap" role="grid" aria-label="How alike every two builds are">{slot("kb-mx-grid")}</div>
-          <p class="jlg" data-marble-id="kb-mx-jlg"><span data-marble-id="kb-mx-j0">Judged by eye:</span><span data-marble-id="kb-mx-j1"><i class="same" data-marble-id="kb-mx-j1i"></i>the same</span><span data-marble-id="kb-mx-j2"><i class="related" data-marble-id="kb-mx-j2i"></i>related</span><span data-marble-id="kb-mx-j3"><i class="different" data-marble-id="kb-mx-j3i"></i>different</span></p>
-        </div>
-        {slot("kb-mx-vals", extra=" hidden")}
+        {slot("kb-map-gpos", extra=" hidden")}
       </section>
 
       <section class="view" id="kb-v-coverage" data-marble-id="kb-v-coverage">
@@ -429,7 +568,34 @@ def skeleton(slots: Dict[str, List[Block]], stamp: str) -> str:
         {slot("kb-wf-body")}
       </section>
 
-      <section class="view" id="kb-v-eval" data-marble-id="kb-v-eval">
+      {compare_section}<section class="view" id="kb-v-runs" data-marble-id="kb-v-runs">
+        {head("runs")}
+        <div class="seg vpart" id="kb-ru-part" data-marble-id="kb-ru-part" data-tools aria-label="Show">{_seg("ru", "part", RUN_PARTS, "tree")}</div>
+        <div class="rustage" id="kb-ru-stage" data-marble-id="kb-ru-stage">
+          {slot("kb-ru-all", cls="ruall")}
+          <div class="ruone" id="kb-ru-one" data-marble-id="kb-ru-one">
+            <div class="runone" id="kb-ru-none" data-marble-id="kb-ru-none"><p data-marble-id="kb-ru-none-p">No agent has run this build yet.</p><button type="button" class="link" data-marble-id="kb-ru-none-all" data-runs-all>Show every run</button></div>
+            {slot("kb-ru-heads", cls="ruheads")}
+            {slot("kb-ru-notes", cls="runotes")}
+            {slot("kb-ru-tree", cls="rutree")}
+            {slot("kb-ru-feats", cls="rufeats")}
+            {slot("kb-ru-gaps", cls="rugaps")}
+          </div>
+        </div>
+        {slot("kb-ru-rules", extra=" hidden")}
+      </section>
+
+      <section class="view" id="kb-v-check" data-marble-id="kb-v-check">
+        {head("check", extra=_run("check", "Bring in new runs", "kb-v-check", "kb-run-check"))}
+        <div class="cktools" id="kb-ck-tools" data-marble-id="kb-ck-tools"></div>
+        <div class="ckstage" id="kb-ck-stage" data-marble-id="kb-ck-stage">
+          <div class="cklist" id="kb-ck-list" data-marble-id="kb-ck-list"></div>
+          <div class="ckone" id="kb-ck-one" data-marble-id="kb-ck-one"></div>
+        </div>
+        <ul class="ckmarks" id="kb-ck-marks" data-marble-id="kb-ck-marks" hidden></ul>
+      </section>
+
+      {features_section}      <section class="view" id="kb-v-eval" data-marble-id="kb-v-eval">
         {head("eval", extra=_run("eval", "Run the evaluation", "kb-v-eval", "kb-run-eval"))}
         <div class="seg vpart" id="kb-ev-part" data-marble-id="kb-ev-part" data-tools aria-label="Show">{_seg("ev", "part", EVAL_PARTS, "reps")}</div>
         {slot("kb-eval-body")}
@@ -503,28 +669,75 @@ def skeleton(slots: Dict[str, List[Block]], stamp: str) -> str:
 {stage_looks}</style>
 <style data-marble-id="kb-map-dots">
 {map_css}</style>
+<style data-marble-id="kb-map-cards">
+{cards_css()}</style>
+<style data-marble-id="kb-map-show">
+{(HERE / "marble_show.css").read_text(encoding="utf-8")}</style>
+<script data-marble-id="kb-map-show-js">
+{(HERE / "marble_show.js").read_text(encoding="utf-8")}</script>
+<style data-marble-id="kb-map-groups">
+{groups_css()}</style>
+<script data-marble-id="kb-map-groups-js">
+{(HERE / "marble_groups.js").read_text(encoding="utf-8")}</script>
+<script data-marble-id="kb-map-by-js">
+{(HERE / "marble_by.js").read_text(encoding="utf-8")}</script>
+<style data-marble-id="kb-map-line">
+{(HERE / "marble_line.css").read_text(encoding="utf-8")}</style>
+<script data-marble-id="kb-map-line-js">
+{(HERE / "marble_line.js").read_text(encoding="utf-8")}</script>
+<script data-marble-id="kb-map-line-ui-js">
+{(HERE / "marble_line_ui.js").read_text(encoding="utf-8")}</script>
+<script data-marble-id="kb-map-line-head-js">
+{(HERE / "marble_line_head.js").read_text(encoding="utf-8")}</script>
+<script data-marble-id="kb-map-line-share-js">
+{(HERE / "marble_line_share.js").read_text(encoding="utf-8")}</script>
+<style data-marble-id="kb-fold">
+{(HERE / "marble_fold.css").read_text(encoding="utf-8")}</style>
+<script data-marble-id="kb-fold-js">
+{(HERE / "marble_fold.js").read_text(encoding="utf-8")}</script>
 <style data-marble-id="kb-adding">
 {add_css}</style>
 <style data-marble-id="kb-sources">
 {sources_css}</style>
+<style data-marble-id="kb-runs">
+{runs_css}</style>
+<style data-marble-id="kb-check">
+{check_css}</style>
+<style data-marble-id="kb-check-steps">
+{check_steps_css}</style>
+{feats_style}<style data-marble-id="kb-top-fit">
+{top_css}</style>
 <script data-marble-id="kb-home-fitter">
 {fit_js}</script>
 <script data-marble-id="kb-copier">
 {copy_js}</script>
+<script data-marble-id="kb-runs-js">
+{runs_js}</script>
+<script data-marble-id="kb-check-js">
+{check_js[0]}</script>
+<script data-marble-id="kb-check-one-js">
+{check_js[1]}</script>
+<script data-marble-id="kb-check-steps-js">
+{check_js[2]}</script>
+<script data-marble-id="kb-check-review-js">
+{check_js[3]}</script>
+{compare_tail}<script data-marble-id="kb-data-js">
+{data_js}</script>
 </div>"""
 
 
 # What a person owns on the page, kept when the page is written anew: the looks
 # (which lens, list and word list are open, what is picked and filtered, how the
-# map and grid are set), the changes waiting, the request typed into Search, and
+# map is set), the changes waiting, the request typed into Search, and
 # what Apply said last.
-LOOKS = {"kb-lens": ("data-view",), "kb-cat": ("data-cat", "data-list"), "kb-sel": ("data-sel",),
-         "kb-filter-btn": ("data-filter",), "kb-map-tools": ("data-channel", "data-colour", "data-req"),
-         "kb-mx-tools": ("data-channel",), "kb-wf-tools": ("data-common", "data-fam"), "kb-tray-bar": ("data-open",),
+LOOKS = {"kb-lens": ("data-view", "data-fold"), "kb-cat": ("data-cat", "data-list"), "kb-sel": ("data-sel",),
+         "kb-filter-btn": ("data-filter",), "kb-map-tools": ("data-channel", "data-colour", "data-req", "data-cards", "data-arrange", "data-cluster", "data-hide", "data-line", "data-lnphases"),
+         "kb-wf-tools": ("data-common", "data-fam"), "kb-tray-bar": ("data-open",),
          "kb-cov-part": ("data-part",), "kb-ev-part": ("data-part",), "kb-sr-part": ("data-part",), "kb-add-who": ("data-consent",),
-         "kb-so-part": ("data-part",),
+         "kb-so-part": ("data-part",), "kb-ru-part": ("data-part",), "kb-fe-tools": ("data-fam",),
          "kb-thumb": ("data-pane",)}
-OWNED = ("kb-queue", "kb-q", "kb-apply-note", "kb-add-what", "kb-add-title", "kb-add-name", "kb-add-role", "kb-add-note")
+# kb-ck-marks holds the owner's verdicts on the computer-use runs (Check Runs).
+OWNED = ("kb-ck-marks", "kb-queue", "kb-q", "kb-apply-note", "kb-add-what", "kb-add-title", "kb-add-name", "kb-add-role", "kb-add-note")
 
 
 def carry(page: str, old: str) -> str:
@@ -550,17 +763,27 @@ def carry(page: str, old: str) -> str:
     return page
 
 
-def document(console, embedder: Optional[str] = None, keep: Optional[str] = None) -> str:
-    """The whole console page: skeleton, every slot filled, the rules its looks
-    follow, and its scripts. With `keep` (an older page's source), what a person
-    put into that page comes along."""
+def build(console, embedder: Optional[str] = None) -> Tuple[Views, Dict[str, List[Block]]]:
+    """Every slot's blocks, with the data slots' written to the files beside the
+    knowledge base (marble_data.py), where the page reads them."""
     views = Views(console, embedder)
     slots = views.slots()
+    marble_data.write(slots, views.kb.root, builds=len(views.atlas.ids))
+    return views, slots
+
+
+def document(console, embedder: Optional[str] = None, keep: Optional[str] = None,
+             built: Optional[Tuple[Views, Dict[str, List[Block]]]] = None) -> str:
+    """The whole console page: skeleton, every slot filled but the data slots,
+    the rules its looks follow, and its scripts. With `keep` (an older page's
+    source), what a person put into that page comes along. `built` is what
+    build() returned, when the caller has it already."""
+    views, slots = built or build(console, embedder)
     stamp = datetime.now().astimezone().strftime("%b %-d, %H:%M")
     # Asta first (tokens, fonts, parts), then how the console wears them, then the looks.
     style = (HERE / "asta.css").read_text(encoding="utf-8") + (HERE / "marble_page.css").read_text(encoding="utf-8") + state_css()
     scripts = [(HERE / name).read_text(encoding="utf-8") for name in ("marble_affordances.js", "marble_app.js", "marble_view.js")]
-    body = skeleton(slots, stamp)
+    body = skeleton(slots, stamp, marble_data.script(views.kb.root))
     page = ("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>AstaUI Console</title>\n"
             f"<style>\n{style}</style>\n</head>\n<body>{body}\n"
@@ -581,6 +804,9 @@ def page_ops(source: str, slots: Dict[str, List[Block]], texts: Optional[Dict[st
     nodes = mdiff.index(source)
     ops: List[mdiff.Op] = []
     for sid, blocks in slots.items():
+        if marble_data.is_data(sid):
+            ops += _emptied(source, nodes, sid)
+            continue
         ops += mdiff.diff_slot(source, nodes, sid, blocks)
     for eid, text in (texts or {}).items():
         n = nodes.get(eid)
@@ -588,6 +814,22 @@ def page_ops(source: str, slots: Dict[str, List[Block]], texts: Optional[Dict[st
             raise mdiff.PageError(f"the page has no {eid!r}; rebuild it with `astaui marble-doc`")
         if mdiff.text_of(source, n) != text:
             ops.append(mdiff.Op({"type": "setText", "id": eid, "text": text}, [eid], n.end - n.start))
+    return ops
+
+
+def _emptied(source: str, nodes: Dict[str, mdiff.Node], sid: str) -> List[mdiff.Op]:
+    """A data slot as the page should have it: empty, and transient, since its
+    blocks are read from the files beside the knowledge base. Only a page an older
+    astaui wrote needs either, and only one small enough to edit: a big console is
+    moved over whole with `astaui marble-doc --keep` while the drive is stopped."""
+    n = nodes.get(sid)
+    if n is None:
+        return []
+    ops = []
+    if "data-marble-transient" not in n.attrs:
+        ops.append(mdiff.Op({"type": "setAttr", "id": sid, "name": "data-marble-transient", "value": ""}, [sid], n.end - n.start))
+    if n.inner_end > n.inner_start:
+        ops.append(mdiff.Op({"type": "setInner", "id": sid, "html": ""}, [sid], n.end - n.start))
     return ops
 
 
@@ -600,8 +842,9 @@ LOOK_EVERY = "hourly"
 # an older astaui wrote, and leaves data-marble-paused, which is the owner's.
 RUN_ATTRS = ("data-marble-run", "data-marble-on", "data-marble-scope")
 # The console's own style and script blocks: a refresh keeps their text current.
-KEPT = ("kb-home-fit", "kb-home-fitter", "kb-stage", "kb-stage-tables", "kb-stage-looks", "kb-map-dots", "kb-adding",
-        "kb-sources", "kb-copier")
+KEPT = ("kb-home-fit", "kb-home-fitter", "kb-stage", "kb-stage-tables", "kb-stage-looks", "kb-map-dots", "kb-map-cards", "kb-map-show", "kb-map-show-js", "kb-map-groups", "kb-map-groups-js", "kb-map-by-js", "kb-map-line", "kb-map-line-js", "kb-map-line-ui-js", "kb-map-line-head-js", "kb-map-line-share-js", "kb-fold", "kb-fold-js", "kb-adding",
+        "kb-sources", "kb-copier", "kb-top-fit", "kb-runs", "kb-runs-js",
+        "kb-check", "kb-check-steps", "kb-check-js", "kb-check-one-js", "kb-check-steps-js", "kb-check-review-js", "kb-data-js") + (("kb-feats",) if FEATURES_ON else ()) + (("kb-compare", "kb-compare-move") + COMPARE_IDS if COMPARE_ON else ())
 
 
 def upgrade_ops(source: str, page: str, slot_ids: Sequence[str]) -> Tuple[List[mdiff.Op], List[mdiff.Op], set]:
@@ -629,11 +872,11 @@ def upgrade_ops(source: str, page: str, slot_ids: Sequence[str]) -> Tuple[List[m
             p = want[p].parent
         return p == part
 
-    parts: List[mdiff.Op] = []
+    parts, renamed = _readopt(have, want, slots, in_slot)
     looks: List[mdiff.Op] = []
     brought: set = set()
     for eid, n in want.items():
-        if eid in have or n.parent is None or n.parent not in have or not n.direct or in_slot(eid):
+        if eid in have or eid in renamed or n.parent is None or n.parent not in have or not n.direct or in_slot(eid):
             continue
         sibs = want[n.parent].children
         before = next((s for s in sibs[sibs.index(eid) + 1:] if s in have and have[s].parent == n.parent), None)
@@ -676,6 +919,11 @@ def upgrade_ops(source: str, page: str, slot_ids: Sequence[str]) -> Tuple[List[m
         words = mdiff.inner(page, n)
         if "<" not in words and words != mdiff.inner(source, have[eid]):
             parts.append(mdiff.Op({"type": "setText", "id": eid, "text": _html.unescape(words)}, [eid], have[eid].end - have[eid].start))
+    for eid, twin in renamed.items():
+        n = want[eid]
+        words = mdiff.inner(page, n)
+        if not n.children and "<" not in words and words != mdiff.inner(source, have[twin]):
+            parts.append(mdiff.Op({"type": "setText", "id": twin, "text": _html.unescape(words)}, [twin], have[twin].end - have[twin].start))
     parts += _reorder(have, want, slots, in_slot)
     for eid in KEPT:
         if eid in have and eid in want:
@@ -685,6 +933,52 @@ def upgrade_ops(source: str, page: str, slot_ids: Sequence[str]) -> Tuple[List[m
                     raise mdiff.PageError(f"{eid!r} would hold {len(new)} characters, more than one edit can carry")
                 looks.append(mdiff.Op({"type": "setInner", "id": eid, "html": new}, [eid], have[eid].end - have[eid].start))
     return parts, looks, brought
+
+
+def _readopt(have: Dict[str, mdiff.Node], want: Dict[str, mdiff.Node], slots: set, in_slot) -> Tuple[List[mdiff.Op], Dict[str, str]]:
+    """Parts the page holds under other ids, taken as the skeleton's own. When a
+    fork is settled by keeping the copy Marble made, that copy's switch buttons
+    and lens names carry minted ids, and inserting the skeleton's own beside
+    them would show each twice. Marble will not rename an id (a setAttr of
+    data-marble-id is refused as taking the part out of the file), so the part
+    keeps the id it has. A child counts as the same part when it sits under the
+    same skeleton parent with the same tag and says the same with data-set and
+    data-to (a switch's button) or data-v (a lens's name); or, failing those,
+    has the same html id (Back and Close in the selection bar); or the same
+    class, where no other part of that parent has it (each kind of thing
+    picked, the spacer). A switch button the skeleton no longer has goes.
+    Returns the edits and, for each skeleton id, the id its part has on the
+    page."""
+    def key(n: mdiff.Node) -> Optional[Tuple[str, ...]]:
+        a = n.attrs
+        if "data-set" in a or "data-v" in a:
+            return (n.tag, "set", a.get("data-set") or "", a.get("data-to") or "", a.get("data-v") or "")
+        if a.get("id"):
+            return (n.tag, "id", a["id"])
+        if a.get("class"):
+            return (n.tag, "class", " ".join(sorted(a["class"].split())))
+        return None
+
+    ops: List[mdiff.Op] = []
+    renamed: Dict[str, str] = {}
+    for pid, p in want.items():
+        if pid not in have or pid in slots or in_slot(pid):
+            continue
+        spare = [c for c in have[pid].children if c not in want and key(have[c])]
+        if not spare:
+            continue
+        keys = [key(want[c]) for c in p.children]
+        for cid, k in zip(p.children, keys):
+            if cid in have or k is None or (k[1] == "class" and keys.count(k) > 1):
+                continue
+            twin = next((s for s in spare if key(have[s]) == k), None)
+            if twin:
+                spare.remove(twin)
+                renamed[cid] = twin
+        for s_ in spare:
+            if "data-set" in have[s_].attrs:
+                ops.append(mdiff.Op({"type": "remove", "id": s_}, [s_], have[s_].end - have[s_].start))
+    return ops, renamed
 
 
 def _reorder(have: Dict[str, mdiff.Node], want: Dict[str, mdiff.Node], slots: set, in_slot) -> List[mdiff.Op]:
@@ -718,8 +1012,9 @@ def _reorder(have: Dict[str, mdiff.Node], want: Dict[str, mdiff.Node], slots: se
 
 
 def refresh_ops(console, source: str, embedder: Optional[str] = None) -> List[mdiff.Op]:
-    slots = Views(console, embedder).slots()
-    parts, looks, brought = upgrade_ops(source, document(console, embedder, keep=source), list(slots))
+    built = build(console, embedder)
+    slots = built[1]
+    parts, looks, brought = upgrade_ops(source, document(console, embedder, keep=source, built=built), list(slots))
     held = page_ops(source, {sid: blocks for sid, blocks in slots.items() if sid not in brought}, {"kb-updated": _stamp("Refreshed")})
     return parts + held + looks
 

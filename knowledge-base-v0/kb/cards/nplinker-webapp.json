@@ -1,0 +1,788 @@
+{
+  "schema": "astaui.card/1",
+  "id": "nplinker-webapp",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T05:27:08Z"
+  },
+  "app": {
+    "title": "NPLinker Webapp",
+    "summary": "A person imports a saved file of predictions, or loads a demo, and both directions of the analysis open up. In one tab they start from gene cluster families and in the other from molecular families of spectra. They narrow the table with filter rows (by ID list, or by biosynthetic class for the chosen MIBiG version), look at a bar chart of family sizes or classes, and tick the rows they care about. They then set the scoring method, raw or standardised scores and a minimum cutoff, and press Show Results. This gives a Candidate Links table: one row per selected family, with its number of links, average score and top-scoring partner. The person can filter and sort this table, choose which columns it shows, and download it as a two-sheet Excel file of best and all candidate links.",
+    "task": {
+      "text": "Rank candidate links between gene cluster families and metabolite families by correlation score, so the person can pick the most promising pairings and export them.",
+      "verbs": [
+        "identify",
+        "explore",
+        "summarize",
+        "lookup",
+        "compare"
+      ]
+    },
+    "data": {
+      "text": "Precomputed links between two kinds of entity: gene cluster families (groups of biosynthetic gene clusters with classes and strains) and mass spectra or molecular families of spectra (with precursor m/z, GNPS IDs and strains). Each link carries a score from a scoring method, its cutoff and whether it is standardised.",
+      "item": "a candidate link between one gene cluster family and one spectrum or molecular family, with its score",
+      "shapes": [
+        "network",
+        "table",
+        "hierarchy",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "analysing precomputed genome–metabolome link scores to pick candidates for follow-up",
+      "terms": [
+        "analyze",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "Two parallel tabs, one per link direction, each stack the same steps: filter rows narrow a selectable data table of families, and the selected rows plus scoring blocks (method, raw/standardised, cutoff) feed a results table that groups links per family and shows count, mean and top-scoring partner. Hovering over cells shows tooltip tables of members, strains and the top five links, and the results table filters, sorts, picks its columns and exports to Excel.",
+      "views": [
+        "table view",
+        "bar chart",
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "multi-select",
+        "sort",
+        "hover for detail",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "linking biosynthetic gene clusters to metabolomics spectra by strain-correlation scoring in natural product discovery",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "metabologenomics",
+        "natural products",
+        "genome mining"
+      ]
+    },
+    "workflow": {
+      "name": "rank candidate pairings between two linked sets of items by score",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a single .pkl/.pickle file saved by the linking tool, or press Load Demo Data. The file is validated and unpacked into families and links, and the two direction tabs become enabled.",
+          "parts": [
+            "data-import",
+            "direction-tabs"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A bar chart counts gene cluster families by number of clusters or by cluster class. Hovering over a bar lists its family IDs.",
+          "parts": [
+            "family-bar-chart"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Add filter rows with +. Each row filters by GCF ID list or BGC class (classes follow the chosen MIBiG version), or in the other tab by MF ID or spectrum ID. The rows are combined with OR when Apply Filters is pressed.",
+          "parts": [
+            "filter-builder",
+            "family-table"
+          ]
+        },
+        {
+          "step": "choose the items to work on",
+          "here": "Tick rows in the paged family table, or use select-all on the filtered rows. Hovering over a cell shows member clusters with their classes and strains, and counters show total and selected rows.",
+          "parts": [
+            "family-table"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Scoring blocks set the method (Metcalf), raw or standardised scores and a minimum cutoff. Show Results keeps the matching links for the selected families, then groups them per family to give the number of links, the average score and the top-scoring partner.",
+          "parts": [
+            "scoring-blocks",
+            "candidate-links-table"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "Each column of the Candidate Links table takes typed filters (> 30, contains Polyketide) and can be sorted. A Columns settings switch list adds optional columns about the top partner, and hovering over # Links shows the top five links.",
+          "parts": [
+            "candidate-links-table"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download Results (Excel) writes a 'Best Candidate Links' sheet and an 'All Candidate Links' sheet with every link per family.",
+          "parts": [
+            "excel-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The same pipeline runs in both directions, genes to metabolites and metabolites to genes, as two mirrored tabs with their own filters and outputs.",
+        "Scores can be read raw or standardised, against the cutoff they were computed with, so only links from the chosen scoring setting are ranked.",
+        "Each family's results show the link count, the mean score and the top-scoring partner. Ties for top score each get their own row.",
+        "Class filters switch between biosynthetic class vocabularies from before and after MIBiG 4.0.",
+        "Links are not computed in the interface: it reads scores already computed elsewhere, and scoring is disabled when the file has none."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "data-import",
+      "level": "view",
+      "parent": null,
+      "title": "Import data",
+      "summary": "Uploads a saved prediction file or fetches the demo file, validates it, unpacks families and links into stores, and enables the tabs.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/layouts.py",
+          "start": 649,
+          "end": 705,
+          "role": "markup",
+          "anchor": "ebc5a060e700",
+          "first": "# ------------------ Uploader ------------------ #"
+        },
+        {
+          "file": "code/app/assets/style.css",
+          "start": 13,
+          "end": 17,
+          "role": "style",
+          "symbol": ".btn-primary",
+          "anchor": "cf3c16064df6",
+          "first": ".btn-primary {"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 64,
+          "end": 88,
+          "role": "logic",
+          "symbol": "upload_data",
+          "anchor": "f3010999fd10",
+          "first": "def upload_data(status: du.UploadStatus) -> tuple[str, str | None, None]:"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 98,
+          "end": 137,
+          "role": "logic",
+          "symbol": "load_demo_data",
+          "anchor": "21c48b01837c",
+          "first": "def load_demo_data(n_clicks):"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 147,
+          "end": 148,
+          "role": "logic",
+          "symbol": "process_uploaded_data",
+          "anchor": "db5a3ecff01a",
+          "first": "def process_uploaded_data("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 349,
+          "end": 350,
+          "role": "logic",
+          "symbol": "disable_tabs_and_reset_blocks",
+          "anchor": "11cd5e1055f7",
+          "first": "def disable_tabs_and_reset_blocks("
+        }
+      ]
+    },
+    {
+      "id": "direction-tabs",
+      "level": "view",
+      "parent": null,
+      "title": "Genomics → Metabolomics / Metabolomics → Genomics tabs",
+      "summary": "Two mirrored tabs, each holding filters, a family table, scoring and results for one direction of linking. Both stay disabled until data is loaded.",
+      "views": [],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/layouts.py",
+          "start": 707,
+          "end": 770,
+          "role": "markup",
+          "anchor": "4f4f118c6303",
+          "first": "# ------------------ Tab Content Configuration ------------------ #"
+        },
+        {
+          "file": "code/app/layouts.py",
+          "start": 518,
+          "end": 627,
+          "role": "markup",
+          "symbol": "create_tab_content",
+          "anchor": "f068bc5e734c",
+          "first": "def create_tab_content(prefix, filter_title, checkl_options, no_sort_columns):"
+        },
+        {
+          "file": "code/app/assets/style.css",
+          "start": 9,
+          "end": 11,
+          "role": "style",
+          "symbol": ".nav-tabs .nav-item .nav-link.disabled",
+          "anchor": "fde8c7edfd69",
+          "first": ".nav-tabs .nav-item .nav-link.disabled {"
+        }
+      ]
+    },
+    {
+      "id": "filter-builder",
+      "level": "component",
+      "parent": "direction-tabs",
+      "title": "Genomics / Metabolomics filter",
+      "summary": "Lets the person add filter rows, each by ID list or biosynthetic class (with a MIBiG version selector), and applies them with OR to the family table.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter",
+        "search"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/layouts.py",
+          "start": 204,
+          "end": 210,
+          "role": "markup",
+          "symbol": "create_filter_accordion",
+          "anchor": "be47c511d3f6",
+          "first": "def create_filter_accordion("
+        },
+        {
+          "file": "code/app/config.py",
+          "start": 1,
+          "end": 32,
+          "role": "data",
+          "anchor": "44687fd58165",
+          "first": "# GM Table Configurations"
+        },
+        {
+          "file": "code/app/config.py",
+          "start": 60,
+          "end": 64,
+          "role": "data",
+          "anchor": "bf2686e6c961",
+          "first": "# MG Table Configurations"
+        },
+        {
+          "file": "code/app/assets/style.css",
+          "start": 34,
+          "end": 36,
+          "role": "style",
+          "symbol": ".custom-textinput .mantine-TextInput-input:focus",
+          "anchor": "734a446eb7ca",
+          "first": ".custom-textinput .mantine-TextInput-input:focus {"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 625,
+          "end": 672,
+          "role": "logic",
+          "symbol": "gm_filter_create_initial_block",
+          "anchor": "bbd6cbb53678",
+          "first": "def gm_filter_create_initial_block(block_id: str) -> dmc.Grid:"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 680,
+          "end": 692,
+          "role": "logic",
+          "symbol": "gm_filter_add_block",
+          "anchor": "c1e117dd7fae",
+          "first": "def gm_filter_add_block(n_clicks: list[int], blocks_id: list[str]) -> list[str]:"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 700,
+          "end": 701,
+          "role": "logic",
+          "symbol": "gm_filter_display_blocks",
+          "anchor": "a7b447867747",
+          "first": "def gm_filter_display_blocks("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 804,
+          "end": 805,
+          "role": "logic",
+          "symbol": "gm_filter_update_placeholder",
+          "anchor": "9f333fc7f787",
+          "first": "def gm_filter_update_placeholder("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1081,
+          "end": 1085,
+          "role": "logic",
+          "symbol": "gm_filter_apply",
+          "anchor": "88125755466a",
+          "first": "def gm_filter_apply("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 872,
+          "end": 919,
+          "role": "logic",
+          "symbol": "mg_filter_create_initial_block",
+          "anchor": "4767d4c27e42",
+          "first": "def mg_filter_create_initial_block(block_id: str) -> dmc.Grid:"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 927,
+          "end": 939,
+          "role": "logic",
+          "symbol": "mg_filter_add_block",
+          "anchor": "7cbc887ca46c",
+          "first": "def mg_filter_add_block(n_clicks: list[int], blocks_id: list[str]) -> list[str]:"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 947,
+          "end": 948,
+          "role": "logic",
+          "symbol": "mg_filter_display_blocks",
+          "anchor": "a9db9c1bafaf",
+          "first": "def mg_filter_display_blocks("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1050,
+          "end": 1051,
+          "role": "logic",
+          "symbol": "mg_filter_update_placeholder",
+          "anchor": "ba1def593e2e",
+          "first": "def mg_filter_update_placeholder("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1288,
+          "end": 1292,
+          "role": "logic",
+          "symbol": "mg_filter_apply",
+          "anchor": "4a05b6155db3",
+          "first": "def mg_filter_apply("
+        }
+      ]
+    },
+    {
+      "id": "family-bar-chart",
+      "level": "component",
+      "parent": "direction-tabs",
+      "title": "Gene cluster family bar chart",
+      "summary": "Counts gene cluster families by number of clusters or by cluster class, chosen with an x-axis selector. Hovering over a bar lists its family IDs.",
+      "views": [
+        "bar chart"
+      ],
+      "interactions": [
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/layouts.py",
+          "start": 575,
+          "end": 608,
+          "role": "markup",
+          "anchor": "3e0ed30c6228",
+          "first": "# Add graph component only for GM tab"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 465,
+          "end": 571,
+          "role": "logic",
+          "symbol": "gm_plot",
+          "anchor": "2033f2c87d82",
+          "first": "def gm_plot(stored_data: str | None, x_axis_selection: str) -> tuple[dict | go.Figure, dict, dict]:"
+        }
+      ]
+    },
+    {
+      "id": "family-table",
+      "level": "component",
+      "parent": "direction-tabs",
+      "title": "Data table",
+      "summary": "Paged table of gene cluster families or molecular families with multi-row selection, select-all over the filtered rows, member tooltips and row counters.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "multi-select",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/layouts.py",
+          "start": 474,
+          "end": 515,
+          "role": "markup",
+          "symbol": "create_data_table_card",
+          "anchor": "22f9a0419832",
+          "first": "def create_data_table_card(table_id, header_id, body_id, select_all_id, output1_id, output2_id):  # noqa: D417"
+        },
+        {
+          "file": "code/app/layouts.py",
+          "start": 14,
+          "end": 88,
+          "role": "markup",
+          "symbol": "create_data_table",
+          "anchor": "ea753158e8e8",
+          "first": "def create_data_table(table_id, select_all_id):"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1140,
+          "end": 1146,
+          "role": "logic",
+          "symbol": "gm_table_update_datatable",
+          "anchor": "7173cb951e8a",
+          "first": "def gm_table_update_datatable("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1235,
+          "end": 1238,
+          "role": "logic",
+          "symbol": "gm_table_toggle_selection",
+          "anchor": "3ba13e1d6f73",
+          "first": "def gm_table_toggle_selection("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1261,
+          "end": 1262,
+          "role": "logic",
+          "symbol": "gm_table_select_rows",
+          "anchor": "a0a8450455cf",
+          "first": "def gm_table_select_rows("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1348,
+          "end": 1354,
+          "role": "logic",
+          "symbol": "mg_table_update_datatable",
+          "anchor": "cc3f71f0b931",
+          "first": "def mg_table_update_datatable("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1472,
+          "end": 1475,
+          "role": "logic",
+          "symbol": "mg_table_toggle_selection",
+          "anchor": "c663f8b39c9b",
+          "first": "def mg_table_toggle_selection("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1498,
+          "end": 1499,
+          "role": "logic",
+          "symbol": "mg_table_select_rows",
+          "anchor": "8f844f8660b9",
+          "first": "def mg_table_select_rows("
+        }
+      ]
+    },
+    {
+      "id": "scoring-blocks",
+      "level": "component",
+      "parent": "direction-tabs",
+      "title": "Scoring",
+      "summary": "Lets the person set the scoring method, raw or standardised scores and a minimum cutoff, which decide which precomputed links are ranked.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/layouts.py",
+          "start": 304,
+          "end": 345,
+          "role": "markup",
+          "symbol": "create_scoring_accordion",
+          "anchor": "dffce18eef2a",
+          "first": "def create_scoring_accordion(control_id, blocks_store_id, blocks_container_id):"
+        },
+        {
+          "file": "code/app/config.py",
+          "start": 88,
+          "end": 89,
+          "role": "data",
+          "anchor": "15a0331d3770",
+          "first": "# Scoring Configurations"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1525,
+          "end": 1592,
+          "role": "logic",
+          "symbol": "scoring_create_initial_block",
+          "anchor": "3bc7affec62b",
+          "first": "def scoring_create_initial_block(block_id: str, tab_prefix: str = \"gm\") -> dmc.Grid:"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1752,
+          "end": 1753,
+          "role": "logic",
+          "symbol": "scoring_apply",
+          "anchor": "8528aec9695f",
+          "first": "def scoring_apply("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1788,
+          "end": 1798,
+          "role": "logic",
+          "symbol": "gm_scoring_add_block",
+          "anchor": "607ae00775b4",
+          "first": "def gm_scoring_add_block(n_clicks: list[int], blocks_id: list[str]) -> list[str]:"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1806,
+          "end": 1807,
+          "role": "logic",
+          "symbol": "gm_scoring_display_blocks",
+          "anchor": "0fcdd8ce4420",
+          "first": "def gm_scoring_display_blocks("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1827,
+          "end": 1828,
+          "role": "logic",
+          "symbol": "gm_scoring_update_placeholder",
+          "anchor": "3019560f5d29",
+          "first": "def gm_scoring_update_placeholder("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1847,
+          "end": 1857,
+          "role": "logic",
+          "symbol": "mg_scoring_add_block",
+          "anchor": "d923d77d9d5e",
+          "first": "def mg_scoring_add_block(n_clicks: list[int], blocks_id: list[str]) -> list[str]:"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1865,
+          "end": 1866,
+          "role": "logic",
+          "symbol": "mg_scoring_display_blocks",
+          "anchor": "cc0cdc9d327e",
+          "first": "def mg_scoring_display_blocks("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 1886,
+          "end": 1887,
+          "role": "logic",
+          "symbol": "mg_scoring_update_placeholder",
+          "anchor": "d20e68ee4300",
+          "first": "def mg_scoring_update_placeholder("
+        }
+      ]
+    },
+    {
+      "id": "candidate-links-table",
+      "level": "component",
+      "parent": "direction-tabs",
+      "title": "Candidate Links",
+      "summary": "For the selected families, groups the links that pass scoring and gives each family's link count, average score and top-scoring partner. Columns take typed filters, can be sorted and can be chosen, and a tooltip shows the top five links.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "filter",
+        "sort",
+        "hover for detail",
+        "toggle view"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app/layouts.py",
+          "start": 348,
+          "end": 443,
+          "role": "markup",
+          "anchor": "56821c1b4ca0",
+          "first": "def create_results_section(  # noqa: D417"
+        },
+        {
+          "file": "code/app/layouts.py",
+          "start": 91,
+          "end": 201,
+          "role": "markup",
+          "symbol": "create_results_table",
+          "anchor": "ca2fa37b92d7",
+          "first": "def create_results_table(table_id, no_sort_columns):"
+        },
+        {
+          "file": "code/app/config.py",
+          "start": 34,
+          "end": 58,
+          "role": "data",
+          "anchor": "872431dfa5c0",
+          "first": "GM_RESULTS_TABLE_MANDATORY_COLUMNS = ["
+        },
+        {
+          "file": "code/app/config.py",
+          "start": 66,
+          "end": 86,
+          "role": "data",
+          "anchor": "4460201ca639",
+          "first": "MG_RESULTS_TABLE_MANDATORY_COLUMNS = ["
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 2551,
+          "end": 2558,
+          "role": "logic",
+          "symbol": "gm_update_results_datatable",
+          "anchor": "e448f523a894",
+          "first": "def gm_update_results_datatable("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 2675,
+          "end": 2682,
+          "role": "logic",
+          "symbol": "mg_update_results_datatable",
+          "anchor": "148eaf7956fe",
+          "first": "def mg_update_results_datatable("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 2514,
+          "end": 2529,
+          "role": "logic",
+          "symbol": "gm_update_columns",
+          "anchor": "b26701484a85",
+          "first": "def gm_update_columns(selected_columns: list[str] | None, n_clicks: int | None) -> list[dict]:"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 2638,
+          "end": 2653,
+          "role": "logic",
+          "symbol": "mg_update_columns",
+          "anchor": "b726f2c08e43",
+          "first": "def mg_update_columns(selected_columns: list[str] | None, n_clicks: int | None) -> list[dict]:"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 2493,
+          "end": 2504,
+          "role": "logic",
+          "symbol": "gm_toggle_column_settings_modal",
+          "anchor": "98a4f0155bc9",
+          "first": "def gm_toggle_column_settings_modal(n1, n2, is_open):"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 2617,
+          "end": 2628,
+          "role": "logic",
+          "symbol": "mg_toggle_column_settings_modal",
+          "anchor": "ef759eb95fe3",
+          "first": "def mg_toggle_column_settings_modal(n1, n2, is_open):"
+        }
+      ]
+    },
+    {
+      "id": "excel-export",
+      "level": "component",
+      "parent": "direction-tabs",
+      "title": "Download Results (Excel)",
+      "summary": "Once results exist, writes a workbook with a sheet of best candidate links and a sheet of every candidate link per family.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app/layouts.py",
+          "start": 445,
+          "end": 469,
+          "role": "markup",
+          "anchor": "6bb026e36424",
+          "first": "results_download = html.Div("
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 2584,
+          "end": 2586,
+          "role": "logic",
+          "symbol": "gm_toggle_download_button",
+          "anchor": "3c8e315ad61e",
+          "first": "def gm_toggle_download_button(table_data):"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 2603,
+          "end": 2605,
+          "role": "logic",
+          "symbol": "gm_generate_excel",
+          "anchor": "1241642c9840",
+          "first": "def gm_generate_excel(n_clicks, table_data, detailed_data):"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 2708,
+          "end": 2710,
+          "role": "logic",
+          "symbol": "mg_toggle_download_button",
+          "anchor": "cd837db19bd6",
+          "first": "def mg_toggle_download_button(table_data):"
+        },
+        {
+          "file": "code/app/callbacks.py",
+          "start": 2727,
+          "end": 2729,
+          "role": "logic",
+          "symbol": "mg_generate_excel",
+          "anchor": "020e98ed6bb3",
+          "first": "def mg_generate_excel(n_clicks, table_data, detailed_data):"
+        }
+      ]
+    }
+  ]
+}

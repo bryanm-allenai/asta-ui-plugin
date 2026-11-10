@@ -1,0 +1,395 @@
+{
+  "schema": "astaui.card/1",
+  "id": "biogenius-rnaseq",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:22:11Z"
+  },
+  "app": {
+    "title": "BioGenius: RNA-Seq differential expression",
+    "summary": "A person uploads a count matrix and a sample metadata table, or loads a bundled demo set, then picks the metadata column to compare on, the target group and the reference group, and runs a DESeq2 fit. Each feature gets a fold change and an adjusted p-value, and is called up, down or not significant against fold-change and p-value cutoffs set in the sidebar. The calls show as totals and as a volcano plot with the cutoffs drawn in, both of which update as the cutoffs move. The full results table can be downloaded as CSV.",
+    "task": {
+      "text": "Test every gene for a difference in expression between two groups of samples and pick out the ones that pass fold-change and significance cutoffs.",
+      "verbs": [
+        "derive",
+        "compare",
+        "identify",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "A matrix of raw read counts, features as rows and samples as columns, with a table of sample metadata giving each sample's group.",
+      "item": "a gene, with its counts across samples and its fitted fold change and adjusted p-value",
+      "shapes": [
+        "table"
+      ]
+    },
+    "stage": {
+      "text": "testing for differential expression after read counting, before interpreting the hits",
+      "terms": [
+        "analyze",
+        "compare"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar uploads and a group picker feed a cached DESeq2 fit. The sidebar's threshold controls then re-classify the fitted results without fitting again, and the summary metrics and the hoverable volcano plot, with its dashed cutoff lines, redraw from that classification.",
+      "views": [
+        "form",
+        "summary stats",
+        "scatter plot"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "hover for detail",
+        "zoom and pan",
+        "filter",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "differential expression testing of RNA-seq counts in genomics",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "transcriptomics",
+        "differential expression",
+        "rna seq"
+      ]
+    },
+    "workflow": {
+      "name": "test each feature for a difference between two groups and call the significant ones",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a count matrix CSV and a metadata CSV in the sidebar, or click the button that loads the bundled demo set; the main area waits until both tables are present.",
+          "parts": [
+            "data-loader"
+          ]
+        },
+        {
+          "step": "choose the groups to compare",
+          "here": "Pick the metadata column to compare on, then a target level and a reference level (the reference defaults to the last level, so the two differ).",
+          "parts": [
+            "model-config"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run Analysis fits a DESeq2 negative-binomial model and returns log2 fold change, adjusted p-value and -log10(padj) for each gene, dropping genes with missing values.",
+          "parts": [
+            "model-config"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "A log2 fold-change slider and a padj input in the sidebar mark each gene up, down or not significant, and totals for tested, up and down genes update with them.",
+          "parts": [
+            "thresholds",
+            "result-counts"
+          ]
+        },
+        {
+          "step": "look over every item at a glance",
+          "here": "A volcano plot shows fold change against -log10(padj), coloured by call, with dashed lines at the cutoffs; hovering shows a gene's name and values.",
+          "parts": [
+            "volcano-plot"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Download every gene's statistics and its call as a CSV file.",
+          "parts": [
+            "results-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The test is a negative-binomial GLM with multiple-testing-adjusted p-values, set by a design factor and a target-versus-reference contrast.",
+        "Calls need both an effect-size cutoff and a significance cutoff, and both are drawn as guide lines on the volcano plot.",
+        "The fit is cached, so moving a cutoff re-classifies genes at once without refitting.",
+        "The interface text can be switched between two languages from the sidebar."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar: data and parameters",
+      "summary": "Holds the language switch, the data uploads with the demo loader, and the threshold controls.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 15,
+          "end": 17,
+          "role": "logic",
+          "symbol": "load_translations",
+          "anchor": "dbbf99dc25c9",
+          "first": "def load_translations(language_code: str) -> Dict[str, str]:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 20,
+          "end": 21,
+          "role": "markup",
+          "anchor": "5267836cca2f",
+          "first": "lang = st.sidebar.radio(\"🌐 Language / Dil\", [\"EN\", \"TR\"], horizontal=True)"
+        },
+        {
+          "file": "code/app.py",
+          "start": 61,
+          "end": 79,
+          "role": "markup",
+          "anchor": "9948b5a14ab6",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/locales/en.json",
+          "start": 1,
+          "end": 28,
+          "role": "data",
+          "anchor": "1281d63aef67",
+          "first": "{"
+        }
+      ]
+    },
+    {
+      "id": "data-loader",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Count matrix and metadata upload",
+      "summary": "Takes a count matrix CSV and a metadata CSV, or loads the bundled demo pair, and keeps them for the analysis.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 61,
+          "end": 75,
+          "role": "markup",
+          "anchor": "244f7fc48947",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 81,
+          "end": 88,
+          "role": "logic",
+          "anchor": "a525df6a8dad",
+          "first": "counts_df, meta_df = None, None"
+        },
+        {
+          "file": "code/data/sample_meta.csv",
+          "start": 1,
+          "end": 11,
+          "role": "data",
+          "anchor": "7ff745398b21",
+          "first": "Sample_ID,Condition"
+        },
+        {
+          "file": "code/generate_sample_data.py",
+          "start": 19,
+          "end": 57,
+          "role": "data",
+          "symbol": "generate_counts",
+          "anchor": "5121fc74465d",
+          "first": "def generate_counts(seed: int = SEED) -> tuple[pd.DataFrame, pd.DataFrame]:"
+        }
+      ]
+    },
+    {
+      "id": "thresholds",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Fold-change and padj cutoffs",
+      "summary": "A slider for the log2 fold-change cutoff and a number input for the adjusted p-value cutoff that set which genes count as significant.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 76,
+          "end": 79,
+          "role": "markup",
+          "anchor": "bb3bad9751cc",
+          "first": "st.markdown(\"---\")"
+        },
+        {
+          "file": "code/app.py",
+          "start": 116,
+          "end": 121,
+          "role": "logic",
+          "symbol": "categorize_gene",
+          "anchor": "8bd4354d2761",
+          "first": "def categorize_gene(row: pd.Series, lfc_thresh: float, padj_thresh: float) -> str:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 124,
+          "end": 124,
+          "role": "logic",
+          "anchor": "6e88071b3d14",
+          "first": "df['Status'] = df.apply(categorize_gene, axis=1, args=(lfc_threshold, padj_threshold))"
+        }
+      ]
+    },
+    {
+      "id": "model-config",
+      "level": "view",
+      "parent": null,
+      "title": "Model configuration and run",
+      "summary": "Picks the comparison column, target and reference groups, and runs the DESeq2 fit on button press.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 90,
+          "end": 111,
+          "role": "markup",
+          "anchor": "3b4b0f315ad8",
+          "first": "if counts_df is not None and meta_df is not None:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 29,
+          "end": 34,
+          "role": "logic",
+          "symbol": "run_deseq2",
+          "anchor": "9c8212b552f9",
+          "first": "def run_deseq2("
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "level": "view",
+      "parent": null,
+      "title": "Analysis results",
+      "summary": "Shows the classified results as totals, a volcano plot and a download once a fit exists.",
+      "views": [
+        "summary stats",
+        "scatter plot"
+      ],
+      "interactions": [
+        "hover for detail",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 113,
+          "end": 126,
+          "role": "logic",
+          "anchor": "7d80e17de48f",
+          "first": "if 'results' in st.session_state:"
+        }
+      ]
+    },
+    {
+      "id": "result-counts",
+      "level": "component",
+      "parent": "results",
+      "title": "Tested, up and down totals",
+      "summary": "Counts the genes tested and the ones called up and down under the current cutoffs.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 127,
+          "end": 133,
+          "role": "markup",
+          "anchor": "1d452fb4c8d7",
+          "first": "c1, c2, c3 = st.columns(3)"
+        }
+      ]
+    },
+    {
+      "id": "volcano-plot",
+      "level": "component",
+      "parent": "results",
+      "title": "Volcano plot",
+      "summary": "Plots every gene's fold change against -log10(padj), coloured by its call, with dashed cutoff lines and hover details.",
+      "views": [
+        "scatter plot"
+      ],
+      "interactions": [
+        "hover for detail",
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 135,
+          "end": 152,
+          "role": "logic",
+          "anchor": "e46abd5ce1bd",
+          "first": "color_map = {"
+        }
+      ]
+    },
+    {
+      "id": "results-export",
+      "level": "component",
+      "parent": "results",
+      "title": "CSV download",
+      "summary": "Downloads the full results table with each gene's call as a CSV file.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 154,
+          "end": 159,
+          "role": "markup",
+          "anchor": "84e3ea052a7e",
+          "first": "st.download_button("
+        }
+      ]
+    }
+  ]
+}

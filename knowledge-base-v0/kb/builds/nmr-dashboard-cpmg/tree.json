@@ -1,0 +1,694 @@
+{
+ "interface": {
+  "title": "NMR Dashboard (nmrdash, Meldrum spin lab)",
+  "field": "Low-field / single-sided NMR relaxometry (T2, T1, T2-D) of echo-train data",
+  "stage_of_work": "Analysis of acquired data: inspect the raw data, fit models, quantify uncertainty, export a reproducible record",
+  "what_it_is_for": "Load Kea or Tecmag CPMG/T1Sat/SSE-T2 echo data in the browser (Pyodide), inspect the echoes, fit multi-exponential and inverse-Laplace models to the decay (overall or per depth position z), add MCMC/bootstrap uncertainty, and export tables, figures, a report and provenance."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "I used the 'Explore test data' sample list, which offers 26 synthetic datasets (tecmag_/kea_ × cpmg/t1/t2d × clean/snr10/30/100, plus power series). All work in the tree used kea_cpmg_snr30 (CPMG, 256 echoes × 64 points, echo time 200 µs). Only the CPMG (T2) path is covered; the T1Sat and T2-D analyses were not reached. I selected kea_t2d_snr30 in a second tab, but it never finished loading Python before I closed that tab."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Characterise the relaxation-time distribution of a sample from an echo-train measurement, with trustworthy uncertainties and a reproducible record",
+  "specific": "Analyse a Kea CPMG dataset into T2 components, an ILT T2 spectrum and T2(z) profiles, with MCMC/bootstrap intervals and exported results",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Bring in the measurement and check it",
+    "specific": "Load tab and Raw data tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Open an example dataset and read its acquisition settings",
+      "specific": "Choose kea_cpmg_snr30 from Explore test data; the sequence name CPMG selects T2 analysis ('Sequence \"CPMG\" → exponential decay (T₂) analysis'); read the Parameters table (echo time 200 µs, 256 echoes, 64 points per echo)",
+      "screens": [
+       "screens/006.webp",
+       "screens/007.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Explore test data",
+        "screens": [
+         "screens/002.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose kea_cpmg_snr30 in the Sample dataset dropdown",
+        "screens": [
+         "screens/003.webp",
+         "screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Inspect the raw signal before fitting",
+      "specific": "View the summed echo decay (linear or log y), step through single echoes (real/imag/magnitude) with the Echo slider, and read the echo-magnitude heatmap (hover tooltip only; it is not linked to the slider)",
+      "screens": [
+       "screens/008.webp",
+       "screens/009.webp",
+       "screens/010.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Raw data →",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "ticked log y-axis",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed End on the Echo slider (echo 256 of 256)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the echo-magnitude heatmap to read its tooltip",
+        "screens": [
+         "screens/011.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Fit models to the whole decay",
+    "specific": "Process tab, 'Integrate each echo' mode, then Results tab",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Fit a sum of exponentials and judge how many components the data support",
+      "specific": "Multi-exponential fit (2 components, constant offset): read T2, amplitude, fraction with 95% CI, the fit-quality table (RSS, reduced χ², R²) and the 1–4-component model comparison (ΔAIC/ΔBIC; 2 components have the lowest BIC); warnings flag correlated parameters and a poorly determined T2,2",
+      "screens": [
+       "screens/019.webp",
+       "screens/020.webp",
+       "screens/021.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Run processing (defaults: 2 components, offset, ILT on)",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled through Decay and fits and Multi-exponential fit on Results",
+        "screens": [
+         "screens/019.webp",
+         "screens/020.webp",
+         "screens/021.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Repeat the fit with a different number of components",
+      "specific": "Set Components = 3 and rerun (the same run also had MCMC and bootstrap switched on, see t6/t7); warnings flag poorly determined T2s for components 1 and 3 and 'BIC prefers 2 components over the 3 chosen'",
+      "branch": "repeat",
+      "screens": [
+       "screens/031.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose 3 in the Components dropdown",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run processing",
+        "screens": [
+         "screens/025.webp",
+         "screens/031.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Get a model-free distribution and compare it to the discrete fit",
+      "specific": "Read the T2 spectrum (ILT, default α and T2 range) with the 2-exp components overlaid as diamonds, plus its fit statistics and peak table. In this run the two do not agree: the 2-exp T2s (~6.8e-3 s, ~8.4e-2 s) do not line up with the ILT peaks (~1.5e-4 s 14%, ~5.0e-3 s 34%, ~2.0e-2 s 52%), so the comparison is not a confirmation of either model",
+      "screens": [
+       "screens/022.webp",
+       "screens/023.webp",
+       "screens/032.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded T₂ spectrum (ILT)",
+        "screens": [
+         "screens/022.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the peak table",
+        "screens": [
+         "screens/023.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Quantify uncertainty on the fitted parameters",
+    "specific": "Advanced settings: MCMC and bootstrap, results under 'Uncertainty: MCMC and bootstrap'; both ran on the 3-component fit left over from t4",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Sample the posterior of the model parameters and check the sampler",
+      "specific": "Run MCMC on the 3-component model (T2,1–T2,3, A1–A3, offset; 32 walkers, 2000 steps, burn-in 500): read credible intervals, the autocorrelation warning ('only 10 autocorrelation times long, 50+ recommended'), trace plots with burn-in shaded and the corner plot",
+      "branch": "optional",
+      "screens": [
+       "screens/032.webp",
+       "screens/038.webp",
+       "screens/039.webp",
+       "screens/040.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened Advanced settings (confidence level, MCMC, bootstrap)",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "ticked Run MCMC, typed Steps 2000 and Burn-in 500 (Components still 3)",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run processing and watched the progress bar ('MCMC: step n of 2000')",
+        "screens": [
+         "screens/032.webp",
+         "screens/033.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Resample the data to get percentile intervals and compare against the other methods",
+      "specific": "Run bootstrap on the 3-component model (50 replicates, measured imaginary-channel noise, multi-exp + ILT); read the 'Methods compared' table (least squares / bootstrap / MCMC), per-parameter histograms and the ILT spectrum with bootstrap band; no cells were flagged as odd-one-out in this run",
+      "branch": "optional",
+      "screens": [
+       "screens/036.webp",
+       "screens/042.webp",
+       "screens/043.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "ticked Run bootstrap, typed Replicates 50",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "waited through 'Bootstrap: replicate n of 50'",
+        "screens": [
+         "screens/036.webp",
+         "screens/037.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Resolve the measurement by position",
+    "specific": "Process: 'FT each echo' mode, Results: Spatially resolved fits",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Fit every depth position and view parameters against position",
+      "specific": "FT each echo (¹H, G 23.67 T/m, z-window −200 to 200 µm, 2 components); read T2 vs position, amplitude vs position and reduced χ² vs position. Not typical output: several T2,1 values sit pinned at the 1e-5 s lower bound, and Amplitude vs position is dominated by a single ~21M outlier near z ≈ 72 µm while the other points sit near 0",
+      "screens": [
+       "screens/048.webp",
+       "screens/072.webp",
+       "screens/073.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "chose the FT each echo radio, unticked MCMC/bootstrap, Components 2",
+        "screens": [
+         "screens/048.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run processing ('Fitting z position n of 282')",
+        "screens": [
+         "screens/049.webp",
+         "screens/067.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "expanded Spatially resolved fits",
+        "screens": [
+         "screens/072.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Explore the distribution map across position and pull out the spectrum at one position",
+      "specific": "ILT map (T2 vs z) with profile above, peak tracks, and a crosshair whose slice spectrum is shown on the right; clicked z ≈ 83 µm, which moved the crosshair (readout 82.4 µm, 'peak 1.83e-2 s') and redrew the slice",
+      "screens": [
+       "screens/073.webp",
+       "screens/074.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the ILT map at z ≈ 83 µm",
+        "screens": [
+         "screens/074.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Fit the decay summed over the chosen position window",
+      "specific": "Window-summed decay and fits (2-exp + ILT fit with residuals). Not typical output: the residuals show a systematic trend (ILT χ² per point 4.46), so neither model fully describes the summed decay",
+      "screens": [
+       "screens/068.webp",
+       "screens/071.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Window-summed decay and fits",
+        "screens": [
+         "screens/071.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Record and export the analysis",
+    "specific": "Results tab: provenance and Save box; Process tab: Export params + script",
+    "children": [
+     {
+      "kind": "task",
+      "general": "See and download how the result was produced",
+      "specific": "Expand provenance (versions, input sha256, seeds) and Download provenance.json",
+      "screens": [
+       "screens/044.webp",
+       "screens/045.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded How these results were produced (provenance)",
+        "screens": [
+         "screens/044.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Download provenance.json",
+        "screens": [
+         "screens/045.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export all results as a bundle",
+      "specific": "Download .zip with Tables (CSV), MCMC/bootstrap samples, PDF report and PNG figures at 200 dpi (2.3 MB zip, '26 files inside one folder'; contents not opened)",
+      "screens": [
+       "screens/046.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Download .zip",
+        "screens": [
+         "screens/046.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the settings and a script to repeat the analysis offline",
+      "specific": "Export params + script, giving params.toml and process_nmr.py",
+      "screens": [
+       "screens/050.webp",
+       "screens/068.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "expanded What does 'Export params + script' give me?",
+        "screens": [
+         "screens/050.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Export params + script (downloaded once processing finished)",
+        "screens": [
+         "screens/051.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Measurement-type detection with acquisition parameters",
+   "general": "Read the measurement type from the file's own metadata, state which analysis it selects, and list the acquisition settings in a table",
+   "specific": "After loading, 'Sequence \"CPMG\" → exponential decay (T₂) analysis' and the Parameters table (echo time, number of echoes, points per echo, dwell, repetition time, scans)",
+   "steps": [
+    "load a dataset",
+    "read the detected sequence and the analysis it selects",
+    "read the Parameters table"
+   ],
+   "serves_tasks": [
+    "Open an example dataset and read its acquisition settings"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/007.webp"
+   ],
+   "id": "f10",
+   "check": "replayed"
+  },
+  {
+   "name": "Raw echo-train inspector",
+   "general": "Look at a stack of repeated signal acquisitions three ways: the summed trend, one acquisition at a time chosen with a slider, and a heatmap of the whole stack",
+   "specific": "Summed echo decay (log-y toggle), Single echo (real/imag/magnitude) driven by the Echo slider with time readout, and Echo magnitude heatmap (point within echo vs echo time; hover tooltip, not linked to the slider)",
+   "steps": [
+    "load a dataset",
+    "toggle log y-axis on the summed decay",
+    "drag or key the Echo slider to pick an echo",
+    "read real/imag/magnitude of that echo and hover the heatmap"
+   ],
+   "serves_tasks": [
+    "Inspect the raw signal before fitting"
+   ],
+   "screens": [
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/010.webp",
+    "screens/011.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Multi-exponential fit with model comparison",
+   "general": "Fit a sum of N decaying exponentials, show residuals, give per-parameter intervals with warnings for correlated or undetermined parameters, and rank 1–4 components by information criteria",
+   "specific": "Components 1–4 + constant offset; decay plot with fit and residual panel; T2/amplitude/fraction table with 95% CI; Fit quality (RSS, MSE, reduced χ², R²); Model comparison ΔAIC/ΔBIC; warnings like 'BIC prefers 2 components'",
+   "steps": [
+    "choose number of components and offset",
+    "run processing",
+    "read the parameter table and warnings",
+    "compare ΔAIC/ΔBIC across 1–4 components",
+    "rerun with another component count"
+   ],
+   "serves_tasks": [
+    "Fit a sum of exponentials and judge how many components the data support",
+    "Repeat the fit with a different number of components"
+   ],
+   "screens": [
+    "screens/019.webp",
+    "screens/020.webp",
+    "screens/021.webp",
+    "screens/031.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Regularised distribution (ILT) with discrete-fit overlay",
+   "general": "Invert a decay into a smooth distribution of time constants, mark its peaks with fractions, and overlay the discrete fit's components for comparison",
+   "specific": "T2 spectrum (ILT) with log10 T2 range, grid points, log10 α and peak threshold settings (only defaults used); peaks labelled with T2 and %; multi-exp components drawn as diamonds (height = amount); peak table and χ² per point",
+   "steps": [
+    "set the T2 range, α and peak threshold",
+    "run processing",
+    "read the spectrum against the component diamonds",
+    "read the peak table"
+   ],
+   "serves_tasks": [
+    "Get a model-free distribution and compare it to the discrete fit"
+   ],
+   "screens": [
+    "screens/023.webp",
+    "screens/032.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "MCMC posterior with diagnostics",
+   "general": "Sample the posterior of a fitted model with an ensemble sampler, show progress with stop-and-keep, then give credible intervals, a chain-length warning, trace plots with burn-in shaded, and a corner plot",
+   "specific": "Run MCMC (walkers, steps, burn-in, optional σ sampling); progress 'MCMC: step n of N' with 'Stop and keep partial results' (not pressed); acceptance and autocorrelation summary; posterior table; trace plots; corner plot. In this run it sampled the 3-component model",
+   "steps": [
+    "tick Run MCMC and set walkers/steps/burn-in",
+    "run processing and watch the progress bar",
+    "read the autocorrelation warning",
+    "inspect traces and corner plot",
+    "read the credible intervals"
+   ],
+   "serves_tasks": [
+    "Sample the posterior of the model parameters and check the sampler"
+   ],
+   "screens": [
+    "screens/032.webp",
+    "screens/038.webp",
+    "screens/039.webp",
+    "screens/040.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Bootstrap resampling of the fits",
+   "general": "Refit many resampled copies of the data, with noise taken from a measured noise estimate, to get percentile intervals, per-parameter histograms and a confidence band on the distribution",
+   "specific": "Run bootstrap (replicates, noise source such as measured imaginary-channel noise, targets multi-exp + ILT); progress 'Bootstrap: replicate n of N'; per-parameter histograms; ILT spectrum with bootstrap 95% band. In this run it resampled the 3-component model",
+   "steps": [
+    "tick Run bootstrap and set replicates and noise source",
+    "run processing and watch the replicate counter",
+    "read the per-parameter histograms",
+    "check the ILT bootstrap band"
+   ],
+   "serves_tasks": [
+    "Resample the data to get percentile intervals and compare against the other methods"
+   ],
+   "screens": [
+    "screens/036.webp",
+    "screens/037.webp",
+    "screens/043.webp"
+   ],
+   "id": "f9",
+   "check": "replayed"
+  },
+  {
+   "name": "Uncertainty methods comparison table",
+   "general": "Put the intervals from least squares, bootstrap and Bayesian sampling side by side per parameter",
+   "specific": "'Methods compared' table: Least squares (±1.96 SE), Bootstrap (95%), MCMC (95% credible), here for the 3-component model. Its legend describes shading ⚠ cells where one method is the odd one out; none were flagged in this run, so that marking was not observed",
+   "steps": [
+    "enable bootstrap and/or MCMC",
+    "run processing",
+    "read the side-by-side table",
+    "look for flagged cells"
+   ],
+   "serves_tasks": [
+    "Resample the data to get percentile intervals and compare against the other methods",
+    "Sample the posterior of the model parameters and check the sampler"
+   ],
+   "screens": [
+    "screens/042.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Position-resolved distribution map with linked slice",
+   "general": "Show a 2-D map (time constant vs position) under a 1-D signal profile; clicking a position moves a crosshair and redraws the distribution at that position next to the map",
+   "specific": "FT-mode ILT map with signal profile on top, peak-T2 tracks, colour bar, and a right-hand T2 spectrum for the crosshair z; clicking at z ≈ 83 µm moved the crosshair and updated the slice",
+   "steps": [
+    "switch to FT each echo and set the z-window",
+    "run processing",
+    "open Spatially resolved fits",
+    "click the map at a position",
+    "read the slice spectrum and the peak label"
+   ],
+   "serves_tasks": [
+    "Explore the distribution map across position and pull out the spectrum at one position"
+   ],
+   "screens": [
+    "screens/073.webp",
+    "screens/074.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Parameter-vs-position panels",
+   "general": "Plot fitted parameters with error bars against position, plus goodness of fit at each position, from one batch of per-position fits",
+   "specific": "T2 vs position (T2,1, T2,2, mean T2), Amplitude vs position (A1, A2, total), Fit quality vs position (reduced χ²); a 'linear T₂ axis' checkbox exists but was not tried",
+   "steps": [
+    "run FT-mode processing",
+    "expand Spatially resolved fits",
+    "read T2(z), amplitude(z) and χ²(z)"
+   ],
+   "serves_tasks": [
+    "Fit every depth position and view parameters against position"
+   ],
+   "screens": [
+    "screens/072.webp",
+    "screens/073.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Provenance and reproducible export",
+   "general": "Record software versions, input file hashes, settings and random seeds; export a results bundle and a settings file plus script that rerun the same analysis offline",
+   "specific": "Provenance panel and provenance.json; Save box (Tables CSV, MCMC/bootstrap samples, PDF report, figures PNG at a chosen dpi) to Download .zip; Export params + script giving params.toml and process_nmr.py",
+   "steps": [
+    "expand provenance",
+    "download provenance.json",
+    "choose what to include and the figure format/dpi",
+    "Download .zip",
+    "Export params + script"
+   ],
+   "serves_tasks": [
+    "See and download how the result was produced",
+    "Export all results as a bundle",
+    "Export the settings and a script to repeat the analysis offline"
+   ],
+   "screens": [
+    "screens/044.webp",
+    "screens/045.webp",
+    "screens/046.webp",
+    "screens/050.webp"
+   ],
+   "id": "f8",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Batch tab: it stayed disabled ('Batch is for several datasets'); it needs several datasets loaded from a folder, and the sample picker loads only one",
+  "T1Sat (saturation recovery) Results view: I never loaded a T1 sample within the action budget",
+  "SSE-T2 / T2-D map and resolvable-region view: kea_t2d_snr30 was selected in a second tab, but Python was still loading when I closed the tab to speed up the FT run",
+  "Spatial profile (FT of each echo) section: seen collapsed but not expanded",
+  "Plot settings panel and the 'Save to another folder…' flow: not opened"
+ ],
+ "not_done": [
+  "T2-D correlation analysis (goal 6): the 2-D inversion, the shading of the D band the b-values cannot resolve, 'Use the range the b-values can resolve', and the few-population model with MCMC/bootstrap. The dataset never finished loading in the time and actions available; the FT run was slow (282 z positions) and used most of the remaining budget",
+  "T1Sat (saturation-recovery) analysis: not attempted",
+  "Batch / time series over a folder of datasets (batch_summary.csv, timeseries.png): Batch tab stayed disabled with a single sample loaded",
+  "α sweep (L-curve) to choose the ILT regularisation strength: not tried; did not change the ILT α / T2 range or the confidence level to see their effect",
+  "Exclude the first n echoes (for a distorted first echo): not tried",
+  "Per-peak ILT T2 and signal fraction against z, and the Spatial profile / echo map: not opened",
+  "Did not try 'One z position' as the MCMC/bootstrap target in FT mode",
+  "Did not press 'Stop and keep partial results' during MCMC, and did not try the 'linear T₂ axis' checkbox on T2 vs position",
+  "Save report (PDF) alone was not pressed. Download .zip produced a 2.3 MB binary zip, which I could not open to confirm the CSV/PDF contents",
+  "Load params… was not tried (it needs a file to upload, and there are no test files)",
+  "Uploading a real folder via the drop zone: no test files are available",
+  "Clicking the raw-data echo-magnitude heatmap only showed a tooltip; it did not move the Echo slider, so those two views are not linked"
+ ],
+ "applied": [
+  "Stated in t6, t7, the uncertainty phase, f4, f9 and f5 that MCMC and bootstrap ran on the 3-component fit, and in t4 that it was the same run",
+  "Split f5 into a bootstrap-resampling feature (f9: noise source, replicate progress, histograms, ILT band) and a methods-comparison-table feature (f5)",
+  "Removed the observed-sounding claim of ⚠ odd-one-out cells from f5; now says the legend describes them and none were flagged",
+  "Dropped t8 from f6's serves_tasks (it belongs to f7)",
+  "Noted in t8 the T2,1 values pinned at the 1e-5 s bound and the ~21M amplitude outlier near z ≈ 72 µm",
+  "Noted in t10 the systematic residual trend in the window-summed fit (χ² per point 4.46)",
+  "Noted in t5 that the 2-exp components do not line up with the ILT peaks",
+  "Added feature f10 for measurement-type detection and the Parameters table, which t1 shows",
+  "Removed the untried 'linear T₂ axis' step from f7 and the untried 'Save report (PDF)' from f8's specific label",
+  "Moved the non-linked heatmap click out of t2's action into a hover action (the non-link stays in not_done)",
+  "Expanded not_done with T2-D details, T1Sat, Batch, α sweep, exclude-first-echoes, per-peak tracks vs z, and untried Stop/linear-axis controls",
+  "Said in data.note that only the CPMG path is covered"
+ ],
+ "open_fixes": [
+  "Add an α-sweep (L-curve) task under t5 and a matching feature: the run never opened the sweep, so a new pass on kea_cpmg_snr30 is needed to see and cite it",
+  "Add T2-D (kea_t2d_snr30: 2-D map, unresolvable D band, resolvable-range option, few-population model with MCMC/bootstrap) and T1Sat (kea_t1_snr30: saturation-recovery fit) as phases or branches and broaden the goal to relaxation and diffusion: neither dataset was ever loaded, so this needs a second run; both stay in not_done",
+  "Add Batch / time series as a branch: requires loading several datasets from a folder, which the sample picker cannot do; stays in screens_never_reached",
+  "Add features for the 2-D correlation map with unresolvable band, the batch time-series summary, and per-peak T2/fraction bands vs z: none were reached in this run",
+  "Add tasks for 'Exclude first n echoes', changing the confidence level, and Load params…: controls never tried (Load params needs an uploadable params file)",
+  "Confirm the contents of the downloaded .zip (CSV tables, PDF report): the binary zip was not opened"
+ ],
+ "screens_at": "pilot/public/runs/nmr-dashboard-cpmg/20261030-021208/",
+ "screens_filed": {
+  "screens/006.webp": "screens/006.webp",
+  "screens/019.webp": "screens/019.webp",
+  "screens/032.webp": "screens/032.webp",
+  "screens/048.webp": "screens/048.webp",
+  "screens/044.webp": "screens/044.webp"
+ }
+}

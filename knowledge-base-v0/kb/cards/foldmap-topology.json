@@ -1,0 +1,621 @@
+{
+  "schema": "astaui.card/1",
+  "id": "foldmap-topology",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-01T17:07:12Z"
+  },
+  "app": {
+    "title": "foldmap — Protein topology diagrams from structures",
+    "summary": "A person types a structure identifier, picks an example or drops a structure file. The app works out the secondary structure and draws a 2D topology diagram of it straight away. They then refine the figure from a sidebar: theme, colouring and labels, which chains to show, and the layout itself through tables that swap, move, rename, mark, recolour or resize elements and define domains. They can also colour the figure with an alignment or their own per-residue values, or draw it like a reference structure to compare the two side by side or as a diff. They switch between the topology, sequence and 3D views and download the figure, its data, a reusable layout file and a share link.",
+    "task": {
+      "text": "Turn a molecular structure into a publication-ready 2D topology figure, adjusted by hand and optionally coloured by the person's own data or set against a reference structure.",
+      "verbs": [
+        "derive",
+        "annotate",
+        "compare",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "One 3D molecular structure (atomic coordinates of protein and nucleic-acid chains), its sequence, and optional tables of per-residue values, crosslinks, a multiple sequence alignment and a second reference structure.",
+      "item": "a secondary-structure element (a helix, strand or stem) of one structure, drawn on the figure",
+      "shapes": [
+        "molecular structure",
+        "sequence",
+        "spans",
+        "table",
+        "network"
+      ]
+    },
+    "stage": {
+      "text": "making figures of a solved or predicted structure for a paper or talk, after the structure exists",
+      "terms": [
+        "report",
+        "explore"
+      ]
+    },
+    "mechanism": {
+      "text": "A start screen loads a structure and opens a workspace whose one large canvas shows the topology figure, the sequence figure or a linked 3D page, switched from the top bar. Every sidebar control (style, chains, layout editor tables, data uploads, reference structure) redraws the canvas, and the Download menu saves whatever the views last drew.",
+      "views": [
+        "image viewer",
+        "sequence track",
+        "3d viewer",
+        "form",
+        "table view",
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "select",
+        "toggle view",
+        "inline edit",
+        "apply label",
+        "filter",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "linked views",
+        "side-by-side comparison"
+      ]
+    },
+    "field": {
+      "text": "protein and nucleic-acid topology diagrams in structural biology",
+      "disciplines": [
+        "biology"
+      ],
+      "terms": [
+        "structural biology",
+        "protein topology",
+        "secondary structure"
+      ]
+    },
+    "workflow": {
+      "name": "compute a figure from one item, then refine and export it",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Type a PDB ID or UniProt accession and press Draw, pick an example pill or drop a .cif/.pdb file. An accession lists its AlphaFold model and experimental structures in a table, and picking a row loads that one.",
+          "parts": [
+            "start"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Loading assigns secondary structure, sheets, symmetry and assemblies and draws the topology figure at once with the current theme. A slow figure turns auto-redraw off and shows a Redraw button.",
+          "parts": [
+            "workspace"
+          ]
+        },
+        {
+          "step": "set how the result looks",
+          "here": "Theme (with a thumbnail browser), Colour by with its palette, toggles for labels, residue numbers and legend, text size, title, which chains and assembly to draw, and Reset to theme.",
+          "parts": [
+            "sidebar"
+          ]
+        },
+        {
+          "step": "select a stretch and label it with a category",
+          "here": "Edit layout tabs are tables of drawn elements: swap two, move by dx/dy, rename, mark or colour, set width, and name domains as residue ranges. There are also arrangement, rotation and element-size sliders.",
+          "parts": [
+            "layout-editors"
+          ]
+        },
+        {
+          "step": "overlay the person's own measurements",
+          "here": "Upload a multiple sequence alignment for conservation colouring, a table of per-residue values (choose the column), or crosslinks drawn as lines checked against their span. UniProt domains and sites can also be added.",
+          "parts": [
+            "residue-data"
+          ]
+        },
+        {
+          "step": "compare items side by side",
+          "here": "Draw like… takes a reference by PDB ID or upload and shows this structure drawn in the reference's frame, a Compare page with both side by side, or a Diff page with displacement and domain turns.",
+          "parts": [
+            "draw-like"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "The Download popover offers the figure as SVG, PNG or PDF, its data tables, the sequence figure, the 3D page, a layout file and a share link. A saved layout file can be loaded again to restore every setting.",
+          "parts": [
+            "download-menu",
+            "layout-file"
+          ]
+        }
+      ],
+      "distinctive": [
+        "the figure is computed deterministically from 3D coordinates, so hand edits are kept as a reusable layout file of residue ranges rather than as positions",
+        "a readability floor (minimum text size) is checked on every figure, and the app suggests drawing one subunit or fewer chains when the figure falls below it",
+        "the same structure is shown in three linked forms (2D topology, annotated sequence, 3D page), switched in one canvas",
+        "a second structure can serve as a reference, so the figure is laid out in its frame or diffed against it",
+        "a hosted mode caps residues, time and memory and never opens server file paths, so share links carry only public ids"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "start",
+      "level": "view",
+      "parent": null,
+      "title": "Start",
+      "summary": "Loads a structure from an identifier, an example or an uploaded file, and lists the structures of a protein accession to pick from.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1339,
+          "end": 1378,
+          "role": "markup",
+          "symbol": "start_inputs",
+          "anchor": "772ecdc61120",
+          "first": "def start_inputs() -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1246,
+          "end": 1322,
+          "role": "logic",
+          "symbol": "load",
+          "anchor": "e0460b811b40",
+          "first": "def load(source: str | None = None, upload: bool = False) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1324,
+          "end": 1326,
+          "role": "logic",
+          "symbol": "load_example",
+          "anchor": "be2e80fc332b",
+          "first": "def load_example() -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1328,
+          "end": 1331,
+          "role": "logic",
+          "symbol": "pick_row",
+          "anchor": "e1b8f2991d7c",
+          "first": "def pick_row() -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 466,
+          "end": 480,
+          "role": "logic",
+          "symbol": "structure_choices",
+          "anchor": "53a3ad565e45",
+          "first": "def structure_choices(source: str, limit: int = 12) -> list[tuple[str, str]]:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 239,
+          "end": 239,
+          "role": "data",
+          "anchor": "25b161dad61a",
+          "first": "EXAMPLES = {\"1LMB\": \"λ repressor–DNA\", \"5NKT\": \"FimA\", \"8UTF\": \"measles F\", \"1UBQ\": \"ubiquitin\"}"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1402,
+          "end": 1411,
+          "role": "markup",
+          "anchor": "6fe6572359a0",
+          "first": "if ss[\"stage\"] == \"load\":  # the look's widgets keep their values while Start shows (persist_state)"
+        }
+      ]
+    },
+    {
+      "id": "workspace",
+      "level": "view",
+      "parent": null,
+      "title": "Workspace canvas and top bar",
+      "summary": "Shows the topology figure, the sequence figure or the linked 3D page in one canvas, with a view switch, Redraw, Download and New structure in the top bar.",
+      "views": [
+        "image viewer",
+        "sequence track",
+        "3d viewer"
+      ],
+      "interactions": [
+        "toggle view",
+        "zoom and pan"
+      ],
+      "patterns": [
+        "linked views"
+      ],
+      "spans": [
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1422,
+          "end": 1451,
+          "role": "markup",
+          "symbol": "top_bar",
+          "anchor": "2c81ab2dbd8b",
+          "first": "def top_bar() -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1413,
+          "end": 1457,
+          "role": "logic",
+          "anchor": "4f5b663ef8e1",
+          "first": "# ---- workspace: top bar, the active view, then the sidebar (a view may switch auto-redraw off first)"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1380,
+          "end": 1381,
+          "role": "logic",
+          "symbol": "redraw",
+          "anchor": "1021ac89310c",
+          "first": "def redraw() -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1333,
+          "end": 1337,
+          "role": "logic",
+          "symbol": "new_structure",
+          "anchor": "e6169c996483",
+          "first": "def new_structure() -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app_views.py",
+          "start": 120,
+          "end": 187,
+          "role": "logic",
+          "anchor": "2c7be87aa9e1",
+          "first": "def figure_view(ws: Workspace) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app_views.py",
+          "start": 358,
+          "end": 389,
+          "role": "logic",
+          "anchor": "de04c9c64b8c",
+          "first": "def sequence_view(ws: Workspace) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app_views.py",
+          "start": 395,
+          "end": 418,
+          "role": "logic",
+          "anchor": "5770bf52e2e0",
+          "first": "def explorer_view(ws: Workspace) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "download-menu",
+      "level": "component",
+      "parent": "workspace",
+      "title": "Download",
+      "summary": "Offers files made from each view as it was last drawn: figure as SVG, PNG or PDF, data tables, sequence, 3D page, layout file, and a share link.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/foldmap/app_views.py",
+          "start": 601,
+          "end": 652,
+          "role": "markup",
+          "anchor": "2d14ac1758cf",
+          "first": "def download_menu(ws: Workspace) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 506,
+          "end": 507,
+          "role": "logic",
+          "symbol": "layout_document",
+          "anchor": "bf6e4bf6a0c5",
+          "first": "def layout_document("
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 430,
+          "end": 441,
+          "role": "logic",
+          "symbol": "like_link",
+          "anchor": "38b5eb3c4148",
+          "first": "def like_link(ss: MutableMapping) -> dict[str, str]:"
+        }
+      ]
+    },
+    {
+      "id": "sidebar",
+      "level": "view",
+      "parent": null,
+      "title": "Sidebar essentials",
+      "summary": "Holds the theme, colouring, label toggles, text size, title and reset, followed by the sections that shape the figure.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "filter"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 999,
+          "end": 1035,
+          "role": "markup",
+          "symbol": "essentials",
+          "anchor": "0a4714d99741",
+          "first": "def essentials(st, ss: MutableMapping) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 979,
+          "end": 996,
+          "role": "logic",
+          "symbol": "browse_themes",
+          "anchor": "19e1307a7bbc",
+          "first": "def browse_themes(st, ss: MutableMapping) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 972,
+          "end": 976,
+          "role": "logic",
+          "symbol": "reset_theme",
+          "anchor": "c271acca6052",
+          "first": "def reset_theme(ss: MutableMapping) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 243,
+          "end": 251,
+          "role": "logic",
+          "symbol": "look_of",
+          "anchor": "38c8fcae87df",
+          "first": "def look_of(settings: dict) -> Style:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1459,
+          "end": 1472,
+          "role": "markup",
+          "anchor": "7236f14694c0",
+          "first": "# ---- sidebar: the essentials, then six sections, then the credit"
+        },
+        {
+          "file": "code/src/foldmap/app_controls.py",
+          "start": 271,
+          "end": 324,
+          "role": "markup",
+          "anchor": "783f68b2ecf6",
+          "first": "def chains_section(st, ss: MutableMapping) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "layout-editors",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Edit layout",
+      "summary": "Sets the arrangement, rotation and element sizes, and edits drawn elements in tabbed tables to swap, move, rename, mark, recolour or resize them and define domains.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "inline edit",
+        "apply label"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/foldmap/app_controls.py",
+          "start": 392,
+          "end": 481,
+          "role": "markup",
+          "anchor": "73fe12f2dc94",
+          "first": "def layout_section(st, ss: MutableMapping) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app_controls.py",
+          "start": 653,
+          "end": 691,
+          "role": "logic",
+          "anchor": "56a7fec81998",
+          "first": "def editor(st, ss: MutableMapping, kind: str, label: str, columns: dict) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 259,
+          "end": 293,
+          "role": "logic",
+          "symbol": "layout_options",
+          "anchor": "9a525f35c679",
+          "first": "def layout_options(settings: dict) -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "residue-data",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Conservation and your data",
+      "summary": "Uploads an alignment, per-residue values or crosslinks, chooses the reference row or column to read, and adds UniProt domains and sites to the figure.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/foldmap/app_controls.py",
+          "start": 733,
+          "end": 799,
+          "role": "markup",
+          "anchor": "af557616828b",
+          "first": "def conservation_section(st, ss: MutableMapping) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app_controls.py",
+          "start": 835,
+          "end": 863,
+          "role": "logic",
+          "anchor": "7943168ec2b7",
+          "first": "def store_alignment(ss: MutableMapping) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app_controls.py",
+          "start": 879,
+          "end": 930,
+          "role": "markup",
+          "anchor": "099007526b75",
+          "first": "def data_section(st, ss: MutableMapping) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 942,
+          "end": 949,
+          "role": "logic",
+          "symbol": "data_colouring",
+          "anchor": "e59121724f78",
+          "first": "def data_colouring(ss: MutableMapping) -> None:"
+        }
+      ]
+    },
+    {
+      "id": "draw-like",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Draw like…",
+      "summary": "Takes a reference structure and either draws this one in its frame or shows both side by side on a Compare or Diff page.",
+      "views": [
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "import",
+        "toggle view"
+      ],
+      "patterns": [
+        "side-by-side comparison"
+      ],
+      "spans": [
+        {
+          "file": "code/src/foldmap/app_controls.py",
+          "start": 1151,
+          "end": 1211,
+          "role": "markup",
+          "anchor": "6c33bc07d64e",
+          "first": "def like_section(st, ss: MutableMapping) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 387,
+          "end": 414,
+          "role": "logic",
+          "symbol": "pair_page",
+          "anchor": "ffe68c84db00",
+          "first": "def pair_page(path, settings: dict):"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 314,
+          "end": 329,
+          "role": "logic",
+          "symbol": "like_entry",
+          "anchor": "da92a807089e",
+          "first": "def like_entry(structure: str, name: str, id: str = \"\", chain: str = \"\", match: str = \"auto\", b: str = \"\") -> dict:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 366,
+          "end": 377,
+          "role": "logic",
+          "symbol": "page_look",
+          "anchor": "70d1b45f2106",
+          "first": "def page_look(settings: dict) -> Style:"
+        }
+      ]
+    },
+    {
+      "id": "layout-file",
+      "level": "component",
+      "parent": "sidebar",
+      "title": "Layout file",
+      "summary": "Loads a saved layout file, whose theme, style, options and edits replace the current settings.",
+      "views": [],
+      "interactions": [
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1157,
+          "end": 1171,
+          "role": "markup",
+          "symbol": "layout_file_section",
+          "anchor": "c92a487c46ce",
+          "first": "def layout_file_section(st, ss: MutableMapping) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1113,
+          "end": 1154,
+          "role": "logic",
+          "symbol": "apply_layout_file",
+          "anchor": "4b200eb43689",
+          "first": "def apply_layout_file(ss: MutableMapping) -> None:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 667,
+          "end": 745,
+          "role": "logic",
+          "symbol": "settings_from_document",
+          "anchor": "f4e11998b83d",
+          "first": "def settings_from_document(doc: dict) -> dict:"
+        },
+        {
+          "file": "code/src/foldmap/app.py",
+          "start": 1091,
+          "end": 1107,
+          "role": "logic",
+          "symbol": "apply_document",
+          "anchor": "7723a92a51be",
+          "first": "def apply_document(ss: MutableMapping, settings: dict) -> None:"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "data",
+      "list": "shapes",
+      "term": "molecular structure"
+    },
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "3d viewer"
+    }
+  ]
+}

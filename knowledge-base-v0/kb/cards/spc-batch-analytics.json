@@ -1,0 +1,434 @@
+{
+  "schema": "astaui.card/1",
+  "id": "spc-batch-analytics",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-31T12:44:19Z"
+  },
+  "app": {
+    "title": "Batch Process Analytics (SPC × ML)",
+    "summary": "The person opens a dashboard over a table of manufacturing batches, one row per batch. A header and a row of summary numbers show how many batches there are, how many out-of-control episodes and out-of-spec batches there were, and the process capability index. They pick a quality attribute and read its individuals control chart: limits come from a reference period, points that break control rules are coloured by severity, and runs of flags are collapsed into episodes with onsets. Further tabs show capability indices against the specification limits, a ranking of which process inputs drive the key quality attribute, and a batch table they can filter to the flagged batches and download as a CSV.",
+    "task": {
+      "text": "Detect when a batch manufacturing process went out of statistical control, judge whether it can still meet its specification limits, and rank which process inputs explain the change.",
+      "verbs": [
+        "monitor",
+        "identify",
+        "derive",
+        "summarize",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A table of production batches in time order. Each batch has its controllable process parameters, raw-material and environment inputs, measured quality attributes with specification limits, and metadata such as lot and shift.",
+      "item": "one manufacturing batch with its process-parameter settings and quality-attribute results",
+      "shapes": [
+        "table",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "analysing production batch records for drift and its root cause, after manufacture and before a process investigation",
+      "terms": [
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "A summary-number header sits above four tabs. Each tab has its own attribute selector and redraws its view from the same precomputed control-rule results: a control chart with sigma zones, limit lines and severity-coloured points with an episode table; a capability histogram with indicator cards; a driver-importance bar chart with model scores; and a batch table that overlays one attribute's flags, can be filtered to flagged batches, and exports as a CSV.",
+      "views": [
+        "summary stats",
+        "line chart",
+        "table view",
+        "bar chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail",
+        "filter",
+        "export"
+      ],
+      "patterns": [
+        "dashboard"
+      ]
+    },
+    "field": {
+      "text": "statistical process control and process capability in pharmaceutical manufacturing (quality by design)",
+      "disciplines": [
+        "engineering"
+      ],
+      "terms": [
+        "statistical process control",
+        "process capability",
+        "quality by design"
+      ]
+    },
+    "workflow": {
+      "name": "flag when a sequence of runs leaves control, and explain why",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "The batch table loads from a CSV, or is generated with a fixed seed if the file is missing. The header shows the product, the line, the batch count and the date range, and summary cards show the episode, out-of-spec and Ppk numbers.",
+          "parts": [
+            "header-kpis"
+          ]
+        },
+        {
+          "step": "set limits from a reference period and flag points that break the rules",
+          "here": "A 'Quality attribute' selector picks the series. Its individuals chart shows a centre line, UCL/LCL and LSL/USL, sigma zones, and a marker where the baseline ends and monitoring begins. Points are teal (in control), amber (out of trend) or red (beyond 3σ or out of spec), and hovering lists the rules that fired.",
+          "parts": [
+            "control-charts"
+          ]
+        },
+        {
+          "step": "collapse runs of flags into distinct events",
+          "here": "An expander table lists each episode's onset, last flagged batch, span, number flagged, peak severity and the rules at onset. A second expander lists every flagged batch.",
+          "parts": [
+            "episode-table"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "For a selected attribute, cards show Cpk and Ppk at qualification and over full production, coloured by the 1.33 and 1.00 thresholds. A histogram of every batch marks the spec limits and the mean.",
+          "parts": [
+            "capability"
+          ]
+        },
+        {
+          "step": "rank which inputs drive the outcome",
+          "here": "A gradient-boosted model is trained on process parameters only. A horizontal bar chart ranks them by mean |SHAP|, a table gives the direction that improves the outcome, and score cards show the random-split R², the cross-validated R², the RMSE and a time-ordered forecast R².",
+          "parts": [
+            "process-drivers"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "The batch explorer merges one attribute's flags and rules into the full batch table, and a checkbox shows only the flagged batches.",
+          "parts": [
+            "batch-explorer"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "'Download data (CSV)' saves the current filtered, flag-annotated table.",
+          "parts": [
+            "batch-explorer"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Control limits come from a fixed qualification baseline of the first batches, with outliers trimmed repeatedly, and are then held fixed to monitor the rest (Phase I / Phase II).",
+        "Detection combines Western Electric rules 1–4, a monotonic-trend rule, a rolling regression-slope rule and spec-limit checks. Each point's severity is in control, out of trend, or beyond 3σ / out of spec.",
+        "Consecutive flags are collapsed into episodes that close after three clean batches, so the person acts on onsets rather than counting flags.",
+        "Capability is reported with both short-term (within) sigma and long-term (overall) sigma, at qualification and in production. The gap between them signals drift.",
+        "The driver model uses only controllable inputs, leaving out other quality attributes. It reports both a random-split and a time-ordered R² to separate explanation from forecasting."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "header-kpis",
+      "level": "view",
+      "parent": null,
+      "title": "Header and KPI row",
+      "summary": "Shows what the data covers and gives headline counts: batches, out-of-control episodes, out-of-spec batches and production Ppk, coloured by status.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [
+        "dashboard"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 52,
+          "end": 85,
+          "role": "style",
+          "anchor": "4fa0b1dbe0d4",
+          "first": ".app-header {{"
+        },
+        {
+          "file": "code/app.py",
+          "start": 317,
+          "end": 329,
+          "role": "markup",
+          "anchor": "5a5c4e2e19ab",
+          "first": "st.markdown("
+        },
+        {
+          "file": "code/app.py",
+          "start": 131,
+          "end": 138,
+          "role": "data",
+          "symbol": "load_data",
+          "anchor": "63660cd90e7d",
+          "first": "def load_data():"
+        },
+        {
+          "file": "code/generate_batch_data.py",
+          "start": 75,
+          "end": 203,
+          "role": "data",
+          "symbol": "generate",
+          "anchor": "68b2865d3895",
+          "first": "def generate():"
+        },
+        {
+          "file": "code/app.py",
+          "start": 301,
+          "end": 314,
+          "role": "logic",
+          "anchor": "c57d8274b546",
+          "first": "df = load_data()"
+        },
+        {
+          "file": "code/app.py",
+          "start": 289,
+          "end": 295,
+          "role": "logic",
+          "symbol": "kpi",
+          "anchor": "687f2d28b8cd",
+          "first": "def kpi(label, value, sub=\"\", color=INK):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 332,
+          "end": 343,
+          "role": "logic",
+          "anchor": "4964e61592bf",
+          "first": "c1, c2, c3, c4 = st.columns(4)"
+        }
+      ]
+    },
+    {
+      "id": "control-charts",
+      "level": "view",
+      "parent": null,
+      "title": "Control charts",
+      "summary": "Draws an individuals control chart for the chosen quality attribute, with baseline-derived limits, spec limits, sigma zones and points coloured by rule severity.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [
+        "toggle view",
+        "hover for detail"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 94,
+          "end": 97,
+          "role": "style",
+          "anchor": "429e1f46088d",
+          "first": ".rule-pill {{"
+        },
+        {
+          "file": "code/app.py",
+          "start": 352,
+          "end": 381,
+          "role": "markup",
+          "anchor": "b62a4a67f2c4",
+          "first": "with tab1:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 202,
+          "end": 264,
+          "role": "logic",
+          "symbol": "control_chart",
+          "anchor": "f500a8e50078",
+          "first": "def control_chart(result, df):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 194,
+          "end": 199,
+          "role": "logic",
+          "symbol": "severity",
+          "anchor": "3f9d66b9d345",
+          "first": "def severity(rules):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 142,
+          "end": 146,
+          "role": "logic",
+          "symbol": "spc_all",
+          "anchor": "0fa9e9a70118",
+          "first": "def spc_all(_df):"
+        },
+        {
+          "file": "code/spc_engine.py",
+          "start": 315,
+          "end": 364,
+          "role": "logic",
+          "symbol": "run_spc",
+          "anchor": "2ee60279f43d",
+          "first": "def run_spc(df, column, baseline_n=80, lsl=None, usl=None, date_col=\"date\","
+        },
+        {
+          "file": "code/app.py",
+          "start": 106,
+          "end": 112,
+          "role": "data",
+          "anchor": "e51914c12d21",
+          "first": "SPECS = {"
+        }
+      ]
+    },
+    {
+      "id": "episode-table",
+      "level": "component",
+      "parent": "control-charts",
+      "title": "Episode onsets and flagged batches",
+      "summary": "Turns runs of flagged batches into episodes with onset, span, count and peak severity, and lists every flagged batch with its rules.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 383,
+          "end": 397,
+          "role": "markup",
+          "anchor": "fa117efa61c8",
+          "first": "eps = r[\"episodes\"]"
+        },
+        {
+          "file": "code/spc_engine.py",
+          "start": 208,
+          "end": 269,
+          "role": "logic",
+          "symbol": "episodes",
+          "anchor": "9dcb160d469f",
+          "first": "def episodes(flag_df, reset=3, id_col=\"batch_id\", date_col=\"date\"):"
+        }
+      ]
+    },
+    {
+      "id": "capability",
+      "level": "view",
+      "parent": null,
+      "title": "Capability",
+      "summary": "Compares Cpk and Ppk at qualification and in production for a chosen attribute, and shows a histogram of every batch against the spec limits.",
+      "views": [
+        "summary stats",
+        "bar chart"
+      ],
+      "interactions": [
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 400,
+          "end": 427,
+          "role": "markup",
+          "anchor": "d0731bda5762",
+          "first": "with tab2:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 409,
+          "end": 414,
+          "role": "logic",
+          "symbol": "cap_card",
+          "anchor": "56b7d2bc9b03",
+          "first": "def cap_card(colobj, label, val):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 267,
+          "end": 286,
+          "role": "logic",
+          "symbol": "capability_plot",
+          "anchor": "dbde9b53a26b",
+          "first": "def capability_plot(values, spec, cap):"
+        },
+        {
+          "file": "code/spc_engine.py",
+          "start": 275,
+          "end": 309,
+          "role": "logic",
+          "symbol": "capability",
+          "anchor": "d68e67f1aad1",
+          "first": "def capability(values, lsl=None, usl=None, sigma_within=None):"
+        }
+      ]
+    },
+    {
+      "id": "process-drivers",
+      "level": "view",
+      "parent": null,
+      "title": "Process drivers",
+      "summary": "Trains a model of the key quality attribute on process inputs and ranks the inputs by SHAP impact, with direction and model scores.",
+      "views": [
+        "bar chart",
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 430,
+          "end": 480,
+          "role": "markup",
+          "anchor": "dc1fe1b38a3c",
+          "first": "with tab3:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 150,
+          "end": 188,
+          "role": "logic",
+          "symbol": "train_model",
+          "anchor": "b8c621433f2a",
+          "first": "def train_model(_df):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 114,
+          "end": 124,
+          "role": "data",
+          "anchor": "0af25d96f729",
+          "first": "CPP_FEATURES = ["
+        }
+      ]
+    },
+    {
+      "id": "batch-explorer",
+      "level": "view",
+      "parent": null,
+      "title": "Batch explorer",
+      "summary": "Shows the full batch table with one attribute's flags overlaid, can be filtered to flagged batches, and downloads the result as a CSV.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [
+        "toggle view",
+        "filter",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 483,
+          "end": 493,
+          "role": "logic",
+          "anchor": "1f9accc3fd4b",
+          "first": "with tab4:"
+        }
+      ]
+    }
+  ]
+}

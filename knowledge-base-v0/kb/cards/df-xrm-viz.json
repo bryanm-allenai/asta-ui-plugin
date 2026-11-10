@@ -1,0 +1,528 @@
+{
+  "schema": "astaui.card/1",
+  "id": "df-xrm-viz",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T03:43:00Z"
+  },
+  "app": {
+    "title": "DF-XRM visualization: plan the geometry of a dark-field X-ray microscopy experiment",
+    "summary": "The person picks a crystal structure, either by uploading a .cif file or by choosing one from a list, and sets the beam energy and the sample's size in a sidebar. The interface plots the attenuation length and the transmission through the sample, and lists the reflections the crystal allows with their scattering angle, intensity and d-spacing. The person picks a reflection and the sample's up and exit faces. The interface then draws the sample, crystal lattice, beam, lens and goniometer stage in a 3D scene that can be rotated, and reports the stage angles and 2θ. They can load a lens-box configuration to work out the lens distances and magnification, then save the whole plan as a PDF or as a 3D model for Blender.",
+    "task": {
+      "text": "Work out, before a beamtime, whether a crystal sample suits dark-field X-ray microscopy and how the sample, stage and lenses must be aligned to image a chosen reflection.",
+      "verbs": [
+        "plan",
+        "derive",
+        "decide",
+        "explore"
+      ]
+    },
+    "data": {
+      "text": "A crystal structure file and a handful of experiment settings: beam energy, sample dimensions, a chosen reflection, the crystal directions of the sample's faces, and an optional lens-box configuration file. From these the interface computes derived quantities and a 3D scene.",
+      "item": "one planned experiment: a crystal sample in a beam, aligned on one reflection",
+      "shapes": [
+        "table",
+        "document"
+      ]
+    },
+    "stage": {
+      "text": "planning the geometry of a diffraction imaging experiment, before beamtime",
+      "terms": [
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "Sidebar inputs for energy, sample size, reflection and crystal directions feed a top-to-bottom page that recomputes on every change: material properties, attenuation plots, a reflection table, the derived stage angles and a rotatable 3D scene of the experiment. A lens-configuration file adds an annotated optics diagram, and the whole plan can be exported as a PDF or a Blender model.",
+      "views": [
+        "form",
+        "line chart",
+        "table view",
+        "3d scene",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "inline edit",
+        "zoom and pan",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "linked views"
+      ]
+    },
+    "field": {
+      "text": "planning the alignment of dark-field X-ray microscopy experiments at a synchrotron",
+      "disciplines": [
+        "materials science"
+      ],
+      "terms": [
+        "dark field x ray microscopy",
+        "x ray diffraction",
+        "crystallography"
+      ]
+    },
+    "workflow": {
+      "name": "set up an experiment's geometry from a few parameters and export the plan",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Upload a .cif crystal structure or pick one of several known crystals, which are fetched from an open crystallography database; formula, density and cell parameters are shown",
+          "parts": [
+            "crystal-picker"
+          ]
+        },
+        {
+          "step": "set the conditions the plan depends on",
+          "here": "Enter beam energy in keV or wavelength in Å (each updates the other), plus sample thickness, height and width in µm",
+          "parts": [
+            "sidebar-settings"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Attenuation length against energy and transmission against thickness are plotted, with the chosen energy and thickness marked, to judge whether enough flux gets through",
+          "parts": [
+            "absorption-plots"
+          ]
+        },
+        {
+          "step": "choose one option from the computed candidates",
+          "here": "A table lists every allowed reflection with 2θ, relative intensity and d-spacing; the brightest reflection is the default Q vector, and the person can type another (h,k,l)",
+          "parts": [
+            "reflection-table",
+            "sidebar-settings"
+          ]
+        },
+        {
+          "step": "lay out the setup and check it visually",
+          "here": "Sample up and exit faces are set as (h,k,l) or [u,v,w]; the interface solves k0 and kh, reports 2θ and the stage angles φ, χ and ω, and draws sample, lattice, beam, lens and goniometer in a rotatable 3D scene",
+          "parts": [
+            "sidebar-settings",
+            "geometry-3d"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Load a .lens file or a sample lens box and a sample-detector distance; the optics are solved for d1, d2 and magnification and drawn on an annotated diagram with the lens mount point",
+          "parts": [
+            "lens-optics"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Tick 'make pdf' to get a report with the settings, plots, 3D view, reflection table and optics diagram; download a pickled 3D scene with a Blender import script, or a .blend file directly",
+          "parts": [
+            "report-export"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The output is a set of instrument settings, goniometer angles φ, χ and ω and lens distances, to apply during alignment, not a result about the data",
+        "Directions can be given as reciprocal-lattice planes (h,k,l) or real-space directions [u,v,w], and only the component orthogonal to Q or to 'up' is kept",
+        "The 3D scene uses parallel projection so the crystal axes can be compared directly with the sample axes",
+        "Lens-box configurations are TOML files; any parameter the calculation does not use is reported back to the person",
+        "Absorption is checked against sample thickness at the chosen energy before any alignment is planned"
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "sidebar-settings",
+      "level": "view",
+      "parent": null,
+      "title": "Experiment settings sidebar",
+      "summary": "Holds every input for the plan: energy or wavelength, sample dimensions, the Q vector, the sample's up and exit directions, the beam exit direction, lens display and visualization options.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "inline edit",
+        "toggle view"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 64,
+          "end": 78,
+          "role": "markup",
+          "anchor": "6e1f67b4ab06",
+          "first": "st.header('DF-XRM visualization')"
+        },
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 67,
+          "end": 68,
+          "role": "logic",
+          "symbol": "update_kev",
+          "anchor": "b5e48a1f73de",
+          "first": "def update_kev():"
+        },
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 192,
+          "end": 194,
+          "role": "markup",
+          "anchor": "01251cf05c57",
+          "first": "st.sidebar.markdown('Scattering vector')"
+        },
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 206,
+          "end": 224,
+          "role": "markup",
+          "anchor": "2145408428c1",
+          "first": "st.sidebar.markdown('Crystal-sample geometry')"
+        },
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 256,
+          "end": 261,
+          "role": "markup",
+          "anchor": "995d0caa6dd1",
+          "first": "st.sidebar.markdown('Beam-crystal geometry')"
+        },
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 314,
+          "end": 345,
+          "role": "markup",
+          "anchor": "4bd1c2b9ba6f",
+          "first": "show_lens = st.sidebar.checkbox(\"Show DFXRM lens\")"
+        },
+        {
+          "file": "code/libs/orientation_helpers.py",
+          "start": 3,
+          "end": 19,
+          "role": "logic",
+          "symbol": "direction_from_string",
+          "anchor": "0540277a35fa",
+          "first": "def direction_from_string(xtl, sting):"
+        },
+        {
+          "file": "code/libs/orientation_helpers.py",
+          "start": 21,
+          "end": 37,
+          "role": "logic",
+          "symbol": "Q_from_hkl_string",
+          "anchor": "07d3ab645176",
+          "first": "def Q_from_hkl_string(xtl, hkl_str):"
+        },
+        {
+          "file": "code/libs/orientation_helpers.py",
+          "start": 40,
+          "end": 55,
+          "role": "logic",
+          "symbol": "up_dir_from_string",
+          "anchor": "3fb545fc20a0",
+          "first": "def up_dir_from_string(xtl, up_hkl_str, Q):"
+        },
+        {
+          "file": "code/libs/orientation_helpers.py",
+          "start": 57,
+          "end": 75,
+          "role": "logic",
+          "symbol": "front_dir_from_string",
+          "anchor": "9d15617e29c6",
+          "first": "def front_dir_from_string(xtl, front_hkl_str, Q):"
+        }
+      ]
+    },
+    {
+      "id": "crystal-picker",
+      "level": "view",
+      "parent": null,
+      "title": "Crystal structure input and properties",
+      "summary": "Lets the person upload a .cif file or choose a known crystal, then shows its formula, density and unit-cell parameters.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 84,
+          "end": 116,
+          "role": "markup",
+          "anchor": "135ea88ca611",
+          "first": "uploaded_file = st.file_uploader(\"Upload a .cif file\")"
+        },
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 87,
+          "end": 95,
+          "role": "data",
+          "anchor": "a066f50fefa7",
+          "first": "known_crystal_structures = {"
+        },
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 136,
+          "end": 151,
+          "role": "logic",
+          "anchor": "5d0df48493f7",
+          "first": "xtl = Dans_Diffraction.Crystal(cif_file)"
+        }
+      ]
+    },
+    {
+      "id": "absorption-plots",
+      "level": "view",
+      "parent": null,
+      "title": "Attenuation and transmission plots",
+      "summary": "Plots attenuation length against energy and transmission against thickness, with the chosen energy and thickness marked, so the person can judge whether enough flux leaves the sample.",
+      "views": [
+        "line chart"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 156,
+          "end": 157,
+          "role": "markup",
+          "anchor": "0a57510b920b",
+          "first": "fig2d = absorption_plots.get_att_plot(xtl, energy_kev, sample_thickness)"
+        },
+        {
+          "file": "code/libs/absorption_plots.py",
+          "start": 30,
+          "end": 74,
+          "role": "logic",
+          "symbol": "get_att_plot",
+          "anchor": "3089b4e6d089",
+          "first": "def get_att_plot(xtl, energy_kev, sample_thickness):"
+        },
+        {
+          "file": "code/libs/absorption_plots.py",
+          "start": 5,
+          "end": 28,
+          "role": "logic",
+          "symbol": "att_length",
+          "anchor": "d9244ad2f1ec",
+          "first": "def att_length(xtl,energies_kev):"
+        }
+      ]
+    },
+    {
+      "id": "reflection-table",
+      "level": "view",
+      "parent": null,
+      "title": "Reflection table",
+      "summary": "Lists every allowed reflection up to a maximum 2θ, with scattering angle, intensity relative to the brightest reflection and d-spacing, so the person can pick the reflection to image.",
+      "views": [
+        "table view"
+      ],
+      "interactions": [],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 163,
+          "end": 187,
+          "role": "logic",
+          "anchor": "30469f596c4f",
+          "first": "xtl.Scatter._scattering_max_twotheta = 45"
+        }
+      ]
+    },
+    {
+      "id": "geometry-3d",
+      "level": "view",
+      "parent": null,
+      "title": "3D experiment geometry and stage angles",
+      "summary": "Solves the incoming and scattered beam directions for the chosen reflection and sample orientation, reports 2θ and the goniometer angles, and draws sample, crystal lattice, beam, lens and stage in a rotatable 3D scene.",
+      "views": [
+        "3d scene",
+        "summary stats"
+      ],
+      "interactions": [
+        "zoom and pan"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 225,
+          "end": 291,
+          "role": "logic",
+          "anchor": "8bb2ab88bf9a",
+          "first": "z_rot = -np.arctan2(up_dir[1],up_dir[0])*180/np.pi"
+        },
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 296,
+          "end": 313,
+          "role": "data",
+          "anchor": "7b30c1b63edf",
+          "first": "scale = 1.0"
+        },
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 347,
+          "end": 382,
+          "role": "logic",
+          "anchor": "af8dd5c548b8",
+          "first": "crystal_structure = draw_crystal_structures.add_crystal_structure( cif_file, scale = crystal_scale,"
+        },
+        {
+          "file": "code/libs/orientation_helpers.py",
+          "start": 110,
+          "end": 120,
+          "role": "logic",
+          "symbol": "crystal_rotation",
+          "anchor": "4218847f5fc1",
+          "first": "class crystal_rotation:"
+        },
+        {
+          "file": "code/libs/draw_crystal_structures.py",
+          "start": 6,
+          "end": 205,
+          "role": "logic",
+          "symbol": "add_crystal_structure",
+          "anchor": "60cab70fd7ab",
+          "first": "def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, legend_pos_shift = [0,0,0], cage_list = ['Ti"
+        },
+        {
+          "file": "code/libs/three_d_draw.py",
+          "start": 10,
+          "end": 274,
+          "role": "logic",
+          "symbol": "make_3d_perspective",
+          "anchor": "3cc243e17d51",
+          "first": "def make_3d_perspective(params, export_blender_filepath=None,"
+        },
+        {
+          "file": "code/libs/three_d_draw.py",
+          "start": 811,
+          "end": 845,
+          "role": "logic",
+          "symbol": "get_phi_chi_omega",
+          "anchor": "46c859817365",
+          "first": "def get_phi_chi_omega(k0, kh):"
+        }
+      ]
+    },
+    {
+      "id": "lens-optics",
+      "level": "view",
+      "parent": null,
+      "title": "Lens-box optics diagram",
+      "summary": "Takes an uploaded or sample lens-box configuration and a sample-detector distance, solves the sample-lens and lens-detector distances and the magnification, and annotates them on a diagram with the lens mount point.",
+      "views": [
+        "form",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "inline edit"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 387,
+          "end": 423,
+          "role": "markup",
+          "anchor": "614cd851496e",
+          "first": "known_lens_configuration = ["
+        },
+        {
+          "file": "code/libs/optics_geometry.py",
+          "start": 9,
+          "end": 111,
+          "role": "logic",
+          "symbol": "make_optics_geometry_plot",
+          "anchor": "048adec18475",
+          "first": "def make_optics_geometry_plot(energy_kev, two_theta, d_tot, parsed_lens_file):"
+        },
+        {
+          "file": "code/libs/optics_geometry.py",
+          "start": 113,
+          "end": 161,
+          "role": "logic",
+          "symbol": "align_optics_from_config",
+          "anchor": "3863d6848bae",
+          "first": "def align_optics_from_config(parsed_lens_file, energy_kev):"
+        },
+        {
+          "file": "code/libs/optics_geometry.py",
+          "start": 207,
+          "end": 241,
+          "role": "logic",
+          "symbol": "get_d1_d2_from_tot_d",
+          "anchor": "d4241e0d2703",
+          "first": "def get_d1_d2_from_tot_d(fs, ds, d_tot, initial_guess):"
+        },
+        {
+          "file": "code/libs/optics_geometry.py",
+          "start": 184,
+          "end": 205,
+          "role": "logic",
+          "symbol": "get_magnification",
+          "anchor": "b3520a03a937",
+          "first": "def get_magnification(fs,ds):"
+        }
+      ]
+    },
+    {
+      "id": "report-export",
+      "level": "view",
+      "parent": null,
+      "title": "PDF report and 3D model export",
+      "summary": "Builds a PDF of the settings, plots, cropped 3D view, reflection table and optics diagram, and offers download links for a pickled 3D scene with a Blender import script or a .blend file.",
+      "views": [],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 429,
+          "end": 525,
+          "role": "logic",
+          "anchor": "d3f6a2f57fe3",
+          "first": "make_pdf = st.checkbox(\"make pdf\")"
+        },
+        {
+          "file": "code/DF-XRM_vis_streamlit.py",
+          "start": 17,
+          "end": 30,
+          "role": "logic",
+          "symbol": "get_binary_file_downloader_html",
+          "anchor": "4e19fd832adb",
+          "first": "def get_binary_file_downloader_html(bin_file, file_label='File'):"
+        },
+        {
+          "file": "code/libs/save_blender.py",
+          "start": 112,
+          "end": 233,
+          "role": "logic",
+          "symbol": "save_blend",
+          "anchor": "6f5f09ba1dcf",
+          "first": "def save_blend(objects, filepath):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "3d scene"
+    }
+  ]
+}

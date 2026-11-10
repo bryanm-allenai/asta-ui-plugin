@@ -1,0 +1,667 @@
+{
+ "interface": {
+  "title": "LabBridge",
+  "field": "Laboratory data management / bioassay QC (96-well plate-reader immunoassay data, e.g. IL6 concentrations)",
+  "stage_of_work": "Data intake and quality control right after acquisition, before downstream analysis or ML modelling",
+  "what_it_is_for": "A six-step Streamlit wizard that takes a messy plate-reader export, maps its columns to a standard schema with a person checking the choices, flags bad wells on a plate heatmap, runs scientific QC (standard curve, replicate CV, Levey-Jennings/Westgard control monitoring), gives a PASS/REVIEW/FAIL fitness verdict, and exports the cleaned dataset with a quality summary and transformation log."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "First pass: uploaded messy_plate_long.csv through the file uploader (97 rows × 12 columns, detected as long format). Later passes used the 'Load sample plate export' button, which loads the same messy_plate_long.csv. The app reads the control-run history for the Levey-Jennings tab (24 runs) by itself."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Turn a raw instrument export into a standardized, quality-checked dataset with a documented verdict on whether it is fit to analyse",
+  "specific": "Take messy_plate_long.csv through LabBridge's six steps (Upload → Schema mapping → Data QC → QC Intelligence → Clean preview → Export) and download the cleaned CSV, the quality summary and the transformation log",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Bring in the raw data",
+    "specific": "Step 1 · Upload",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load a raw instrument file and have its layout recognised automatically",
+      "specific": "Upload the plate export, or load the bundled sample; LabBridge reports 'detected format: long · 97 rows × 12 columns' and shows a raw preview",
+      "screens": [
+       "screens/003.webp",
+       "screens/004.webp",
+       "screens/043.webp"
+      ],
+      "branch": "sequence",
+      "children": [
+       {
+        "kind": "task",
+        "general": "Choose where the raw data comes from",
+        "specific": "Either upload your own plate export or press 'Load sample plate export'; both lead to the same detected-format banner",
+        "screens": [
+         "screens/003.webp",
+         "screens/043.webp"
+        ],
+        "branch": "one-of",
+        "children": [
+         {
+          "kind": "action",
+          "label": "pressed Upload and gave the file picker messy_plate_long.csv",
+          "screens": [
+           "screens/003.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "pressed 'Load sample plate export' (second run, after Start over)",
+          "screens": [
+           "screens/043.webp"
+          ]
+         }
+        ],
+        "id": "n1"
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the Raw preview table",
+        "screens": [
+         "screens/004.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Next →",
+        "screens": [
+         "screens/006.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Match the file's columns to a standard data model",
+    "specific": "Step 2 · Schema mapping",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Review proposed column matches with their confidence and fix the uncertain ones",
+      "specific": "Look over the 12 raw-column → canonical-field proposals (green auto-mapped, yellow needs review). Confirm 'Anlyst' → operator (78% fuzzy match), or set it to '— leave unmapped —', then press Confirm mapping & run quality checks",
+      "screens": [
+       "screens/006.webp",
+       "screens/008.webp",
+       "screens/009.webp",
+       "screens/010.webp",
+       "screens/047.webp"
+      ],
+      "branch": "sequence",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the 'Your decision' dropdown for Anlyst",
+        "screens": [
+         "screens/007.webp",
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "task",
+        "general": "Decide what the uncertain column should become",
+        "specific": "For 'Anlyst', keep the proposed operator field or choose '— leave unmapped —'",
+        "screens": [
+         "screens/009.webp",
+         "screens/010.webp",
+         "screens/047.webp",
+         "screens/048.webp"
+        ],
+        "branch": "one-of",
+        "children": [
+         {
+          "kind": "action",
+          "label": "typed 'operator' in the Anlyst dropdown and pressed Enter (first run; recorded as a manual choice)",
+          "screens": [
+           "screens/010.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "chose '— leave unmapped —' (on the second run kept it and confirmed; QC ran normally)",
+          "screens": [
+           "screens/009.webp",
+           "screens/047.webp",
+           "screens/048.webp"
+          ]
+         }
+        ],
+        "id": "n2"
+       },
+       {
+        "kind": "action",
+        "label": "pressed ✅ Confirm mapping & run quality checks",
+        "screens": [
+         "screens/012.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Find unusable or suspicious measurements",
+    "specific": "Step 3 · Data QC (quality control & anomaly review)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "See where problem wells sit on the plate and why each was flagged",
+      "specific": "Read the summary numbers (97→97 rows, 13 QC flags, 4 errors, 9 warnings, ML-ready: Not yet), the log-scaled plate heatmap with ▲ on flagged wells, and the Flagged wells table (DUPLICATE_WELL, SATURATED_OR_OVERFLOW, NEGATIVE_VALUE, CONTROL_FAIL, MISSING_VALUE, OUTLIER_MAD, REPLICATE_CV_HIGH), each with its reason",
+      "screens": [
+       "screens/013.webp",
+       "screens/014.webp",
+       "screens/016.webp",
+       "screens/017.webp",
+       "screens/018.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered well B7 on the plate map (tooltip column 7 / row B)",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled the Flagged wells table down",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the 'What these flags mean' expander",
+        "screens": [
+         "screens/017.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled the flags table sideways to read the reasons (e.g. 'sample S002: CV=72% across wells [B5, B6, B4]')",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Next →",
+        "screens": [
+         "screens/020.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Check the data against scientific acceptance criteria",
+    "specific": "Step 4 · QC Intelligence (tabbed)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Fit a calibration curve and back-calculate unknown concentrations with confidence intervals",
+      "specific": "Standard curve tab: linear fit of measured signal vs expected concentration (R² 0.9996, slope 0.996, 16 standard levels, acceptance PASS), then a table of samples with calc_conc_nM, ci95_low, ci95_high and in_curve_range",
+      "screens": [
+       "screens/020.webp",
+       "screens/021.webp",
+       "screens/022.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered the standard point at 32 nM (G2, measured 31.39)",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the calc_conc_nM column header to sort ascending",
+        "screens": [
+         "screens/022.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Find samples whose replicates disagree",
+      "specific": "Replicate reliability tab: bar chart of replicate CV% per sample against the 25% limit; 2 samples fail (S007, S002 with CV 88.4%)",
+      "screens": [
+       "screens/024.webp",
+       "screens/026.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the 🔁 Replicate reliability tab",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the S002 bar (n_reps 3, mean 39.736, cv_pct 88.4, fail)",
+        "screens": [
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Track a control across runs over time and catch drift",
+      "specific": "Control monitoring tab: Levey-Jennings chart of the positive control over 24 runs (baseline mean 60.499 nM, SD 3.279) with ±2SD/±3SD lines; 10 Westgard violations marked in red for runs 19–24",
+      "screens": [
+       "screens/027.webp",
+       "screens/028.webp",
+       "screens/029.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the 📉 Control monitoring tab",
+        "screens": [
+         "screens/027.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the run 22 point (RUN_022, value 42.975, z −5.34, flags 1_3s;2_2s)",
+        "screens": [
+         "screens/029.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Get an overall go/no-go verdict on whether the dataset can be used",
+      "specific": "Fitness verdict tab: '⛔ FAIL — Not fit for analysis yet', with the reasons: curve passed, 2 replicate failures, 2 outliers, control drift (1_3s, 2_2s)",
+      "screens": [
+       "screens/030.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the ✅ Fitness verdict tab",
+        "screens": [
+         "screens/030.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Next →",
+        "screens": [
+         "screens/032.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Review what was changed in the data",
+    "specific": "Step 5 · Clean preview",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Inspect every automatic correction and the cleaned table",
+      "specific": "Read the before→after table of 178 normalized values (control_type labels, decimal commas, embedded units stripped, µM→nM conversion, dates turned into ISO format) and the clean dataset with a qc_flag column for each row",
+      "screens": [
+       "screens/032.webp",
+       "screens/033.webp",
+       "screens/034.webp",
+       "screens/036.webp",
+       "screens/038.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "turned on 'Show all normalizations'",
+        "screens": [
+         "screens/033.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled the normalization table (DECIMAL_NORMALIZED, EMBEDDED_UNIT_STRIPPED, UNIT_NORMALIZED, DATE_NORMALIZED)",
+        "screens": [
+         "screens/034.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled the clean dataset sideways to operator / instrument_id / qc_flag",
+        "screens": [
+         "screens/036.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed the table Search icon, typed 'SAT', pressed Enter (jumped to the SATURATED_OR_OVERFLOW row)",
+        "screens": [
+         "screens/037.webp",
+         "screens/038.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Next →",
+        "screens": [
+         "screens/040.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Export the cleaned data with its audit trail",
+    "specific": "Step 6 · Export & data-quality report",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Download the cleaned dataset, a quality report and a full log of changes",
+      "specific": "Download clean_dataset.csv, data_quality_summary.md (rows in/out, mapping counts, flags by type, ML-ready: NO) and transformation_log.json (every map and normalize event; the manual Anlyst→operator choice is recorded as rule 'manual')",
+      "screens": [
+       "screens/040.webp",
+       "screens/041.webp",
+       "screens/049.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed ⬇️ Clean dataset (CSV)",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed ⬇️ Quality summary (Markdown)",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed ⬇️ Transformation log (JSON)",
+        "screens": [
+         "screens/041.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "(second run, Anlyst unmapped) reopened Export; summary now reads '1 unmapped'",
+        "screens": [
+         "screens/049.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Start a fresh session",
+      "specific": "Press ↺ Start over in the sidebar to clear the session and go back to Upload",
+      "screens": [
+       "screens/042.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed ↺ Start over",
+        "screens": [
+         "screens/042.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Column-to-schema mapper with confidence scores",
+   "general": "Match each column of an incoming table to a fixed set of standard fields, show how confident each match is and why, and let a person confirm, change or drop each match before processing",
+   "specific": "Schema mapping step: each raw column (Plate, Conc., Anlyst…) gets a proposed canonical field, a green/yellow/red status, a % confidence bar, a reason ('known synonym', 'fuzzy match', 'values look like'), and a 'Your decision' dropdown that includes '— leave unmapped —'. A yellow banner names the columns that need judgement. Confirm runs QC; manual choices later show up only as counts in the export summary and as rule 'manual' entries in the transformation log",
+   "steps": [
+    "Read the proposed mapping, confidence and reason for each raw column",
+    "Open the decision dropdown on a yellow (needs review) column",
+    "Pick a different canonical field or '— leave unmapped —'",
+    "Press Confirm mapping & run quality checks",
+    "See the choice recorded in the summary counts (auto/manual/unmapped) and in the transformation log"
+   ],
+   "serves_tasks": [
+    "Review proposed column matches with their confidence and fix the uncertain ones"
+   ],
+   "screens": [
+    "screens/006.webp",
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/010.webp",
+    "screens/049.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Plate heatmap with linked flag table",
+   "general": "Show every position of a sample grid coloured by its reading, mark the problem positions, and list each problem next to it with a severity, a type and a reason",
+   "specific": "Data QC step: 8×12 plate map coloured by log reading (viridis) with ▲ on flagged wells and blanks for missing/overflow wells, hover tooltips for row/column, next to a 'Flagged wells' table (severity error/warn, well, flag code, reason). Headline numbers (rows, flags, errors, warnings, ML-ready) and a 'What these flags mean' glossary go with them",
+   "steps": [
+    "Scan the plate map for ▲ markers and empty (white) wells",
+    "Hover a well to get its row and column",
+    "Find that well in the Flagged wells table and scroll sideways to read the reason",
+    "Open 'What these flags mean' to look up a flag code"
+   ],
+   "serves_tasks": [
+    "See where problem wells sit on the plate and why each was flagged"
+   ],
+   "screens": [
+    "screens/013.webp",
+    "screens/014.webp",
+    "screens/016.webp",
+    "screens/017.webp",
+    "screens/018.webp"
+   ],
+   "id": "f2",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Standard-curve fit with back-calculated concentrations",
+   "general": "Fit a calibration line through reference samples, check it against an acceptance threshold, and convert unknown readings to concentrations with 95% confidence intervals and an in-range check",
+   "specific": "Standard curve tab: R², slope, number of standard levels and PASS/FAIL acceptance (R² ≥ 0.98); scatter of measured signal vs expected nM with the fitted line and hover tooltips per standard well; a sortable table of samples with calc_conc_nM, ci95_low, ci95_high, in_curve_range",
+   "steps": [
+    "Read the fit numbers and acceptance verdict",
+    "Hover a standard point to see its well, expected and measured value",
+    "Sort the quantified-sample table by calculated concentration",
+    "Check the CI bounds and the in_curve_range tick for each sample"
+   ],
+   "serves_tasks": [
+    "Fit a calibration curve and back-calculate unknown concentrations with confidence intervals"
+   ],
+   "screens": [
+    "screens/020.webp",
+    "screens/021.webp",
+    "screens/022.webp"
+   ],
+   "id": "f3",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Replicate CV reliability chart",
+   "general": "Rank each sample by how much its repeat measurements disagree, against a fixed limit, and colour each as good, watch or fail",
+   "specific": "Replicate reliability tab: horizontal bar chart of replicate CV% per sample_id with a dashed 25% limit line and good/watch/fail colouring; tooltip gives n_reps, mean, cv_pct and reliability; a headline counts failing samples",
+   "steps": [
+    "Read the headline count of samples over the CV limit",
+    "Find red bars past the dashed 25% line",
+    "Hover a bar to read n_reps, mean and CV%"
+   ],
+   "serves_tasks": [
+    "Find samples whose replicates disagree"
+   ],
+   "screens": [
+    "screens/024.webp",
+    "screens/026.webp"
+   ],
+   "id": "f4",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Levey-Jennings control chart with Westgard rules",
+   "general": "Plot a control measurement run by run against limits from a baseline, and mark the runs that break standard rules for drift or shift",
+   "specific": "Control monitoring tab: positive-control value (nM) by run # with the mean line and ±2SD/±3SD dashed limits from the validated baseline; violating runs drawn as red triangles; tooltip gives run_id, value, z-score and Westgard flags (e.g. 1_3s;2_2s); headline gives the baseline mean/SD and the number of violations",
+   "steps": [
+    "Read the baseline mean/SD and the number of violations",
+    "Look for points beyond the 2SD/3SD lines or trending runs",
+    "Hover a red triangle to see run_id, z-score and which Westgard rules fired"
+   ],
+   "serves_tasks": [
+    "Track a control across runs over time and catch drift"
+   ],
+   "screens": [
+    "screens/027.webp",
+    "screens/028.webp",
+    "screens/029.webp"
+   ],
+   "id": "f5",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Before/after normalization log with clean-table preview",
+   "general": "List every automatic change made to the data (field, rule, old value, new value) next to the resulting clean table, so nothing changes without being shown",
+   "specific": "Clean preview step: 'Before → after · 178 values normalized' table (well, field, transformation such as NORMALIZED / DECIMAL_NORMALIZED / EMBEDDED_UNIT_STRIPPED / UNIT_NORMALIZED / DATE_NORMALIZED, before, after) with a 'Show all normalizations' toggle, followed by the clean dataset in canonical columns with a qc_flag for each row, searchable from the table toolbar",
+   "steps": [
+    "Turn on 'Show all normalizations' to list every change",
+    "Scroll through the transformation types",
+    "Search the clean table for a flag (e.g. 'SAT') to jump to that row",
+    "Check that flagged rows carry their qc_flag"
+   ],
+   "serves_tasks": [
+    "Inspect every automatic correction and the cleaned table"
+   ],
+   "screens": [
+    "screens/032.webp",
+    "screens/033.webp",
+    "screens/034.webp",
+    "screens/037.webp",
+    "screens/038.webp"
+   ],
+   "id": "f6",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Audited export bundle",
+   "general": "Package the cleaned data, a readable quality summary and a machine-readable log of every change for download together",
+   "specific": "Export step: three download buttons (Clean dataset CSV, Quality summary Markdown, Transformation log JSON), with a rendered data-quality summary (rows in/out, column mapping counts, required fields present, normalizations, flags by type, ML-ready YES/NO) and the first rows of the audit trail shown on the page",
+   "steps": [
+    "Read the rendered data-quality summary and ML-ready status",
+    "Look over the transformation log preview",
+    "Download the clean CSV, the Markdown summary and the JSON log"
+   ],
+   "serves_tasks": [
+    "Download the cleaned dataset, a quality report and a full log of changes"
+   ],
+   "screens": [
+    "screens/041.webp",
+    "screens/040.webp",
+    "screens/049.webp"
+   ],
+   "id": "f7",
+   "check": "in_place_only"
+  },
+  {
+   "name": "Fitness verdict summary",
+   "general": "Combine the results of several independent quality checks (calibration acceptance, replicate agreement, statistical outliers, control-rule violations) into one go/no-go banner, with a severity-marked reason for each check",
+   "specific": "Fitness verdict tab: a single PASS/REVIEW/FAIL banner (seen here only as '⛔ FAIL — Not fit for analysis yet') above one reason line per check, each with a severity icon: curve passed (R²=1.000), 2 replicate failures, 2 outliers, control drift (1_3s, 2_2s)",
+   "steps": [
+    "Read the verdict banner",
+    "Read each per-check reason and its severity icon",
+    "Open the tab behind a failing reason (e.g. Replicate reliability or Control monitoring) to see the detail"
+   ],
+   "serves_tasks": [
+    "Get an overall go/no-go verdict on whether the dataset can be used"
+   ],
+   "screens": [
+    "screens/030.webp"
+   ],
+   "id": "f8"
+  }
+ ],
+ "screens_never_reached": [
+  "Wide/grid-format detection: the only test file is long-format, so I never saw the 'grid' layout path on Upload. The reviewer notes that the README calls the grid parser a Phase-4 stub, so this path is likely not reachable in the current app at all, whatever file is used",
+  "PASS or REVIEW fitness verdicts: the sample data always gives FAIL, and nothing in the interface lets you exclude wells or re-run to change the verdict",
+  "A red 'unmapped' proposal on Schema mapping: every column in the test file got a green or yellow proposal",
+  "A failing standard curve (R² < 0.98): the sample curve always passes"
+ ],
+ "not_done": [
+  "Did not upload an Excel (XLSX/XLS) file; only messy_plate_long.csv was available",
+  "Could not exclude or select wells from the plate map. Clicking a well (G4) only shows a tooltip, the same as hovering (screens/015.webp), so there is no well-exclusion step that feeds back into QC",
+  "Did not use the chart toolbar buttons (show data / download / copy / fullscreen) on the Altair charts or the column show/hide button on the tables",
+  "Did not use the Back buttons to return from QC to Schema mapping, change a mapping and re-run the checks; other mapping choices were only tried by pressing Start over and reloading",
+  "Error path: leaving the required measurement column (Conc.) unmapped is accepted at the mapping step, but step 3 then crashes with KeyError 'measurement_value' (screens/045.webp, screens/046.webp). The app does not stop the user before this; recovery needs Start over",
+  "Did not check every page of the downloaded files. clean_dataset.csv and transformation_log.json were longer than the reader shows (only the beginning was read). data_quality_summary.md was read in full",
+  "Small oddity: with Anlyst left unmapped, the summary reads '11 auto-mapped, 1 manual, 0 need review, 1 unmapped', which adds up to 13 for 12 columns (screens/049.webp)"
+ ],
+ "applied": [
+  "Added feature f8 'Fitness verdict summary' (banner plus severity-marked per-check reasons; only the FAIL state was seen), citing screens/030.webp; left without a check value because no replay tested it as a feature",
+  "Moved the verdict task out of f3, f4 and f5 serves_tasks and into f8",
+  "Changed t1 and t2 from 'one-of' to 'sequence'",
+  "Wrapped the true alternatives in new one-of subtasks: n1 (upload file vs load sample) under t1 and n2 (keep operator vs leave unmapped) under t2",
+  "Merged the second-run 'left Anlyst unmapped and confirmed' action into the leave-unmapped option of n2",
+  "Removed the 'Conc. unmapped → KeyError' crash action from t2 and kept it in not_done, labelled as an error path",
+  "Dropped the export task from f1.serves_tasks and said in f1.specific that the mapping choice shows up only as summary counts and log entries",
+  "Moved the no-op G4 well click (tooltip only) out of t3 and cited it in the not_done entry about well selection",
+  "Added the reviewer's README note (grid parser is a Phase-4 stub) to the grid-format entry in screens_never_reached",
+  "Recorded in not_done that the Back-button route for revising the mapping was never used"
+ ],
+ "open_fixes": [
+  "Add a task for going Back from QC to Schema mapping, changing a choice and re-running the checks: the trace never pressed Back, so a new run must do it and keep a screen of the result",
+  "Try uploading an XLSX/XLS export: no Excel file was available in this run",
+  "Confirm whether grid-format detection can be reached at all: this needs a wide/grid test file and a check against the README's Phase-4 stub note",
+  "Show the PASS and REVIEW states of the fitness verdict for f8: this needs data that passes or only partly fails, which the sample file does not give",
+  "Replay f8 as a feature so it gets a check value: no second agent tested it as a separate component"
+ ],
+ "screens_at": "pilot/public/runs/labbridge-qc/20261031-000018/",
+ "screens_filed": {
+  "screens/003.webp": "screens/003.webp",
+  "screens/006.webp": "screens/006.webp",
+  "screens/013.webp": "screens/013.webp",
+  "screens/020.webp": "screens/020.webp",
+  "screens/032.webp": "screens/032.webp",
+  "screens/040.webp": "screens/040.webp"
+ }
+}

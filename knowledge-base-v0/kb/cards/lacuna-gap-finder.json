@@ -1,0 +1,621 @@
+{
+  "schema": "astaui.card/1",
+  "id": "lacuna-gap-finder",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-10-30T17:05:50Z"
+  },
+  "app": {
+    "title": "Field specific lacuna identifier: literature discovery, thesis gap finding and topic mapping",
+    "summary": "A person writes a research specification as concept groups with synonyms, year and type limits and sources. They can fill a form or paste and validate a JSON request, and can upload their own PDFs and record files. A run collects publication records from bibliographic sources within fixed request limits and ranks them by how close their text is to the specification. The person filters the ranked table and opens each record to read its evidence excerpts and page positions. In separate modes they can pull the limitations and future-work statements that thesis authors wrote about a topic, or place a topic in a research taxonomy. Finally they export a single self-contained brief, or technical packages, for their own assistant to interpret.",
+    "task": {
+      "text": "Find the published work closest to a planned study, or the gaps that thesis authors reported in a field, and hand the evidence on as a self-contained brief.",
+      "verbs": [
+        "explore",
+        "identify",
+        "derive",
+        "locate",
+        "summarize"
+      ]
+    },
+    "data": {
+      "text": "Bibliographic records retrieved from scholarly indexes or imported from files, with abstracts and, where it can be read, PDF full text split into physical pages; also extracted quoted passages and a topic taxonomy.",
+      "item": "a publication record (title, abstract, year, type, DOI) with optional full-text pages and evidence excerpts",
+      "shapes": [
+        "table",
+        "text corpus",
+        "spans",
+        "hierarchy",
+        "categories"
+      ]
+    },
+    "stage": {
+      "text": "scoping prior literature and open problems before proposing a study",
+      "terms": [
+        "explore",
+        "plan"
+      ]
+    },
+    "mechanism": {
+      "text": "A specification form or JSON editor drives a bounded retrieval run. The results then appear in tabs: a ranked table with a selector that opens one record's evidence, a table of gap candidates with their quoted sources, and a taxonomy tree drawn for a chosen placement. An artifacts tab turns the active run, or one reloaded from the local run store, into a downloadable brief.",
+      "views": [
+        "form",
+        "text editor",
+        "table view",
+        "detail panel",
+        "tree view",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "filter",
+        "search",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "master-detail",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "literature search and research-gap identification using lexical retrieval over scholarly indexes",
+      "disciplines": [
+        "computer science"
+      ],
+      "terms": [
+        "literature review",
+        "research gap identification",
+        "information retrieval"
+      ]
+    },
+    "workflow": {
+      "name": "gather and rank sources against a specification, inspect their evidence, and export a brief",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Fill the specification form (concept groups with synonyms separated by |, mechanism groups, seed titles, years, publication types, sources and limits) or paste or upload a request JSON and validate it against the schema. Optional PDF and CSV/JSON record uploads are added. A saved run can be reloaded from the local run store instead.",
+          "parts": [
+            "spec-tab",
+            "runs-tab"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Run discovery queries OpenAlex, Crossref, CORE or OAI-PMH within the per-source, query and request budgets, removes duplicate records, and scores each record by proximity = 0.70 word + 0.30 character TF-IDF cosine × 100.",
+          "parts": [
+            "spec-tab",
+            "results-tab"
+          ]
+        },
+        {
+          "step": "filter to the items that matter",
+          "here": "A score-first table can be narrowed by a title/DOI substring and a minimum score. Each row shows how many concept groups matched and the evidence level (full text, abstract or title).",
+          "parts": [
+            "results-tab"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "A study selector opens the record's authors, source link, word and character scores, concept and mechanism matches, and evidence excerpts with matched terms and physical PDF page. Possible duplicates are flagged for review.",
+          "parts": [
+            "study-detail"
+          ]
+        },
+        {
+          "step": "pull marked statements out of the texts and group them",
+          "here": "Field gaps mode takes a topic and retrieves theses only. Cue rules extract limitation, future-work and open-question quotes with offsets and pages, and identical wording is grouped. Each candidate then shows its sources and the result of a bounded follow-up search for later related work.",
+          "parts": [
+            "gaps-tab",
+            "gap-detail"
+          ]
+        },
+        {
+          "step": "place the topic in a hierarchy",
+          "here": "Topic branches mode samples publications to suggest domain → field → subfield → topic placements, with neighbouring topics. The person chooses one placement to draw as a tree and can also read it as a text tree.",
+          "parts": [
+            "branches-tab"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "A concise or extended assistant brief (.md) can be downloaded, copied, or saved to a folder without overwriting earlier briefs. Optional full or compact ZIP packages and the result JSON are available, along with gap JSON/Markdown and branch SVG/JSON/Markdown.",
+          "parts": [
+            "artifacts-tab",
+            "gaps-tab",
+            "branches-tab"
+          ]
+        }
+      ],
+      "distinctive": [
+        "The proximity score is lexical and labelled throughout as uncalibrated, not a novelty probability, and no language model is ever called.",
+        "Every run is bounded by explicit request budgets and page and download caps, and coverage, source failures and unread pages are kept visible.",
+        "Gap candidates are author-reported and always marked unverified. Uploaded PDFs count as theses only if the person ticks that they are. Follow-up searches look for possible counterevidence but never declare a gap open or closed.",
+        "Evidence keeps exact character offsets and physical PDF page positions, and long theses are read as a head and tail sample so their final chapters are not missed.",
+        "The output is a single self-contained brief meant for the person's own AI assistant, built from the same request schema the command line uses."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "spec-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Specification",
+      "summary": "Lets the person write or paste the research request, attach local files and limits, validate it, and start a discovery run.",
+      "views": [
+        "form",
+        "text editor"
+      ],
+      "interactions": [
+        "import",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 124,
+          "end": 210,
+          "role": "markup",
+          "anchor": "73947649e8cf",
+          "first": "with spec_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 211,
+          "end": 232,
+          "role": "logic",
+          "anchor": "f2867c0be013",
+          "first": "if prepare or submit:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 102,
+          "end": 118,
+          "role": "markup",
+          "anchor": "31b6c25cbf6f",
+          "first": "with st.sidebar:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 23,
+          "end": 48,
+          "role": "style",
+          "anchor": "24cdd0aedaf8",
+          "first": "st.markdown(\"\"\"<style>"
+        },
+        {
+          "file": "code/app.py",
+          "start": 51,
+          "end": 52,
+          "role": "logic",
+          "symbol": "terms",
+          "anchor": "5d56c31b7928",
+          "first": "def terms(value):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 55,
+          "end": 63,
+          "role": "logic",
+          "symbol": "errors",
+          "anchor": "7d3023fe9bc3",
+          "first": "def errors(exc):"
+        },
+        {
+          "file": "code/app.py",
+          "start": 72,
+          "end": 94,
+          "role": "logic",
+          "symbol": "run_request",
+          "anchor": "b41a5d538c7f",
+          "first": "def run_request(request, pdf_files, record_files, oa_key, core_key):"
+        },
+        {
+          "file": "code/lacuna/specification.py",
+          "start": 34,
+          "end": 48,
+          "role": "logic",
+          "symbol": "parse_request",
+          "anchor": "13a2f31af3a5",
+          "first": "def parse_request(text: str) -> ResearchRequest:"
+        },
+        {
+          "file": "code/lacuna/specification.py",
+          "start": 20,
+          "end": 31,
+          "role": "data",
+          "symbol": "example_request",
+          "anchor": "a7387af5f74e",
+          "first": "def example_request() -> dict:"
+        }
+      ]
+    },
+    {
+      "id": "results-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Results",
+      "summary": "Shows the run's coverage and the ranked records in a score-first table that can be narrowed by text and minimum score.",
+      "views": [
+        "table view",
+        "summary stats"
+      ],
+      "interactions": [
+        "search",
+        "filter"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 323,
+          "end": 341,
+          "role": "markup",
+          "anchor": "5b8995988fb7",
+          "first": "with results_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 364,
+          "end": 366,
+          "role": "markup",
+          "anchor": "111fa3129404",
+          "first": "with st.expander(\"coverage.json / request log\"):"
+        },
+        {
+          "file": "code/lacuna/scoring.py",
+          "start": 71,
+          "end": 85,
+          "role": "logic",
+          "symbol": "rank_studies",
+          "anchor": "d3ba3d389974",
+          "first": "def rank_studies(studies, profile):"
+        },
+        {
+          "file": "code/lacuna/scoring.py",
+          "start": 59,
+          "end": 68,
+          "role": "logic",
+          "symbol": "tfidf_scores",
+          "anchor": "a6bb988f3f9e",
+          "first": "def tfidf_scores(query: str, documents: list[str], analyzer=\"word\") -> list[float]:"
+        }
+      ]
+    },
+    {
+      "id": "study-detail",
+      "level": "component",
+      "parent": "results-tab",
+      "title": "Study evidence detail",
+      "summary": "Opens one selected record with its scores, concept matches, full-text status and evidence excerpts with page positions.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 342,
+          "end": 363,
+          "role": "markup",
+          "anchor": "1509ab8b384b",
+          "first": "if visible:"
+        },
+        {
+          "file": "code/lacuna/scoring.py",
+          "start": 88,
+          "end": 113,
+          "role": "logic",
+          "symbol": "make_evidence",
+          "anchor": "784d5600f26c",
+          "first": "def make_evidence(study, profile, limit):"
+        }
+      ]
+    },
+    {
+      "id": "gaps-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Field gaps",
+      "summary": "Takes a field or topic and thesis sources, extracts author-reported limitations, future work and open questions, and lists them with downloads.",
+      "views": [
+        "form",
+        "table view"
+      ],
+      "interactions": [
+        "import",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 234,
+          "end": 267,
+          "role": "markup",
+          "anchor": "5b2d1c39cf65",
+          "first": "with gaps_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 368,
+          "end": 375,
+          "role": "markup",
+          "anchor": "8edc63a1c284",
+          "first": "with gaps_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 395,
+          "end": 402,
+          "role": "markup",
+          "anchor": "4625f9c05b1a",
+          "first": "with st.expander(\"Gap analysis coverage\"):"
+        },
+        {
+          "file": "code/lacuna/gaps.py",
+          "start": 106,
+          "end": 153,
+          "role": "logic",
+          "symbol": "extract_field_gaps",
+          "anchor": "131b53d64597",
+          "first": "def extract_field_gaps(studies, profile, config):"
+        },
+        {
+          "file": "code/lacuna/gaps.py",
+          "start": 60,
+          "end": 95,
+          "role": "logic",
+          "symbol": "excerpt_spans",
+          "anchor": "2e9028792c0d",
+          "first": "def excerpt_spans(text, inherited_section=\"\"):"
+        },
+        {
+          "file": "code/lacuna/gaps.py",
+          "start": 156,
+          "end": 179,
+          "role": "logic",
+          "symbol": "verify_gap_candidates",
+          "anchor": "bdf212e65da1",
+          "first": "def verify_gap_candidates(candidates, profile, config, client, openalex_key=\"\"):"
+        },
+        {
+          "file": "code/lacuna/specification.py",
+          "start": 112,
+          "end": 118,
+          "role": "logic",
+          "symbol": "field_gap_request",
+          "anchor": "eb599786ab8e",
+          "first": "def field_gap_request(topic: str, concept_groups=None, sources=None) -> ResearchRequest:"
+        },
+        {
+          "file": "code/lacuna/export.py",
+          "start": 158,
+          "end": 182,
+          "role": "logic",
+          "symbol": "build_gap_report",
+          "anchor": "0c7e6ea5659d",
+          "first": "def build_gap_report(result):"
+        }
+      ]
+    },
+    {
+      "id": "gap-detail",
+      "level": "component",
+      "parent": "gaps-tab",
+      "title": "Gap candidate evidence",
+      "summary": "For one selected gap, shows each thesis quote with its page, section and source basis, the follow-up query and any later related work to review.",
+      "views": [
+        "detail panel"
+      ],
+      "interactions": [
+        "select"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 376,
+          "end": 394,
+          "role": "markup",
+          "anchor": "96658ad7d8a1",
+          "first": "by_id={gap.id:gap for gap in result.gap_candidates}"
+        }
+      ]
+    },
+    {
+      "id": "branches-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Topic branches",
+      "summary": "Places a specific topic in the domain-field-subfield-topic taxonomy, lets the person pick among alternative placements, and draws the branch with neighbouring topics.",
+      "views": [
+        "tree view",
+        "form"
+      ],
+      "interactions": [
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 269,
+          "end": 321,
+          "role": "markup",
+          "anchor": "914e8ed8b6cd",
+          "first": "with branches_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 43,
+          "end": 44,
+          "role": "style",
+          "anchor": "8fda502ffaf6",
+          "first": ".branch-map-mobile {display:none;}"
+        },
+        {
+          "file": "code/lacuna/branches.py",
+          "start": 36,
+          "end": 116,
+          "role": "logic",
+          "symbol": "run_topic_branches",
+          "anchor": "4e9bcd7c7669",
+          "first": "def run_topic_branches(profile, config, *, db_path=None, openalex_key=\"\", progress=None, client=None):"
+        },
+        {
+          "file": "code/lacuna/branches.py",
+          "start": 119,
+          "end": 136,
+          "role": "logic",
+          "symbol": "branch_tree",
+          "anchor": "d7808c67cbb5",
+          "first": "def branch_tree(data, index=0):"
+        },
+        {
+          "file": "code/lacuna/branches.py",
+          "start": 162,
+          "end": 189,
+          "role": "logic",
+          "symbol": "branch_svg",
+          "anchor": "90c041d3e7eb",
+          "first": "def branch_svg(data,index=0,width=1040):"
+        },
+        {
+          "file": "code/lacuna/branches.py",
+          "start": 139,
+          "end": 148,
+          "role": "logic",
+          "symbol": "tree_lines",
+          "anchor": "4249558f616c",
+          "first": "def tree_lines(tree):"
+        },
+        {
+          "file": "code/lacuna/branches.py",
+          "start": 192,
+          "end": 202,
+          "role": "logic",
+          "symbol": "branch_report",
+          "anchor": "c0d4094462a9",
+          "first": "def branch_report(data):"
+        }
+      ]
+    },
+    {
+      "id": "artifacts-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Artifacts",
+      "summary": "Builds a concise or extended single-file brief from the active run for download, copying or saving to a folder, with optional ZIP and JSON exports.",
+      "views": [
+        "summary stats"
+      ],
+      "interactions": [
+        "toggle view",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 404,
+          "end": 433,
+          "role": "markup",
+          "anchor": "e0d845c60ce7",
+          "first": "with artifacts_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 66,
+          "end": 69,
+          "role": "logic",
+          "symbol": "activate_result",
+          "anchor": "59969e8c7151",
+          "first": "def activate_result(result):"
+        },
+        {
+          "file": "code/lacuna/export.py",
+          "start": 319,
+          "end": 343,
+          "role": "logic",
+          "symbol": "build_assistant_document",
+          "anchor": "d282f83293e6",
+          "first": "def build_assistant_document(result, compact=True):"
+        },
+        {
+          "file": "code/lacuna/export.py",
+          "start": 346,
+          "end": 359,
+          "role": "logic",
+          "symbol": "save_assistant_document",
+          "anchor": "5beb253894e9",
+          "first": "def save_assistant_document(result, directory, compact=True):"
+        },
+        {
+          "file": "code/lacuna/export.py",
+          "start": 185,
+          "end": 195,
+          "role": "logic",
+          "symbol": "build_package",
+          "anchor": "d26544146fa3",
+          "first": "def build_package(result, compact=False) -> bytes:"
+        }
+      ]
+    },
+    {
+      "id": "runs-tab",
+      "level": "view",
+      "parent": null,
+      "title": "Runs",
+      "summary": "Lists recent saved runs from the local store and reloads one as the active result.",
+      "views": [
+        "list"
+      ],
+      "interactions": [
+        "select",
+        "import"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/app.py",
+          "start": 435,
+          "end": 451,
+          "role": "markup",
+          "anchor": "4f54fe84c91e",
+          "first": "with runs_tab:"
+        },
+        {
+          "file": "code/app.py",
+          "start": 66,
+          "end": 69,
+          "role": "logic",
+          "symbol": "activate_result",
+          "anchor": "59969e8c7151",
+          "first": "def activate_result(result):"
+        }
+      ]
+    }
+  ]
+}

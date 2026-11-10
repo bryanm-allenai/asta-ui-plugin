@@ -1,0 +1,569 @@
+{
+ "interface": {
+  "title": "Batch Process Analytics (SPC × ML)",
+  "field": "Pharmaceutical manufacturing / process engineering (Quality-by-Design, solid oral dose tablets)",
+  "stage_of_work": "Monitoring and investigating a production process after qualification: finding when it drifted, then working out why",
+  "what_it_is_for": "Shows when a batch manufacturing process went out of statistical control (individuals control charts with Western Electric rules, and capability) and suggests which process parameters caused the shift (XGBoost + SHAP), with a batch table that can be filtered and exported. The footer and README say I-MR, but only the individuals (I) chart is drawn; there is no moving-range panel."
+ },
+ "data": {
+  "source": "built-in",
+  "note": "Synthetic demo data loads on its own: Acetriptan 50 mg IR Tablet, Line-02, 220 batches, Jan 2024 – Oct 2025, labelled 'SYNTHETIC DEMO DATA'. The interface has no upload control. Control limits come from the first 80 qualification batches."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Find when a batch process drifted out of control and explain why",
+  "specific": "Use SPC charts, Cpk/Ppk and an XGBoost+SHAP driver model to explain the drop in dissolution on Line-02 for Acetriptan 50 mg tablets",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Detect when the process went out of control",
+    "specific": "Control charts tab: an individuals chart per quality attribute with baseline limits, spec lines and rule-coloured points, followed by the rule-violation episode tables",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Read the individuals control chart for a quality attribute",
+      "specific": "Pick a quality attribute and read its I chart: CL, UCL and LCL from the 80 baseline batches (dissolution CL 91.33, LCL 85.98; hardness CL 5.94, UCL 7.42, LCL 4.45), spec lines (dissolution has only LSL 80; hardness LSL 4, USL 10), the baseline→monitoring divider, and points coloured teal (in control), orange (out of trend) or red (beyond 3σ/OOS). Only the I chart is drawn; no MR chart appears",
+      "screens": [
+       "screens/003.webp",
+       "screens/008.webp",
+       "screens/035.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the 'Quality attribute' dropdown",
+        "screens": [
+         "screens/007.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Dissolution @ 30 min (%) (default)",
+        "screens": [
+         "screens/003.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Tablet hardness (kp)",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 'Content' + Enter to pick Content uniformity (%RSD)",
+        "screens": [
+         "screens/035.webp"
+        ]
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check a single suspicious point",
+      "specific": "Hover a chart point to see its batch ID, value and the Western Electric rules it triggered (the rules line is pale yellow and hard to read in the tooltip)",
+      "screens": [
+       "screens/009.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "hovered point B24-1179 on the hardness chart (8.58 kp, with its WE rules)",
+        "screens": [
+         "screens/009.webp"
+        ]
+       }
+      ],
+      "id": "t2",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Zoom into a period of the chart",
+      "specific": "Drag a box on the Plotly chart to zoom into the late-production period, then double-click to reset (the reset was confirmed on replay)",
+      "screens": [
+       "screens/036.webp",
+       "screens/037.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "dragged a box over the right part of the content uniformity chart",
+        "screens": [
+         "screens/036.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the chart (the trace records a single click); the screen shows Plotly's 'Double-click to zoom back out' hint",
+        "screens": [
+         "screens/037.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Review rule violations grouped into episodes",
+      "specific": "Read the summary sentence (N episodes from M flagged batches), expand 'View N episode onset(s)' to see onset, last flagged, span, flagged in episode, peak severity and rule(s) at onset, and expand 'View all N flagged batches' for each batch's rules. Dissolution: 7 episodes from 109 flagged; hardness: 4 episodes; content uniformity: 7 episodes from 51 flagged",
+      "screens": [
+       "screens/004.webp",
+       "screens/005.webp",
+       "screens/010.webp",
+       "screens/038.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "read the 7 dissolution episodes table",
+        "screens": [
+         "screens/004.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "expanded 'View all 109 flagged batches'",
+        "screens": [
+         "screens/005.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "read the 4 hardness episodes",
+        "screens": [
+         "screens/010.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "on the content uniformity episodes table (7 episodes from 51 flagged), clicked the 'Span (batches)' header twice to sort episodes longest first",
+        "screens": [
+         "screens/038.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Judge whether the process is capable over the long term",
+    "specific": "Capability tab: Cpk and Ppk cards for the qualification and production periods, with a histogram against the spec limits",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Use the gap between short-term and long-term capability as the sign of drift, comparing the reference period with later production",
+      "specific": "Read the Cpk (qual), Ppk (qual), Cpk (prod) and Ppk (prod) cards (green ≥1.33, amber 1.00–1.33, red <1.00) and the Cpk–Ppk gap. Dissolution: Cpk 2.12 vs Ppk 1.59 in qualification (gap 0.53), Cpk 1.75 vs Ppk 0.74 in production (gap 1.01), so short-term capability stays good while long-term capability collapses. Hardness: 1.30/1.22 qual, 1.74/0.97 prod. A histogram shows LSL/USL and the mean",
+      "screens": [
+       "screens/012.webp",
+       "screens/013.webp",
+       "screens/016.webp",
+       "screens/040.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "read Dissolution: Cpk 2.12/1.75 vs Ppk 1.59/0.74 (gap 0.53 → 1.01)",
+        "screens": [
+         "screens/013.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "chose Assay / potency (%) from the dropdown",
+        "screens": [
+         "screens/016.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 'hardness' + Enter to pick Tablet hardness (kp)",
+        "screens": [
+         "screens/040.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered a histogram bar to see bin range and count",
+        "screens": [
+         "screens/041.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Explain why the key quality attribute shifted",
+    "specific": "Process drivers tab: an XGBoost model of dissolution with fit cards, a mean |SHAP| ranking of process parameters and a direction table",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Check how well the explanatory model fits",
+      "specific": "Read explanatory R² 0.72 (random 80/20 split), 5-fold CV R² 0.72±0.03, RMSE 2.56% and forecast R² 0.19 (time-ordered holdout). The UI shows forecast R² 0.19, while the README reports 0.24; the tree records what the UI showed",
+      "screens": [
+       "screens/017.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "opened the Process drivers tab",
+        "screens": [
+         "screens/017.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Rank the process parameters by influence and see which way each one acts",
+      "specific": "Read the mean |SHAP| bar chart (top 3 in red: API d90 ≈2.50, room humidity ≈0.98, compression force ≈0.64) and the table column 'Dissolution improves when this is lower/higher' (lower for most parameters, higher for granulation water and blend time)",
+      "screens": [
+       "screens/018.webp",
+       "screens/019.webp",
+       "screens/042.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to the SHAP bar chart and table",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "hovered the Room humidity bar (0.98)",
+        "screens": [
+         "screens/042.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Inspect individual batches and export them",
+    "specific": "Batch explorer tab: the full batch table with one attribute's rule flags overlaid, a flagged-only filter and a CSV export",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Filter the batch table to the flagged batches of one attribute",
+      "specific": "Choose 'Overlay flags from' an attribute and tick 'Show only flagged batches'; the flagged and rules columns follow (the table can briefly show unfiltered rows before it updates)",
+      "screens": [
+       "screens/020.webp",
+       "screens/024.webp",
+       "screens/027.webp",
+       "screens/044.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "ticked 'Show only flagged batches'",
+        "screens": [
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 'Content' + Enter in 'Overlay flags from'",
+        "screens": [
+         "screens/027.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "typed 'Dissolution' + Enter in 'Overlay flags from'",
+        "screens": [
+         "screens/044.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Locate a record and trim the columns of a data table (generic table handling)",
+      "specific": "Optional steps with the platform's standard data-grid toolbar: Search a batch ID (it highlights the match, it does not filter rows), Show/hide columns, sort by clicking a header",
+      "screens": [
+       "screens/031.webp",
+       "screens/033.webp",
+       "screens/034.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Search and typed B24-1201, Enter",
+        "screens": [
+         "screens/030.webp",
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Show/hide columns and unticked product and line",
+        "screens": [
+         "screens/032.webp",
+         "screens/033.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "clicked the compression_force_kn header to sort ascending",
+        "screens": [
+         "screens/034.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Export the filtered batch table",
+      "specific": "Press 'Download data (CSV)' to get batch_data_flagged.csv with all parameters (including columns hidden in the grid), flagged and rules, limited to the rows currently filtered",
+      "screens": [
+       "screens/028.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Download data (CSV) (content-uniformity flags, flagged only) → batch_data_flagged.csv",
+        "screens": [
+         "screens/028.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Check that the model's drivers agree with the flagged episodes",
+    "specific": "Cross-check SHAP drivers against dissolution-flagged batches in the Batch explorer. Only the top driver (API d90) was checked; room humidity and compression force were not",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Compare the top driver's values in flagged batches against all batches",
+      "specific": "With dissolution flags, sort by api_d90_um descending and open the column's Statistics: 109 flagged batches average 51.5 µm vs 48.2 µm for all 220; the high-d90 batches have dissolution of 71.7–86.5%, including the OOS batches (73.79 and 71.68)",
+      "screens": [
+       "screens/045.webp",
+       "screens/047.webp",
+       "screens/048.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the api_d90_um header twice (sort descending)",
+        "screens": [
+         "screens/045.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "opened the column menu ⋮ and hovered Statistics (flagged only)",
+        "screens": [
+         "screens/046.webp",
+         "screens/047.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "unticked 'Show only flagged batches' and reopened Statistics (all batches)",
+        "screens": [
+         "screens/048.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Control chart with fixed baseline limits and rule-coloured points",
+   "general": "Choose a measured attribute, plot it in time order against limits fixed from a reference period, colour each point by which rule it breaks, and hover or zoom to inspect individual points",
+   "specific": "Choose a quality attribute, then read the I chart with CL/UCL/LCL from the first 80 batches, LSL/USL, the baseline→monitoring divider, and teal/orange/red points; hover for batch ID, value and WE rules; drag-zoom and double-click to reset. Only the individuals chart is drawn: there is no moving-range panel, even though the footer says 'I-MR'",
+   "steps": [
+    "choose quality attribute from dropdown",
+    "read limits and coloured points",
+    "hover a point for batch ID, value and rules",
+    "drag a box to zoom into a period",
+    "double-click to zoom back out"
+   ],
+   "serves_tasks": [
+    "Read the individuals control chart for a quality attribute",
+    "Check a single suspicious point",
+    "Zoom into a period of the chart"
+   ],
+   "screens": [
+    "screens/003.webp",
+    "screens/008.webp",
+    "screens/009.webp",
+    "screens/035.webp",
+    "screens/036.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Rule-violation episode summary",
+   "general": "Group consecutive rule violations into episodes with onset, span and worst severity, and keep the raw per-point violations in a second list",
+   "specific": "Expanders 'View N episode onset(s)' (Onset, Last flagged, Span, Flagged in episode, Peak severity, Rule(s) at onset) and 'View all N flagged batches' (batch_id, value, rules); they update with the chosen attribute and the table sorts by header (screens/038 shows the content uniformity table sorted by span)",
+   "steps": [
+    "choose attribute on the chart above",
+    "read the summary sentence (N episodes from M flagged batches)",
+    "expand episode onsets and sort by span",
+    "expand all flagged batches to see each batch's rules"
+   ],
+   "serves_tasks": [
+    "Review rule violations grouped into episodes"
+   ],
+   "screens": [
+    "screens/004.webp",
+    "screens/005.webp",
+    "screens/010.webp",
+    "screens/038.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Capability comparison cards with spec histogram",
+   "general": "For a chosen measure, compare short-term and long-term capability for the reference period and the later period, read the gap between them as the sign of drift, and see the distribution against the spec limits",
+   "specific": "Capability tab: pick an attribute and read Cpk/Ppk for qual and prod (green ≥1.33, amber 1.00–1.33, red <1.00); the Cpk–Ppk gap is the diagnostic (dissolution 0.53 in qualification → 1.01 in production); histogram with LSL/USL and mean; hover a bin for range and count",
+   "steps": [
+    "choose quality attribute",
+    "read the four Cpk/Ppk cards and their colours",
+    "compare Cpk with Ppk in each period to read the gap",
+    "read the histogram against the spec lines",
+    "hover a bin for range and count"
+   ],
+   "serves_tasks": [
+    "Use the gap between short-term and long-term capability as the sign of drift, comparing the reference period with later production"
+   ],
+   "screens": [
+    "screens/013.webp",
+    "screens/016.webp",
+    "screens/040.webp",
+    "screens/041.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "SHAP driver ranking with model-fit cards",
+   "general": "Fit an explanatory model of an outcome on the input parameters, report how well it fits, and rank the inputs by mean absolute contribution, showing which direction improves the outcome",
+   "specific": "Process drivers tab: R², CV R², RMSE and forecast R² cards (UI shows forecast R² 0.19; README says 0.24); 'What drives dissolution?' mean |SHAP| bar chart with the top 3 in red (hover for value); table of parameter, impact and 'Dissolution improves when this is lower/higher'",
+   "steps": [
+    "open tab (model trains on first visit)",
+    "read the fit cards",
+    "read the ranked SHAP bars and hover for values",
+    "read the direction column in the table"
+   ],
+   "serves_tasks": [
+    "Check how well the explanatory model fits",
+    "Rank the process parameters by influence and see which way each one acts"
+   ],
+   "screens": [
+    "screens/017.webp",
+    "screens/018.webp",
+    "screens/042.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Flag-overlay batch table with filter and CSV export",
+   "general": "Overlay one attribute's rule flags on the full records table, optionally keep only the flagged rows, and export the filtered table",
+   "specific": "Batch explorer: 'Overlay flags from' dropdown + 'Show only flagged batches' checkbox drive the flagged/rules columns; 'Download data (CSV)' saves batch_data_flagged.csv with every parameter plus flagged and rules. Search, Show/hide columns, Fullscreen, header sort and the column menu's Statistics belong to the platform's (Streamlit) standard data grid, not to this tool",
+   "steps": [
+    "choose attribute whose flags to overlay",
+    "tick 'Show only flagged batches'",
+    "read the flagged and rules columns",
+    "press Download data (CSV)"
+   ],
+   "serves_tasks": [
+    "Filter the batch table to the flagged batches of one attribute",
+    "Export the filtered batch table",
+    "Compare the top driver's values in flagged batches against all batches"
+   ],
+   "screens": [
+    "screens/024.webp",
+    "screens/027.webp",
+    "screens/044.webp",
+    "screens/028.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "Moving-range (MR) chart: the README says I-MR, but the Control charts tab only showed the individuals chart; no MR panel was found (the reviewer confirmed in the code that only the I chart is drawn)",
+  "Tablet weight (mg) control chart and capability view: listed in the dropdown but not opened",
+  "Header summary cards (batches monitored, episodes vs flagged batches, OOS count, production Ppk vs qualification): never read in this run"
+ ],
+ "not_done": [
+  "The toolbar 'Download as CSV' icon on the Streamlit tables (episode table and batch explorer) produced no file in the headless browser, probably because it uses a save-file picker. Only the app's own 'Download data (CSV)' button produced a file",
+  "Could not load my own data: the interface has no upload control and always uses the bundled synthetic batch_data.csv",
+  "There are no controls to change the model or SPC settings (baseline length, rule set, which target the model explains); the SHAP view only covers dissolution",
+  "The column menu's Format, Pin column and Autosize options were seen but not tried; the Streamlit main menu (Deploy/⋮) was not explored because it is app chrome",
+  "Only API d90 was cross-checked against flagged batches; room humidity (vs single-batch WE1 dissolution episodes and OOS points) and compression force (vs the hardness drift episodes) were not checked",
+  "A click on a Batch explorer control timed out (trace step 47) and the run moved on; two typed dropdown selections also timed out once and succeeded on retry",
+  "Pressed the batch table's Fullscreen button (screens/049.webp); dropped from the tree as generic grid chrome that adds nothing to the analysis"
+ ],
+ "applied": [
+  "Reframed the capability task's general label around the Cpk–Ppk gap as the sign of drift and added the gap values 0.53 → 1.01 (computed from the recorded card values)",
+  "Stated plainly in the cross-check phase and not_done that only API d90 was checked",
+  "Fixed t4's screen list: replaced 037 with 038 so the task and its sort action agree, and relabelled the sort action as the content uniformity episode table (7 episodes from 51 flagged)",
+  "Cut f5 to flag overlay, flagged-only filter and CSV export; noted search, show/hide, fullscreen, sort and Statistics as platform data-grid controls",
+  "Relabelled t9 as optional generic table handling, noted that search highlights rather than filters, and dropped its Fullscreen action (moved to not_done)",
+  "Noted in t6 and f4 that the UI shows forecast R² 0.19 while the README says 0.24",
+  "Added short descriptions of what each tab shows to the phase specific labels",
+  "Noted in f1 and the interface description that there is no MR panel despite the 'I-MR' footer",
+  "Relabelled t3's reset action to match the trace (single click, hint visible) and noted the reset was confirmed on replay",
+  "Added recorded values to t1, t2, t5, t7, t10 and t11 from the run and replay notes",
+  "Added the header summary cards and the Tablet weight attribute to screens_never_reached, and recorded the timed-out clicks in not_done"
+ ],
+ "open_fixes": [
+  "Add a task and a matching feature for the header summary cards (7 episodes / 109 flagged, 2 OOS, Ppk 0.74 vs 1.59): the run never read them and no kept screen is confirmed to show them, so a new run must read and capture them",
+  "Add cross-check tasks for room humidity vs the single-batch WE1 and OOS dissolution episodes, and compression force vs the hardness drift episodes (WE4/slope from about B24-1108): neither was done in this run",
+  "Open Tablet weight (mg) on the Control charts and Capability tabs: it was listed but never selected"
+ ],
+ "screens_at": "pilot/public/runs/spc-batch-analytics/20261031-053446/",
+ "screens_filed": {
+  "screens/003.webp": "screens/003.webp",
+  "screens/012.webp": "screens/012.webp",
+  "screens/017.webp": "screens/017.webp",
+  "screens/020.webp": "screens/020.webp",
+  "screens/045.webp": "screens/045.webp"
+ }
+}

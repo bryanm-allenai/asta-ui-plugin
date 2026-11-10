@@ -1,0 +1,575 @@
+{
+  "schema": "astaui.card/1",
+  "id": "riper-turbomole-tools",
+  "ontology": "3",
+  "made": {
+    "by": "agent",
+    "prompt": "extract/4",
+    "from": "code",
+    "model": "claude-opus-5-5",
+    "at": "2026-11-02T03:16:02Z"
+  },
+  "app": {
+    "title": "RIPER Tools for TURBOMOLE",
+    "summary": "A person brings in a crystal or molecular structure in one of two ways. They can paste or upload a file in one of several common formats, or search a materials database by formula or ID and pick one of the matches. The structure's cell parameters, atom coordinates and a rotatable 3D view appear. The person can shift the atoms along the lattice vectors, switch between primitive and conventional cells, or build a supercell. Each version is turned into the simulation code's coordinate file, in atomic units, plus a lattice block to paste into its control file, and both can be downloaded. After the run, the person pastes the program's output to check how the energies converged over the iterations, and uploads its band file to plot bands against a chosen Fermi level. The plot and its data can be saved.",
+    "task": {
+      "text": "Prepare structure input files for a periodic DFT code from common formats or a database, then check the run's convergence and plot its band structure.",
+      "verbs": [
+        "derive",
+        "lookup",
+        "plan",
+        "monitor"
+      ]
+    },
+    "data": {
+      "text": "Atomic structures (element and position of each atom, with lattice vectors for periodic systems) as text files in many formats, and text output from the simulation program: energies per iteration and band energies along a path in reciprocal space.",
+      "item": "one crystal or molecular structure: a set of atoms with positions and, if periodic, a unit cell",
+      "shapes": [
+        "table",
+        "document",
+        "time series"
+      ]
+    },
+    "stage": {
+      "text": "setting up periodic DFT calculations, then checking and plotting their results",
+      "terms": [
+        "plan",
+        "analyze"
+      ]
+    },
+    "mechanism": {
+      "text": "Each page is a top-to-bottom form. An input box or a search fills a structure. That structure drives a table of cell parameters and coordinates, a 3D view and generated input text, and sliders and number inputs regenerate all three for translated or enlarged cells. The output pages parse uploaded program output into a table and charts, with controls for the energy reference, the energy window and the plot style.",
+      "views": [
+        "form",
+        "table view",
+        "detail panel",
+        "line chart",
+        "scatter plot",
+        "summary stats",
+        "3d structure viewer"
+      ],
+      "interactions": [
+        "import",
+        "search",
+        "select",
+        "toggle view",
+        "hover for detail",
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "master-detail",
+        "overview and detail"
+      ]
+    },
+    "field": {
+      "text": "periodic Kohn-Sham DFT with Gaussian basis functions in computational materials science",
+      "disciplines": [
+        "materials science"
+      ],
+      "terms": [
+        "density functional theory",
+        "band structure",
+        "turbomole"
+      ]
+    },
+    "workflow": {
+      "name": "turn a structure into input files for a simulation code, then read back its output",
+      "steps": [
+        {
+          "step": "bring the data in",
+          "here": "Pick one of seven formats (CIF, XYZ, CAR, POSCAR, PWSCF, extended XYZ, coord) and a CIF parser, then paste or upload the file. Or search the Materials Project by formula or material ID and pick one entry from a table of matches.",
+          "parts": [
+            "format-import",
+            "mp-search"
+          ]
+        },
+        {
+          "step": "open one item in detail",
+          "here": "Shows lattice lengths and angles, a table of atomic coordinates and an interactive 3D view of the cell, plus the centre of mass in Cartesian and fractional coordinates.",
+          "parts": [
+            "structure-preview"
+          ]
+        },
+        {
+          "step": "adjust the model before computing",
+          "here": "Sliders shift all atoms along a, b and c. nx/ny/nz inputs build a supercell, and the database page switches between the primitive and conventional cell. Each change redraws the view.",
+          "parts": [
+            "cell-adjust",
+            "mp-search"
+          ]
+        },
+        {
+          "step": "export the result",
+          "here": "Converts coordinates to Bohr and writes the coord file text and the lattice block for the control file. Each is shown side by side with download buttons for the coord file and a CIF, for the original, translated and supercell versions.",
+          "parts": [
+            "riper-export"
+          ]
+        },
+        {
+          "step": "check that the computation converged",
+          "here": "Paste the program output to get a table of kinetic, Coulomb, exchange-correlation and total energies, DIIS error and damping per SCF iteration. Pick which quantity to plot against iteration. If the run was periodic, the cell is rebuilt with an interatomic distance matrix.",
+          "parts": [
+            "scf-convergence"
+          ]
+        },
+        {
+          "step": "compute a value from the data",
+          "here": "Upload the bands file. Set E = 0 from the output file, from a detected valence-band maximum or from a custom shift, then choose an energy window, spin, projection buckets and k-point labels. Download the plot as PNG and the plotted bands as CSV.",
+          "parts": [
+            "band-plotter"
+          ]
+        }
+      ],
+      "distinctive": [
+        "Every structure is turned into two pieces the simulation code needs: coordinates in Bohr for the coord file, and a lattice block to paste into the control file.",
+        "One structure can be read from many file formats or a materials database, with a choice of parser, and coordinates are re-read so lattice vector a lies along x.",
+        "Translation and supercell controls regenerate the input files, so the computed cell can differ from the source cell.",
+        "The band plot's energy zero comes from the run's own output, from automatic gap detection that skips flat core bands, or from a typed value. The plot refuses to draw if no band falls in the energy window.",
+        "Projected (fat) bands draw marker areas proportional to Mulliken weights for chosen atom or orbital buckets."
+      ]
+    }
+  },
+  "parts": [
+    {
+      "id": "format-import",
+      "level": "component",
+      "parent": null,
+      "title": "Structure file import",
+      "summary": "Lets the person choose a file format and parser, then paste or upload a structure file, which is parsed into a periodic structure or a molecule.",
+      "views": [
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 581,
+          "end": 654,
+          "role": "markup",
+          "anchor": "f6bc95edd472",
+          "first": "st.write('# CIF/XYZ/CAR/POSCAR/PWSCF ➡️ RIPER')"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 371,
+          "end": 377,
+          "role": "logic",
+          "symbol": "parse_cif_ase",
+          "anchor": "6cfe1fc8a22e",
+          "first": "def parse_cif_ase(stringio):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 325,
+          "end": 329,
+          "role": "logic",
+          "symbol": "parse_cif_pymatgen",
+          "anchor": "61dc79a7cc75",
+          "first": "def parse_cif_pymatgen(contents):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 332,
+          "end": 336,
+          "role": "logic",
+          "symbol": "parse_xyz",
+          "anchor": "abf9a0ed7770",
+          "first": "def parse_xyz(contents):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 339,
+          "end": 343,
+          "role": "logic",
+          "symbol": "parse_poscar",
+          "anchor": "f2609d304f1c",
+          "first": "def parse_poscar(contents):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 353,
+          "end": 359,
+          "role": "logic",
+          "symbol": "parse_qe_ase",
+          "anchor": "34a9d28a774e",
+          "first": "def parse_qe_ase(stringio):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 361,
+          "end": 368,
+          "role": "logic",
+          "symbol": "parse_extxyz_ase",
+          "anchor": "d900ee59b2ae",
+          "first": "def parse_extxyz_ase(stringio):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 386,
+          "end": 479,
+          "role": "logic",
+          "symbol": "parse_car_ase",
+          "anchor": "5679a11b6f20",
+          "first": "def parse_car_ase(stringio):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 251,
+          "end": 323,
+          "role": "logic",
+          "symbol": "parse_coord",
+          "anchor": "4c6205726e43",
+          "first": "def parse_coord(file_contents):"
+        }
+      ]
+    },
+    {
+      "id": "mp-search",
+      "level": "view",
+      "parent": null,
+      "title": "Materials database search",
+      "summary": "Searches the Materials Project by formula or ID, lists the matches with band gap, symmetry and stability, and opens the chosen one as a primitive or conventional cell with its input files and a supercell.",
+      "views": [
+        "form",
+        "table view",
+        "detail panel"
+      ],
+      "interactions": [
+        "search",
+        "select",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "master-detail"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/Materials_Project_to_RIPER.py",
+          "start": 161,
+          "end": 357,
+          "role": "markup",
+          "anchor": "3026713280b2",
+          "first": "# Create an instance of MPRester"
+        },
+        {
+          "file": "code/pages/Materials_Project_to_RIPER.py",
+          "start": 76,
+          "end": 79,
+          "role": "logic",
+          "symbol": "convert_pymatgen_to_ase_to_pymatgen",
+          "anchor": "33ef3d008228",
+          "first": "def convert_pymatgen_to_ase_to_pymatgen(structure):"
+        },
+        {
+          "file": "code/pages/Materials_Project_to_RIPER.py",
+          "start": 116,
+          "end": 157,
+          "role": "logic",
+          "symbol": "display_structure_info",
+          "anchor": "bc236a9186a0",
+          "first": "def display_structure_info(structure):"
+        }
+      ]
+    },
+    {
+      "id": "structure-preview",
+      "level": "component",
+      "parent": null,
+      "title": "Structure details and 3D view",
+      "summary": "Shows the parsed structure's lattice parameters, a table of atomic coordinates, a rotatable 3D view of the cell or molecule, and its centre of mass.",
+      "views": [
+        "detail panel",
+        "table view",
+        "3d structure viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "zoom and pan",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 658,
+          "end": 694,
+          "role": "markup",
+          "anchor": "d8f2c87fe263",
+          "first": "# Display structure information"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 190,
+          "end": 230,
+          "role": "logic",
+          "symbol": "display_structure_info",
+          "anchor": "0a96fa5afec3",
+          "first": "def display_structure_info(structure):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 133,
+          "end": 158,
+          "role": "logic",
+          "symbol": "visualize_structure",
+          "anchor": "6f1b3eacb33c",
+          "first": "def visualize_structure(structure, html_file_name='viz.html'):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 162,
+          "end": 186,
+          "role": "logic",
+          "symbol": "visualize_molecule",
+          "anchor": "ea60abba2165",
+          "first": "def visualize_molecule(structure, html_file_name='viz.html'):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 61,
+          "end": 84,
+          "role": "logic",
+          "symbol": "calculate_com",
+          "anchor": "f482f9788ecd",
+          "first": "def calculate_com(structure):"
+        }
+      ]
+    },
+    {
+      "id": "cell-adjust",
+      "level": "component",
+      "parent": null,
+      "title": "Translate and supercell controls",
+      "summary": "Sliders shift the atoms along each lattice vector and number inputs repeat the cell into a supercell; the view and input files are regenerated for each.",
+      "views": [
+        "form",
+        "3d structure viewer"
+      ],
+      "interactions": [
+        "select",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 734,
+          "end": 833,
+          "role": "markup",
+          "anchor": "7dd1cad068f4",
+          "first": "if isinstance(structure, Structure):"
+        }
+      ]
+    },
+    {
+      "id": "riper-export",
+      "level": "component",
+      "parent": null,
+      "title": "Input file text and downloads",
+      "summary": "Converts coordinates to Bohr and shows the coord file and the control-file lattice block side by side, with download buttons for the coord file and a CIF.",
+      "views": [
+        "side-by-side panes"
+      ],
+      "interactions": [
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 680,
+          "end": 720,
+          "role": "markup",
+          "anchor": "a443380bdf2d",
+          "first": "# Download CIF files"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 87,
+          "end": 89,
+          "role": "logic",
+          "symbol": "convert_to_bohr",
+          "anchor": "486dd03a6a74",
+          "first": "def convert_to_bohr(structure):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 100,
+          "end": 111,
+          "role": "logic",
+          "symbol": "generate_coord_text",
+          "anchor": "7dc39ed6db3a",
+          "first": "def generate_coord_text(coords_bohr):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 115,
+          "end": 123,
+          "role": "logic",
+          "symbol": "generate_lattice_text",
+          "anchor": "c321e4c72337",
+          "first": "def generate_lattice_text(structure):"
+        },
+        {
+          "file": "code/pages/Convert_other_formats_to_RIPER.py",
+          "start": 127,
+          "end": 129,
+          "role": "logic",
+          "symbol": "convert_to_cif",
+          "anchor": "4e761d7a8001",
+          "first": "def convert_to_cif(structure, filename):"
+        }
+      ]
+    },
+    {
+      "id": "scf-convergence",
+      "level": "view",
+      "parent": null,
+      "title": "Output parser and SCF convergence",
+      "summary": "Parses pasted program output into a table of energies and convergence measures per SCF iteration, plots a chosen quantity against iteration, and rebuilds the periodic cell with interatomic distances.",
+      "views": [
+        "table view",
+        "line chart",
+        "3d structure viewer",
+        "summary stats"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "hover for detail",
+        "toggle view",
+        "export"
+      ],
+      "patterns": [
+        "overview and detail"
+      ],
+      "spans": [
+        {
+          "file": "code/pages/Output_Parser.py",
+          "start": 234,
+          "end": 519,
+          "role": "markup",
+          "anchor": "a54d2772c636",
+          "first": "st.title(\"`RIPER` Output Parser\")"
+        },
+        {
+          "file": "code/pages/Output_Parser.py",
+          "start": 90,
+          "end": 158,
+          "role": "logic",
+          "symbol": "parse_energies",
+          "anchor": "6155cd3092e1",
+          "first": "def parse_energies(text):"
+        },
+        {
+          "file": "code/pages/Output_Parser.py",
+          "start": 83,
+          "end": 87,
+          "role": "logic",
+          "symbol": "find_line_with_text",
+          "anchor": "b0857458fd7b",
+          "first": "def find_line_with_text(lines, text):"
+        },
+        {
+          "file": "code/pages/Output_Parser.py",
+          "start": 308,
+          "end": 315,
+          "role": "logic",
+          "symbol": "formatvalue",
+          "anchor": "5752e170007d",
+          "first": "def formatvalue(value):"
+        }
+      ]
+    },
+    {
+      "id": "band-plotter",
+      "level": "view",
+      "parent": null,
+      "title": "Band structure plotter",
+      "summary": "Plots uploaded band energies along the k-path relative to a chosen energy zero, inside an energy window, with optional fat-band markers sized by projection weight, and downloads the figure and the plotted data.",
+      "views": [
+        "line chart",
+        "scatter plot",
+        "form"
+      ],
+      "interactions": [
+        "import",
+        "select",
+        "multi-select",
+        "filter",
+        "export"
+      ],
+      "patterns": [],
+      "spans": [
+        {
+          "file": "code/pages/Bands_Plot.py",
+          "start": 220,
+          "end": 527,
+          "role": "markup",
+          "anchor": "25371bd75da0",
+          "first": "st.title('Band Structure Plotter')"
+        },
+        {
+          "file": "code/pages/Bands_Plot.py",
+          "start": 60,
+          "end": 146,
+          "role": "logic",
+          "symbol": "parse_bands",
+          "anchor": "b48dde9723c8",
+          "first": "def parse_bands(raw: bytes):"
+        },
+        {
+          "file": "code/pages/Bands_Plot.py",
+          "start": 150,
+          "end": 158,
+          "role": "logic",
+          "symbol": "detect_ticks",
+          "anchor": "c6ab20f3e8f0",
+          "first": "def detect_ticks(kxyz: np.ndarray, kpath: np.ndarray):"
+        },
+        {
+          "file": "code/pages/Bands_Plot.py",
+          "start": 162,
+          "end": 167,
+          "role": "logic",
+          "symbol": "band_edges",
+          "anchor": "9496c3e1ed79",
+          "first": "def band_edges(E1: np.ndarray):"
+        },
+        {
+          "file": "code/pages/Bands_Plot.py",
+          "start": 200,
+          "end": 214,
+          "role": "logic",
+          "symbol": "gap_candidates",
+          "anchor": "324b437621d2",
+          "first": "def gap_candidates(bmax, bmin, gaps):"
+        },
+        {
+          "file": "code/pages/Bands_Plot.py",
+          "start": 171,
+          "end": 197,
+          "role": "logic",
+          "symbol": "parse_output",
+          "anchor": "d3666a2d9a6c",
+          "first": "def parse_output(raw: bytes):"
+        }
+      ]
+    }
+  ],
+  "proposed": [
+    {
+      "facet": "mechanism",
+      "list": "views",
+      "term": "3d structure viewer"
+    }
+  ]
+}

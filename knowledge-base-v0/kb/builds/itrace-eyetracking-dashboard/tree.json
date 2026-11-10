@@ -1,0 +1,790 @@
+{
+ "interface": {
+  "title": "iTrace - eye-movement session dashboard (Streamlit page written by the run over iTrace library calls)",
+  "field": "Eye tracking / oculomotor research and pupillometry",
+  "stage_of_work": "Analysing a recorded or simulated session, and checking event detectors against ground truth before trusting their output",
+  "what_it_is_for": "Load a gaze CSV (and optionally a pupil CSV), or simulate a session with known ground truth, then detect fixations, saccades and microsaccades with adjustable settings and review the main sequence, pupil statistics, recording quality and detector recovery across synthetic stress domains.",
+  "note": "This Streamlit page (seed/dashboard_app.py) was written by the run as a front end over iTrace library calls, because the repo's own dashboard is a stub. The repo's real interactive UI is live-html, which needs a camera and was not explored. Workflows here describe the library's analysis functions as exposed by this page, not a UI the repo ships."
+ },
+ "data": {
+  "source": "uploaded test file",
+  "note": "I uploaded demo_gaze.csv (151 samples at 50 Hz over 3 s) and demo_pupil.csv. I also used the built-in synthetic generator: 6 saccades, seed 0, noise 0.02, then 10 saccades, seed 1, noise 0.06, dropout 0.00. The demo saccades were found as described: 12 deg at 0 deg direction (onset 0.76 s) and 9 deg at -45 deg (onset 2.38 s). The demo dropout appeared as dropout_fraction 0.013, and the pupil blink was counted (n_blinks 1). The replay used a different synthetic session (8 saccades, seed 7, noise 0.03, dropout 0.01)."
+ },
+ "tree": {
+  "kind": "goal",
+  "general": "Turn a raw gaze/pupil recording into trustworthy eye-movement event metrics, and check that the event detector can be trusted",
+  "specific": "Use iTrace to detect fixations, saccades and microsaccades, fit the main sequence, summarise pupillometry and recording quality, and validate detector recovery on synthetic domains",
+  "children": [
+   {
+    "kind": "phase",
+    "general": "Bring a session into the tool",
+    "specific": "Sidebar sections 1 and 2: load uploaded CSVs or generate a synthetic session",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Load a recorded time series, with an optional second signal",
+      "specific": "Upload a gaze CSV (t,x,y) and optionally a pupil CSV (t,size[,unit]), then click Load uploaded CSV(s)",
+      "screens": [
+       "screens/006.webp",
+       "screens/008.webp"
+      ],
+      "branch": "sequence",
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked Upload under Gaze CSV and gave demo_gaze.csv",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "(optional) clicked Upload under Pupil CSV and gave demo_pupil.csv",
+        "screens": [
+         "screens/006.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Load uploaded CSV(s) ('Loaded 151 gaze samples.')",
+        "screens": [
+         "screens/007.webp",
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "task",
+        "general": "Reload the recording without the optional signal",
+        "specific": "Remove demo_pupil.csv and reload gaze only; the Pupillometry section then reads 'No pupil data loaded.'",
+        "screens": [
+         "screens/059.webp",
+         "screens/061.webp"
+        ],
+        "branch": "optional",
+        "children": [
+         {
+          "kind": "action",
+          "label": "pressed Remove demo_pupil.csv",
+          "screens": [
+           "screens/059.webp"
+          ]
+         },
+         {
+          "kind": "action",
+          "label": "pressed Load uploaded CSV(s) ('No pupil data loaded.' under Pupillometry)",
+          "screens": [
+           "screens/061.webp"
+          ]
+         }
+        ],
+        "id": "t2",
+        "check": "replayed"
+       }
+      ],
+      "id": "t1",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Simulate a dataset with known ground truth, varying its difficulty",
+      "specific": "Set Number of saccades, Gaze noise (deg), Seed and optionally Dropout fraction, then click Generate synthetic session (dropout 0.10 crashes; see not_done)",
+      "screens": [
+       "screens/018.webp",
+       "screens/049.webp"
+      ],
+      "branch": "sequence",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Generate synthetic session with defaults (6 saccades, seed 0, noise 0.02)",
+        "screens": [
+         "screens/016.webp",
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged Number of saccades to 10 and Gaze noise to 0.06, and pressed Seed + to 1",
+        "screens": [
+         "screens/043.webp",
+         "screens/044.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "(optional) set Dropout fraction; this run used 0.00 (the replay generated successfully at 0.01)",
+        "screens": [
+         "screens/047.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Generate synthetic session (10-saccade noisy session)",
+        "screens": [
+         "screens/047.webp",
+         "screens/049.webp"
+        ]
+       }
+      ],
+      "id": "t3",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Detect and review discrete events in the signal, including a scaling law between event size and speed",
+    "specific": "Session dashboard figure, metric tiles, Saccades table and Main sequence fit, driven by sidebar section 3 (Detection settings)",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Inspect the speed trace and spatial path with detected events marked",
+      "specific": "Read the 2-D speed panel (threshold line, saccade shading) and the Scanpath panel (fixation circles, transition arrows). The dashed threshold line and its legend stay at 30 deg/s whatever the slider says",
+      "screens": [
+       "screens/008.webp",
+       "screens/056.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to the Session dashboard figure",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "read the 2-D speed panel: dashed threshold line and shaded saccade bands",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "read the Scanpath panel: fixation circles joined by transition arrows",
+        "screens": [
+         "screens/008.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Fullscreen on the figure to enlarge the panels",
+        "screens": [
+         "screens/056.webp"
+        ]
+       }
+      ],
+      "id": "t4",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Adjust the detection threshold and see how many events are found",
+      "specific": "Drag the I-VT velocity threshold (deg/s) slider and read the Saccades/Fixations counts. Only fixed-threshold I-VT is exposed; the other detection methods the library README lists (adaptive I-VT, I-DT, PSO) cannot be chosen here",
+      "screens": [
+       "screens/014.webp",
+       "screens/049.webp",
+       "screens/058.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed End on the I-VT slider (100 deg/s) on the demo: saccades 2 -> 1, fixations 4 -> 3",
+        "screens": [
+         "screens/014.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "with the I-VT slider at 30 on the noisy synthetic session (per the action log; the screen does not show the slider): 13 saccades detected against 10 true",
+        "screens": [
+         "screens/049.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged the I-VT slider to 70: 10 saccades detected, matching ground truth",
+        "screens": [
+         "screens/057.webp",
+         "screens/058.webp"
+        ]
+       }
+      ],
+      "id": "t5",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Review per-event measurements in a table",
+      "specific": "Read the Saccades table (onset_t, offset_t, duration_s, amplitude_deg, direction_deg, peak_velocity_deg_s); sort, search and hide columns. There is no equivalent table for fixations",
+      "screens": [
+       "screens/009.webp",
+       "screens/020.webp",
+       "screens/021.webp",
+       "screens/024.webp",
+       "screens/055.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "clicked the peak_velocity_deg_s header to sort ascending",
+        "screens": [
+         "screens/021.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Search on the table toolbar and typed 17 (3 results highlighted)",
+        "screens": [
+         "screens/023.webp",
+         "screens/024.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Show/hide columns and unticked offset_t and duration_s",
+        "screens": [
+         "screens/054.webp",
+         "screens/055.webp"
+        ]
+       }
+      ],
+      "id": "t6",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Compare detected events with the known truth",
+      "specific": "Read the Saccades table against the 'Synthetic ground truth (for comparison)' table below it",
+      "screens": [
+       "screens/020.webp",
+       "screens/053.webp"
+      ],
+      "branch": "when a synthetic session is loaded",
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to the Saccades and Synthetic ground truth tables (6 detected vs 6 true)",
+        "screens": [
+         "screens/020.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the tables for the noisy session: extra 0.008 s, ~0.9 deg detections right after large saccades",
+        "screens": [
+         "screens/053.webp"
+        ]
+       }
+      ],
+      "id": "t7",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Turn a second detector for very small movements on or off",
+      "specific": "Toggle 'Detect microsaccades (Engbert & Kliegl)' and read the Microsaccades count tile (the scanpath string encodes saccades and does not change with this toggle)",
+      "screens": [
+       "screens/019.webp",
+       "screens/052.webp"
+      ],
+      "branch": "optional",
+      "children": [
+       {
+        "kind": "action",
+        "label": "left the checkbox ticked on the noisy 10-saccade session: Microsaccades = 21",
+        "screens": [
+         "screens/049.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "unticked Detect microsaccades (Engbert & Kliegl) on the same session: Microsaccades = 0",
+        "screens": [
+         "screens/051.webp",
+         "screens/052.webp"
+        ]
+       }
+      ],
+      "id": "t8",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Look at the distributions of event size and direction",
+      "specific": "Read the Amplitude distribution panel (histogram with gamma fit, AIC and KS) and the Saccade directions polar histogram",
+      "screens": [
+       "screens/018.webp",
+       "screens/056.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "read the Amplitude distribution panel: histogram with gamma curve, AIC and KS",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "read the Saccade directions polar histogram",
+        "screens": [
+         "screens/018.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Fullscreen on the dashboard figure to enlarge the panels",
+        "screens": [
+         "screens/056.webp"
+        ]
+       }
+      ],
+      "id": "t9",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Fit and inspect a power-law relation between two event measures",
+      "specific": "Read the log-log main-sequence plot with its power fit (b, R^2) and the Main sequence fit JSON (v_max, C, power_a, power_b, r_squared_power)",
+      "screens": [
+       "screens/019.webp",
+       "screens/052.webp",
+       "screens/058.webp",
+       "screens/009.webp"
+      ],
+      "branch": "when 3 or more saccades are detected (the demo with 2 saccades says 'Fewer than 3 saccades detected; no main-sequence fit.')",
+      "children": [
+       {
+        "kind": "action",
+        "label": "generated the 6-saccade synthetic session: b=0.70, R^2=0.995",
+        "screens": [
+         "screens/019.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "generated the noisy 10-saccade session at threshold 30: b=0.83",
+        "screens": [
+         "screens/052.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "dragged the I-VT threshold to 70: b=0.98, R^2=0.998",
+        "screens": [
+         "screens/058.webp"
+        ]
+       }
+      ],
+      "id": "t10",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Summarise the secondary signal and the recording quality",
+    "specific": "Pupillometry and Recording-quality diagnostics JSON panels",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Read summary statistics of a physiological trace",
+      "specific": "Read the Pupillometry JSON: mean/std/min/max size, n_blinks, blink_fraction, baseline_size, response_peak_size, latency_to_peak_s, dilation_auc, phase fractions. Summary numbers only: no pupil trace (raw or blink-interpolated) and no x/y position-over-time plot is shown",
+      "screens": [
+       "screens/010.webp",
+       "screens/011.webp",
+       "screens/025.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Pupillometry for the uploaded demo_pupil.csv (n_blinks 1, latency_to_peak_s 0.95)",
+        "screens": [
+         "screens/010.webp",
+         "screens/011.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed the collapse triangle on the Pupillometry JSON",
+        "screens": [
+         "screens/026.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed a copy icon on the JSON (the replay found it copies the single hovered value; copying the whole dict was not confirmed)",
+        "screens": [
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t11",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Check data-quality diagnostics before trusting results",
+      "specific": "Read Recording-quality diagnostics: finite_sample_fraction, sampling_rate_hz, dropout_fraction, sampling_jitter_s, longest_gap_s, large_gap_count, nonmonotonic_timestamp_count, and the detection_threshold_deg_s in use",
+      "screens": [
+       "screens/011.webp",
+       "screens/012.webp",
+       "screens/026.webp"
+      ],
+      "children": [
+       {
+        "kind": "action",
+        "label": "scrolled to Recording-quality diagnostics for the demo (dropout_fraction 0.013, jitter 0)",
+        "screens": [
+         "screens/011.webp",
+         "screens/012.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "scrolled to the diagnostics for the synthetic session (250 Hz, detection_threshold_deg_s 100)",
+        "screens": [
+         "screens/026.webp"
+        ]
+       }
+      ],
+      "id": "t12",
+      "check": "replayed"
+     }
+    ]
+   },
+   {
+    "kind": "phase",
+    "general": "Validate the detector against simulated ground truth across stress conditions",
+    "specific": "Synthetic-domain validation section (itrace.validation.synthetic_validation_suite). It runs with its own detector settings and ignores the sidebar Detection settings, so it does not validate the setting used on the session above",
+    "children": [
+     {
+      "kind": "task",
+      "general": "Benchmark detector recovery over several simulated conditions with repeated seeds",
+      "specific": "Set Repetitions per domain, click Run synthetic validation suite, and read the Cross-domain summary (macro/min/max saccade F1, stability gap, worst_domain). The sidebar I-VT threshold has no effect on the result",
+      "screens": [
+       "screens/030.webp",
+       "screens/031.webp",
+       "screens/042.webp",
+       "screens/065.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed Run synthetic validation suite at 2 repetitions (macro F1 0.751, worst head_drift)",
+        "screens": [
+         "screens/029.webp",
+         "screens/030.webp",
+         "screens/031.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed End on Repetitions per domain (5) and pressed Run again (macro F1 0.757, worst low_light_dropout)",
+        "screens": [
+         "screens/035.webp",
+         "screens/039.webp",
+         "screens/042.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed Run at 2 repetitions with the I-VT slider at 70: same result as the first run, so the suite does not use the sidebar threshold",
+        "screens": [
+         "screens/064.webp",
+         "screens/065.webp"
+        ]
+       }
+      ],
+      "id": "t13",
+      "check": "replayed"
+     },
+     {
+      "kind": "task",
+      "general": "Drill into one condition's recovery metrics with confidence intervals",
+      "specific": "Expand a domain (Clean desktop, Webcam jitter, Head-pose drift, Low-light dropout) to read saccade_f1/precision/recall, amplitude/direction MAE, peak_velocity_rmse, pupil_valid_fraction and gaze_finite_fraction, each with n, mean, std, ci_low, ci_high. These describe the suite's own detector settings, not the sidebar threshold",
+      "screens": [
+       "screens/032.webp",
+       "screens/033.webp",
+       "screens/034.webp",
+       "screens/066.webp"
+      ],
+      "branch": "repeat",
+      "children": [
+       {
+        "kind": "action",
+        "label": "pressed the Head-pose drift (head_drift) expander",
+        "screens": [
+         "screens/032.webp",
+         "screens/033.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed the Low-light dropout (low_light_dropout) expander",
+        "screens": [
+         "screens/034.webp"
+        ]
+       },
+       {
+        "kind": "action",
+        "label": "pressed the Clean desktop (clean_desktop) expander (F1 0.875)",
+        "screens": [
+         "screens/066.webp"
+        ]
+       }
+      ],
+      "id": "t14",
+      "check": "replayed"
+     }
+    ]
+   }
+  ]
+ },
+ "features": [
+  {
+   "name": "Threshold slider that re-runs event detection",
+   "general": "Move a detection-threshold slider and see event counts, event table, distributions and fitted law update right away; read back the threshold actually used",
+   "specific": "Drag the I-VT velocity threshold (deg/s) slider; the Fixations/Saccades tiles, Saccades table, amplitude fit, scanpath and main-sequence fit recompute, and Recording-quality diagnostics reports detection_threshold_deg_s. Bug: the 2-D speed panel's dashed threshold line and legend stay at 'threshold (30 deg/s)' whatever the slider value, so read the threshold from diagnostics, not the plot",
+   "steps": [
+    "load or generate a session",
+    "drag the I-VT threshold slider (10-100 deg/s)",
+    "read the Fixations/Saccades counts and the shaded speed trace",
+    "check detection_threshold_deg_s in diagnostics (the plotted line does not follow the slider)",
+    "compare against ground truth if synthetic"
+   ],
+   "serves_tasks": [
+    "Adjust the detection threshold and see how many events are found",
+    "Fit and inspect a power-law relation between two event measures"
+   ],
+   "screens": [
+    "screens/014.webp",
+    "screens/049.webp",
+    "screens/058.webp",
+    "screens/026.webp"
+   ],
+   "id": "f1",
+   "check": "replayed"
+  },
+  {
+   "name": "Synthetic ground-truth generator with a truth table for comparison",
+   "general": "Simulate a dataset with chosen event count, noise, missing-data rate and random seed, then compare detected events row by row with the known truth",
+   "specific": "Sidebar section 2 (Number of saccades, Dropout fraction, Gaze noise, Seed) plus Generate synthetic session; 'Synthetic ground truth (for comparison)' appears below the detected Saccades table. Dropout 0.10 crashes with a ValueError (0.01 works)",
+   "steps": [
+    "set number of events, noise and seed",
+    "optionally set a small dropout fraction",
+    "press Generate synthetic session",
+    "read the detected-events table against the ground-truth table below it",
+    "change the detector setting and compare again"
+   ],
+   "serves_tasks": [
+    "Simulate a dataset with known ground truth, varying its difficulty",
+    "Compare detected events with the known truth"
+   ],
+   "screens": [
+    "screens/018.webp",
+    "screens/020.webp",
+    "screens/049.webp",
+    "screens/053.webp",
+    "screens/046.webp"
+   ],
+   "id": "f2",
+   "check": "replayed"
+  },
+  {
+   "name": "Multi-panel session summary figure",
+   "general": "One composite figure: signal speed over time with threshold and event shading, a spatial path of dwell points, an event-size histogram with a fitted distribution, a log-log scaling-law fit, a polar direction histogram and a text summary; can be opened full screen",
+   "specific": "iTrace session dashboard (session_dashboard): 2-D speed, Scanpath, Amplitude distribution (gamma AIC/KS), Saccadic main sequence (power b, R^2), Saccade directions, Session summary with scanpath string. Static matplotlib image. The speed panel's threshold line and legend are fixed at 30 deg/s and do not follow the slider",
+   "steps": [
+    "load or generate a session",
+    "read the speed trace and scanpath",
+    "read the amplitude and direction distributions",
+    "read the main-sequence fit",
+    "press Fullscreen to enlarge"
+   ],
+   "serves_tasks": [
+    "Inspect the speed trace and spatial path with detected events marked",
+    "Look at the distributions of event size and direction",
+    "Fit and inspect a power-law relation between two event measures"
+   ],
+   "screens": [
+    "screens/008.webp",
+    "screens/018.webp",
+    "screens/056.webp"
+   ],
+   "id": "f3",
+   "check": "replayed"
+  },
+  {
+   "name": "Saccade event table (generic Streamlit data grid)",
+   "general": "Browse per-event measurements in a standard data grid: sort by a column, search values, show/hide columns; the grid's CSV export was not confirmed",
+   "specific": "Saccades dataframe (onset_t, offset_t, duration_s, amplitude_deg, direction_deg, peak_velocity_deg_s) with Streamlit's built-in grid toolbar; not a component specific to iTrace. Download as CSV produced no captured file in either run",
+   "steps": [
+    "click a column header to sort",
+    "press Search and type a value",
+    "press Show/hide columns and untick columns"
+   ],
+   "serves_tasks": [
+    "Review per-event measurements in a table",
+    "Compare detected events with the known truth"
+   ],
+   "screens": [
+    "screens/021.webp",
+    "screens/024.webp",
+    "screens/054.webp",
+    "screens/055.webp"
+   ],
+   "id": "f4",
+   "check": "replayed"
+  },
+  {
+   "name": "Multi-condition validation suite with per-condition drill-down",
+   "general": "Run a detector over several simulated stress conditions with repeated seeds, get a cross-condition summary naming the worst condition, then expand each condition for metrics with mean, std and confidence interval",
+   "specific": "Repetitions per domain slider, Run synthetic validation suite, Cross-domain summary (macro/min/max saccade F1, stability_gap_f1, worst_domain), and expanders for clean_desktop, webcam_jitter, head_drift and low_light_dropout. Uses its own detector settings and ignores the sidebar I-VT threshold",
+   "steps": [
+    "set repetitions per domain (1-5)",
+    "press Run synthetic validation suite and wait for the spinner",
+    "read the cross-domain summary and worst_domain",
+    "expand a domain to read F1/precision/recall/MAE with confidence intervals",
+    "rerun with more repetitions to tighten estimates"
+   ],
+   "serves_tasks": [
+    "Benchmark detector recovery over several simulated conditions with repeated seeds",
+    "Drill into one condition's recovery metrics with confidence intervals"
+   ],
+   "screens": [
+    "screens/031.webp",
+    "screens/032.webp",
+    "screens/033.webp",
+    "screens/042.webp",
+    "screens/066.webp"
+   ],
+   "id": "f5",
+   "check": "replayed"
+  },
+  {
+   "name": "Pupil summary statistics",
+   "general": "Summarise a physiological size trace as level, spread, blink count and fraction, baseline, response peak, latency to peak, response area and phase fractions",
+   "specific": "Pupillometry block (st.json): mean/std/min/max size, n_blinks, blink_fraction, baseline_size, response_peak_size, latency_to_peak_s, dilation_auc, phase_fraction_*; reads 'No pupil data loaded.' without a pupil CSV. A copy icon copies a single hovered value; copying the whole dict was not confirmed",
+   "steps": [
+    "load a gaze CSV together with a pupil CSV",
+    "scroll to Pupillometry",
+    "read blink count/fraction and the response measures",
+    "collapse the block or copy a value"
+   ],
+   "serves_tasks": [
+    "Read summary statistics of a physiological trace"
+   ],
+   "screens": [
+    "screens/010.webp",
+    "screens/011.webp",
+    "screens/026.webp"
+   ],
+   "id": "f6",
+   "check": "replayed"
+  },
+  {
+   "name": "Recording-quality report",
+   "general": "Check a recording's fitness before trusting results: valid-sample fraction, sampling rate, missing-data fraction, timing jitter, longest gap, count of large gaps, out-of-order timestamps, and the detection threshold actually applied",
+   "specific": "Recording-quality diagnostics block: finite_sample_fraction, sampling_rate_hz, dropout_fraction, sampling_jitter_s, longest_gap_s, large_gap_count, nonmonotonic_timestamp_count, detection_threshold_deg_s",
+   "steps": [
+    "load or generate a session",
+    "scroll to Recording-quality diagnostics",
+    "check dropout, gaps, jitter and timestamp order",
+    "confirm detection_threshold_deg_s matches the intended setting"
+   ],
+   "serves_tasks": [
+    "Check data-quality diagnostics before trusting results"
+   ],
+   "screens": [
+    "screens/011.webp",
+    "screens/012.webp",
+    "screens/026.webp",
+    "check/screens/025.webp"
+   ],
+   "id": "f7",
+   "check": "replayed"
+  },
+  {
+   "name": "Session summary tiles",
+   "general": "A row of headline counts (samples, duration, fixation, saccade and small-movement counts) that recomputes when detection settings change",
+   "specific": "Metric tiles for samples, duration, Fixations, Saccades and Microsaccades above the dashboard figure; they update with the I-VT slider and the microsaccade toggle",
+   "steps": [
+    "load or generate a session",
+    "read the tiles",
+    "change the threshold or microsaccade toggle",
+    "read the updated counts"
+   ],
+   "serves_tasks": [
+    "Adjust the detection threshold and see how many events are found",
+    "Turn a second detector for very small movements on or off"
+   ],
+   "screens": [
+    "screens/014.webp",
+    "screens/049.webp",
+    "screens/052.webp",
+    "check/screens/023.webp"
+   ],
+   "id": "f8",
+   "check": "replayed"
+  }
+ ],
+ "screens_never_reached": [
+  "A plot of x and y gaze position against time: the dashboard only shows 2-D speed against time and the spatial scanpath",
+  "A pupil-trace plot (raw against blink-interpolated, or the dilation response): pupillometry appears only as a JSON of summary statistics",
+  "Any interactive (plotly) view: the dashboard is a static matplotlib image with no hover or zoom beyond full screen",
+  "A synthetic session with dropout 0.10: Generate synthetic session ends in 'ValueError: array must not contain infs or NaNs' (screens/046.webp); the replay did generate a session at dropout 0.01",
+  "A per-microsaccade table: only the count, rate and scanpath code appear",
+  "A per-fixation table: fixations appear only as a count and as scanpath circles",
+  "A detection-method selector (adaptive I-VT, I-DT, PSO from the library README): the page exposes only fixed I-VT plus optional Engbert & Kliegl",
+  "The repo's own live-html interface, which needs a camera"
+ ],
+ "not_done": [
+  "Bug: Generate synthetic session with Dropout fraction 0.10 raised 'ValueError: array must not contain infs or NaNs' from saccades.velocities/savgol (screens/046.webp); setting dropout back to 0.00 worked, and the replay generated a session at 0.01",
+  "I could not confirm the CSV export: pressing Download as CSV on the Saccades table produced no captured download (screens/022.webp), and the replay saw the same",
+  "I could not confirm copying the whole Pupillometry dict: the replay found the copy icon copies only the single hovered value",
+  "I could not see blink interpolation itself: only n_blinks and blink_fraction are reported, with no before/after trace",
+  "I did not see any microsaccades on the uploaded demo (count 0), so I only judged microsaccade detection by the synthetic count (21) and the toggle to 0; the replay's session showed 0 microsaccades both on and off, and the toggle does not change the scanpath string",
+  "The speed-trace legend always reads 'threshold (30 deg/s)' and its dashed line stays at 30, even at slider values of 60, 70 or 100. Diagnostics confirm the slider value is the one used for detection, so the plotted threshold is misleading",
+  "The validation suite ignores the sidebar I-VT threshold: at the same repetitions it gave identical results at 100 and at 70 deg/s, so the current detector setting cannot be validated from this interface",
+  "I did not choose a different detection method (only I-VT plus optional Engbert & Kliegl is exposed), and there is no per-domain selection in the validation suite"
+ ],
+ "applied": [
+  "noted in interface that the Streamlit page was written by the run over iTrace library calls; repo dashboard is a stub and live-html needs a camera",
+  "folded t2 into t1 as an optional sub-task",
+  "changed t1 and t3 branch from one-of to sequence with optional steps",
+  "removed the dropout-0.10 ValueError from t3 and recorded it as a bug in not_done and screens_never_reached (noting 0.01 works in replay)",
+  "rewrote t8 to report only the microsaccade count within one session (21 -> 0) and stated the toggle does not change the scanpath; sharpened its general label",
+  "f2 and t7: 'beside'/'side-by-side' changed to 'below'",
+  "t11: hedged the copy claim to a single value",
+  "split f6 into a pupil-summary feature (f6) and a recording-quality report feature (f7)",
+  "marked f4 as a generic Streamlit grid, dropped the unconfirmed CSV-export step and moved the Download click out of t6",
+  "added the fixed-at-30 threshold-line bug to f1, f3 and t4",
+  "noted on the validation phase, t13, t14 and f5 that the suite ignores sidebar detector settings",
+  "gave t4 and t9 explicit panel-reading actions",
+  "merged the one-task main-sequence phase into the event-review phase",
+  "added a summary-tiles feature (f8) from screens already kept",
+  "marked missing detection-method choice on t5, missing fixation table on t6, and missing pupil/x-y traces on t11; added both to screens_never_reached",
+  "hedged t5's 'slider at 30' as resting on the action log"
+ ],
+ "open_fixes": [
+  "Confirm the Saccades CSV export works: needs a run in a browser that captures downloads",
+  "Confirm whether the whole Pupillometry/diagnostics dict can be copied: needs a new run that looks for a block-level copy control",
+  "Detection-method choice (adaptive I-VT, I-DT, PSO): not exposed on this page; needs a page that exposes these methods, or a run against the library directly",
+  "Linking validation to the analysed recording's detector settings: the suite ignores the sidebar threshold, so this needs a code change and a new run",
+  "Per-fixation table, x/y-over-time plot and raw vs blink-interpolated pupil trace: never reachable on this page; need a new page or a new exploration",
+  "Find the dropout level at which synthetic generation starts to crash (0.01 works, 0.10 fails): needs new runs at intermediate values",
+  "Microsaccade detection on real data: neither run saw a nonzero count outside the synthetic session; needs a recording with microsaccades",
+  "Explore the repo's real live-html interface: needs a camera"
+ ],
+ "screens_at": "pilot/public/runs/itrace-eyetracking-dashboard/20261029-234254/",
+ "screens_filed": {
+  "screens/006.webp": "screens/006.webp",
+  "screens/008.webp": "screens/008.webp",
+  "screens/010.webp": "screens/010.webp",
+  "screens/030.webp": "screens/030.webp"
+ }
+}
