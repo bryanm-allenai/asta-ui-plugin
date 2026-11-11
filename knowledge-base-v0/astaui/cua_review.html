@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workflow check</title>
+<style>
+/*__ASTA__*/
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { min-height: 100vh; }
+.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: var(--spacing-xs);
+  padding: var(--spacing-2xs) var(--spacing-2xl); background: var(--surface-pane); border-bottom: 1px solid var(--stroke); }
+.top h1 { font-size: var(--text-body-md); margin: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.top .count { color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.top .saved { color: var(--text-faint); white-space: nowrap; margin-left: auto; font-size: var(--text-body-xs); }
+.top .saved.bad { color: var(--danger); }
+main { max-width: 60rem; margin: 0 auto; padding: var(--spacing-3xl) var(--spacing-2xl) 6rem; }
+.lede { color: var(--text-muted); max-width: 44rem; margin: 0 0 var(--spacing-2xs); font-size: var(--text-body-md); line-height: var(--leading-body-md); }
+.facts { color: var(--text-faint); margin: 0 0 var(--spacing-3xl); font-size: var(--text-body-xs); }
+.facts button { appearance: none; border: 0; background: none; color: var(--color-link); font: inherit; padding: 0; cursor: pointer; text-decoration: underline; }
+section { margin: 0 0 var(--spacing-5xl); }
+section > h2 { font-size: var(--text-heading-sm); line-height: var(--leading-heading-sm); margin: 0 0 4px; }
+section > .how { color: var(--text-muted); margin: 0 0 var(--spacing-md); max-width: 44rem; }
+
+/* A node: what the agent wrote on the left, the person's grade on the right. */
+.node { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px var(--spacing-md); align-items: start;
+  padding: var(--spacing-xs) 0; border-top: 1px solid var(--stroke); }
+.node:first-child { border-top: 0; }
+.kind { color: var(--text-faint); font-size: var(--text-body-xs); text-transform: uppercase; letter-spacing: .04em; margin-right: 6px; }
+.gen { font-weight: 600; }
+.spec { color: var(--text-muted); margin-top: 2px; }
+.branch { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: var(--radius-3xs); background: var(--surface-strong);
+  color: var(--text-muted); font-size: var(--text-body-xs); font-weight: 500; vertical-align: 1px; }
+.shots { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--spacing-2xs); }
+.shots button { appearance: none; padding: 0; border: 1px solid var(--stroke); border-radius: var(--radius-3xs); background: var(--surface);
+  cursor: zoom-in; width: 104px; height: 65px; overflow: hidden; }
+.shots img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+details.acts { margin-top: 6px; color: var(--text-muted); font-size: var(--text-body-xs); }
+details.acts summary { cursor: pointer; width: max-content; }
+details.acts ol { margin: 4px 0 0; padding-left: 1.4em; }
+.grade { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.asta-segmented.small > button { padding: 4px 10px; font-size: 12px; }
+.note { width: 16rem; max-width: 100%; height: 32px; padding: 0 var(--spacing-2xs); font-size: var(--text-body-sm);
+  background: var(--surface-field); color: var(--color-text); border-radius: var(--radius-3xs); }
+.node .note[hidden] { display: none; }
+
+/* A phase is a pane; what is inside it is indented under its head. */
+.phase { background: var(--surface); border: 1px solid var(--stroke); border-radius: var(--radius-xs); padding: var(--spacing-2xs) var(--spacing-md) var(--spacing-xs); margin-bottom: var(--spacing-xs); }
+.phase > .node { border-top: 0; }
+.kids { padding-left: var(--spacing-xl); border-left: 1px solid var(--stroke); margin-left: 2px; }
+.phase .phase { background: var(--surface); margin: var(--spacing-2xs) 0; }
+.goal { background: var(--surface); border: 1px solid var(--stroke); border-radius: var(--radius-xs); padding: var(--spacing-2xs) var(--spacing-md); }
+.about { margin: 0 0 var(--spacing-xs); }
+.about dt { color: var(--text-faint); font-size: var(--text-body-xs); }
+.about dd { margin: 0 0 var(--spacing-2xs); }
+
+/* What the person adds: tasks and features the agent missed. */
+.missed { margin-top: var(--spacing-2xs); }
+.missed ul { list-style: none; margin: 0 0 6px; padding: 0; }
+.missed li { display: flex; gap: var(--spacing-2xs); align-items: center; padding: 4px 0; }
+.missed li span { flex: 1; }
+.missed li span::before { content: "Missed: "; color: var(--text-faint); }
+.addrow { display: flex; gap: 6px; }
+.addrow input { flex: 1; min-width: 0; height: 32px; padding: 0 var(--spacing-2xs); font-size: var(--text-body-sm);
+  background: var(--surface-field); color: var(--color-text); border-radius: var(--radius-3xs); }
+.x { appearance: none; border: 0; background: none; color: var(--text-faint); cursor: pointer; font: inherit; padding: 2px 6px; border-radius: var(--radius-3xs); }
+.x:hover { background: var(--surface-strong); color: var(--color-text); }
+
+.feat .steps { margin: 6px 0 0; padding-left: 1.4em; color: var(--text-muted); }
+.limit { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px var(--spacing-md); align-items: center; padding: var(--spacing-2xs) 0; border-top: 1px solid var(--stroke); }
+.limit:first-child { border-top: 0; }
+.list { background: var(--surface); border: 1px solid var(--stroke); border-radius: var(--radius-xs); padding: var(--spacing-2xs) var(--spacing-md); }
+.empty { color: var(--text-faint); padding: var(--spacing-2xs) 0; }
+
+.q { padding: var(--spacing-xs) 0; border-top: 1px solid var(--stroke); display: grid; gap: var(--spacing-2xs); }
+.q:first-child { border-top: 0; }
+.q label, .q .ask { font-weight: 600; }
+.q textarea { width: 100%; min-height: 5rem; padding: var(--spacing-2xs); font: inherit; background: var(--surface-field); color: var(--color-text);
+  border: 1px solid var(--stroke); border-radius: var(--radius-3xs); resize: vertical; }
+.q input.name { width: 18rem; max-width: 100%; height: 32px; padding: 0 var(--spacing-2xs); background: var(--surface-field); color: var(--color-text); border-radius: var(--radius-3xs); }
+.finish { display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-xs); margin-top: var(--spacing-md); }
+.finish .said { color: var(--text-muted); }
+.score { font-variant-numeric: tabular-nums; }
+.sendbox { margin-top: var(--spacing-md); padding: var(--spacing-md); background: var(--surface); border: 1px solid var(--stroke); border-radius: var(--radius-xs); }
+.sendbox p { margin: 0 0 var(--spacing-2xs); }
+.err { color: var(--danger); }
+
+dialog { border: 1px solid var(--stroke); border-radius: var(--radius-xs); padding: var(--spacing-md); background: var(--surface-raised); color: var(--color-text);
+  max-width: min(96vw, 1320px); }
+dialog::backdrop { background: color-mix(in srgb, var(--color-off-black) 60%, transparent); }
+dialog img { display: block; max-width: 100%; max-height: 78vh; border-radius: var(--radius-3xs); }
+dialog .cap { display: flex; justify-content: space-between; gap: var(--spacing-md); align-items: center; margin-top: var(--spacing-2xs); color: var(--text-muted); }
+dialog.brief pre { white-space: pre-wrap; font-size: 12px; max-height: 70vh; overflow: auto; margin: 0; }
+
+@media (max-width: 640px) {
+  .top { padding: var(--spacing-2xs) var(--spacing-md); flex-wrap: wrap; }
+  .top .saved { margin-left: 0; }
+  main { padding: var(--spacing-2xl) var(--spacing-md) 5rem; }
+  .node, .limit { grid-template-columns: 1fr; }
+  .grade { align-items: flex-start; }
+  .kids { padding-left: var(--spacing-xs); }
+  .phase { padding: var(--spacing-2xs) var(--spacing-xs); }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1 id="title">Workflow check</h1>
+  <span class="count" id="count"></span>
+  <span class="saved" id="saved"></span>
+</header>
+<main id="main">
+  <p class="lede">Loading the run…</p>
+</main>
+<dialog id="shot"><img alt=""><div class="cap"><span></span><button class="asta-button asta-button-default-outlined asta-button-size-sm" value="close" formmethod="dialog">Close</button></div></dialog>
+<dialog id="brief" class="brief"><pre></pre><div class="cap"><span>The brief the agent was given, word for word.</span><button class="asta-button asta-button-default-outlined asta-button-size-sm">Close</button></div></dialog>
+<script>
+(() => {
+  const $ = (sel, el = document) => el.querySelector(sel);
+  const h = (tag, attrs = {}, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      else if (k === 'class') el.className = v;
+      else el.setAttribute(k, v === true ? '' : v);
+    }
+    for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : String(kid));
+    return el;
+  };
+
+  let data, state, saveTimer, nodesById = {};
+  const GRADES = [['right', 'Right'], ['partly', 'Partly'], ['wrong', 'Wrong']];
+
+  function seg(options, current, onPick, small = true) {
+    const box = h('div', { class: 'asta-segmented' + (small ? ' small' : ''), role: 'group' });
+    for (const [value, label] of options) {
+      const b = h('button', { type: 'button', 'aria-pressed': String(current === value) }, label);
+      b.addEventListener('click', () => {
+        const now = b.getAttribute('aria-pressed') === 'true' ? null : value;
+        for (const o of box.children) o.setAttribute('aria-pressed', String(o === b && now !== null));
+        onPick(now);
+      });
+      box.append(b);
+    }
+    return box;
+  }
+
+  function shots(list, caption) {
+    const names = (list || []).filter((s) => typeof s === 'string' && s.startsWith('screens/'));
+    if (!names.length) return null;
+    return h('div', { class: 'shots' }, names.map((s) => h('button', {
+      type: 'button', title: `Open ${s}`, onclick: () => openShot(s, caption),
+    }, h('img', { src: s, alt: `${caption} (${s})`, loading: 'lazy' }))));
+  }
+
+  function openShot(src, caption) {
+    const d = $('#shot');
+    $('img', d).src = src;
+    $('img', d).alt = caption;
+    $('.cap span', d).textContent = `${caption} · ${src}`;
+    d.showModal();
+  }
+  $('#shot button').addEventListener('click', () => $('#shot').close());
+  $('#shot').addEventListener('click', (e) => { if (e.target.id === 'shot') e.target.close(); });
+  $('#brief button').addEventListener('click', () => $('#brief').close());
+
+  function gradeBox(id) {
+    const g = state.grades[id] || {};
+    const note = h('input', { class: 'note asta-input', placeholder: 'What is wrong with it (optional)', value: g.note || '',
+      hidden: !(g.grade === 'partly' || g.grade === 'wrong') });
+    note.addEventListener('input', () => { (state.grades[id] ||= {}).note = note.value; save(); });
+    const box = h('div', { class: 'grade' },
+      seg(GRADES, g.grade, (v) => {
+        const cur = (state.grades[id] ||= {});
+        if (v) cur.grade = v; else delete cur.grade;
+        note.hidden = !(v === 'partly' || v === 'wrong');
+        if (!cur.grade && !cur.note) delete state.grades[id];
+        save();
+        count();
+      }),
+      note);
+    return box;
+  }
+
+  function missedBox(kind, parent, prompt) {
+    const wrap = h('div', { class: 'missed' });
+    const list = h('ul');
+    const draw = () => {
+      list.replaceChildren(...state.missed.filter((m) => m.kind === kind && m.parent === parent).map((m) =>
+        h('li', {}, h('span', {}, m.text), h('button', { type: 'button', class: 'x', title: 'Remove', 'aria-label': `Remove ${m.text}`, onclick: () => {
+          state.missed = state.missed.filter((x) => x !== m); draw(); save(); count();
+        } }, 'Remove'))));
+      list.hidden = !list.children.length;
+    };
+    const input = h('input', { class: 'asta-input', placeholder: prompt, 'aria-label': prompt });
+    const add = () => {
+      const text = input.value.trim();
+      if (!text) return;
+      state.missed.push({ kind, parent, text, at: new Date().toISOString() });
+      input.value = '';
+      draw(); save(); count();
+    };
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+    wrap.append(list, h('div', { class: 'addrow' }, input,
+      h('button', { type: 'button', class: 'asta-button asta-button-default-outlined asta-button-size-sm', onclick: add }, 'Add')));
+    draw();
+    return wrap;
+  }
+
+  const KIND = { goal: 'Goal', phase: 'Phase', task: 'Task' };
+
+  function nodeRow(n) {
+    nodesById[n.id] = n;
+    const acts = (n.children || []).filter((c) => c.kind === 'action');
+    const text = h('div', {},
+      h('div', {}, h('span', { class: 'kind' }, `${KIND[n.kind] || n.kind}${n.id === 'g' ? '' : ' ' + n.id} `),
+        h('span', { class: 'gen' }, n.general || n.label || ''), n.branch ? h('span', { class: 'branch' }, n.branch) : null),
+      n.specific ? h('div', { class: 'spec' }, n.specific) : null,
+      shots(n.screens, n.general || n.label || ''),
+      acts.length ? h('details', { class: 'acts' }, h('summary', {}, `${acts.length} action${acts.length > 1 ? 's' : ''} it took`),
+        h('ol', {}, acts.map((a) => h('li', {}, a.label || a.general || '', ...(a.screens || []).slice(0, 1).map((s) =>
+          h('button', { type: 'button', class: 'x', onclick: () => openShot(s, a.label || '') }, 'screen')))))) : null);
+    return h('div', { class: 'node', 'data-id': n.id }, text, gradeBox(n.id));
+  }
+
+  function branch(n) {
+    const kids = (n.children || []).filter((c) => c.kind !== 'action');
+    if (n.kind === 'phase') {
+      return h('div', { class: 'phase' }, nodeRow(n),
+        h('div', { class: 'kids' }, kids.map(branch), missedBox('task', n.id, 'A task in this phase it missed')));
+    }
+    if (!kids.length) return nodeRow(n);
+    return h('div', {}, nodeRow(n), h('div', { class: 'kids' }, kids.map(branch)));
+  }
+
+  function count() {
+    const ids = Object.keys(nodesById);
+    const graded = ids.filter((id) => state.grades[id]?.grade);
+    const right = graded.filter((id) => state.grades[id].grade === 'right').length;
+    const missed = state.missed.length;
+    $('#count').textContent = `${graded.length} of ${ids.length} graded · ${right} right` + (missed ? ` · ${missed} missed` : '');
+    const send = $('#send');
+    if (send) send.disabled = !graded.length || !data.can_send;
+  }
+
+  let saving = Promise.resolve();
+  function save(now = false) {
+    clearTimeout(saveTimer);
+    $('#saved').textContent = 'Not saved yet';
+    $('#saved').classList.remove('bad');
+    saveTimer = setTimeout(() => {
+      saving = saving.then(() => fetch('review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state) })
+        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error(r.error || 'not saved');
+          $('#saved').textContent = `Saved ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+          data.summary = r.summary;
+          drawScore();
+        })
+        .catch((e) => { $('#saved').textContent = `Not saved: ${e.message}. Is astaui cua review still running?`; $('#saved').classList.add('bad'); }));
+    }, now ? 0 : 400);
+  }
+
+  function pct(x) { return x == null ? '–' : `${Math.round(x * 100)}%`; }
+  function drawScore() {
+    const el = $('#score');
+    if (!el || !data.summary) return;
+    const s = data.summary, t = s.by_kind.task, f = s.by_kind.feature;
+    el.textContent = t.graded
+      ? `Tasks: ${pct(t.accuracy)} accurate (right counts 1, partly ½), and it found ${pct(s.task_recall)} of the tasks you know of.`
+        + (f.graded ? ` Features: ${pct(f.accuracy)} accurate.` : '')
+      : 'Grade some tasks to see the score.';
+  }
+
+  function render() {
+    const { run, tree } = data;
+    const iface = tree.interface || {};
+    document.title = `Workflow check: ${iface.title || run.name}`;
+    $('#title').textContent = `Workflow check: ${iface.title || run.name}`;
+    const mins = Math.max(1, Math.round((run.seconds || 0) / 60));
+    const told = run.about ? 'one line from you on what it is for' : 'no description';
+    const main = $('#main');
+    main.replaceChildren();
+    main.append(
+      h('p', { class: 'lede' }, `An agent used your interface at ${run.url} for ${mins} minute${mins === 1 ? '' : 's'}, with a browser and nothing else: no code and ${told}. Below is the workflow it wrote down. Mark each part right, partly right or wrong for your interface, and add what it missed. Your grades are saved as you make them.`),
+      h('p', { class: 'facts' }, [run.model, run.browser_calls != null ? `${run.browser_calls} browser actions` : null,
+        run.screens != null ? `${run.screens} screenshots` : null, run.cost_usd ? `$${run.cost_usd.toFixed(2)}` : null,
+        run.files?.length ? `test files: ${run.files.join(', ')}` : null].filter(Boolean).join(' · '), ' · ',
+        h('button', { type: 'button', onclick: () => { $('#brief pre').textContent = data.brief; $('#brief').showModal(); } }, 'What the agent was told')));
+
+    // 1. What it is for.
+    const goal = tree.tree || {};
+    main.append(h('section', {},
+      h('h2', {}, 'What it says your interface is for'),
+      h('p', { class: 'how' }, 'The goal it inferred, and how it described the interface.'),
+      h('div', { class: 'goal' },
+        h('dl', { class: 'about' },
+          iface.what_it_is_for ? [h('dt', {}, 'For'), h('dd', {}, iface.what_it_is_for)] : null,
+          iface.field ? [h('dt', {}, 'Field'), h('dd', {}, iface.field)] : null,
+          iface.stage_of_work ? [h('dt', {}, 'Stage of the work'), h('dd', {}, iface.stage_of_work)] : null,
+          tree.data?.note ? [h('dt', {}, 'Data it worked on'), h('dd', {}, `${tree.data.source || ''}${tree.data.source ? ': ' : ''}${tree.data.note}`)] : null),
+        nodeRow(goal))));
+
+    // 2. The workflow.
+    const phases = (goal.children || []).filter((c) => c.kind !== 'action');
+    main.append(h('section', {},
+      h('h2', {}, 'The workflow it found'),
+      h('p', { class: 'how' }, 'Phases, and the tasks inside them. A task is right if your interface supports it and the agent describes it the way you would. Open a screenshot to see what it saw.'),
+      phases.length ? phases.map(branch) : h('p', { class: 'empty' }, 'It wrote no phases.'),
+      h('div', { class: 'phase' }, h('div', { class: 'how' }, 'A phase or task it missed that fits none of the phases above'),
+        missedBox('task', 'g', 'What it missed'))));
+
+    // 3. Features.
+    const feats = tree.features || [];
+    main.append(h('section', {},
+      h('h2', {}, 'Features it found'),
+      h('p', { class: 'how' }, 'A feature is a component with the few steps a person takes with it, which someone could reuse in their own tool.'),
+      h('div', { class: 'list' }, feats.length ? feats.map((f) => {
+        nodesById[f.id] = f;
+        return h('div', { class: 'node feat', 'data-id': f.id },
+          h('div', {}, h('div', {}, h('span', { class: 'kind' }, 'Feature '), h('span', { class: 'gen' }, f.name || '')),
+            f.specific ? h('div', { class: 'spec' }, f.specific) : null,
+            f.steps?.length ? h('ol', { class: 'steps' }, f.steps.map((s) => h('li', {}, s))) : null,
+            shots(f.screens, f.name || '')),
+          gradeBox(f.id));
+      }) : h('p', { class: 'empty' }, 'It found no features.'),
+      missedBox('feature', 'features', 'A feature it missed'))));
+
+    // 4. What it could not do.
+    const limits = [...(tree.not_done || []).map((t, i) => ['n' + i, t]), ...(tree.screens_never_reached || []).map((t, i) => ['s' + i, t])];
+    main.append(h('section', {},
+      h('h2', {}, 'What it says it could not do'),
+      h('p', { class: 'how' }, 'For each, say whether your interface really cannot do it, or the agent did not manage to.'),
+      h('div', { class: 'list' }, limits.length ? limits.map(([key, text]) => h('div', { class: 'limit' },
+        h('div', {}, text),
+        seg([['interface', 'The interface can’t'], ['agent', 'The agent failed']], state.limits[key], (v) => {
+          if (v) state.limits[key] = v; else delete state.limits[key];
+          save();
+        }))) : h('p', { class: 'empty' }, 'It listed nothing.'))));
+
+    // 5. Overall.
+    const o = state.overall;
+    const scale = (key) => seg([1, 2, 3, 4, 5].map((n) => [n, String(n)]), o[key], (v) => { if (v) o[key] = v; else delete o[key]; save(); }, false);
+    const note = h('textarea', { id: 'q-note', placeholder: 'What it got wrong about how the work goes, what surprised you' }, o.note || '');
+    note.addEventListener('input', () => { o.note = note.value; save(); });
+    const name = h('input', { id: 'q-name', class: 'name asta-input', placeholder: 'Your name (optional)', value: state.name || '' });
+    name.addEventListener('input', () => { state.name = name.value.trim(); save(); });
+    main.append(h('section', {},
+      h('h2', {}, 'Overall'),
+      h('div', { class: 'list' },
+        h('div', { class: 'q' }, h('span', { class: 'ask' }, 'How well do the goal and its phases say what your interface is for?'),
+          h('span', { class: 'spec' }, '1 misses it, 5 exactly'), scale('point')),
+        h('div', { class: 'q' }, h('span', { class: 'ask' }, 'How much of what people do with your interface is in the tree?'),
+          h('span', { class: 'spec' }, '1 almost none, 5 all of it'), scale('coverage')),
+        h('div', { class: 'q' }, h('span', { class: 'ask' }, 'How deep is the tree?'),
+          seg([['shallow', 'Too shallow'], ['right', 'About right'], ['deep', 'Too deep']], o.depth, (v) => { if (v) o.depth = v; else delete o.depth; save(); }, false)),
+        h('div', { class: 'q' }, h('span', { class: 'ask' }, 'Would this tree describe your interface well to someone who has not seen it?'),
+          seg([['yes', 'Yes'], ['fix', 'With fixes'], ['no', 'No']], o.trust, (v) => { if (v) o.trust = v; else delete o.trust; save(); }, false)),
+        h('div', { class: 'q' }, h('label', { for: 'q-note' }, 'Anything else'), note),
+        h('div', { class: 'q' }, h('label', { for: 'q-name' }, 'Your name'), h('span', { class: 'spec' }, 'Sent with your grades. Left empty, the name git has for you is used.'), name)),
+      h('div', { class: 'finish' },
+        h('button', { type: 'button', id: 'done', class: 'asta-button asta-button-default asta-button-size-md', onclick: () => {
+          state.done = true; save(true); $('#done-said').textContent = 'Marked as finished. You can still change any grade.';
+        } }, 'Finish grading'),
+        h('span', { class: 'said', id: 'done-said' }, state.done ? 'Marked as finished. You can still change any grade.' : '')),
+      h('p', { class: 'score', id: 'score' }),
+      data.can_send ? sendBox() : h('p', { class: 'how' }, 'This computer has no link to send checks to, so the grades stay in review.json in the run’s folder.')));
+    count();
+    drawScore();
+  }
+
+  function sendBox() {
+    const said = h('p', { class: 'said' }, state.sent ? `Sent ${new Date(state.sent).toLocaleString()}. Sending again sends the newer grades.` : '');
+    const btn = h('button', { type: 'button', id: 'send', class: 'asta-button asta-button-primary asta-button-size-md' }, state.sent ? 'Send again' : 'Send to the AstaUI team');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      said.className = 'said';
+      said.textContent = 'Sending…';
+      clearTimeout(saveTimer);
+      await fetch('review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state) });
+      const r = await fetch('send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then((x) => x.json()).catch((e) => ({ error: e.message }));
+      btn.disabled = false;
+      if (r.ok) {
+        state.sent = new Date().toISOString();
+        said.textContent = `Sent to the AstaUI team. Sending again sends the newer grades.`;
+        btn.textContent = 'Send again';
+      } else {
+        said.className = 'said err';
+        said.textContent = `Not sent: ${r.error}`;
+      }
+    });
+    const n = new Set();
+    JSON.stringify(data.tree).replace(/screens\/[A-Za-z0-9_.-]+/g, (m) => n.add(m));
+    return h('div', { class: 'sendbox' },
+      h('p', {}, `Sending gives the AstaUI team your grades, the agent’s tree, the brief it was given and the ${n.size} screenshots the tree cites. It does not send your code or the agent’s transcript.`),
+      h('div', { class: 'finish' }, btn, said));
+  }
+
+  fetch('data').then((r) => r.json()).then((d) => {
+    data = d;
+    const r = d.review || {};
+    state = { grades: r.grades || {}, missed: r.missed || [], limits: r.limits || {}, overall: r.overall || {},
+      name: r.name || '', done: !!r.done, sent: r.sent || null };
+    render();
+    $('#saved').textContent = r.saved ? `Saved ${new Date(r.saved).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '';
+  }).catch((e) => {
+    $('#main').replaceChildren(h('p', { class: 'lede err' }, `The run did not load (${e.message}). Start the page with astaui cua review.`));
+  });
+})();
+</script>
+</body>
+</html>

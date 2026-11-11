@@ -320,6 +320,30 @@ def _row(build_id: str, meta: Dict[str, Any], packed: bytes, sent: datetime) -> 
             f'<pre class="bundle" hidden>{base64.b64encode(packed).decode("ascii")}</pre></li>')
 
 
+def post_row(link: str, row: str, what: str = "row") -> Dict[str, str]:
+    """Add one row to the end of the owner's list through their Add only link."""
+    door = open_link(link)
+    op = {"type": "insert", "parentId": INBOX_LIST, "beforeId": None, "html": row}
+    url = f"{door['origin']}/ops?app={urllib.parse.quote(door['page'], safe='')}"
+    req = urllib.request.Request(url, data=json.dumps([op]).encode("utf-8"), method="POST",
+                                 headers={"Content-Type": "application/json", "Cookie": door["cookie"],
+                                          "Origin": door["origin"], "User-Agent": AGENT})
+    try:
+        answer = json.loads(urllib.request.urlopen(req, timeout=300).read() or b"{}")
+    except urllib.error.HTTPError as e:
+        try:
+            said = json.loads(e.read() or b"{}").get("error")
+        except (ValueError, OSError):
+            said = None
+        e.close()
+        raise KBError(f"The drive turned the {what} away ({e.code}): {said or e.reason}") from e
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        raise KBError(f"Could not send it to {door['origin']}: {getattr(e, 'reason', e)}") from e
+    if not answer.get("ok"):
+        raise KBError(f"The drive did not take the {what}: {answer.get('error') or answer}")
+    return {"page": door["page"], "drive": door["origin"]}
+
+
 def send(kb: KB, build_id: str, link: Optional[str] = None) -> Dict[str, Any]:
     """Add a filed build to the owner's page through their Add only link (the
     one the plugin carries, unless another is given)."""
@@ -335,32 +359,13 @@ def send(kb: KB, build_id: str, link: Optional[str] = None) -> Dict[str, Any]:
         meta = json.loads((kb.builds_dir / build_id / "build.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
         raise KBError(f"{build_id}'s build.json does not read: {e}") from e
-    door = open_link(link)
-    op = {"type": "insert", "parentId": INBOX_LIST, "beforeId": None,
-          "html": _row(build_id, meta, packed, datetime.now().astimezone())}
-    url = f"{door['origin']}/ops?app={urllib.parse.quote(door['page'], safe='')}"
-    req = urllib.request.Request(url, data=json.dumps([op]).encode("utf-8"), method="POST",
-                                 headers={"Content-Type": "application/json", "Cookie": door["cookie"],
-                                          "Origin": door["origin"], "User-Agent": AGENT})
-    try:
-        answer = json.loads(urllib.request.urlopen(req, timeout=300).read() or b"{}")
-    except urllib.error.HTTPError as e:
-        try:
-            said = json.loads(e.read() or b"{}").get("error")
-        except (ValueError, OSError):
-            said = None
-        e.close()
-        raise KBError(f"The drive turned the build away ({e.code}): {said or e.reason}") from e
-    except (urllib.error.URLError, OSError, ValueError) as e:
-        raise KBError(f"Could not send it to {door['origin']}: {getattr(e, 'reason', e)}") from e
-    if not answer.get("ok"):
-        raise KBError(f"The drive did not take the build: {answer.get('error') or answer}")
+    where = post_row(link, _row(build_id, meta, packed, datetime.now().astimezone()), "build")
     remember_filed(build_id)
     if user_config().get("inbox-link") != link and not user_config().get("inbox"):
         # A scientist's computer: later builds go where this one went. (The
         # owner's computer keeps the link it was given with its page.)
         set_user_config("inbox-link", link)
-    return {"id": build_id, "bytes": len(packed), "page": door["page"], "drive": door["origin"]}
+    return {"id": build_id, "bytes": len(packed), **where}
 
 
 def remember_filed(build_id: str, folder: Optional[Path] = None) -> None:

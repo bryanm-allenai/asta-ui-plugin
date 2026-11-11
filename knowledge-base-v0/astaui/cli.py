@@ -29,6 +29,7 @@ def _print_json(data: Any) -> None:
 
 def _say(msg: str = "") -> None:
     sys.stdout.write(msg + "\n")
+    sys.stdout.flush()  # a command left running in the background still shows what it said
 
 
 def _warn(msg: str) -> None:
@@ -1025,6 +1026,98 @@ def run_checks(kb: KB) -> List[str]:
     return problems
 
 
+def cmd_cua(args) -> int:
+    """Workflow checks: a computer-use agent works out an app's workflow from
+    using it alone, and the person who built it grades the result."""
+    from . import cua
+    from .sources import inbox_link, inbox_file
+
+    act = args.action
+    if act == "setup":
+        st = cua.setup(say=_say)
+        if args.json:
+            _print_json(st)
+        else:
+            _say(f"The agent's browser is ready (Playwright in {st['playwright']}). "
+                 + ("Claude Code is on the PATH." if st["claude"] else ""))
+        return 0
+    if act == "status":
+        _print_json(cua.status())
+        return 0
+    if act == "run":
+        if not args.url:
+            raise KBError("Give the address the app answers at: astaui cua run --url http://127.0.0.1:8000/")
+        res = cua.run(args.url, files=args.files, about=args.about, name=args.name, actions=args.actions,
+                      model=args.model, quiet=args.quiet or args.json, say=_say)
+        if args.json:
+            _print_json(res)
+        else:
+            cost = f", ${res['cost_usd']:.2f}" if res.get("cost_usd") else ""
+            _say(f"Done in {res['seconds'] // 60} min{cost}: {res.get('phases', 0)} phases, {res.get('tasks', 0)} tasks, "
+                 f"{res.get('features', 0)} features, {res.get('screens', 0)} screenshots, in {res['run']}.")
+            _say("Next: `astaui cua review latest` opens the page where you grade it.")
+        return 0
+    if act == "list":
+        rows = []
+        for r in cua.runs():
+            meta = json.loads((r / "run.json").read_text())
+            rows.append({"run": r.name, "status": meta.get("status"), "title": meta.get("title"), "url": meta.get("url"),
+                         "graded": cua.summary_words(cua.summary(r)) if (r / "review.json").is_file() else None})
+        if args.json:
+            _print_json(rows)
+        elif not rows:
+            _say(f"No runs yet in {cua.CHECKS}.")
+        for row in rows:
+            _say(f"{row['run']}  {row['status']}  {row['title'] or row['url']}" + (f"  ({row['graded']})" if row["graded"] else ""))
+        return 0
+    if act in ("review", "summary", "send"):
+        run_dir = cua.resolve(args.run)
+        if not (run_dir / "tree.json").is_file():
+            raise KBError(f"{run_dir.name} has no tree: the run did not finish.")
+        link = args.to or inbox_link(_kb(args))
+        if act == "review":
+            cua.serve(run_dir, port=args.port, open_browser=not args.no_open, link=link, say=_say)
+            return 0
+        if act == "summary":
+            s = cua.summary(run_dir)
+            if args.json:
+                _print_json(s)
+            else:
+                _say(f"{run_dir.name}: {cua.summary_words(s)}")
+            return 0
+        res = cua.send(run_dir, link)
+        if args.json:
+            _print_json(res)
+        else:
+            _say(f"Sent {res['id']} ({max(1, round(res['bytes'] / 1024))} KB) to {res['page']} on {res['drive']}.")
+        return 0
+    if act == "line":
+        kb = _kb(args)
+        public = kb.config.get("plugin") or {}
+        link = args.to or inbox_link(kb)
+        if not public.get("repo") or not link:
+            raise KBError("The line needs kb.json's plugin.repo and an inbox link (`astaui config inbox-link`).")
+        raw = f"https://raw.githubusercontent.com/{public['repo']}/{public.get('branch') or 'main'}"
+        line = cua.LINE.format(raw=raw, link=link)
+        _print_json({"line": line}) if args.json else _say(line)
+        return 0
+    if act == "received":
+        kb = _kb(args)
+        page = inbox_file(kb)
+        if not page:
+            raise KBError("This computer does not have the page checks are sent to.")
+        into = Path(args.into) if args.into else kb.root.parent / "pilot" / "checks"
+        rows = cua.received(page, into)
+        if args.json:
+            _print_json(rows)
+        elif not rows:
+            _say("No checks have been sent yet.")
+        for r in rows:
+            _say(f"{r['id']}  {r['sent'][:16]}  {r['title'] or ''}  {r['who'] or ''}: {cua.summary_words(r['summary'])}")
+        return 0
+    raise KBError(f"astaui cua {act}: no such action")
+
+
 def cmd_check(args) -> int:
     """Everything a pull request should pass: builds, cards, evaluation references, privacy."""
     kb = _kb(args)
@@ -1101,6 +1194,22 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--try", dest="rules", nargs="+", metavar="RULE", help="rules to try without saving, e.g. depth=shallow,deep point_below=4")
     sp.add_argument("--set", nargs="+", metavar="RULE", help="save these rules as kb.json's set_aside (builds named by hand are kept)")
     sp.add_argument("--clear", action="store_true", help="set nothing aside")
+
+    sp = cmd("cua", "workflow checks: a computer-use agent works out an app's workflow from using it alone, "
+             "and the person who built it grades the tree (setup, run, review, send, list, summary, line, received)", cmd_cua)
+    sp.add_argument("action", choices=["setup", "status", "run", "review", "send", "list", "summary", "line", "received"])
+    sp.add_argument("run", nargs="?", help="for review, send and summary: a run folder, its name, `latest`, or an app's name")
+    sp.add_argument("--url", help="run: the address the app answers at")
+    sp.add_argument("--files", help="run: a folder of test files the agent may give the app")
+    sp.add_argument("--about", help="run: one line on what the app is for (leave it out to test the interface alone)")
+    sp.add_argument("--name", help="run: a short name for the app (default: this folder's)")
+    sp.add_argument("--actions", type=int, default=60, help="run: about how many browser actions (default 60)")
+    sp.add_argument("--model", help="run: the model (default claude-opus-5-5, the collection's)")
+    sp.add_argument("--quiet", action="store_true", help="run: do not print each browser call")
+    sp.add_argument("--port", type=int, default=0, help="review: the port (default: any free one)")
+    sp.add_argument("--no-open", action="store_true", help="review: do not open a browser")
+    sp.add_argument("--to", help="send, line: the drive link (default: the one the line gave)")
+    sp.add_argument("--into", help="received: where checks are unpacked (default: pilot/checks beside the kb)")
 
     sp = cmd("init", "make an empty knowledge base", cmd_init, json_flag=False)
     sp.add_argument("path")
