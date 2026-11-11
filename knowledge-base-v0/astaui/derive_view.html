@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workflow</title>
+<style>
+/*__ASTA__*/
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { min-height: 100vh; }
+.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: var(--spacing-xs);
+  padding: var(--spacing-2xs) var(--spacing-2xl); background: var(--surface-pane); border-bottom: 1px solid var(--stroke); }
+.top h1 { font-size: var(--text-body-md); margin: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.top .count { color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.top .saved { color: var(--text-faint); white-space: nowrap; margin-left: auto; font-size: var(--text-body-xs); }
+.top .saved.bad { color: var(--danger); white-space: normal; }
+.top .saved button { appearance: none; border: 0; background: none; color: var(--color-link); font: inherit; padding: 0 0 0 6px; cursor: pointer; text-decoration: underline; }
+.top .get { display: flex; gap: 6px; }
+main { max-width: 60rem; margin: 0 auto; padding: var(--spacing-3xl) var(--spacing-2xl) 6rem; }
+.lede { color: var(--text-muted); max-width: 44rem; margin: 0 0 var(--spacing-2xs); font-size: var(--text-body-md); line-height: var(--leading-body-md); }
+.facts { color: var(--text-faint); margin: 0 0 var(--spacing-md); font-size: var(--text-body-xs); }
+.facts button { appearance: none; border: 0; background: none; color: var(--color-link); font: inherit; padding: 0; cursor: pointer; text-decoration: underline; }
+.show { display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-xs); margin: 0 0 var(--spacing-3xl); color: var(--text-muted); }
+section { margin: 0 0 var(--spacing-5xl); }
+section > h2 { font-size: var(--text-heading-sm); line-height: var(--leading-heading-sm); margin: 0 0 4px; }
+section > .how { color: var(--text-muted); margin: 0 0 var(--spacing-md); max-width: 44rem; }
+
+/* A part: what was written on the left, the person's check on the right. */
+.node { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px var(--spacing-md); align-items: start;
+  padding: var(--spacing-xs) 0; border-top: 1px solid var(--stroke); }
+.node:first-child { border-top: 0; }
+.node[data-hide] { display: none; }
+.kind { color: var(--text-faint); font-size: var(--text-body-xs); text-transform: uppercase; letter-spacing: .04em; margin-right: 6px; }
+.gen { font-weight: 600; }
+.spec { color: var(--text-muted); margin-top: 2px; }
+[contenteditable] { border-radius: var(--radius-3xs); outline: 0; padding: 0 2px; margin: 0 -2px; }
+[contenteditable]:hover { background: var(--surface); }
+[contenteditable]:focus-visible, [contenteditable]:focus { background: var(--surface-field); box-shadow: 0 0 0 2px var(--focus-ring); }
+[contenteditable]:empty::before { content: attr(data-placeholder); color: var(--text-faint); font-weight: 400; }
+.tags { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 6px; vertical-align: 1px; }
+.tag { display: inline-block; padding: 0 6px; border-radius: var(--radius-3xs); background: var(--surface-strong);
+  color: var(--text-muted); font-size: var(--text-body-xs); font-weight: 500; }
+.differs { margin-top: 4px; color: var(--text-muted); font-size: var(--text-body-sm); }
+.differs::before { content: "The sources differ: "; color: var(--text-faint); }
+.ev { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--spacing-2xs); align-items: center; }
+.ev .shot { appearance: none; padding: 0; border: 1px solid var(--stroke); border-radius: var(--radius-3xs); background: var(--surface);
+  cursor: zoom-in; width: 104px; height: 65px; overflow: hidden; }
+.ev img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+.ev .ref { appearance: none; border: 1px solid var(--stroke); background: var(--surface); color: var(--color-text); cursor: pointer;
+  font: 12px/1.6 var(--font-mono); padding: 2px 8px; border-radius: var(--radius-3xs); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev .ref:hover { background: var(--surface-strong); }
+details.acts { margin-top: 6px; color: var(--text-muted); font-size: var(--text-body-xs); }
+details.acts summary { cursor: pointer; width: max-content; }
+details.acts ol { margin: 4px 0 0; padding-left: 1.4em; }
+details.acts .x { font-size: var(--text-body-xs); }
+.check { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.check .row { display: flex; gap: 6px; align-items: center; }
+.asta-segmented.small > button { padding: 4px 10px; font-size: 12px; }
+.note { width: 16rem; max-width: 100%; height: 32px; padding: 0 var(--spacing-2xs); font-size: var(--text-body-sm);
+  background: var(--surface-field); color: var(--color-text); border-radius: var(--radius-3xs); }
+.note[hidden] { display: none; }
+
+/* A phase is a pane; what is inside it is indented under its head. */
+.phase { background: var(--surface); border: 1px solid var(--stroke); border-radius: var(--radius-xs); padding: var(--spacing-2xs) var(--spacing-md) var(--spacing-xs); margin-bottom: var(--spacing-xs); }
+.phase > .node { border-top: 0; }
+.kids { padding-left: var(--spacing-xl); border-left: 1px solid var(--stroke); margin-left: 2px; }
+.goal { background: var(--surface); border: 1px solid var(--stroke); border-radius: var(--radius-xs); padding: var(--spacing-2xs) var(--spacing-md); }
+.about { margin: 0 0 var(--spacing-xs); display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: 4px var(--spacing-md); }
+.about dt { color: var(--text-faint); font-size: var(--text-body-xs); padding-top: 3px; }
+.about dd { margin: 0; }
+.adds { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--spacing-2xs); }
+.x { appearance: none; border: 0; background: none; color: var(--text-faint); cursor: pointer; font: inherit; padding: 2px 6px; border-radius: var(--radius-3xs); }
+.x:hover { background: var(--surface-strong); color: var(--color-text); }
+
+.feat .steps { margin: 6px 0 0; padding-left: 1.4em; color: var(--text-muted); }
+.list { background: var(--surface); border: 1px solid var(--stroke); border-radius: var(--radius-xs); padding: var(--spacing-2xs) var(--spacing-md); }
+.list > p { margin: 0; padding: var(--spacing-2xs) 0; border-top: 1px solid var(--stroke); }
+.list > p:first-child { border-top: 0; }
+.empty { color: var(--text-faint); padding: var(--spacing-2xs) 0; }
+.where { color: var(--text-muted); }
+.where code { font-size: 12px; word-break: break-all; }
+.err { color: var(--danger); }
+
+dialog { border: 1px solid var(--stroke); border-radius: var(--radius-xs); padding: var(--spacing-md); background: var(--surface-raised); color: var(--color-text);
+  max-width: min(96vw, 1320px); }
+dialog::backdrop { background: color-mix(in srgb, var(--color-off-black) 60%, transparent); }
+dialog img { display: block; max-width: 100%; max-height: 78vh; border-radius: var(--radius-3xs); }
+dialog .cap { display: flex; justify-content: space-between; gap: var(--spacing-md); align-items: center; margin-top: var(--spacing-2xs); color: var(--text-muted); }
+dialog pre { white-space: pre; font-size: 12px; max-height: 70vh; overflow: auto; margin: 0; min-width: min(80vw, 56rem); }
+dialog pre .ln { color: var(--text-faint); user-select: none; display: inline-block; min-width: 3.5em; }
+dialog pre > div { width: max-content; min-width: 100%; }
+dialog pre .hit { background: var(--surface-strong); }
+dialog.brief pre { white-space: pre-wrap; }
+
+@media (max-width: 640px) {
+  .top { position: static; padding: var(--spacing-2xs) var(--spacing-md); flex-wrap: wrap; }
+  .top .saved { margin-left: 0; }
+  main { padding: var(--spacing-2xl) var(--spacing-md) 5rem; }
+  .node { grid-template-columns: 1fr; }
+  .check { align-items: flex-start; }
+  .kids { padding-left: var(--spacing-xs); }
+  .phase { padding: var(--spacing-2xs) var(--spacing-xs); }
+  .about { grid-template-columns: 1fr; }
+  .about dt { padding-top: 0; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1 id="title">Workflow</h1>
+  <span class="count" id="count"></span>
+  <span class="saved" id="saved"></span>
+  <span class="get">
+    <a class="asta-button asta-button-default-outlined asta-button-size-sm" href="workflow.json" download>JSON</a>
+    <a class="asta-button asta-button-default-outlined asta-button-size-sm" href="workflow.md" download>Outline</a>
+  </span>
+</header>
+<main id="main">
+  <p class="lede">Loading the workflow…</p>
+</main>
+<dialog id="shot"><img alt=""><div class="cap"><span></span><button class="asta-button asta-button-default-outlined asta-button-size-sm">Close</button></div></dialog>
+<dialog id="code"><pre></pre><div class="cap"><span></span><button class="asta-button asta-button-default-outlined asta-button-size-sm">Close</button></div></dialog>
+<script>
+(() => {
+  const $ = (sel, el = document) => el.querySelector(sel);
+  const h = (tag, attrs = {}, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      else if (k === 'class') el.className = v;
+      else el.setAttribute(k, v === true ? '' : v);
+    }
+    for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : String(kid));
+    return el;
+  };
+
+  let data, wf, saveTimer, filter = 'all', removed = null;
+  const SAID = { ui: 'Seen in use', code: 'In the code', person: 'Added by you' };
+  const newId = () => 'p' + Math.random().toString(36).slice(2, 9);
+
+  // -- evidence: screenshots and code ------------------------------------------------------------
+  function openShot(src, caption) {
+    const d = $('#shot');
+    $('img', d).src = src;
+    $('img', d).alt = caption;
+    $('.cap span', d).textContent = `${caption} · ${src}`;
+    d.showModal();
+  }
+  async function openCode(ref) {
+    const d = $('#code');
+    const pre = $('pre', d);
+    pre.textContent = 'Loading…';
+    $('.cap span', d).textContent = ref;
+    d.showModal();
+    const r = await fetch('code?ref=' + encodeURIComponent(ref)).then((x) => x.json()).catch((e) => ({ error: e.message }));
+    if (r.error) { pre.textContent = `These lines could not be shown: ${r.error}.`; return; }
+    pre.replaceChildren(...r.lines.map((line, i) => {
+      const n = r.first + i;
+      return h('div', { class: n >= r.from && n <= r.to ? 'hit' : null }, h('span', { class: 'ln' }, n), line || ' ');
+    }));
+    $('.cap span', d).textContent = `${r.path}, lines ${r.from}–${r.to} of ${r.of}`;
+    const hit = $('.hit', pre);
+    if (hit) hit.scrollIntoView({ block: 'center' });
+  }
+  for (const id of ['shot', 'code']) {
+    $(`#${id} button`).addEventListener('click', () => $('#' + id).close());
+    $('#' + id).addEventListener('click', (e) => { if (e.target.id === id) e.target.close(); });
+  }
+
+  function evidence(n, caption) {
+    const shots = (n.screens || []).filter((s) => typeof s === 'string' && s.startsWith('screens/'));
+    const refs = (n.code || []).filter((s) => typeof s === 'string');
+    if (!shots.length && !refs.length) return null;
+    return h('div', { class: 'ev' },
+      shots.map((s) => h('button', { type: 'button', class: 'shot', title: `Open ${s}`, onclick: () => openShot(s, caption) },
+        h('img', { src: s, alt: `${caption} (${s})`, loading: 'lazy' }))),
+      refs.map((ref) => h('button', { type: 'button', class: 'ref', title: `Show ${ref}`, onclick: () => openCode(ref) }, ref)));
+  }
+
+  // -- editing -----------------------------------------------------------------------------------
+  function editable(n, key, cls, placeholder) {
+    const el = h('div', { class: cls, contenteditable: 'plaintext-only', spellcheck: 'true', 'data-placeholder': placeholder,
+      role: 'textbox', 'aria-label': placeholder }, n[key] || '');
+    el.addEventListener('input', () => { n[key] = el.textContent.replace(/\s+/g, ' ').trim(); save(); });
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+    return el;
+  }
+
+  function tags(n) {
+    const f = n.from || [];
+    const out = [];
+    if (f.includes('ui') && f.includes('code')) out.push('Seen in use and in the code');
+    else for (const x of f) out.push(SAID[x] || x);
+    if (n.branch) out.unshift(n.branch);
+    return h('span', { class: 'tags' }, out.map((t) => h('span', { class: 'tag' }, t)));
+  }
+
+  function checkBox(n, list) {
+    const note = h('input', { class: 'note asta-input', placeholder: 'What is wrong with it', 'aria-label': 'What is wrong with it',
+      value: n.note || '', hidden: n.check !== 'wrong' });
+    note.addEventListener('input', () => { n.note = note.value; if (!n.note) delete n.note; save(); });
+    const seg = h('div', { class: 'asta-segmented small', role: 'group', 'aria-label': 'Check this part' });
+    for (const [value, label] of [['right', 'Right'], ['wrong', 'Needs a fix']]) {
+      const b = h('button', { type: 'button', 'aria-pressed': String(n.check === value) }, label);
+      b.addEventListener('click', () => {
+        n.check = n.check === value ? undefined : value;
+        if (!n.check) delete n.check;
+        for (const o of seg.children) o.setAttribute('aria-pressed', String(o === b && n.check === value));
+        note.hidden = n.check !== 'wrong';
+        if (n.check === 'wrong') note.focus();
+        save();
+        count();
+      });
+      seg.append(b);
+    }
+    const row = h('div', { class: 'row' }, seg,
+      list ? h('button', { type: 'button', class: 'x', title: 'Remove this part', onclick: () => removePart(n, list) }, 'Remove') : null);
+    return h('div', { class: 'check' }, row, note);
+  }
+
+  function removePart(n, list) {
+    const at = list.indexOf(n);
+    if (at < 0) return;
+    list.splice(at, 1);
+    removed = { n, list, at };
+    render();
+    save(true, `Removed “${n.name || n.general || 'a part'}”.`);
+  }
+
+  function addPart(list, kind) {
+    const n = kind === 'feature'
+      ? { id: newId(), name: '', general: '', from: ['person'] }
+      : { id: newId(), kind, general: '', specific: '', from: ['person'], children: [] };
+    list.push(n);
+    render();
+    const el = document.querySelector(`[data-id="${n.id}"] [contenteditable]`);
+    if (el) el.focus();
+  }
+
+  // -- drawing -----------------------------------------------------------------------------------
+  const KIND = { goal: 'Goal', phase: 'Phase', task: 'Task' };
+  const shown = (n) => {
+    if (filter === 'all') return true;
+    const f = n.from || [];
+    if (filter === 'one') return !(f.includes('ui') && f.includes('code'));
+    if (filter === 'wrong') return n.check === 'wrong';
+    if (filter === 'open') return !n.check;
+    return true;
+  };
+
+  function nodeRow(n, label, list) {
+    const acts = (n.children || []).filter((c) => c.kind === 'action');
+    const text = h('div', {},
+      h('div', {}, h('span', { class: 'kind' }, label), tags(n)),
+      editable(n, 'general', 'gen', n.kind === 'goal' ? 'The goal, in words any field could use' : 'What is done, in words any field could use'),
+      editable(n, 'specific', 'spec', 'The same in this tool’s words'),
+      n.differs ? h('div', { class: 'differs' }, n.differs) : null,
+      evidence(n, n.general || ''),
+      acts.length ? h('details', { class: 'acts' }, h('summary', {}, `${acts.length} action${acts.length > 1 ? 's' : ''}`),
+        h('ol', {}, acts.map((a) => h('li', {}, a.label || a.general || '',
+          ...(a.screens || []).slice(0, 1).map((s) => h('button', { type: 'button', class: 'x', onclick: () => openShot(s, a.label || '') }, 'screen')),
+          ...(a.code || []).slice(0, 1).map((ref) => h('button', { type: 'button', class: 'x', onclick: () => openCode(ref) }, ref)))))) : null);
+    return h('div', { class: 'node', 'data-id': n.id, 'data-hide': shown(n) ? null : '' }, text, checkBox(n, list));
+  }
+
+  function branch(n, path, list) {
+    const kids = (n.children ||= []).filter((c) => c.kind !== 'action');
+    const word = n.kind === 'phase' ? 'Phase' : 'Task';
+    const inner = kids.map((c, i) => branch(c, `${path}.${i + 1}`, n.children));
+    if (n.kind === 'phase') {
+      return h('div', { class: 'phase' }, nodeRow(n, `${word} ${path}`, list),
+        h('div', { class: 'kids' }, inner,
+          h('div', { class: 'adds' }, h('button', { type: 'button', class: 'asta-button asta-button-default-outlined asta-button-size-sm',
+            onclick: () => addPart(n.children, 'task') }, 'Add a task'))));
+    }
+    if (!kids.length) return nodeRow(n, `${word} ${path}`, list);
+    return h('div', {}, nodeRow(n, `${word} ${path}`, list), h('div', { class: 'kids' }, inner));
+  }
+
+  function parts() {
+    const out = [];
+    const walk = (n) => { if (n.kind !== 'action') out.push(n); for (const c of n.children || []) walk(c); };
+    if (wf.tree) walk(wf.tree);
+    return out.concat(wf.features || []);
+  }
+
+  function count() {
+    const all = parts();
+    const right = all.filter((n) => n.check === 'right').length;
+    const wrong = all.filter((n) => n.check === 'wrong').length;
+    $('#count').textContent = `${right + wrong} of ${all.length} checked` + (wrong ? ` · ${wrong} need${wrong === 1 ? 's' : ''} a fix` : '');
+  }
+
+  function aboutRow(label, key, placeholder) {
+    const iface = (wf.interface ||= {});
+    return [h('dt', {}, label), h('dd', {}, editable(iface, key, '', placeholder))];
+  }
+
+  function howMade() {
+    const run = data.run || {};
+    const ui = run.ui_run || {};
+    const src = run.sources || {};
+    const from = wf.derived_from;
+    const mins = Math.max(1, Math.round((ui.seconds || 0) / 60));
+    const used = `an agent using the app for ${mins} minute${mins === 1 ? '' : 's'} without seeing the code`;
+    const read = run.folder ? `the code in ${run.folder}` : 'the code';
+    const how = from === 'both' ? `Made from ${read} and from ${used}, then merged. Each part says where it was found.`
+      : from === 'ui' ? `Made from ${used}.`
+        : `Made from ${read}.`;
+    const facts = [];
+    if (src.code) facts.push(`from the code: ${src.code.tasks} tasks, ${src.code.features} features`);
+    if (src.ui) facts.push(`from use: ${src.ui.tasks} tasks, ${src.ui.features} features`);
+    if (src.ui && ui.model) facts.push(ui.model);
+    if (src.ui && ui.screens != null) facts.push(`${ui.screens} screenshots`);
+    if (src.ui && ui.cost_usd) facts.push(`$${ui.cost_usd.toFixed(2)}`);
+    return [h('p', { class: 'lede' }, `${how} Click any words to correct them, mark each part, remove what is not there and add what is missing. Changes save as you go.`),
+      facts.length ? h('p', { class: 'facts' }, facts.join(' · ')) : null];
+  }
+
+  function filters() {
+    const both = wf.derived_from === 'both';
+    const opts = [['all', 'Everything'], ['open', 'Not checked yet'], ['wrong', 'Needs a fix']];
+    if (both) opts.splice(1, 0, ['one', 'Found one way only']);
+    const seg = h('div', { class: 'asta-segmented small', role: 'group', 'aria-label': 'Show' });
+    for (const [v, label] of opts) {
+      const b = h('button', { type: 'button', 'aria-pressed': String(filter === v) }, label);
+      b.addEventListener('click', () => { filter = v; render(); });
+      seg.append(b);
+    }
+    return h('div', { class: 'show' }, h('span', {}, 'Show'), seg);
+  }
+
+  function render() {
+    const iface = wf.interface || {};
+    const name = iface.title || data.run?.title || data.run?.name || 'Workflow';
+    document.title = `Workflow: ${name}`;
+    $('#title').textContent = `Workflow: ${name}`;
+    const main = $('#main');
+    const y = window.scrollY;
+    main.replaceChildren(...howMade().filter(Boolean), filters());
+
+    const goal = wf.tree || {};
+    main.append(h('section', {},
+      h('h2', {}, 'What it is for'),
+      h('div', { class: 'goal' },
+        h('dl', { class: 'about' },
+          aboutRow('Title', 'title', 'The interface’s name'),
+          aboutRow('For', 'what_it_is_for', 'One sentence'),
+          aboutRow('Field', 'field', 'The science it serves'),
+          aboutRow('Stage of the work', 'stage_of_work', 'Where in the work it is used'),
+          wf.data?.note ? [h('dt', {}, 'Data'), h('dd', {}, `${wf.data.source || ''}${wf.data.source ? ': ' : ''}${wf.data.note}`)] : null),
+        nodeRow(goal, 'Goal', null))));
+
+    const phases = (goal.children ||= []).filter((c) => c.kind !== 'action');
+    main.append(h('section', {},
+      h('h2', {}, 'The workflow'),
+      h('p', { class: 'how' }, 'Phases, and the tasks inside them, in the order a person meets them. Open a screenshot or a code reference to see what each part rests on.'),
+      phases.length ? phases.map((p, i) => branch(p, String(i + 1), goal.children)) : h('p', { class: 'empty' }, 'There are no phases yet.'),
+      h('div', { class: 'adds' }, h('button', { type: 'button', class: 'asta-button asta-button-default-outlined asta-button-size-sm',
+        onclick: () => addPart(goal.children, 'phase') }, 'Add a phase'))));
+
+    const feats = (wf.features ||= []);
+    main.append(h('section', {},
+      h('h2', {}, 'Features'),
+      h('p', { class: 'how' }, 'A feature is a component with the few steps a person takes with it, which someone could reuse in their own tool.'),
+      h('div', { class: 'list' }, feats.length ? feats.map((f) => {
+        const row = h('div', { class: 'node feat', 'data-id': f.id, 'data-hide': shown(f) ? null : '' },
+          h('div', {}, h('div', {}, h('span', { class: 'kind' }, 'Feature'), tags(f)),
+            editable(f, 'name', 'gen', 'Its name'),
+            editable(f, 'general', 'spec', 'What a person does with it, in words any field could use'),
+            f.steps?.length ? h('ol', { class: 'steps' }, f.steps.map((s) => h('li', {}, s))) : null,
+            f.differs ? h('div', { class: 'differs' }, f.differs) : null,
+            evidence(f, f.name || '')),
+          checkBox(f, feats));
+        return row;
+      }) : h('p', { class: 'empty' }, 'There are no features yet.')),
+      h('div', { class: 'adds' }, h('button', { type: 'button', class: 'asta-button asta-button-default-outlined asta-button-size-sm',
+        onclick: () => addPart(feats, 'feature') }, 'Add a feature'))));
+
+    const gaps = [...(wf.not_done || []), ...(wf.screens_never_reached || [])];
+    if (gaps.length) {
+      main.append(h('section', {},
+        h('h2', {}, 'Not reached'),
+        h('p', { class: 'how' }, 'What the derivation saw named or started but could not reach, and why.'),
+        h('div', { class: 'list' }, gaps.map((g) => h('p', {}, g)))));
+    }
+    main.append(h('p', { class: 'where' }, 'Saved on this computer as ', h('code', {}, data.files.json), ' and, as an outline, ',
+      h('code', {}, data.files.md), '.'));
+    window.scrollTo(0, y);
+    count();
+  }
+
+  // -- saving ------------------------------------------------------------------------------------
+  // Parts left with no words are not saved, so an Add that was never typed in leaves nothing.
+  function clean(obj) {
+    const copy = JSON.parse(JSON.stringify(obj));
+    const keep = (n) => (n.kind === 'action' ? (n.label || '').trim() : (n.general || '').trim());
+    const walk = (n) => { n.children = (n.children || []).filter(keep); n.children.forEach(walk); };
+    if (copy.tree) walk(copy.tree);
+    copy.features = (copy.features || []).filter((f) => (f.name || '').trim());
+    return copy;
+  }
+
+  let saving = Promise.resolve();
+  function save(now = false, said = '') {
+    clearTimeout(saveTimer);
+    $('#saved').textContent = 'Not saved yet';
+    $('#saved').classList.remove('bad');
+    saveTimer = setTimeout(() => {
+      saving = saving.then(() => fetch('workflow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(clean(wf)) })
+        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error(r.error || 'not saved');
+          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          $('#saved').replaceChildren(said ? `${said} Saved ${t}.` : `Saved ${t}`);
+          if (said && removed) {
+            $('#saved').append(h('button', { type: 'button', onclick: () => {
+              const { n, list, at } = removed;
+              removed = null;
+              list.splice(at, 0, n);
+              render();
+              save(true);
+            } }, 'Undo'));
+          }
+        })
+        .catch((e) => { $('#saved').textContent = `Not saved: ${e.message}. Is astaui derive show still running?`; $('#saved').classList.add('bad'); }));
+    }, now ? 0 : 400);
+  }
+
+  fetch('data').then((r) => r.json()).then((d) => {
+    data = d;
+    wf = d.workflow || {};
+    render();
+    $('#saved').textContent = wf.saved ? `Saved ${new Date(wf.saved).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '';
+  }).catch((e) => {
+    $('#main').replaceChildren(h('p', { class: 'lede err' }, `The workflow did not load (${e.message}). Start the page with astaui derive show.`));
+  });
+})();
+</script>
+</body>
+</html>

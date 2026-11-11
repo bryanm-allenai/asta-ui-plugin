@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The browser AstaUI's computer-use agent works in, as an MCP server on stdio.
-// `astaui cua run` starts it for one run; it is the same browser the project's
+// `astaui derive run` starts it for one run; it is the same browser the project's
 // own collection runs use, so a check on your app sees what those runs saw.
 // It does what a scientist's hands do: click (by element or by position),
 // type, choose from a list, keys, drags, text selection, hover, the wheel,
@@ -8,7 +8,7 @@
 // answered, the clipboard and the window size. It only opens pages on the
 // app's own address.
 //
-// It needs Playwright and its Chromium, which `astaui cua setup` installs into
+// It needs Playwright and its Chromium, which `astaui derive setup` installs into
 // ~/.astaui/cua. ASTAUI_PLAYWRIGHT names another folder whose node_modules has
 // Playwright.
 //
@@ -29,7 +29,7 @@ import readline from 'node:readline';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
-// Where Playwright is: ASTAUI_PLAYWRIGHT, else the folder `astaui cua setup` made.
+// Where Playwright is: ASTAUI_PLAYWRIGHT, else the folder `astaui derive setup` made.
 const PW_HOME = process.env.ASTAUI_PLAYWRIGHT || path.join(os.homedir(), '.astaui', 'cua');
 
 async function loadChromium() {
@@ -39,7 +39,7 @@ async function loadChromium() {
     const { chromium } = await import(entry.href);
     return chromium;
   } catch (err) {
-    throw new Error(`Playwright is not installed in ${PW_HOME} (${err.message}). Run \`astaui cua setup\`.`);
+    throw new Error(`Playwright is not installed in ${PW_HOME} (${err.message}). Run \`astaui derive setup\`.`);
   }
 }
 

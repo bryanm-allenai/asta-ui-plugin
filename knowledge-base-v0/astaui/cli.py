@@ -1026,15 +1026,14 @@ def run_checks(kb: KB) -> List[str]:
     return problems
 
 
-def cmd_cua(args) -> int:
-    """Workflow checks: a computer-use agent works out an app's workflow from
-    using it alone, and the person who built it grades the result."""
-    from . import cua
-    from .sources import inbox_link, inbox_file
+def cmd_derive(args) -> int:
+    """Derive an app's workflow from its code, from a computer-use agent using
+    it, or both, and show it to the person so they can check and correct it."""
+    from . import derive
 
     act = args.action
     if act == "setup":
-        st = cua.setup(say=_say)
+        st = derive.setup(say=_say)
         if args.json:
             _print_json(st)
         else:
@@ -1042,80 +1041,96 @@ def cmd_cua(args) -> int:
                  + ("Claude Code is on the PATH." if st["claude"] else ""))
         return 0
     if act == "status":
-        _print_json(cua.status())
+        _print_json(derive.status())
+        return 0
+    if act == "brief":
+        kind = args.run or ""
+        if kind not in ("code", "merge"):
+            raise KBError("astaui derive brief code (how to read the code) or astaui derive brief merge <workflow>")
+        run_dir = derive.resolve(args.target) if kind == "merge" else None
+        text = derive.brief(kind, run_dir)
+        _print_json({"brief": text}) if args.json else _say(text)
+        return 0
+    if act == "put":
+        if not args.run:
+            raise KBError("Give the file the workflow is in: astaui derive put /tmp/workflow-code.json --from code")
+        if not args.source:
+            raise KBError("Say where it came from: --from code, --from ui or --from both")
+        src = Path(args.run).expanduser()
+        text = sys.stdin.read() if args.run == "-" else src.read_text(encoding="utf-8")
+        if args.source == "both" and not args.into:
+            raise KBError("A merge goes into the workflow it merges: --into latest (or its name)")
+        run_dir = derive._target(args.into, args.name)
+        res = derive.put(run_dir, text, args.source)
+        if args.json:
+            _print_json(res)
+        else:
+            _say(f"Kept the workflow from {'the code' if args.source == 'code' else 'use' if args.source == 'ui' else 'both, merged'}: "
+                 f"{res['phases']} phases, {res['tasks']} tasks, {res['features']} features, in {res['run']}.")
+            _next(res)
         return 0
     if act == "run":
         if not args.url:
-            raise KBError("Give the address the app answers at: astaui cua run --url http://127.0.0.1:8000/")
-        res = cua.run(args.url, files=args.files, about=args.about, name=args.name, actions=args.actions,
-                      model=args.model, quiet=args.quiet or args.json, say=_say)
+            raise KBError("Give the address the app answers at: astaui derive run --url http://127.0.0.1:8000/")
+        res = derive.run(args.url, files=args.files, about=args.about, name=args.name, actions=args.actions,
+                         model=args.model, into=args.into, quiet=args.quiet or args.json, say=_say)
         if args.json:
             _print_json(res)
         else:
             cost = f", ${res['cost_usd']:.2f}" if res.get("cost_usd") else ""
             _say(f"Done in {res['seconds'] // 60} min{cost}: {res.get('phases', 0)} phases, {res.get('tasks', 0)} tasks, "
                  f"{res.get('features', 0)} features, {res.get('screens', 0)} screenshots, in {res['run']}.")
-            _say("Next: `astaui cua review latest` opens the page where you grade it.")
+            _next(res)
         return 0
     if act == "list":
         rows = []
-        for r in cua.runs():
+        for r in derive.runs():
             meta = json.loads((r / "run.json").read_text())
-            rows.append({"run": r.name, "status": meta.get("status"), "title": meta.get("title"), "url": meta.get("url"),
-                         "graded": cua.summary_words(cua.summary(r)) if (r / "review.json").is_file() else None})
+            wf = derive._read(r / "workflow.json", {}) or {}
+            rows.append({"workflow": r.name, "title": meta.get("title"), "folder": meta.get("folder"),
+                         "sources": sorted((meta.get("sources") or {}).keys()), "shown": wf.get("derived_from"),
+                         **(derive.tally(wf) if wf else {})})
         if args.json:
             _print_json(rows)
         elif not rows:
-            _say(f"No runs yet in {cua.CHECKS}.")
+            _say(f"No workflows yet in {derive.WORKFLOWS}.")
         for row in rows:
-            _say(f"{row['run']}  {row['status']}  {row['title'] or row['url']}" + (f"  ({row['graded']})" if row["graded"] else ""))
+            checked = f", {row['right'] + row['wrong']} of {row['parts']} checked" if row.get("parts") else ""
+            _say(f"{row['workflow']}  {row['title'] or row['folder']}  (from {', '.join(row['sources']) or 'nothing yet'}{checked})")
         return 0
-    if act in ("review", "summary", "send"):
-        run_dir = cua.resolve(args.run)
-        if not (run_dir / "tree.json").is_file():
-            raise KBError(f"{run_dir.name} has no tree: the run did not finish.")
-        link = args.to or inbox_link(_kb(args))
-        if act == "review":
-            cua.serve(run_dir, port=args.port, open_browser=not args.no_open, link=link, say=_say)
+    if act in ("show", "outline", "export"):
+        run_dir = derive.resolve(args.run)
+        if not (run_dir / "workflow.json").is_file():
+            raise KBError(f"{run_dir.name} has no workflow yet.")
+        if act == "show":
+            derive.serve(run_dir, port=args.port, open_browser=not args.no_open, say=_say)
             return 0
-        if act == "summary":
-            s = cua.summary(run_dir)
-            if args.json:
-                _print_json(s)
-            else:
-                _say(f"{run_dir.name}: {cua.summary_words(s)}")
+        if act == "outline":
+            _say((run_dir / "workflow.md").read_text(encoding="utf-8").rstrip())
             return 0
-        res = cua.send(run_dir, link)
-        if args.json:
-            _print_json(res)
-        else:
-            _say(f"Sent {res['id']} ({max(1, round(res['bytes'] / 1024))} KB) to {res['page']} on {res['drive']}.")
+        if not args.to:
+            raise KBError("Say where: astaui derive export latest --to ./workflow.json (or a folder)")
+        res = derive.export(run_dir, Path(args.to))
+        _print_json(res) if args.json else _say(f"Wrote {res['json']} and {res['md']}.")
         return 0
     if act == "line":
         kb = _kb(args)
         public = kb.config.get("plugin") or {}
-        link = args.to or inbox_link(kb)
-        if not public.get("repo") or not link:
-            raise KBError("The line needs kb.json's plugin.repo and an inbox link (`astaui config inbox-link`).")
+        if not public.get("repo"):
+            raise KBError("The line needs kb.json's plugin.repo.")
         raw = f"https://raw.githubusercontent.com/{public['repo']}/{public.get('branch') or 'main'}"
-        line = cua.LINE.format(raw=raw, link=link)
+        line = derive.LINE.format(raw=raw)
         _print_json({"line": line}) if args.json else _say(line)
         return 0
-    if act == "received":
-        kb = _kb(args)
-        page = inbox_file(kb)
-        if not page:
-            raise KBError("This computer does not have the page checks are sent to.")
-        into = Path(args.into) if args.into else kb.root.parent / "pilot" / "checks"
-        rows = cua.received(page, into)
-        if args.json:
-            _print_json(rows)
-        elif not rows:
-            _say("No checks have been sent yet.")
-        for r in rows:
-            _say(f"{r['id']}  {r['sent'][:16]}  {r['title'] or ''}  {r['who'] or ''}: {cua.summary_words(r['summary'])}")
-        return 0
-    raise KBError(f"astaui cua {act}: no such action")
+    raise KBError(f"astaui derive {act}: no such action")
+
+
+def _next(res) -> None:
+    have = res.get("have") or []
+    if len(have) == 2 and res.get("shown") != "both":
+        _say("It has both a workflow from the code and one from use: `astaui derive brief merge latest` says how to merge them.")
+    else:
+        _say("Next: `astaui derive show latest` opens it, or `astaui derive outline latest` prints it.")
 
 
 def cmd_check(args) -> int:
@@ -1195,21 +1210,24 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--set", nargs="+", metavar="RULE", help="save these rules as kb.json's set_aside (builds named by hand are kept)")
     sp.add_argument("--clear", action="store_true", help="set nothing aside")
 
-    sp = cmd("cua", "workflow checks: a computer-use agent works out an app's workflow from using it alone, "
-             "and the person who built it grades the tree (setup, run, review, send, list, summary, line, received)", cmd_cua)
-    sp.add_argument("action", choices=["setup", "status", "run", "review", "send", "list", "summary", "line", "received"])
-    sp.add_argument("run", nargs="?", help="for review, send and summary: a run folder, its name, `latest`, or an app's name")
+    sp = cmd("derive", "work out an app's workflow from its code, from a computer-use agent using it, or both, and show it "
+             "on a page where the person checks and corrects it (setup, brief, put, run, show, outline, export, list, line)", cmd_derive)
+    sp.add_argument("action", choices=["setup", "status", "brief", "put", "run", "show", "outline", "export", "list", "line"])
+    sp.add_argument("run", nargs="?", help="show, outline, export: a workflow folder, its name or `latest`; put: the JSON file (- for stdin); "
+                                          "brief: code or merge")
+    sp.add_argument("target", nargs="?", help="brief merge: the workflow to merge (default latest)")
+    sp.add_argument("--from", dest="source", choices=["code", "ui", "both"], help="put: where the workflow came from")
+    sp.add_argument("--into", help="put, run: add to this workflow (`latest`, its name or folder) instead of starting a new one")
     sp.add_argument("--url", help="run: the address the app answers at")
     sp.add_argument("--files", help="run: a folder of test files the agent may give the app")
-    sp.add_argument("--about", help="run: one line on what the app is for (leave it out to test the interface alone)")
-    sp.add_argument("--name", help="run: a short name for the app (default: this folder's)")
+    sp.add_argument("--about", help="run: one line on what the app is for (leave it out so the agent learns from the interface alone)")
+    sp.add_argument("--name", help="put, run: a short name for the app (default: this folder's)")
     sp.add_argument("--actions", type=int, default=60, help="run: about how many browser actions (default 60)")
     sp.add_argument("--model", help="run: the model (default claude-opus-5-5, the collection's)")
     sp.add_argument("--quiet", action="store_true", help="run: do not print each browser call")
-    sp.add_argument("--port", type=int, default=0, help="review: the port (default: any free one)")
-    sp.add_argument("--no-open", action="store_true", help="review: do not open a browser")
-    sp.add_argument("--to", help="send, line: the drive link (default: the one the line gave)")
-    sp.add_argument("--into", help="received: where checks are unpacked (default: pilot/checks beside the kb)")
+    sp.add_argument("--port", type=int, default=0, help="show: the port (default: any free one)")
+    sp.add_argument("--no-open", action="store_true", help="show: do not open a browser")
+    sp.add_argument("--to", help="export: a folder, or a .json path (the outline goes beside it)")
 
     sp = cmd("init", "make an empty knowledge base", cmd_init, json_flag=False)
     sp.add_argument("path")

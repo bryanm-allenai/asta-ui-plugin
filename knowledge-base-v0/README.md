@@ -29,14 +29,14 @@ A build is your prompts to Claude Code, the interface's code and a screenshot, w
 
 A copy of everything filed stays on your computer, in `~/.astaui/kb`.
 
-## Checking how the agent reads your app
+## Seeing the workflow of your own app
 
-The open-source builds were each described by a computer-use agent: Claude, with a headless browser and nothing else, used the interface and wrote down its goal, its phases and tasks, and its features. Only the person who built an interface can say how accurate that is, so `workflow-check` runs the same agent on yours. If someone on the project sent you the line for it, paste it into your coding agent in your app's folder. The agent installs AstaUI, starts your app, lets the computer-use agent use it for 10 to 20 minutes (it never sees your code), then opens a page where you mark each phase, task and feature right, partly right or wrong, add what it missed, and send your grades to the project.
+`derive-workflow` works out the workflow of an app you built: its goal, the phases and tasks of the work, the actions a person takes and the features that carry them, in the same shape as every build here. Ask your coding agent for it in your app's folder. It reads your code, and, if the app can run, lets a computer-use agent (Claude with a headless browser and nothing else) use it for a few minutes without seeing the code, then merges the two. A page opens where each part says where it was found and shows its evidence, the screenshot or the lines of code, and you can correct the words, mark each part right or needing a fix, remove parts and add what is missing.
 
-It needs Node.js 18 or later, for the browser, and Claude Code signed in: the computer-use agent runs on your own Claude login, at about the cost of 10 to 20 minutes of Claude Code on Opus. Sending gives the project your grades, the agent's tree, the brief it was given and the screenshots the tree cites, not your code. Every run stays on your computer in `~/.astaui/checks`; `astaui cua --help` lists the commands.
+Reading the code needs nothing extra. Using the app needs Node.js 18 or later, for the browser, and Claude Code signed in: the computer-use agent runs on your own Claude login, usually 2 to 20 minutes and $1 to $5 a run. Nothing is sent anywhere. Every workflow stays on your computer in `~/.astaui/workflows`, as `workflow.json` and `workflow.md`; `astaui derive --help` lists the commands.
 
 ## The skills
 
-`workflow-to-ui` builds an interface for your work, starting from the builds that share its structure. `ui-to-workflow` files an interface you built. `ui-explorer` draws the knowledge base as a map and shows any build. `review-publish` is the check a build passes before it joins a shared knowledge base. `workflow-check` tests how well the computer-use agent behind the open-source builds works out an interface's workflow, on one you built (see below).
+`workflow-to-ui` builds an interface for your work, starting from the builds that share its structure. `ui-to-workflow` files an interface you built. `ui-explorer` draws the knowledge base as a map and shows any build. `review-publish` is the check a build passes before it joins a shared knowledge base. `derive-workflow` works out the workflow of an interface you built and shows it to you to check (see below).
 
 The tool behind them is `astaui` (`python3 ~/.astaui/plugin/knowledge-base-v0/astaui_cli.py` after the installer, or `pip install ./knowledge-base-v0`). `astaui sessions` finds your conversations with Claude Code, Codex, Gemini CLI and Cursor in a folder, which is where a build's prompts come from. `astaui search "<what you need>"` finds builds, `astaui show <id>` shows one, and `astaui --help` lists the rest.

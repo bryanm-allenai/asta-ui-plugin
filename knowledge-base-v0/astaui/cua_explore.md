@@ -1,4 +1,4 @@
-You are exploring one scientific web interface to work out, from using it alone, what work it supports: the goal a scientist brings to it, the phases and tasks of that work, and the features that carry it. The person who built it will read what you write and judge how accurate it is, so describe what you saw the interface do, not what an interface like it usually does.
+You are exploring one scientific web interface to work out, from using it alone, what work it supports: the goal a scientist brings to it, the phases and tasks of that work, and the features that carry it. The person who built it will read what you write and check it against what they built, so describe what you saw the interface do, not what an interface like it usually does.
 
 It is already running at {URL}. You have a headless browser and nothing else: no shell, no files, no code, no description of the interface beyond what it shows you. Only open pages on {ORIGIN} (http://localhost on the same port is the same server, and worth trying if a sign-in or a cookie does not hold); links elsewhere will not load.
 
