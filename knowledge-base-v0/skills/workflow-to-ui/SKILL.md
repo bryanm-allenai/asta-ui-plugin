@@ -82,7 +82,7 @@ Go through the scientist's workflow one step at a time and decide what the inter
 
 Then go through their distinctive needs and say how the interface will meet each one.
 
-Tell the scientist, briefly and in plain words: the closest builds and the field each came from (saying which are from their own field and which from another), the far match if it lends something, the feature plan, and any part of their workflow you assumed because nobody could answer in step 2. Say that each feature taken from a build will carry a credit they can open, naming its builder where the build is public (step 8), and that the interface will offer a few ideas from other workflows on the same data (step 9). Then go ahead unless they choose otherwise.
+Tell the scientist, briefly and in plain words: the closest builds and the field each came from (saying which are from their own field and which from another), the far match if it lends something, the feature plan, and any part of their workflow you assumed because nobody could answer in step 2. Say that each feature taken from a build will carry a credit they can open from a Show sources switch, naming its builder where the build is public (step 8), and that the interface will offer a few ideas from other workflows on the same data (step 9). Then go ahead unless they choose otherwise.
 
 ## 7. Build it new
 
@@ -92,7 +92,7 @@ Write the interface from nothing for this scientist: their item, their data, the
 - If a feature's behaviour is unclear from its screens and its steps (an edge case, a rule for when a value is missing, how an undo works), you may read how the build does it, with `astaui slice <build> <part>` or a search without `--no-code`, to understand it. Then write your own.
 - Never carry over a reference's sample data or labels from its field. Its builder appears only in the credits of step 8, never in the interface's own labels or data.
 
-Put one comment at the top of what you build, naming its references: `Features drawn from <build ids> in the AstaUI knowledge base; the code is new. Credits are in astaui-sources.json.` Build the credits (step 8) and the ideas (step 9) with the rest, then test it all and show it working, as you would any interface, with Show sources on and off.
+Put one comment at the top of what you build, naming its references: `Features drawn from <build ids> in the AstaUI knowledge base; the code is new. Credits are in astaui-sources.json.` Build the credits (step 8) and the ideas (step 9) with the rest, then test it all and show it working, as you would any interface, with Show sources off (as it opens) and on.
 
 ## 8. Credit the references in the interface
 
@@ -164,7 +164,7 @@ Escape or a click elsewhere closes the card. Features no reference had (`from: n
 
 Add a Sources list: the references from their own field first, then those from other fields, each with its field tag and its credit, and under each the features taken from it, each as its `summary` with its `why` beneath. That puts in one place everything the interface owes to others, what each part is for and why it was brought over.
 
-Give the interface one switch for all of it, Show sources, in its settings or menu, or as a small toggle in a corner when it has neither. It is on at first; remember the choice in `localStorage` under a key named for this app. With it off, no frame, logo, card or list is drawn and nothing else on the page moves.
+Give the interface one switch for all of it, Show sources, in its settings or menu, or as a small toggle in a corner when it has neither. It is off at first: the interface opens as the scientist's own tool, with no frame, logo, card or list drawn, and they turn the switch on when they want to see which features were borrowed and where each came from. Put the Asta logo beside the switch's label so they can find it without the frames to point at it. Remember the choice in `localStorage` under a key named for this app, so once they turn it on it stays on. Turning it on or off moves nothing else on the page.
 
 ## 9. Offer what other workflows do
 
@@ -184,7 +184,7 @@ If the second search finds no other workflow on their data, leave the panel out 
 
 Once the scientist has the interface:
 
-- Tell them in one sentence where the credits are, how many come from their own field and how many from others, how many ideas from other workflows it offers, and that Show sources hides both.
+- Tell them in one sentence where the credits are, how many come from their own field and how many from others, how many ideas from other workflows it offers, and that both appear when they turn on Show sources, which is off at first.
 - Offer a walkthrough in one sentence: you can add a step-by-step guide to the interface that goes through their work in order, ringing each control and saying what to do with it. Do not add it unasked. It is a layer on top of the interface, made once it works the way they want. When they ask, follow `walkthrough.md` in this skill's folder.
 - Record whether the references helped. It is part of the research this knowledge base exists for: `astaui feedback <search id> <build id> --used yes --helped yes` (or `no`), with `--note "…"` naming the features you took from it and anything the scientist said about it.
 - Do not file it. The scientist has not used it yet, and it will change as they do: what you send now may not be ready for anyone else, or be what they would want shared. Say in one sentence that when it is working the way they want, they can ask you to file it into AstaUI so the next scientist can start from it. Then leave it with them.

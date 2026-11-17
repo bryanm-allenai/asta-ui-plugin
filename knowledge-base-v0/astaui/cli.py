@@ -211,17 +211,23 @@ def cmd_intake(args) -> int:
     kb = _kb(args)
     _writable(kb)
     res = intake(kb, index=not args.no_index)
+    from . import derive
+    flows = derive.take_received(kb)
     if args.json:
         _print_json({"taken": [{k: w.get(k) for k in ("id", "as", "title", "replaced", "stripped")} for w in res["taken"]],
-                     "held": [{"id": w["id"], "title": w["title"], "why": w["held"]} for w in res["held"]]})
+                     "held": [{"id": w["id"], "title": w["title"], "why": w["held"]} for w in res["held"]],
+                     "workflows": flows})
         return 0
+    for g in flows:
+        _say(f"Took in the workflow {g['name']}" + (f" from {g['who']}" if g.get("who") else "")
+             + f": {g['right'] + g['wrong']} of {g['parts']} parts checked" + (f", for {g['build']}" if g.get("build") else ""))
     for w in res["taken"]:
         how = "Replaced" if w.get("replaced") else "Took in"
         also = f" (sent as {w['as']}, which another build has)" if w.get("as") and w["as"] != w["id"] else ""
         _say(f"{how} {w['id']}, {w['title']}{also}" + (f"; swapped {w['stripped']} key(s), email(s) or path(s) for placeholders" if w.get("stripped") else ""))
     for w in res["held"]:
         _say(f"Held {w['id']}, {w['title']}: " + "; ".join(w["held"]))
-    if not res["taken"] and not res["held"]:
+    if not res["taken"] and not res["held"] and not flows:
         _say("Nothing new has been sent.")
     elif res["taken"] and not args.no_index:
         _say("The index is up to date.")
@@ -293,10 +299,22 @@ def cmd_add(args) -> int:
         forked_from=args.forked_from, entry=args.entry, notes=args.notes or "", replace=args.replace,
         source={k: v for k, v in (("repo", args.repo), ("commit", args.commit), ("path", args.subdir)) if v} or None,
     )
+    # A workflow derived for this app (and checked by the person) goes with the
+    # build, so sending and publishing it carry their ratings.
+    from . import derive
+    found = derive.for_folder(Path.cwd())
+    if found is not None and not args.no_workflow:
+        res["workflow"] = derive.attach(kb, res["id"], found)
+        meta = derive._read(found / "run.json", {}) or {}
+        meta["build"] = res["id"]
+        derive._write(found / "run.json", meta)
     if args.json:
         _print_json(res)
         return 0
     _say(f"Filed {res['id']}: {res['prompts']} prompts, {len(res['files'])} files.")
+    if res.get("workflow"):
+        w = res["workflow"]
+        _say(f"Kept the workflow derived for this app ({w['workflow']}, {w['right'] + w['wrong']} of {w['parts']} parts checked) with it.")
     for s in res["skipped"][:12]:
         _say(f"  skipped {s}")
     findings = scan_build(kb.build(res["id"]))
@@ -1113,13 +1131,51 @@ def cmd_derive(args) -> int:
         res = derive.export(run_dir, Path(args.to))
         _print_json(res) if args.json else _say(f"Wrote {res['json']} and {res['md']}.")
         return 0
+    if act == "send":
+        run_dir = derive.resolve(args.run)
+        res = derive.send(run_dir, link=args.to, author=args.author)
+        if args.json:
+            _print_json(res)
+            return 0
+        checked = res["right"] + res["wrong"]
+        _say(f"Sent {res['workflow']} to {res['page']} on {res['drive']}: {checked} of {res['parts']} parts checked"
+             + (f", {res['wrong']} needing a fix" if res["wrong"] else "") + f", {res['screens']} screenshots"
+             + (f", for build {res['build']}" if res.get("build") else "") + ". Sending it again replaces this copy.")
+        return 0
+    if act == "received":
+        kb = _kb(args)
+        _writable(kb)
+        got = derive.take_received(kb)
+        rows = derive.received(kb)
+        if args.json:
+            _print_json({"taken": got, "sent": [{k: r[k] for k in ("name", "sent", "for")} for r in rows]})
+            return 0
+        for g in got:
+            _say(f"Took in {g['name']}" + (f" from {g['who']}" if g.get("who") else "") + f": {g['right'] + g['wrong']} of {g['parts']} checked"
+                 + (f", kept with build {g['build']}" if g.get("build") and g["build"] in kb.build_ids() else ""))
+        if not rows:
+            _say("No workflows have been sent yet.")
+        elif not got:
+            _say(f"{len(rows)} workflow(s) sent, all taken in already. `astaui derive show <name>` opens one; `astaui derive list` names them.")
+        return 0
+    if act == "attach":
+        kb = _kb(args)
+        _writable(kb)
+        if not args.build:
+            raise KBError("Say which build: astaui derive attach latest --build <build id>")
+        res = derive.attach(kb, check_id(args.build, "build id"), derive.resolve(args.run))
+        _print_json(res) if args.json else _say(f"Kept {res['workflow']} with {res['build']}, in {res['folder']}: "
+                                               f"{res['right'] + res['wrong']} of {res['parts']} parts checked.")
+        return 0
     if act == "line":
         kb = _kb(args)
         public = kb.config.get("plugin") or {}
         if not public.get("repo"):
             raise KBError("The line needs kb.json's plugin.repo.")
         raw = f"https://raw.githubusercontent.com/{public['repo']}/{public.get('branch') or 'main'}"
-        line = derive.LINE.format(raw=raw)
+        from .sources import inbox_link
+        link = args.to or inbox_link(kb)
+        line = derive.LINE.format(raw=raw, link=f" --link {link}" if link else "")
         _print_json({"line": line}) if args.json else _say(line)
         return 0
     raise KBError(f"astaui derive {act}: no such action")
@@ -1211,8 +1267,10 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--clear", action="store_true", help="set nothing aside")
 
     sp = cmd("derive", "work out an app's workflow from its code, from a computer-use agent using it, or both, and show it "
-             "on a page where the person checks and corrects it (setup, brief, put, run, show, outline, export, list, line)", cmd_derive)
-    sp.add_argument("action", choices=["setup", "status", "brief", "put", "run", "show", "outline", "export", "list", "line"])
+             "on a page where the person checks and corrects it, then send it, with their marks, to the knowledge base's owner "
+             "(setup, brief, put, run, show, outline, export, send, received, attach, list, line)", cmd_derive)
+    sp.add_argument("action", choices=["setup", "status", "brief", "put", "run", "show", "outline", "export", "send", "received",
+                                       "attach", "list", "line"])
     sp.add_argument("run", nargs="?", help="show, outline, export: a workflow folder, its name or `latest`; put: the JSON file (- for stdin); "
                                           "brief: code or merge")
     sp.add_argument("target", nargs="?", help="brief merge: the workflow to merge (default latest)")
@@ -1227,7 +1285,9 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--quiet", action="store_true", help="run: do not print each browser call")
     sp.add_argument("--port", type=int, default=0, help="show: the port (default: any free one)")
     sp.add_argument("--no-open", action="store_true", help="show: do not open a browser")
-    sp.add_argument("--to", help="export: a folder, or a .json path (the outline goes beside it)")
+    sp.add_argument("--to", help="export: a folder, or a .json path (the outline goes beside it); send, line: another Add only link")
+    sp.add_argument("--author", help="send: the name the owner sees (default: the name git has for you)")
+    sp.add_argument("--build", help="attach: the build in the knowledge base this workflow describes")
 
     sp = cmd("init", "make an empty knowledge base", cmd_init, json_flag=False)
     sp.add_argument("path")
@@ -1258,6 +1318,7 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--source", action="append", choices=SOURCES)
     sp.add_argument("--kind", default="contributed", choices=KINDS)
     sp.add_argument("--consent", default="team", choices=CONSENT)
+    sp.add_argument("--no-workflow", action="store_true", help="leave out the workflow `astaui derive` worked out for this folder's app")
     sp.add_argument("--origin")
     sp.add_argument("--forked-from")
     sp.add_argument("--notes")

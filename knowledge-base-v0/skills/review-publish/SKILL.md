@@ -19,7 +19,7 @@ In the clone, `git diff --name-only origin/main...HEAD -- knowledge-base-v0/kb` 
 
 - `astaui check`: every build, card, query and judged pair is well formed, every card matches its build's code, and nothing that must go (keys, emails) is left. It must pass.
 - `astaui lint <id>`: read every line it lists, not only the ones marked MUST GO.
-- Read the prompts in `kb/builds/<id>/prompts.jsonl` and skim the code's embedded data. Look for what a program cannot: names of real people, patient or participant details, unpublished results, a lab's private paths or hostnames, data that is not synthetic.
+- Read the prompts in `kb/builds/<id>/prompts.jsonl`, the notes in its checked workflow if it has one (`kb/builds/<id>/derived/workflow.md`: the person's marks and words, which publish with the build), and skim the code's embedded data. Look for what a program cannot: names of real people, patient or participant details, unpublished results, a lab's private paths or hostnames, data that is not synthetic.
 - Read `build.json`: `author.name` is a pseudonym unless the person asked to be named; `provenance.consent` allows where this is going (`team` for the project's repository, `public` for anything published); `provenance.kind` is right.
 - Read the card (`astaui card show <id>`): it describes structure, not content, and its summary would make sense to someone in another field.
 

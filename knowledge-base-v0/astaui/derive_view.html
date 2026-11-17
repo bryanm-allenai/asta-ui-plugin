@@ -16,7 +16,8 @@ body { min-height: 100vh; }
 .top .saved { color: var(--text-faint); white-space: nowrap; margin-left: auto; font-size: var(--text-body-xs); }
 .top .saved.bad { color: var(--danger); white-space: normal; }
 .top .saved button { appearance: none; border: 0; background: none; color: var(--color-link); font: inherit; padding: 0 0 0 6px; cursor: pointer; text-decoration: underline; }
-.top .get { display: flex; gap: 6px; }
+.top .get { display: flex; gap: 6px; align-items: center; }
+.top .get [hidden] { display: none; }
 main { max-width: 60rem; margin: 0 auto; padding: var(--spacing-3xl) var(--spacing-2xl) 6rem; }
 .lede { color: var(--text-muted); max-width: 44rem; margin: 0 0 var(--spacing-2xs); font-size: var(--text-body-md); line-height: var(--leading-body-md); }
 .facts { color: var(--text-faint); margin: 0 0 var(--spacing-md); font-size: var(--text-body-xs); }
@@ -61,6 +62,33 @@ details.acts .x { font-size: var(--text-body-xs); }
   background: var(--surface-field); color: var(--color-text); border-radius: var(--radius-3xs); }
 .note[hidden] { display: none; }
 
+/* Moving a phase or task among its neighbours, and folding a phase away. */
+.order { display: inline-flex; gap: 2px; }
+.order .x { padding: 2px 7px; }
+.order .x:disabled { visibility: hidden; }
+.fold { appearance: none; border: 0; background: none; color: var(--text-muted); cursor: pointer; font: inherit;
+  width: 22px; height: 22px; margin: 0 2px 0 -4px; border-radius: var(--radius-3xs); display: inline-grid; place-items: center; vertical-align: -1px; }
+.fold:hover { background: var(--surface-strong); color: var(--color-text); }
+.fold::before { content: ""; width: 7px; height: 7px; border: solid currentColor; border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-2px) rotate(45deg); transition: transform .15s ease; }
+.fold[aria-expanded="false"]::before { transform: translateX(-1px) rotate(-45deg); }
+.phase.closed > .kids { display: none; }
+.phase.closed > .node .spec, .phase.closed > .node .ev, .phase.closed > .node .acts, .phase.closed > .node .differs { display: none; }
+.folded { color: var(--text-faint); font-size: var(--text-body-xs); margin-left: 6px; }
+.phase:not(.closed) .folded { display: none; }
+.show .gap { flex: 1; }
+
+/* Sending the checked workflow. */
+dialog.send { width: min(94vw, 34rem); }
+dialog.send h2 { font-size: var(--text-heading-sm); line-height: var(--leading-heading-sm); margin: 0 0 var(--spacing-2xs); }
+dialog.send p { margin: 0 0 var(--spacing-xs); color: var(--text-muted); }
+dialog.send label { display: block; font-size: var(--text-body-xs); color: var(--text-muted); margin: var(--spacing-xs) 0 4px; }
+dialog.send input { width: 100%; height: 36px; padding: 0 var(--spacing-2xs); background: var(--surface-field); color: var(--color-text);
+  border-radius: var(--radius-3xs); font: inherit; }
+dialog.send .said { min-height: 1.4em; margin: var(--spacing-xs) 0 0; }
+dialog.send .said.bad { color: var(--danger); }
+dialog.send .cap { justify-content: flex-end; margin-top: var(--spacing-md); }
+
 /* A phase is a pane; what is inside it is indented under its head. */
 .phase { background: var(--surface); border: 1px solid var(--stroke); border-radius: var(--radius-xs); padding: var(--spacing-2xs) var(--spacing-md) var(--spacing-xs); margin-bottom: var(--spacing-xs); }
 .phase > .node { border-top: 0; }
@@ -103,6 +131,7 @@ dialog.brief pre { white-space: pre-wrap; }
   .phase { padding: var(--spacing-2xs) var(--spacing-xs); }
   .about { grid-template-columns: 1fr; }
   .about dt { padding-top: 0; }
+  .top .get { flex-wrap: wrap; }
 }
 </style>
 </head>
@@ -112,6 +141,7 @@ dialog.brief pre { white-space: pre-wrap; }
   <span class="count" id="count"></span>
   <span class="saved" id="saved"></span>
   <span class="get">
+    <button type="button" id="send" class="asta-button asta-button-primary asta-button-size-sm" hidden>Send to the AstaUI team</button>
     <a class="asta-button asta-button-default-outlined asta-button-size-sm" href="workflow.json" download>JSON</a>
     <a class="asta-button asta-button-default-outlined asta-button-size-sm" href="workflow.md" download>Outline</a>
   </span>
@@ -120,6 +150,15 @@ dialog.brief pre { white-space: pre-wrap; }
   <p class="lede">Loading the workflow…</p>
 </main>
 <dialog id="shot"><img alt=""><div class="cap"><span></span><button class="asta-button asta-button-default-outlined asta-button-size-sm">Close</button></div></dialog>
+<dialog id="sendbox" class="send" aria-labelledby="send-h">
+  <h2 id="send-h">Send this workflow to the AstaUI team</h2>
+  <p id="send-what"></p>
+  <label for="send-name">Your name, as the team will see it</label>
+  <input id="send-name" autocomplete="name" placeholder="Leave empty to send without a name">
+  <p class="said" id="send-said" role="status"></p>
+  <div class="cap"><button type="button" class="asta-button asta-button-default-outlined asta-button-size-sm" id="send-no">Cancel</button>
+    <button type="button" class="asta-button asta-button-primary asta-button-size-sm" id="send-go">Send</button></div>
+</dialog>
 <dialog id="code"><pre></pre><div class="cap"><span></span><button class="asta-button asta-button-default-outlined asta-button-size-sm">Close</button></div></dialog>
 <script>
 (() => {
@@ -137,6 +176,10 @@ dialog.brief pre { white-space: pre-wrap; }
   };
 
   let data, wf, saveTimer, filter = 'all', removed = null;
+  // Which phases are folded away: how the page is looked at, so it stays in this browser.
+  let closed = new Set();
+  const foldKey = () => `derive-folded:${data?.folder || ''}`;
+  const keepFolds = () => { try { localStorage.setItem(foldKey(), JSON.stringify([...closed])); } catch (e) { /* private window */ } };
   const SAID = { ui: 'Seen in use', code: 'In the code', person: 'Added by you' };
   const newId = () => 'p' + Math.random().toString(36).slice(2, 9);
 
@@ -215,9 +258,33 @@ dialog.brief pre { white-space: pre-wrap; }
       });
       seg.append(b);
     }
-    const row = h('div', { class: 'row' }, seg,
+    const row = h('div', { class: 'row' }, seg, list && n.kind !== 'goal' ? order(n, list) : null,
       list ? h('button', { type: 'button', class: 'x', title: 'Remove this part', onclick: () => removePart(n, list) }, 'Remove') : null);
     return h('div', { class: 'check' }, row, note);
+  }
+
+  // Up and down among the parts beside it (phases among phases, tasks among
+  // tasks); the actions under a part stay where they are.
+  function order(n, list) {
+    const peers = () => list.filter((c) => c.kind !== 'action');
+    const what = n.kind === 'phase' ? 'phase' : n.kind === 'task' ? 'task' : 'feature';
+    const move = (by) => {
+      const p = peers();
+      const other = p[p.indexOf(n) + by];
+      if (!other) return;
+      const a = list.indexOf(n), b = list.indexOf(other);
+      [list[a], list[b]] = [list[b], list[a]];
+      render();
+      save();
+      const el = document.querySelector(`[data-id="${n.id}"] .order button[data-by="${by}"]`);
+      if (el && !el.disabled) el.focus();
+    };
+    const at = peers().indexOf(n);
+    return h('span', { class: 'order' },
+      h('button', { type: 'button', class: 'x', 'data-by': '-1', title: `Move this ${what} up`, 'aria-label': `Move this ${what} up`,
+        disabled: at <= 0, onclick: () => move(-1) }, '↑'),
+      h('button', { type: 'button', class: 'x', 'data-by': '1', title: `Move this ${what} down`, 'aria-label': `Move this ${what} down`,
+        disabled: at >= peers().length - 1, onclick: () => move(1) }, '↓'));
   }
 
   function removePart(n, list) {
@@ -229,11 +296,12 @@ dialog.brief pre { white-space: pre-wrap; }
     save(true, `Removed “${n.name || n.general || 'a part'}”.`);
   }
 
-  function addPart(list, kind) {
+  function addPart(list, kind, after) {
     const n = kind === 'feature'
       ? { id: newId(), name: '', general: '', from: ['person'] }
       : { id: newId(), kind, general: '', specific: '', from: ['person'], children: [] };
-    list.push(n);
+    const at = after ? list.indexOf(after) : -1;
+    if (at >= 0) list.splice(at + 1, 0, n); else list.push(n);
     render();
     const el = document.querySelector(`[data-id="${n.id}"] [contenteditable]`);
     if (el) el.focus();
@@ -252,8 +320,13 @@ dialog.brief pre { white-space: pre-wrap; }
 
   function nodeRow(n, label, list) {
     const acts = (n.children || []).filter((c) => c.kind === 'action');
+    const inside = n.kind === 'phase' ? (n.children || []).filter((c) => c.kind !== 'action').length : 0;
+    const fold = n.kind === 'phase' ? h('button', { type: 'button', class: 'fold', 'aria-expanded': String(!closed.has(n.id)),
+      'aria-label': `${closed.has(n.id) ? 'Open' : 'Fold'} ${label}`, title: closed.has(n.id) ? 'Open this phase' : 'Fold this phase',
+      onclick: () => { closed.has(n.id) ? closed.delete(n.id) : closed.add(n.id); keepFolds(); render(); } }) : null;
     const text = h('div', {},
-      h('div', {}, h('span', { class: 'kind' }, label), tags(n)),
+      h('div', {}, fold, h('span', { class: 'kind' }, label), tags(n),
+        n.kind === 'phase' ? h('span', { class: 'folded' }, `${inside} task${inside === 1 ? '' : 's'} inside`) : null),
       editable(n, 'general', 'gen', n.kind === 'goal' ? 'The goal, in words any field could use' : 'What is done, in words any field could use'),
       editable(n, 'specific', 'spec', 'The same in this tool’s words'),
       n.differs ? h('div', { class: 'differs' }, n.differs) : null,
@@ -270,10 +343,13 @@ dialog.brief pre { white-space: pre-wrap; }
     const word = n.kind === 'phase' ? 'Phase' : 'Task';
     const inner = kids.map((c, i) => branch(c, `${path}.${i + 1}`, n.children));
     if (n.kind === 'phase') {
-      return h('div', { class: 'phase' }, nodeRow(n, `${word} ${path}`, list),
+      return h('div', { class: 'phase' + (closed.has(n.id) ? ' closed' : '') }, nodeRow(n, `${word} ${path}`, list),
         h('div', { class: 'kids' }, inner,
-          h('div', { class: 'adds' }, h('button', { type: 'button', class: 'asta-button asta-button-default-outlined asta-button-size-sm',
-            onclick: () => addPart(n.children, 'task') }, 'Add a task'))));
+          h('div', { class: 'adds' },
+            h('button', { type: 'button', class: 'asta-button asta-button-default-outlined asta-button-size-sm',
+              onclick: () => addPart(n.children, 'task') }, 'Add a task'),
+            h('button', { type: 'button', class: 'asta-button asta-button-default-outlined asta-button-size-sm',
+              onclick: () => addPart(list, 'phase', n) }, `Add a phase after ${path}`))));
     }
     if (!kids.length) return nodeRow(n, `${word} ${path}`, list);
     return h('div', {}, nodeRow(n, `${word} ${path}`, list), h('div', { class: 'kids' }, inner));
@@ -315,6 +391,7 @@ dialog.brief pre { white-space: pre-wrap; }
     if (src.ui && ui.model) facts.push(ui.model);
     if (src.ui && ui.screens != null) facts.push(`${ui.screens} screenshots`);
     if (src.ui && ui.cost_usd) facts.push(`$${ui.cost_usd.toFixed(2)}`);
+    if (run.received) facts.unshift(`Sent by ${run.checked_by || 'someone who left no name'} ${new Date(run.received.sent).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` + (run.build ? ` for build ${run.build}` : ''));
     return [h('p', { class: 'lede' }, `${how} Click any words to correct them, mark each part, remove what is not there and add what is missing. Changes save as you go.`),
       facts.length ? h('p', { class: 'facts' }, facts.join(' · ')) : null];
   }
@@ -329,7 +406,12 @@ dialog.brief pre { white-space: pre-wrap; }
       b.addEventListener('click', () => { filter = v; render(); });
       seg.append(b);
     }
-    return h('div', { class: 'show' }, h('span', {}, 'Show'), seg);
+    const ids = (wf.tree?.children || []).filter((c) => c.kind === 'phase').map((c) => c.id);
+    const allClosed = ids.length && ids.every((id) => closed.has(id));
+    const folds = ids.length ? h('button', { type: 'button', class: 'asta-button asta-button-default-outlined asta-button-size-sm',
+      onclick: () => { closed = allClosed ? new Set() : new Set(ids); keepFolds(); render(); } },
+      allClosed ? 'Open every phase' : 'Fold every phase') : null;
+    return h('div', { class: 'show' }, h('span', {}, 'Show'), seg, h('span', { class: 'gap' }), folds);
   }
 
   function render() {
@@ -403,12 +485,13 @@ dialog.brief pre { white-space: pre-wrap; }
     return copy;
   }
 
-  let saving = Promise.resolve();
+  let saving = Promise.resolve(), waiting = null;
   function save(now = false, said = '') {
     clearTimeout(saveTimer);
     $('#saved').textContent = 'Not saved yet';
     $('#saved').classList.remove('bad');
-    saveTimer = setTimeout(() => {
+    waiting = () => {
+      waiting = null;
       saving = saving.then(() => fetch('workflow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(clean(wf)) })
         .then((r) => r.json())
         .then((r) => {
@@ -426,12 +509,62 @@ dialog.brief pre { white-space: pre-wrap; }
           }
         })
         .catch((e) => { $('#saved').textContent = `Not saved: ${e.message}. Is astaui derive show still running?`; $('#saved').classList.add('bad'); }));
-    }, now ? 0 : 400);
+      return saving;
+    };
+    saveTimer = setTimeout(() => waiting && waiting(), now ? 0 : 400);
   }
+  // Whatever is still waiting to save, saved now.
+  const flush = () => { clearTimeout(saveTimer); return waiting ? waiting() : saving; };
+
+  // -- sending it --------------------------------------------------------------------------------
+  const when = (iso) => new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  function sendState() {
+    const s = data.send || {};
+    const b = $('#send');
+    b.hidden = !s.ready;
+    b.textContent = s.sent ? 'Send again' : 'Send to the AstaUI team';
+    b.title = s.sent ? `Sent ${when(s.sent.at)}. Sending again replaces that copy with this one.` : 'Send the workflow, with your marks and notes';
+  }
+  function openSend() {
+    const all = parts();
+    const right = all.filter((n) => n.check === 'right').length;
+    const wrong = all.filter((n) => n.check === 'wrong').length;
+    const shots = data.send?.screens || 0;
+    $('#send-what').textContent = `The team gets the workflow as it is on this page: every part, your ${right + wrong ? `${right + wrong} mark${right + wrong === 1 ? '' : 's'} (${right} right, ${wrong} needing a fix)` : 'marks (you have not marked any parts yet)'} and notes, the words you corrected and the parts you added or removed`
+      + (shots ? `, and up to ${shots} screenshot${shots === 1 ? '' : 's'} the agent took of the app.` : '.')
+      + ' None of the app’s code is sent.' + (data.send?.sent ? ` You sent it ${when(data.send.sent.at)}; this copy replaces that one.` : '');
+    $('#send-name').value = data.send?.name || '';
+    $('#send-said').textContent = '';
+    $('#send-said').classList.remove('bad');
+    $('#send-go').disabled = false;
+    $('#sendbox').showModal();
+  }
+  $('#send').addEventListener('click', openSend);
+  $('#send-no').addEventListener('click', () => $('#sendbox').close());
+  $('#send-go').addEventListener('click', async () => {
+    const go = $('#send-go');
+    go.disabled = true;
+    $('#send-said').textContent = 'Sending…';
+    await flush();
+    const r = await fetch('send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: $('#send-name').value }) }).then((x) => x.json()).catch((e) => ({ ok: false, error: e.message }));
+    if (!r.ok) {
+      $('#send-said').textContent = `Not sent: ${r.error || 'no answer'}`;
+      $('#send-said').classList.add('bad');
+      go.disabled = false;
+      return;
+    }
+    data.send = { ...(data.send || {}), sent: r.sent, name: $('#send-name').value };
+    sendState();
+    $('#sendbox').close();
+    $('#saved').textContent = `Sent to the AstaUI team ${when(r.sent.at)}.`;
+  });
 
   fetch('data').then((r) => r.json()).then((d) => {
     data = d;
     wf = d.workflow || {};
+    try { closed = new Set(JSON.parse(localStorage.getItem(foldKey()) || '[]')); } catch (e) { closed = new Set(); }
+    sendState();
     render();
     $('#saved').textContent = wf.saved ? `Saved ${new Date(wf.saved).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '';
   }).catch((e) => {

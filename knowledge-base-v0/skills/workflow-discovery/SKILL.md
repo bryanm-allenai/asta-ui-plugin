@@ -162,7 +162,7 @@ Put one comment at the top of what you build: `Workflow shifts and features draw
 
 **Show the workflow change in the interface.** The scientist should be able to see, from inside the interface, how it asks them to work and what is new. Give it a Workflow view, opened from the header or menu: their workflow as a row of phases in order, each with its tasks, laid out the way the interface is (a phase that is a tab here is that tab there, and clicking it goes to it). Mark each stage, task or record field that a chosen shift added or changed with a small "New" tag, and with the Asta credit of step 10, coloured by field. Selecting a marked part shows the shift: the change, its payoff, its cost, and where it came from. A toggle in the view, "As you described it", shows their original workflow beside it, so the difference reads at a glance. The shifts they did not choose (`offered`) sit at the foot of the view under "Other ways to work", each with its payoff, its source and Copy request: a request they could give their agent to take that shift up. Dismiss puts one away, remembered in `localStorage`.
 
-Build the credits and the ideas (steps 10 and 11) with the rest, then test it all and show it working, with Show sources on and off.
+Build the credits and the ideas (steps 10 and 11) with the rest, then test it all and show it working, with Show sources off (as it opens) and on.
 
 ## 10. Credit the references in the interface
 
@@ -210,7 +210,7 @@ At rest the frame is faint and the logo full strength; the frame strengthens whi
 
 Add a Sources list: the references from their own field first, then those from other fields, each with its field tag, and under each the shifts and the features taken from it.
 
-Give the interface one switch for all of the annotation, Show sources, in its settings or menu, or as a small toggle in a corner when it has neither. It is on at first; remember the choice in `localStorage` under a key named for this app. With it off, no frame, logo, card or Sources list is drawn and nothing else on the page moves. The Workflow view stays, since it is how they find their way around the work; only its credits go.
+Give the interface one switch for all of the annotation, Show sources, in its settings or menu, or as a small toggle in a corner when it has neither. It is off at first: the interface opens as the scientist's own tool, with no frame, logo, card or Sources list drawn, and they turn the switch on when they want to see which features and shifts were borrowed and where each came from. Put the Asta logo beside the switch's label so they can find it without the frames to point at it. Remember the choice in `localStorage` under a key named for this app, so once they turn it on it stays on. Turning it on or off moves nothing else on the page. The Workflow view stays, since it is how they find their way around the work; only its credits go.
 
 ## 11. Offer the other shifts as ideas
 
@@ -221,7 +221,7 @@ The shifts they did not choose already sit under "Other ways to work" in the Wor
 Once the scientist has the interface:
 
 - Tell them in two or three sentences how the interface asks them to work differently from how they described, what each chosen shift should let them find or check, and where it came from. If you chose for them, say so and say how to change it.
-- Tell them in one sentence where the Workflow view and the credits are, how many come from their own field and how many from others, and that Show sources hides the credits.
+- Tell them in one sentence where the Workflow view and the credits are, how many come from their own field and how many from others, and that the credits appear when they turn on Show sources, which is off at first.
 - Record whether the references helped: `astaui feedback <search id> <build id> --used yes --helped yes` (or `no`) for each build a shift or feature came from, with `--note "…"` naming the shift or features you took and anything the scientist said about them.
 - Offer a walkthrough in one sentence, and add it only when they ask: when they do, follow `walkthrough.md` in the workflow-to-ui skill's folder, starting with the stages that are new to them.
 - Do not file it. Say in one sentence that when it is working the way they want, they can ask you to file it into AstaUI so the next scientist can start from it, and then the workflow they chose becomes one the next scientist can find. File it only when they ask, following the `ui-to-workflow` skill.

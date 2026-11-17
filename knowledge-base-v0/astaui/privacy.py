@@ -72,13 +72,20 @@ def scan_build(build: Build) -> List[Finding]:
     for i, t in enumerate(build.prompts, 1):
         for f in scan_text(t.get("text", ""), f"prompts.jsonl turn {i}"):
             found.append(f)
-    for p in build.code_files():
+    for p in build.code_files() + derived_files(build):
         try:
             text = p.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
         found.extend(scan_text(text, str(p.relative_to(build.path))))
     return found
+
+
+def derived_files(build: Build) -> List[Path]:
+    """The checked workflow a build carries (derived/), whose notes and
+    corrections are the person's own words."""
+    folder = build.path / "derived"
+    return sorted(p for p in folder.glob("*") if p.is_file() and p.suffix in (".json", ".md")) if folder.is_dir() else []
 
 
 def strip_text(text: str) -> Tuple[str, int]:
@@ -113,7 +120,7 @@ def strip_build(build: Build) -> int:
     with (build.path / "prompts.jsonl").open("w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    for p in build.code_files():
+    for p in build.code_files() + derived_files(build):
         try:
             text = p.read_text(encoding="utf-8")
         except UnicodeDecodeError:

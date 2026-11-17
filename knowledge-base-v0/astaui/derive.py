@@ -9,6 +9,9 @@
     astaui derive show latest              the page where the person reads, checks and corrects it
     astaui derive outline latest           the same workflow as a plain outline
     astaui derive export latest --to DIR   workflow.json and workflow.md, wherever they want them
+    astaui derive send latest              the checked workflow, marks and notes, to the knowledge base's owner
+    astaui derive received                 (the owner) take in the workflows sent, and keep each with its build
+    astaui derive attach latest --build ID keep a checked workflow with a build in the knowledge base
     astaui derive list | line
 
 A workflow is a goal, the phases and tasks of the work under it, the actions a
@@ -61,9 +64,9 @@ ACTIONS = 60
 BUDGET = 20.0
 PLAYWRIGHT = "playwright@^1.50"
 # The line someone pastes into their coding agent, in the folder of their app.
-LINE = ("Set up AstaUI by running `curl -fsSL {raw}/install.py | python3 -`, then follow its derive-workflow skill "
+LINE = ("Set up AstaUI by running `curl -fsSL {raw}/install.py | python3 -{link}`, then follow its derive-workflow skill "
         "(~/.agents/skills/derive-workflow/SKILL.md) to work out the workflow of the app in this folder, from its code "
-        "and from using it, and show it to me so I can check it.")
+        "and from using it, and show it to me so I can check it and send it to the AstaUI team.")
 SOURCES = ("code", "ui")
 KINDS = ("goal", "phase", "task", "action")
 CHECKS = ("right", "wrong")  # what the person can mark a part
@@ -698,6 +701,10 @@ def _handler(run_dir: Path):
                 meta = _read(run_dir / "run.json", {}) or {}
                 return self._json(200, {"run": meta, "workflow": _read(run_dir / "workflow.json", {}),
                                         "have": [s for s in SOURCES if (run_dir / f"{s}.json").is_file()],
+                                        "send": {"ready": can_send() and not meta.get("received"), "sent": meta.get("sent"),
+                                                 "received": meta.get("received"), "build": meta.get("build"),
+                                                 "name": meta.get("checked_by") or _who(),
+                                                 "screens": len(_screens_in(_read(run_dir / "workflow.json", {}) or {}))},
                                         "folder": run_dir.name, "files": {"json": str(run_dir / "workflow.json"),
                                                                           "md": str(run_dir / "workflow.md")}})
             if path == "/code":
@@ -745,6 +752,14 @@ def _handler(run_dir: Path):
                     _write(run_dir / "workflow.json", body)
                     (run_dir / "workflow.md").write_text(outline(body, _read(run_dir / "run.json", {})), encoding="utf-8")
                 return self._json(200, {"ok": True, "saved": body["saved"], **tally(body)})
+            if path == "/send":
+                name = body.get("name")
+                try:
+                    with lock:
+                        res = send(run_dir, author=str(name).strip()[:120] if isinstance(name, str) else None)
+                except KBError as e:
+                    return self._json(200, {"ok": False, "error": str(e)})
+                return self._json(200, {"ok": True, **res, "sent": (_read(run_dir / "run.json", {}) or {}).get("sent")})
             return self._json(404, {"error": "no such thing"})
 
     return Handler
@@ -782,3 +797,342 @@ def export(run_dir: Path, to: Path) -> Dict[str, str]:
     shutil.copyfile(run_dir / "workflow.json", dest_json)
     shutil.copyfile(run_dir / "workflow.md", dest_md)
     return {"json": str(dest_json), "md": str(dest_md)}
+
+
+# -- sending it to the AstaUI team, and keeping it with the build ---------------------------------
+#
+# A checked workflow (the tree with every Right / Needs a fix the person marked,
+# their notes and their corrections) goes to the knowledge base's owner the way
+# a filed build does: as one row added to the end of the list on their drive
+# page, through the Add only link the line carries. The row is a
+# <li data-workflow> (never data-build, so build intake passes it by) with the
+# workflow packed out of sight. The owner's intake unpacks it into their own
+# ~/.astaui/workflows, where `astaui derive show` opens the same page with the
+# person's marks, and copies it into the build it describes (builds/<id>/derived/),
+# so filing, sending and publishing a build carry its ratings with it.
+
+DERIVED = "derived"           # the folder in a build that holds its checked workflow
+SENT_SCREENS_MAX = 9 * 1024 * 1024   # screenshots ride along while the row stays under the drive's limit
+TAKEN = ".derived-intake.json"  # what the owner's intake took, kept beside the knowledge base
+
+
+def _who() -> str:
+    try:
+        name = subprocess.run(["git", "config", "user.name"], capture_output=True, text=True, timeout=10).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        name = ""
+    return name
+
+
+def _screens_in(tree: Dict[str, Any]) -> List[str]:
+    seen: List[str] = []
+    for n in _nodes(tree) + list(tree.get("features") or []):
+        for s in n.get("screens") or []:
+            if isinstance(s, str) and s.startswith("screens/") and SCREEN_RE.match(s[len("screens/"):]) and s not in seen:
+                seen.append(s)
+    return seen
+
+
+def about(run_dir: Path, author: Optional[str] = None) -> Dict[str, Any]:
+    """What travels with a checked workflow: where it came from, how far it was
+    checked and by whom. The app's folder goes by its name only, never its path."""
+    meta = _read(run_dir / "run.json", {}) or {}
+    wf = _read(run_dir / "workflow.json", {}) or {}
+    ui = meta.get("ui_run") or {}
+    return {"kind": "checked-workflow", "astaui": __version__, "name": run_dir.name,
+            "title": (wf.get("interface") or {}).get("title") or meta.get("title") or meta.get("name"),
+            "app": Path(meta.get("folder") or meta.get("app") or run_dir.name).name,
+            "build": meta.get("build"), "derived_from": wf.get("derived_from"),
+            "sources": {k: {x: v.get(x) for x in ("at", "phases", "tasks", "features") if x in v}
+                        for k, v in (meta.get("sources") or {}).items()},
+            "ui_run": {k: ui[k] for k in ("model", "seconds", "screens", "actions") if k in ui},
+            "checked_by": author if author is not None else (meta.get("checked_by") or ""),
+            "saved": wf.get("saved"), **tally(wf)}
+
+
+def pack_workflow(run_dir: Path, author: Optional[str] = None) -> bytes:
+    """A checked workflow as one gzipped tar: workflow.json, workflow.md,
+    about.json, and the screenshots its parts rest on while they fit."""
+    import io
+    import tarfile
+    if not (run_dir / "workflow.json").is_file():
+        raise KBError(f"{run_dir.name} has no workflow yet.")
+    wf = _read(run_dir / "workflow.json", {}) or {}
+    info = about(run_dir, author)
+    room = SENT_SCREENS_MAX
+    shots = []
+    for s in _screens_in(wf):
+        f = run_dir / s
+        if f.is_file() and f.stat().st_size <= room:
+            shots.append(s)
+            room -= f.stat().st_size
+    info["screens_sent"] = len(shots)
+    buf = io.BytesIO()
+
+    def add(name: str, data: bytes) -> None:
+        ti = tarfile.TarInfo(f"workflow/{name}")
+        ti.size, ti.mtime, ti.mode = len(data), int(time.time()), 0o644
+        t.addfile(ti, io.BytesIO(data))
+    with tarfile.open(fileobj=buf, mode="w:gz") as t:
+        add("workflow.json", (run_dir / "workflow.json").read_bytes())
+        add("workflow.md", (run_dir / "workflow.md").read_bytes() if (run_dir / "workflow.md").is_file()
+            else outline(wf).encode("utf-8"))
+        add("about.json", json.dumps(info, indent=1, ensure_ascii=False).encode("utf-8"))
+        for s in shots:
+            add(s, (run_dir / s).read_bytes())
+    return buf.getvalue()
+
+
+def unpack_workflow(packed: str) -> Dict[str, bytes]:
+    """The files a workflow row carries, by their name in a derivation folder,
+    and nothing else, however the row was made."""
+    import base64
+    import io
+    import tarfile
+    try:
+        t = tarfile.open(fileobj=io.BytesIO(base64.b64decode(packed, validate=True)), mode="r:gz")
+    except (ValueError, tarfile.TarError, OSError) as e:
+        raise KBError(f"the workflow did not arrive whole: {e}") from e
+    out: Dict[str, bytes] = {}
+    total = 0
+    with t:
+        for m in t.getmembers():
+            if not m.isfile() or not m.name.startswith("workflow/"):
+                continue
+            name = m.name[len("workflow/"):]
+            if not (name in ("workflow.json", "workflow.md", "about.json")
+                    or (name.startswith("screens/") and SCREEN_RE.match(name[len("screens/"):]))):
+                continue
+            total += m.size
+            if total > 64 * 1024 * 1024:
+                raise KBError("the workflow unpacks to more than 64 MB")
+            src = t.extractfile(m)
+            out[name] = src.read() if src else b""
+    if "workflow.json" not in out:
+        raise KBError("the workflow arrived without its workflow.json")
+    return out
+
+
+def _link(link: Optional[str]) -> Optional[str]:
+    """The Add only link: the one given, or the one this computer keeps (from
+    `astaui setup --link`, the owner's config, or the first build sent)."""
+    from .sources import inbox_link
+    return link or inbox_link(None)
+
+
+def can_send(link: Optional[str] = None) -> bool:
+    return bool(_link(link))
+
+
+def _row(run_dir: Path, info: Dict[str, Any], packed: bytes, sent: datetime) -> str:
+    """The row a sent workflow is on the owner's page. Nothing in it is markup
+    the sender wrote: the drive refuses a tag it did not expect."""
+    import base64
+    import html
+    e = lambda v: html.escape(str(v), quote=True)  # noqa: E731
+    checked = info["right"] + info["wrong"]
+    how = f"{checked} of {info['parts']} parts checked" + (f", {info['wrong']} need a fix" if info["wrong"] else "")
+    size = f"{max(1, round(len(packed) / 1024))} KB"
+    when = f"{sent:%b} {sent.day}, {sent:%H:%M}"
+    build = info.get("build")
+    return (f'<li data-marble-removable data-workflow="{e(run_dir.name)}" data-sent="{e(sent.isoformat(timespec="seconds"))}"'
+            + (f' data-for="{e(build)}"' if build else "") + ">"
+            f'<b>Workflow: {e(info.get("title") or info["app"])}</b><span class="when">{e(when)}</span>'
+            f'<span class="who">{e(info.get("checked_by") or "No name given")} · {e(how)}</span>'
+            f'<span class="id">{e(run_dir.name)}{" · build " + e(build) if build else ""} · {e(size)}</span>'
+            f'<pre class="bundle" hidden>{base64.b64encode(packed).decode("ascii")}</pre></li>')
+
+
+def send(run_dir: Path, link: Optional[str] = None, author: Optional[str] = None) -> Dict[str, Any]:
+    """Send a checked workflow, with every mark and note, to the knowledge base
+    owner's drive page through their Add only link. Sending again sends the
+    newer copy, which replaces the older one there."""
+    from .sources import INBOX_MAX, filed_as, post_row, set_user_config, user_config
+    link = _link(link)
+    if not link:
+        raise KBError("There is no link to send it to. The line you were given has one: run "
+                      "`astaui setup --link <that link>` once, or pass --to <that link>.")
+    meta = _read(run_dir / "run.json", {}) or {}
+    if not meta.get("build") and meta.get("folder"):
+        bid = filed_as(Path(meta["folder"]))
+        if bid:
+            meta["build"] = bid
+    who = author if author is not None else (meta.get("checked_by") or _who())
+    meta["checked_by"] = who
+    _write(run_dir / "run.json", meta)
+    packed = pack_workflow(run_dir, who)
+    if len(packed) > INBOX_MAX:
+        raise KBError(f"The workflow packs to {len(packed) // (1024 * 1024)} MB, more than the drive takes at once.")
+    info = json.loads(_unpack_about(packed))
+    now = datetime.now().astimezone()
+    where = post_row(link, _row(run_dir, info, packed, now), "workflow")
+    meta = _read(run_dir / "run.json", {}) or {}
+    meta["sent"] = {"at": now.isoformat(timespec="seconds"), "saved": info.get("saved"), **where}
+    _write(run_dir / "run.json", meta)
+    if user_config().get("inbox-link") != link and not user_config().get("inbox"):
+        set_user_config("inbox-link", link)  # later workflows and builds go where this one went
+    return {"workflow": run_dir.name, "bytes": len(packed), "screens": info.get("screens_sent", 0),
+            "right": info["right"], "wrong": info["wrong"], "parts": info["parts"], "build": info.get("build"), **where}
+
+
+def _unpack_about(packed: bytes) -> str:
+    import io
+    import tarfile
+    with tarfile.open(fileobj=io.BytesIO(packed), mode="r:gz") as t:
+        return t.extractfile("workflow/about.json").read().decode("utf-8")
+
+
+# -- the owner's side -----------------------------------------------------------------------------
+
+def _rows(path: Path) -> List[Dict[str, Any]]:
+    """The workflow rows on the owner's page: name, when, the build it is for, packed text."""
+    from html.parser import HTMLParser
+
+    class Rows(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.rows, self.row, self.packed = [], None, False
+
+        def handle_starttag(self, tag, attrs):
+            a = dict(attrs)
+            if tag == "li" and a.get("data-workflow") and not a.get("data-build"):
+                self.row = {"name": a["data-workflow"], "sent": a.get("data-sent") or "", "for": a.get("data-for") or "", "packed": []}
+                self.rows.append(self.row)
+            elif tag == "pre" and self.row is not None and "bundle" in (a.get("class") or "").split():
+                self.packed = True
+
+        def handle_endtag(self, tag):
+            if tag == "pre":
+                self.packed = False
+            elif tag == "li":
+                self.row = None
+
+        def handle_data(self, d):
+            if self.packed and self.row is not None:
+                self.row["packed"].append(d)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    p = Rows()
+    p.feed(text)
+    p.close()
+    return [{**r, "packed": "".join(r["packed"]).strip()} for r in p.rows]
+
+
+NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,80}-\d{8}-\d{6}$")
+
+
+def received(kb) -> List[Dict[str, Any]]:
+    """The workflows sent to the owner's page, the newest copy of each, newest first."""
+    from .sources import inbox_file
+    path = inbox_file(kb)
+    if path is None:
+        return []
+    latest: Dict[str, Dict[str, Any]] = {}
+    for r in _rows(path):
+        if NAME_RE.match(r["name"]):
+            latest[r["name"]] = r  # a later row is a newer copy
+    return sorted(latest.values(), key=lambda r: r["sent"], reverse=True)
+
+
+def take_received(kb) -> List[Dict[str, Any]]:
+    """Unpack every workflow sent to the owner's page that is new, or newer than
+    the copy taken before, into ~/.astaui/workflows/<its name>, where
+    `astaui derive show <name>` opens it with the sender's marks, and keep it
+    with the build it describes."""
+    import hashlib
+    state_path = kb.root / TAKEN
+    state = _read(state_path, {}) or {}
+    got: List[Dict[str, Any]] = []
+    for r in received(kb):
+        digest = hashlib.sha256(r["packed"].encode("ascii", "replace")).hexdigest()[:16]
+        if (state.get(r["name"]) or {}).get("digest") == digest:
+            continue
+        try:
+            files = unpack_workflow(r["packed"])
+            info = json.loads(files.get("about.json", b"{}").decode("utf-8") or "{}")
+            wf = json.loads(files["workflow.json"].decode("utf-8"))
+        except (KBError, ValueError) as e:
+            state[r["name"]] = {"digest": digest, "sent": r["sent"], "held": str(e)}
+            continue
+        bad = problems(wf)
+        if bad:
+            state[r["name"]] = {"digest": digest, "sent": r["sent"], "held": bad[0]}
+            continue
+        dest = WORKFLOWS / r["name"]
+        if dest.exists():
+            shutil.rmtree(dest)
+        for name, data in files.items():
+            f = dest / name
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_bytes(data)
+        build = r["for"] if r["for"] and re.match(r"^[a-z0-9][a-z0-9-]*$", r["for"]) else (info.get("build") or None)
+        _write(dest / "run.json", {"kind": "derived-workflow", "astaui": info.get("astaui"), "name": r["name"],
+                                   "title": info.get("title"), "app": info.get("app"), "build": build,
+                                   "sources": info.get("sources") or {}, "ui_run": info.get("ui_run") or {},
+                                   "checked_by": info.get("checked_by") or "",
+                                   "received": {"sent": r["sent"], "at": datetime.now().astimezone().isoformat(timespec="seconds")},
+                                   "started": r["sent"]})
+        state[r["name"]] = {"digest": digest, "sent": r["sent"], "build": build, "who": info.get("checked_by") or "",
+                            "at": datetime.now().astimezone().isoformat(timespec="seconds")}
+        got.append({"name": r["name"], "title": info.get("title"), "build": build, "who": info.get("checked_by") or "",
+                    **tally(wf)})
+    if state != (_read(state_path, {}) or {}):
+        _write(state_path, state)
+    attach_received(kb)
+    return got
+
+
+def attach(kb, build_id: str, run_dir: Path) -> Dict[str, Any]:
+    """Keep a checked workflow in a build's folder (builds/<id>/derived/): its
+    tree with every mark and note, its outline, and about.json. The screenshots
+    stay with the derivation; filing, sending and publishing the build carry
+    the rest."""
+    folder = kb.builds_dir / build_id
+    if not (folder / "build.json").is_file():
+        raise KBError(f"There is no build {build_id} in {kb.root}.")
+    wf = _read(run_dir / "workflow.json")
+    if not isinstance(wf, dict):
+        raise KBError(f"{run_dir.name} has no workflow yet.")
+    meta = _read(run_dir / "run.json", {}) or {}
+    info = about(run_dir)
+    info.update({"build": build_id, "sent": (meta.get("received") or {}).get("sent") or (meta.get("sent") or {}).get("at")})
+    out = folder / DERIVED
+    out.mkdir(exist_ok=True)
+    _write(out / "workflow.json", wf)
+    (out / "workflow.md").write_text(outline(wf, meta), encoding="utf-8")
+    _write(out / "about.json", info)
+    return {"build": build_id, "folder": str(out), "workflow": run_dir.name, **tally(wf)}
+
+
+def _stamp(info: Dict[str, Any]) -> str:
+    return str(info.get("sent") or info.get("saved") or "")
+
+
+def attach_received(kb) -> List[Dict[str, Any]]:
+    """Copy each received workflow into the build it names, unless the build
+    already holds a copy as new (a build re-sent replaces its folder, so this
+    puts the workflow back)."""
+    done = []
+    have = set(kb.build_ids())
+    for run_dir in runs():
+        meta = _read(run_dir / "run.json", {}) or {}
+        bid = meta.get("build")
+        if not meta.get("received") or bid not in have:
+            continue
+        there = _read(kb.builds_dir / bid / DERIVED / "about.json", {}) or {}
+        if there and _stamp(there) >= str(meta["received"].get("sent") or ""):
+            continue
+        done.append(attach(kb, bid, run_dir))
+    return done
+
+
+def for_folder(folder: Path) -> Optional[Path]:
+    """The newest derivation of the app in this folder that has a workflow."""
+    folder = folder.resolve()
+    for r in reversed(runs()):
+        meta = _read(r / "run.json", {}) or {}
+        if meta.get("folder") and Path(meta["folder"]).resolve() == folder and (r / "workflow.json").is_file():
+            return r
+    return None
