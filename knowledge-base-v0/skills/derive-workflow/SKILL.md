@@ -93,14 +93,12 @@ When you show the page, tell the person that once they have checked it they can 
 astaui derive send latest [--author "<the name they give>"]
 ```
 
-and say what it printed: how many parts they had checked, how many need a fix, and where it went. Send only when they have said so, by the button or in words. If it says there is no link, the line they pasted had one: run `astaui setup --link <that link>` and send again. If the app in this folder was filed into AstaUI before (`astaui filed`), the workflow says which build it describes, and the team keeps the two together.
+and say what it printed: how many parts they had checked, how many need a fix, and where it went. Send only when they have said so, by the button or in words. If it says there is no link, the line they pasted had one: run `astaui setup --link <that link>` and send again. It goes to the team's testbench, not into the knowledge base: sending a workflow files nothing.
 
 ## 6. Afterwards
 
 When they are done, `astaui derive outline latest` shows their corrections, and the parts they marked as needing a fix carry their notes. If they ask you to fix those, edit the workflow JSON (a copy of `workflow.json`) and keep it with `astaui derive put <file> --from both --into latest` (or `--from code` / `--from ui` for a single source), then reload the page.
 
 If they want the workflow in their project, `astaui derive export latest --to <folder or path.json>` writes `workflow.json` and `workflow.md` there, marks and notes included. Do not write into their project without being asked.
-
-If they later file the app with the ui-to-workflow skill, `astaui add` run from this folder keeps the newest checked workflow in the build (`derived/`), so sending and publishing the build carry their marks with it.
 
 Stop the page server and any app you started when they are finished. `astaui derive list` shows every workflow on this computer, and `astaui derive show <name>` opens any of them.

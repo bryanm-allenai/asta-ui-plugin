@@ -10,8 +10,7 @@
     astaui derive outline latest           the same workflow as a plain outline
     astaui derive export latest --to DIR   workflow.json and workflow.md, wherever they want them
     astaui derive send latest              the checked workflow, marks and notes, to the knowledge base's owner
-    astaui derive received                 (the owner) take in the workflows sent, and keep each with its build
-    astaui derive attach latest --build ID keep a checked workflow with a build in the knowledge base
+    astaui derive received                 (the owner) take the workflows sent into the testbench's folder
     astaui derive list | line
 
 A workflow is a goal, the phases and tasks of the work under it, the actions a
@@ -799,21 +798,20 @@ def export(run_dir: Path, to: Path) -> Dict[str, str]:
     return {"json": str(dest_json), "md": str(dest_md)}
 
 
-# -- sending it to the AstaUI team, and keeping it with the build ---------------------------------
+# -- sending it to the AstaUI team ---------------------------------------------------------------
 #
 # A checked workflow (the tree with every Right / Needs a fix the person marked,
-# their notes and their corrections) goes to the knowledge base's owner the way
-# a filed build does: as one row added to the end of the list on their drive
-# page, through the Add only link the line carries. The row is a
-# <li data-workflow> (never data-build, so build intake passes it by) with the
-# workflow packed out of sight. The owner's intake unpacks it into their own
-# ~/.astaui/workflows, where `astaui derive show` opens the same page with the
-# person's marks, and copies it into the build it describes (builds/<id>/derived/),
-# so filing, sending and publishing a build carry its ratings with it.
+# their notes and their corrections) goes to the AstaUI team the way a filed
+# build does: as one row added to the end of the list on the team's drive page,
+# through the Add only link the line carries. The row is a <li data-workflow>
+# (never data-build, so build intake passes it by) with the workflow packed out
+# of sight. It never joins the knowledge base: on the owner's computer it is
+# unpacked into the AstaUI Testbench's own folder (skill-lab/submitted/derive),
+# which the Derive workflow tab lists, and `astaui derive show <its folder>`
+# opens the same page with the sender's marks.
 
-DERIVED = "derived"           # the folder in a build that holds its checked workflow
 SENT_SCREENS_MAX = 9 * 1024 * 1024   # screenshots ride along while the row stays under the drive's limit
-TAKEN = ".derived-intake.json"  # what the owner's intake took, kept beside the knowledge base
+INDEX = "index.json"                  # the list of what was sent in, which the testbench reads
 
 
 def _who() -> str:
@@ -1036,103 +1034,68 @@ def received(kb) -> List[Dict[str, Any]]:
     return sorted(latest.values(), key=lambda r: r["sent"], reverse=True)
 
 
-def take_received(kb) -> List[Dict[str, Any]]:
+def submitted_dir(kb) -> Path:
+    """Where sent-in workflows are kept on the owner's computer: the testbench's
+    folder beside the knowledge base, never inside it."""
+    env = os.environ.get("ASTAUI_SUBMITTED")
+    return Path(env) if env else kb.root.resolve().parent / "skill-lab" / "submitted" / "derive"
+
+
+def _entry(name: str, info: Dict[str, Any], wf: Dict[str, Any], sent: str, digest: str, screens: int) -> Dict[str, Any]:
+    iface = wf.get("interface") or {}
+    return {"name": name, "title": iface.get("title") or info.get("title") or info.get("app") or name,
+            "for": iface.get("what_it_is_for") or "", "field": iface.get("field") or "",
+            "app": info.get("app") or "", "build": info.get("build") or None, "who": info.get("checked_by") or "",
+            "sent": sent, "derived_from": wf.get("derived_from"), "screens": screens, "digest": digest,
+            "received": datetime.now().astimezone().isoformat(timespec="seconds"), **shape(wf), **tally(wf)}
+
+
+def take_received(kb, into: Optional[Path] = None) -> List[Dict[str, Any]]:
     """Unpack every workflow sent to the owner's page that is new, or newer than
-    the copy taken before, into ~/.astaui/workflows/<its name>, where
-    `astaui derive show <name>` opens it with the sender's marks, and keep it
-    with the build it describes."""
+    the copy taken before, into the testbench's folder (one folder each, with
+    the index the Derive workflow tab reads). Returns the ones taken."""
     import hashlib
-    state_path = kb.root / TAKEN
-    state = _read(state_path, {}) or {}
+    into = into or submitted_dir(kb)
+    index = _read(into / INDEX, {}) or {}
+    have = {e["name"]: e for e in index.get("workflows") or [] if isinstance(e, dict) and e.get("name")}
+    held = dict(index.get("held") or {})
     got: List[Dict[str, Any]] = []
     for r in received(kb):
         digest = hashlib.sha256(r["packed"].encode("ascii", "replace")).hexdigest()[:16]
-        if (state.get(r["name"]) or {}).get("digest") == digest:
+        if (have.get(r["name"]) or {}).get("digest") == digest or (held.get(r["name"]) or {}).get("digest") == digest:
             continue
         try:
             files = unpack_workflow(r["packed"])
             info = json.loads(files.get("about.json", b"{}").decode("utf-8") or "{}")
             wf = json.loads(files["workflow.json"].decode("utf-8"))
+            bad = problems(wf)
         except (KBError, ValueError) as e:
-            state[r["name"]] = {"digest": digest, "sent": r["sent"], "held": str(e)}
-            continue
-        bad = problems(wf)
+            bad = [str(e)]
         if bad:
-            state[r["name"]] = {"digest": digest, "sent": r["sent"], "held": bad[0]}
+            held[r["name"]] = {"digest": digest, "sent": r["sent"], "why": bad[0]}
             continue
-        dest = WORKFLOWS / r["name"]
+        held.pop(r["name"], None)
+        dest = into / r["name"]
         if dest.exists():
             shutil.rmtree(dest)
         for name, data in files.items():
             f = dest / name
             f.parent.mkdir(parents=True, exist_ok=True)
             f.write_bytes(data)
-        build = r["for"] if r["for"] and re.match(r"^[a-z0-9][a-z0-9-]*$", r["for"]) else (info.get("build") or None)
+        build = r["for"] if re.match(r"^[a-z0-9][a-z0-9-]{0,80}$", r["for"] or "") else (info.get("build") or None)
+        info["build"] = build
         _write(dest / "run.json", {"kind": "derived-workflow", "astaui": info.get("astaui"), "name": r["name"],
                                    "title": info.get("title"), "app": info.get("app"), "build": build,
                                    "sources": info.get("sources") or {}, "ui_run": info.get("ui_run") or {},
                                    "checked_by": info.get("checked_by") or "",
                                    "received": {"sent": r["sent"], "at": datetime.now().astimezone().isoformat(timespec="seconds")},
                                    "started": r["sent"]})
-        state[r["name"]] = {"digest": digest, "sent": r["sent"], "build": build, "who": info.get("checked_by") or "",
-                            "at": datetime.now().astimezone().isoformat(timespec="seconds")}
-        got.append({"name": r["name"], "title": info.get("title"), "build": build, "who": info.get("checked_by") or "",
-                    **tally(wf)})
-    if state != (_read(state_path, {}) or {}):
-        _write(state_path, state)
-    attach_received(kb)
+        entry = _entry(r["name"], info, wf, r["sent"], digest, sum(1 for n in files if n.startswith("screens/")))
+        have[r["name"]] = entry
+        got.append(entry)
+    if got or held != (index.get("held") or {}):
+        into.mkdir(parents=True, exist_ok=True)
+        rows = sorted(have.values(), key=lambda e: e.get("sent") or "", reverse=True)
+        _write(into / INDEX, {"updated": datetime.now().astimezone().isoformat(timespec="seconds"),
+                              "workflows": rows, "held": held})
     return got
-
-
-def attach(kb, build_id: str, run_dir: Path) -> Dict[str, Any]:
-    """Keep a checked workflow in a build's folder (builds/<id>/derived/): its
-    tree with every mark and note, its outline, and about.json. The screenshots
-    stay with the derivation; filing, sending and publishing the build carry
-    the rest."""
-    folder = kb.builds_dir / build_id
-    if not (folder / "build.json").is_file():
-        raise KBError(f"There is no build {build_id} in {kb.root}.")
-    wf = _read(run_dir / "workflow.json")
-    if not isinstance(wf, dict):
-        raise KBError(f"{run_dir.name} has no workflow yet.")
-    meta = _read(run_dir / "run.json", {}) or {}
-    info = about(run_dir)
-    info.update({"build": build_id, "sent": (meta.get("received") or {}).get("sent") or (meta.get("sent") or {}).get("at")})
-    out = folder / DERIVED
-    out.mkdir(exist_ok=True)
-    _write(out / "workflow.json", wf)
-    (out / "workflow.md").write_text(outline(wf, meta), encoding="utf-8")
-    _write(out / "about.json", info)
-    return {"build": build_id, "folder": str(out), "workflow": run_dir.name, **tally(wf)}
-
-
-def _stamp(info: Dict[str, Any]) -> str:
-    return str(info.get("sent") or info.get("saved") or "")
-
-
-def attach_received(kb) -> List[Dict[str, Any]]:
-    """Copy each received workflow into the build it names, unless the build
-    already holds a copy as new (a build re-sent replaces its folder, so this
-    puts the workflow back)."""
-    done = []
-    have = set(kb.build_ids())
-    for run_dir in runs():
-        meta = _read(run_dir / "run.json", {}) or {}
-        bid = meta.get("build")
-        if not meta.get("received") or bid not in have:
-            continue
-        there = _read(kb.builds_dir / bid / DERIVED / "about.json", {}) or {}
-        if there and _stamp(there) >= str(meta["received"].get("sent") or ""):
-            continue
-        done.append(attach(kb, bid, run_dir))
-    return done
-
-
-def for_folder(folder: Path) -> Optional[Path]:
-    """The newest derivation of the app in this folder that has a workflow."""
-    folder = folder.resolve()
-    for r in reversed(runs()):
-        meta = _read(r / "run.json", {}) or {}
-        if meta.get("folder") and Path(meta["folder"]).resolve() == folder and (r / "workflow.json").is_file():
-            return r
-    return None

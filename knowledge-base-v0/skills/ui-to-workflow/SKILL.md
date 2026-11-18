@@ -43,8 +43,6 @@ astaui add <id> --title "<what it is>" --session latest --code <path> [--code <p
 
 `--source` is one or more of `prompt log`, `repo`, `skill file`, `Claude artifact`, `Marble app`. `--forked-from <id>` records the build it was adapted from.
 
-Run it from the app's folder. If the person worked out this app's workflow with the derive-workflow skill, `astaui add` keeps the newest one with the build, in `derived/`, with every part they marked right or needing a fix and their notes, and says so; sending and publishing the build carry it. `--no-workflow` leaves it out.
-
 ## 3. Strip what must not leave
 
 ```sh
