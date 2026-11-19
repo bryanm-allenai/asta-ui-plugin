@@ -162,7 +162,9 @@ def working_copy(shipped: Path, dest: Optional[Path] = None) -> Path:
     to ask where it should go."""
     dest = dest or WORKING
     mark = dest / ".shipped"
-    stamp = "\n".join([str(shipped)] + [str(int((shipped / f).stat().st_mtime)) for f in ("kb.json", "ontology.json")])
+    # stats.json too: a plugin update that brings newer counts and stars brings them here.
+    stamp = "\n".join([str(shipped)] + [str(int((shipped / f).stat().st_mtime)) for f in ("kb.json", "ontology.json", "stats.json")
+                                         if f != "stats.json" or (shipped / f).is_file()])
     try:
         if mark.read_text(encoding="utf-8") == stamp and _looks_like_kb(dest):
             return dest

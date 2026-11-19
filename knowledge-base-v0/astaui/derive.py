@@ -68,7 +68,7 @@ LINE = ("Set up AstaUI by running `curl -fsSL {raw}/install.py | python3 -{link}
         "and from using it, and show it to me so I can check it and send it to the AstaUI team.")
 SOURCES = ("code", "ui")
 KINDS = ("goal", "phase", "task", "action")
-CHECKS = ("right", "wrong")  # what the person can mark a part
+CHECKS = ("right", "wrong", "out")  # what the person can mark a part: right, needs a fix, does not belong
 
 # -- setup ----------------------------------------------------------------------------------------
 
@@ -403,6 +403,176 @@ def _tag(tree: Dict[str, Any], source: str) -> None:
             n["from"] = ["ui", "code"] if source == "both" else [source]
 
 
+# -- what the person changed ----------------------------------------------------------------------
+#
+# Every part the derivation wrote keeps its first form as "orig": its words, the
+# part it sat in and its place there. The page marks what differs from it
+# (reworded, moved, added, does not belong), and the saved workflow carries the
+# list of changes, so whoever reads it sees the workflow before and after.
+
+def _norm(s: Any) -> str:
+    return re.sub(r"\s+", " ", str(s or "")).strip()
+
+
+def _peers(n: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return [c for c in n.get("children") or [] if isinstance(c, dict) and c.get("kind") != "action"]
+
+
+def baseline(tree: Dict[str, Any], source: Optional[Dict[str, Any]] = None, fresh: bool = False) -> Dict[str, Any]:
+    """Give each derived part its "orig" (fresh: always; otherwise only where it
+    is missing). For a workflow edited before this existed, the derivation's own
+    file (source) says what the parts were, by id."""
+    known: Dict[str, Dict[str, Any]] = {}
+    if source and isinstance(source.get("tree"), dict):
+        def look(n, parent):
+            for i, c in enumerate(_peers(n)):
+                if c.get("id"):
+                    known[c["id"]] = {"in": n.get("id") or "g", "i": i, "at": c["id"],
+                                      "general": _norm(c.get("general")), "specific": _norm(c.get("specific"))}
+                look(c, n)
+        look(source["tree"], None)
+        for f in source.get("features") or []:
+            if isinstance(f, dict) and f.get("id"):
+                known[f["id"]] = {"name": _norm(f.get("name")), "general": _norm(f.get("general"))}
+
+    def mine(n):
+        return "person" in (n.get("from") or []) and "ui" not in (n.get("from") or []) and "code" not in (n.get("from") or [])
+
+    def walk(n):
+        for i, c in enumerate(_peers(n)):
+            if (fresh or "orig" not in c) and not mine(c):
+                c["orig"] = known.get(c.get("id")) or {"in": n.get("id") or "g", "i": i, "at": c.get("id"),
+                                                       "general": _norm(c.get("general")), "specific": _norm(c.get("specific"))}
+            walk(c)
+    if isinstance(tree.get("tree"), dict):
+        walk(tree["tree"])
+    for f in tree.get("features") or []:
+        if isinstance(f, dict) and (fresh or "orig" not in f) and not mine(f):
+            f["orig"] = known.get(f.get("id")) or {"name": _norm(f.get("name")), "general": _norm(f.get("general"))}
+    return tree
+
+
+def link_features(tree: Dict[str, Any]) -> Dict[str, Any]:
+    """Point each feature at the parts it serves, by id ("serves"), from the
+    words the derivation gave (serves_tasks), so a rename later keeps the link."""
+    parts = [n for n in _nodes(tree) if n.get("kind") in ("phase", "task")]
+    by_words: Dict[str, str] = {}
+    for n in parts:
+        by_words.setdefault(_norm(n.get("general")).lower(), n.get("id"))
+    words = lambda s: set(re.findall(r"[a-z0-9]+", s.lower()))  # noqa: E731
+    for f in tree.get("features") or []:
+        if not isinstance(f, dict) or isinstance(f.get("serves"), list):
+            continue
+        out: List[str] = []
+        for s in f.get("serves_tasks") or []:
+            key = _norm(s).lower()
+            hit = by_words.get(key)
+            if not hit:  # the closest by shared words, if close enough
+                w = words(key)
+                best, score = None, 0.0
+                for n in parts:
+                    o = words(_norm(n.get("general")))
+                    j = len(w & o) / max(1, len(w | o))
+                    if j > score:
+                        best, score = n.get("id"), j
+                hit = best if score >= 0.6 else None
+            if hit and hit not in out:
+                out.append(hit)
+        f["serves"] = out
+    return tree
+
+
+def _kept(seq: List[int], placed: Optional[List[bool]] = None) -> set:
+    """Positions of the longest run of seq that is still in its first order:
+    the parts that stayed; the rest are the ones that were moved. Between runs
+    as long, the one that leaves out the parts the person placed by hand wins,
+    so a swap marks the part they moved, not its neighbour."""
+    n = len(seq)
+    if not n:
+        return set()
+    weight = [100 + (0 if placed and placed[i] else 1) for i in range(n)]
+    best = weight[:]
+    prev = [-1] * n
+    for i in range(n):
+        for j in range(i):
+            if seq[j] < seq[i] and best[j] + weight[i] > best[i]:
+                best[i], prev[i] = best[j] + weight[i], j
+    i = max(range(n), key=lambda k: best[k])
+    out = set()
+    while i >= 0:
+        out.add(i)
+        i = prev[i]
+    return out
+
+
+def changes(tree: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """What the person changed, part by part, with before and after: reworded,
+    moved, added, and marked as not belonging."""
+    out: List[Dict[str, Any]] = []
+
+    def walk(n, path):
+        kids = _peers(n)
+        stay = [(k, c) for k, c in enumerate(kids) if isinstance(c.get("orig"), dict) and c["orig"].get("in") == (n.get("id") or "g")]
+        kept = _kept([c["orig"].get("i", 0) for _, c in stay], [bool(c.get("placed")) for _, c in stay])
+        still = {id(c) for j, (_, c) in enumerate(stay) if j in kept}
+        for k, c in enumerate(kids, 1):
+            at = f"{path}.{k}" if path else str(k)
+            word = "phase" if c.get("kind") == "phase" else "task"
+            o = c.get("orig")
+            base = {"id": c.get("id"), "kind": word, "at": at, "words": _norm(c.get("general"))}
+            if not isinstance(o, dict):
+                out.append({**base, "what": "added"})
+            else:
+                if id(c) not in still:
+                    out.append({**base, "what": "moved", "before": o.get("at"), "after": at})
+                for key in ("general", "specific"):
+                    if _norm(c.get(key)) != (o.get(key) or ""):
+                        out.append({**base, "what": "reworded", "field": key, "before": o.get(key) or "", "after": _norm(c.get(key))})
+            if c.get("check") == "out":
+                out.append({**base, "what": "out", **({"note": c["note"]} if c.get("note") else {})})
+            walk(c, at)
+    if isinstance(tree.get("tree"), dict):
+        root = tree["tree"]
+        o = root.get("orig")
+        if isinstance(o, dict):
+            for key in ("general", "specific"):
+                if _norm(root.get(key)) != (o.get(key) or ""):
+                    out.append({"id": "g", "kind": "goal", "at": "goal", "words": _norm(root.get("general")), "what": "reworded",
+                                "field": key, "before": o.get(key) or "", "after": _norm(root.get(key))})
+        walk(root, "")
+    for k, f in enumerate(tree.get("features") or [], 1):
+        if not isinstance(f, dict):
+            continue
+        base = {"id": f.get("id"), "kind": "feature", "at": f"F{k}", "words": _norm(f.get("name"))}
+        o = f.get("orig")
+        if not isinstance(o, dict):
+            out.append({**base, "what": "added"})
+        else:
+            for key in ("name", "general"):
+                if _norm(f.get(key)) != (o.get(key) or ""):
+                    out.append({**base, "what": "reworded", "field": key, "before": o.get(key) or "", "after": _norm(f.get(key))})
+        if f.get("check") == "out":
+            out.append({**base, "what": "out", **({"note": f["note"]} if f.get("note") else {})})
+    return out
+
+
+def _goal_orig(tree: Dict[str, Any], fresh: bool = False) -> None:
+    root = tree.get("tree")
+    if isinstance(root, dict) and (fresh or "orig" not in root):
+        root["orig"] = {"general": _norm(root.get("general")), "specific": _norm(root.get("specific"))}
+
+
+def ready(tree: Dict[str, Any], source: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """A workflow as the page needs it: every derived part with its first form,
+    every feature with the parts it serves."""
+    if source and isinstance(source.get("tree"), dict) and "orig" not in tree.get("tree", {}):
+        tree["tree"]["orig"] = {"general": _norm(source["tree"].get("general")), "specific": _norm(source["tree"].get("specific"))}
+    _goal_orig(tree)
+    baseline(tree, source)
+    link_features(tree)
+    return tree
+
+
 def keep(run_dir: Path, tree: Dict[str, Any], source: str, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Keep a workflow from one source (code or ui) or from both, and make it the
     one shown: a single source is shown until both are in, then the merge is."""
@@ -413,6 +583,9 @@ def keep(run_dir: Path, tree: Dict[str, Any], source: str, extra: Optional[Dict[
         raise KBError("The workflow does not have the right shape:\n  " + "\n  ".join(bad[:20]))
     number(tree)
     _tag(tree, source)
+    _goal_orig(tree, fresh=True)
+    baseline(tree, fresh=True)
+    link_features(tree)
     tree["derived_from"] = source
     if source in SOURCES:
         _write(run_dir / f"{source}.json", tree)
@@ -428,11 +601,24 @@ def keep(run_dir: Path, tree: Dict[str, Any], source: str, extra: Optional[Dict[
     return {"run": str(run_dir), "have": have, "shown": _read(run_dir / "workflow.json", {}).get("derived_from"), **shape(tree)}
 
 
-def put(run_dir: Path, text: str, source: str) -> Dict[str, Any]:
+# The skills that derive a workflow, and the folder beside skill-lab/submitted/derive
+# where the testbench keeps what each one's people sent in.
+SKILLS = {"derive-workflow": "derive", "derive-workflow-no-cua": "derive-nc"}
+DEFAULT_SKILL = "derive-workflow"
+
+
+def put(run_dir: Path, text: str, source: str, skill: Optional[str] = None) -> Dict[str, Any]:
     tree = last_json(text)
     if tree is None:
         raise KBError("That file holds no JSON object.")
-    return keep(run_dir, tree, source)
+    if skill and skill not in SKILLS:
+        raise KBError(f"--skill is one of {', '.join(SKILLS)}")
+    res = keep(run_dir, tree, source)
+    if skill:  # which skill derived it, so a sent copy lands on that skill's testbench tab
+        meta = _read(run_dir / "run.json", {}) or {}
+        meta["skill"] = skill
+        _write(run_dir / "run.json", meta)
+    return res
 
 
 # -- what the coding agent is told ----------------------------------------------------------------
@@ -478,7 +664,8 @@ def outline(tree: Dict[str, Any], meta: Optional[Dict[str, Any]] = None) -> str:
 
     def mark(n):
         c = n.get("check")
-        return " [checked]" if c == "right" else (" [needs a fix" + (f": {n['note']}" if n.get("note") else "") + "]") if c == "wrong" else ""
+        note = f": {n['note']}" if n.get("note") else ""
+        return {"right": " [checked]", "wrong": f" [needs a fix{note}]", "out": f" [does not belong{note}]"}.get(c, "")
 
     def walk(n, path, depth):
         kids = [c for c in n.get("children") or [] if c.get("kind") != "action"]
@@ -511,13 +698,48 @@ def outline(tree: Dict[str, Any], meta: Optional[Dict[str, Any]] = None) -> str:
     gaps = list(tree.get("not_done") or []) + list(tree.get("screens_never_reached") or [])
     if gaps:
         lines += ["", "## Not reached", ""] + [f"- {g}" for g in gaps]
+    ch = changes(tree)
+    if ch:
+        lines += ["", "## What the person changed", ""]
+        for c in ch:
+            what = c["what"]
+            name = f"{c['kind'].capitalize()} {c['at']}" if c["kind"] != "goal" else "Goal"
+            if what == "moved":
+                lines.append(f"- {name} moved (was {c['before']}): {c['words']}")
+            elif what == "reworded":
+                lines.append(f"- {name} reworded ({c['field']}): “{c['before']}” → “{c['after']}”")
+            elif what == "added":
+                lines.append(f"- {name} added: {c['words']}")
+            elif what == "out":
+                lines.append(f"- {name} does not belong: {c['words']}" + (f" ({c['note']})" if c.get("note") else ""))
+    survey = tree.get("survey") or {}
+    said = [(q, survey.get(k)) for k, q, _ in SURVEY if isinstance(survey.get(k), int)]
+    if said:
+        lines += ["", "## Survey", ""] + [f"- {q} **{v} of 5**" for q, v in said]
+    if _norm(tree.get("intended_workflow")):
+        lines += ["", "## The workflow they intended", "", str(tree["intended_workflow"]).strip()]
     return "\n".join(lines).rstrip() + "\n"
 
 
+# The page's survey: (key, question, the words at 1 and 5). The page holds the same.
+SURVEY = (
+    ("match", "How closely does this workflow match the one you meant the interface to support?", ("Not at all", "Exactly")),
+    ("tasks", "How much of the work the interface supports do the phases and tasks cover?", ("None of it", "All of it")),
+    ("features", "How many of the interface's features does the feature list include?", ("None", "All")),
+)
+
+
 def tally(tree: Dict[str, Any]) -> Dict[str, int]:
+    """How far the derived parts were rated (the person's own additions are not rated)."""
     parts = [n for n in _nodes(tree) if n.get("kind") != "action"] + list(tree.get("features") or [])
+    parts = [n for n in parts if (n.get("from") or []) != ["person"]]
+    ch = changes(tree)
+    survey = tree.get("survey") or {}
     return {"parts": len(parts), "right": sum(1 for n in parts if n.get("check") == "right"),
-            "wrong": sum(1 for n in parts if n.get("check") == "wrong")}
+            "wrong": sum(1 for n in parts if n.get("check") == "wrong"),
+            "out": sum(1 for n in parts if n.get("check") == "out"),
+            "changed": len({c["id"] for c in ch if c["what"] in ("moved", "reworded", "added")}),
+            "answered": sum(1 for k, _, _ in SURVEY if isinstance(survey.get(k), int))}
 
 
 # -- using the interface --------------------------------------------------------------------------
@@ -698,7 +920,10 @@ def _handler(run_dir: Path):
                 return self._send(200, page().encode("utf-8"), "text/html; charset=utf-8")
             if path == "/data":
                 meta = _read(run_dir / "run.json", {}) or {}
-                return self._json(200, {"run": meta, "workflow": _read(run_dir / "workflow.json", {}),
+                wf = _read(run_dir / "workflow.json", {}) or {}
+                if wf.get("tree"):
+                    ready(wf, _source(run_dir, wf))
+                return self._json(200, {"run": meta, "workflow": wf,
                                         "have": [s for s in SOURCES if (run_dir / f"{s}.json").is_file()],
                                         "send": {"ready": can_send() and not meta.get("received"), "sent": meta.get("sent"),
                                                  "received": meta.get("received"), "build": meta.get("build"),
@@ -748,6 +973,7 @@ def _handler(run_dir: Path):
                     return self._json(200, {"ok": False, "error": bad[0]})
                 with lock:
                     body["saved"] = datetime.now().astimezone().isoformat(timespec="seconds")
+                    body["changes"] = changes(body)
                     _write(run_dir / "workflow.json", body)
                     (run_dir / "workflow.md").write_text(outline(body, _read(run_dir / "run.json", {})), encoding="utf-8")
                 return self._json(200, {"ok": True, "saved": body["saved"], **tally(body)})
@@ -782,6 +1008,15 @@ def serve(run_dir: Path, port: int = 0, open_browser: bool = True, say=print) ->
         pass
     finally:
         server.server_close()
+
+
+def _source(run_dir: Path, wf: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The workflow as the derivation wrote it, before the person changed anything."""
+    for name in ("derived.json", f"{wf.get('derived_from') or 'both'}.json", "both.json", "code.json", "ui.json"):
+        got = _read(run_dir / name, None)
+        if isinstance(got, dict) and got.get("tree"):
+            return got
+    return None
 
 
 def export(run_dir: Path, to: Path) -> Dict[str, str]:
@@ -838,6 +1073,7 @@ def about(run_dir: Path, author: Optional[str] = None) -> Dict[str, Any]:
     wf = _read(run_dir / "workflow.json", {}) or {}
     ui = meta.get("ui_run") or {}
     return {"kind": "checked-workflow", "astaui": __version__, "name": run_dir.name,
+            "skill": meta.get("skill") or DEFAULT_SKILL,
             "title": (wf.get("interface") or {}).get("title") or meta.get("title") or meta.get("name"),
             "app": Path(meta.get("folder") or meta.get("app") or run_dir.name).name,
             "build": meta.get("build"), "derived_from": wf.get("derived_from"),
@@ -876,6 +1112,9 @@ def pack_workflow(run_dir: Path, author: Optional[str] = None) -> bytes:
         add("workflow.md", (run_dir / "workflow.md").read_bytes() if (run_dir / "workflow.md").is_file()
             else outline(wf).encode("utf-8"))
         add("about.json", json.dumps(info, indent=1, ensure_ascii=False).encode("utf-8"))
+        src = _source(run_dir, wf)
+        if src:  # the workflow before the person's changes, for before and after
+            add("derived.json", json.dumps(src, ensure_ascii=False).encode("utf-8"))
         for s in shots:
             add(s, (run_dir / s).read_bytes())
     return buf.getvalue()
@@ -898,7 +1137,7 @@ def unpack_workflow(packed: str) -> Dict[str, bytes]:
             if not m.isfile() or not m.name.startswith("workflow/"):
                 continue
             name = m.name[len("workflow/"):]
-            if not (name in ("workflow.json", "workflow.md", "about.json")
+            if not (name in ("workflow.json", "workflow.md", "about.json", "derived.json")
                     or (name.startswith("screens/") and SCREEN_RE.match(name[len("screens/"):]))):
                 continue
             total += m.size
@@ -928,8 +1167,9 @@ def _row(run_dir: Path, info: Dict[str, Any], packed: bytes, sent: datetime) -> 
     import base64
     import html
     e = lambda v: html.escape(str(v), quote=True)  # noqa: E731
-    checked = info["right"] + info["wrong"]
-    how = f"{checked} of {info['parts']} parts checked" + (f", {info['wrong']} need a fix" if info["wrong"] else "")
+    checked = info["right"] + info["wrong"] + info.get("out", 0)
+    how = f"{checked} of {info['parts']} parts rated" + (f", {info['wrong']} need a fix" if info["wrong"] else "") \
+        + (f", {info['out']} do not belong" if info.get("out") else "")
     size = f"{max(1, round(len(packed) / 1024))} KB"
     when = f"{sent:%b} {sent.day}, {sent:%H:%M}"
     build = info.get("build")
@@ -970,7 +1210,7 @@ def send(run_dir: Path, link: Optional[str] = None, author: Optional[str] = None
     if user_config().get("inbox-link") != link and not user_config().get("inbox"):
         set_user_config("inbox-link", link)  # later workflows and builds go where this one went
     return {"workflow": run_dir.name, "bytes": len(packed), "screens": info.get("screens_sent", 0),
-            "right": info["right"], "wrong": info["wrong"], "parts": info["parts"], "build": info.get("build"), **where}
+            "right": info["right"], "wrong": info["wrong"], "out": info.get("out", 0), "parts": info["parts"], "build": info.get("build"), **where}
 
 
 def _unpack_about(packed: bytes) -> str:
@@ -1034,11 +1274,18 @@ def received(kb) -> List[Dict[str, Any]]:
     return sorted(latest.values(), key=lambda r: r["sent"], reverse=True)
 
 
-def submitted_dir(kb) -> Path:
+def submitted_dir(kb, skill: Optional[str] = None) -> Path:
     """Where sent-in workflows are kept on the owner's computer: the testbench's
-    folder beside the knowledge base, never inside it."""
+    folder beside the knowledge base, never inside it. Each skill has its own
+    (derive, derive-nc), so each testbench tab lists only its own."""
     env = os.environ.get("ASTAUI_SUBMITTED")
-    return Path(env) if env else kb.root.resolve().parent / "skill-lab" / "submitted" / "derive"
+    base = Path(env) if env else kb.root.resolve().parent / "skill-lab" / "submitted" / "derive"
+    return _skill_dir(base, skill)
+
+
+def _skill_dir(base: Path, skill: Optional[str]) -> Path:
+    folder = SKILLS.get(skill or DEFAULT_SKILL, SKILLS[DEFAULT_SKILL])
+    return base if folder == SKILLS[DEFAULT_SKILL] else base.with_name(base.name + folder[len("derive"):])
 
 
 def _entry(name: str, info: Dict[str, Any], wf: Dict[str, Any], sent: str, digest: str, screens: int) -> Dict[str, Any]:
@@ -1046,23 +1293,29 @@ def _entry(name: str, info: Dict[str, Any], wf: Dict[str, Any], sent: str, diges
     return {"name": name, "title": iface.get("title") or info.get("title") or info.get("app") or name,
             "for": iface.get("what_it_is_for") or "", "field": iface.get("field") or "",
             "app": info.get("app") or "", "build": info.get("build") or None, "who": info.get("checked_by") or "",
-            "sent": sent, "derived_from": wf.get("derived_from"), "screens": screens, "digest": digest,
+            "sent": sent, "derived_from": wf.get("derived_from"), "skill": info.get("skill") or DEFAULT_SKILL,
+            "screens": screens, "digest": digest,
             "received": datetime.now().astimezone().isoformat(timespec="seconds"), **shape(wf), **tally(wf)}
 
 
 def take_received(kb, into: Optional[Path] = None) -> List[Dict[str, Any]]:
     """Unpack every workflow sent to the owner's page that is new, or newer than
-    the copy taken before, into the testbench's folder (one folder each, with
-    the index the Derive workflow tab reads). Returns the ones taken."""
+    the copy taken before, into the testbench's folder for the skill that derived
+    it (one folder each, with the index that skill's Sent in tab reads). Returns
+    the ones taken."""
     import hashlib
-    into = into or submitted_dir(kb)
-    index = _read(into / INDEX, {}) or {}
-    have = {e["name"]: e for e in index.get("workflows") or [] if isinstance(e, dict) and e.get("name")}
-    held = dict(index.get("held") or {})
+    base = into or submitted_dir(kb)
+    dirs = {sk: _skill_dir(base, sk) for sk in SKILLS}
+    indexes = {sk: _read(d / INDEX, {}) or {} for sk, d in dirs.items()}
+    haves = {sk: {e["name"]: e for e in ix.get("workflows") or [] if isinstance(e, dict) and e.get("name")}
+             for sk, ix in indexes.items()}
+    helds = {sk: dict(ix.get("held") or {}) for sk, ix in indexes.items()}
+    held = helds[DEFAULT_SKILL]  # a row that cannot be read is listed on the first skill's tab
     got: List[Dict[str, Any]] = []
     for r in received(kb):
         digest = hashlib.sha256(r["packed"].encode("ascii", "replace")).hexdigest()[:16]
-        if (have.get(r["name"]) or {}).get("digest") == digest or (held.get(r["name"]) or {}).get("digest") == digest:
+        if any((h.get(r["name"]) or {}).get("digest") == digest for h in haves.values()) \
+                or (held.get(r["name"]) or {}).get("digest") == digest:
             continue
         try:
             files = unpack_workflow(r["packed"])
@@ -1075,7 +1328,13 @@ def take_received(kb, into: Optional[Path] = None) -> List[Dict[str, Any]]:
             held[r["name"]] = {"digest": digest, "sent": r["sent"], "why": bad[0]}
             continue
         held.pop(r["name"], None)
-        dest = into / r["name"]
+        skill = info.get("skill") if info.get("skill") in SKILLS else DEFAULT_SKILL
+        for sk, h in haves.items():  # a copy sent from the other skill moves here
+            if sk != skill and h.pop(r["name"], None) is not None:
+                old = dirs[sk] / r["name"]
+                if old.exists():
+                    shutil.rmtree(old)
+        dest = dirs[skill] / r["name"]
         if dest.exists():
             shutil.rmtree(dest)
         for name, data in files.items():
@@ -1085,17 +1344,21 @@ def take_received(kb, into: Optional[Path] = None) -> List[Dict[str, Any]]:
         build = r["for"] if re.match(r"^[a-z0-9][a-z0-9-]{0,80}$", r["for"] or "") else (info.get("build") or None)
         info["build"] = build
         _write(dest / "run.json", {"kind": "derived-workflow", "astaui": info.get("astaui"), "name": r["name"],
-                                   "title": info.get("title"), "app": info.get("app"), "build": build,
+                                   "title": info.get("title"), "app": info.get("app"), "build": build, "skill": skill,
                                    "sources": info.get("sources") or {}, "ui_run": info.get("ui_run") or {},
                                    "checked_by": info.get("checked_by") or "",
                                    "received": {"sent": r["sent"], "at": datetime.now().astimezone().isoformat(timespec="seconds")},
                                    "started": r["sent"]})
         entry = _entry(r["name"], info, wf, r["sent"], digest, sum(1 for n in files if n.startswith("screens/")))
-        have[r["name"]] = entry
+        haves[skill][r["name"]] = entry
         got.append(entry)
-    if got or held != (index.get("held") or {}):
-        into.mkdir(parents=True, exist_ok=True)
-        rows = sorted(have.values(), key=lambda e: e.get("sent") or "", reverse=True)
-        _write(into / INDEX, {"updated": datetime.now().astimezone().isoformat(timespec="seconds"),
-                              "workflows": rows, "held": held})
+    for sk, d in dirs.items():
+        before = indexes[sk]
+        names = lambda ws: [(e.get("name"), e.get("digest")) for e in ws]  # noqa: E731
+        rows = sorted(haves[sk].values(), key=lambda e: e.get("sent") or "", reverse=True)
+        if names(rows) != names(sorted(before.get("workflows") or [], key=lambda e: e.get("sent") or "", reverse=True)) \
+                or helds[sk] != (before.get("held") or {}):
+            d.mkdir(parents=True, exist_ok=True)
+            _write(d / INDEX, {"updated": datetime.now().astimezone().isoformat(timespec="seconds"),
+                               "workflows": rows, "held": helds[sk]})
     return got

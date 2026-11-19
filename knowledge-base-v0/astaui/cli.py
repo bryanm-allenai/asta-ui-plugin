@@ -220,7 +220,7 @@ def cmd_intake(args) -> int:
         return 0
     for g in flows:
         _say(f"Took in the workflow {g['name']}" + (f" from {g['who']}" if g.get("who") else "")
-             + f": {g['right'] + g['wrong']} of {g['parts']} parts checked, kept in the testbench's folder")
+             + f": {g['right'] + g['wrong'] + g.get('out', 0)} of {g['parts']} parts rated, kept in the testbench's folder")
     for w in res["taken"]:
         how = "Replaced" if w.get("replaced") else "Took in"
         also = f" (sent as {w['as']}, which another build has)" if w.get("as") and w["as"] != w["id"] else ""
@@ -556,6 +556,7 @@ def cmd_search(args) -> int:
     sid = log_search(kb, res)
     if sid:
         res["search_id"] = sid
+    _attach_standing(kb, res)
     if args.json:
         _print_json(res)
     else:
@@ -565,15 +566,29 @@ def cmd_search(args) -> int:
     return 0
 
 
+def _attach_standing(kb: KB, res: Dict[str, Any]) -> None:
+    """Each build a search found says how well used it is (astaui/stats.py)."""
+    from .stats import standings
+
+    hits = list(res.get("results") or []) + ([res["far"]] if res.get("far") else [])
+    got = standings(kb, [h["id"] for h in hits])
+    for h in hits:
+        if h["id"] in got:
+            h["standing"] = got[h["id"]]
+
+
 def cmd_show(args) -> int:
     from .slices import find_part, format_slice, slice_part
+    from .stats import log_fetch, standing
 
     kb = _kb(args)
     b = kb.build(args.id)
+    log_fetch(kb, b.id, "part" if args.part else "show")
     data: Dict[str, Any] = {"id": b.id, "meta": b.meta, "prompts": b.prompts,
                             "files": [str(p.relative_to(b.path)) for p in b.code_files()]}
     card = kb.card(b.id) if b.id in kb.card_ids() else None
     data["card"] = card
+    data["standing"] = standing(kb, b.id)
     if card and args.part:
         sl = slice_part(kb, b.id, find_part(kb, b.id, args.part))
         if args.json:
@@ -586,6 +601,7 @@ def cmd_show(args) -> int:
         return 0
     _say(f"{b.title}  [{b.id}]  {b.kind} build by {(b.meta.get('author') or {}).get('name', '?')}")
     _say(f"Files: {', '.join(data['files'])}")
+    _say(f"Standing: {_standing_line(data['standing'])}")
     _say("\nPrompts:")
     for i, t in enumerate(b.prompts, 1):
         _say(f"  {i}. {t.get('text', '')}")
@@ -599,8 +615,10 @@ def cmd_show(args) -> int:
 
 def cmd_slice(args) -> int:
     from .slices import find_part, format_slice, slice_part
+    from .stats import log_fetch
 
     kb = _kb(args)
+    log_fetch(kb, args.build, "slice")
     sl = slice_part(kb, args.build, find_part(kb, args.build, args.part), deps=not args.no_deps, max_lines=args.max_lines)
     if args.json:
         _print_json(sl)
@@ -966,6 +984,44 @@ def cmd_compare(args) -> int:
     return 0
 
 
+def _standing_line(st: Dict[str, Any]) -> str:
+    level = st.get("vetted")
+    out = st["line"] + (f" ({level})" if level else "")
+    if st.get("stars_at"):
+        out += f", checked {st['stars_at']}"
+    if st.get("also"):
+        out += f"; {st['also'][0].lower()}{st['also'][1:]}"
+    return out
+
+
+def cmd_stats(args) -> int:
+    from . import stats as S
+
+    kb = _kb(args)
+    if args.write:
+        got = S.write(kb)
+        _say(f"Folded this computer's usage into {S.path(kb)}: {got['builds']} builds"
+             + (f", through {got['through']}." if got["through"] else " (nothing new)."))
+    if args.stars:
+        got = S.update_stars(kb, args.ids or None, max_age_days=0 if args.fresh else S.STARS_MAX_AGE_DAYS)
+        _say(f"Asked GitHub for {got['asked']} repositories' stars" + ("" if got["token"] else " without a token (60 an hour)")
+             + (f"; {len(got['failed'])} failed: " + ", ".join(f"{f['build']} ({f['why']})" for f in got["failed"][:8]) if got["failed"] else "") + ".")
+    if args.write or args.stars:
+        if not args.ids:
+            return 0
+    ids = args.ids or kb.build_ids()
+    rows = S.standings(kb, ids)
+    if args.json:
+        _print_json(rows if args.ids else {"builds": rows})
+        return 0
+    if not args.ids:
+        rows = dict(sorted(rows.items(), key=lambda kv: (-kv[1]["approved"], -(kv[1].get("stars") or 0), -kv[1]["fetched"], -kv[1]["retrieved"]))[:args.top])
+        _say(f"{len(ids)} builds. Retrieved = came back from a search; fetched = opened with show or slice; approved = feedback --helped yes.")
+    for b, st in rows.items():
+        _say(f"{b}: {_standing_line(st)} · retrieved {st['retrieved']}, fetched {st['fetched']}, used {st['used']}, approved {st['approved']}")
+    return 0
+
+
 def cmd_feedback(args) -> int:
     from .usage import log_feedback
 
@@ -1067,7 +1123,7 @@ def cmd_derive(args) -> int:
         if args.source == "both" and not args.into:
             raise KBError("A merge goes into the workflow it merges: --into latest (or its name)")
         run_dir = derive._target(args.into, args.name)
-        res = derive.put(run_dir, text, args.source)
+        res = derive.put(run_dir, text, args.source, args.skill)
         if args.json:
             _print_json(res)
         else:
@@ -1125,9 +1181,10 @@ def cmd_derive(args) -> int:
         if args.json:
             _print_json(res)
             return 0
-        checked = res["right"] + res["wrong"]
-        _say(f"Sent {res['workflow']} to {res['page']} on {res['drive']}: {checked} of {res['parts']} parts checked"
-             + (f", {res['wrong']} needing a fix" if res["wrong"] else "") + f", {res['screens']} screenshots"
+        checked = res["right"] + res["wrong"] + res.get("out", 0)
+        _say(f"Sent {res['workflow']} to {res['page']} on {res['drive']}: {checked} of {res['parts']} parts rated"
+             + (f", {res['wrong']} needing a fix" if res["wrong"] else "")
+             + (f", {res['out']} not belonging" if res.get("out") else "") + f", {res['screens']} screenshots"
              + (f", for build {res['build']}" if res.get("build") else "") + ". Sending it again replaces this copy.")
         return 0
     if act == "received":
@@ -1141,6 +1198,9 @@ def cmd_derive(args) -> int:
         for g in got:
             _say(f"Took in {g['name']}" + (f" from {g['who']}" if g.get("who") else "") + f": {g['right'] + g['wrong']} of {g['parts']} checked")
         where = derive.submitted_dir(kb)
+        nc = sum(1 for g in got if g.get("skill") == "derive-workflow-no-cua")
+        if nc:
+            _say(f"{nc} of them came from derive-workflow-no-cua, kept in {derive.submitted_dir(kb, 'derive-workflow-no-cua')}.")
         if not rows:
             _say("No workflows have been sent yet.")
         elif not got:
@@ -1268,6 +1328,8 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--no-open", action="store_true", help="show: do not open a browser")
     sp.add_argument("--to", help="export: a folder, or a .json path (the outline goes beside it); send, line: another Add only link")
     sp.add_argument("--author", help="send: the name the owner sees (default: the name git has for you)")
+    sp.add_argument("--skill", choices=["derive-workflow", "derive-workflow-no-cua"],
+                    help="put: the skill deriving it, so a sent copy lands on that skill's testbench tab (default derive-workflow)")
 
     sp = cmd("init", "make an empty knowledge base", cmd_init, json_flag=False)
     sp.add_argument("path")
@@ -1397,6 +1459,13 @@ def parser() -> argparse.ArgumentParser:
     sp.add_argument("--used", choices=["yes", "no"])
     sp.add_argument("--helped", choices=["yes", "no"])
     sp.add_argument("--note")
+
+    sp = cmd("stats", "how well used each build is: retrieved, fetched, approved, and GitHub stars", cmd_stats)
+    sp.add_argument("ids", nargs="*", help="builds to show (default: the most used)")
+    sp.add_argument("--write", action="store_true", help="fold this computer's usage log into kb/stats.json")
+    sp.add_argument("--stars", action="store_true", help="ask GitHub for the stars of builds from public repositories")
+    sp.add_argument("--fresh", action="store_true", help="--stars: ask again even for counts under a week old")
+    sp.add_argument("--top", type=int, default=20, help="with no ids: how many to list")
 
     sp = cmd("slice", "the code for one part: its spans and what they use from elsewhere in the build", cmd_slice)
     sp.add_argument("build")

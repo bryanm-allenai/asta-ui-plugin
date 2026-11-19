@@ -536,6 +536,10 @@ def format_results(res: Dict[str, Any], show_code: bool = True, prompt_turns: in
             out.append("   shares: " + "; ".join(f"{f}: {', '.join(w)}" for f, w in h["shared"].items()))
         if h.get("summary"):
             out.append(f"   {h['summary']}")
+        if h.get("standing"):
+            st = h["standing"]
+            out.append(f"   standing: {st['line']}" + (f" ({st['vetted']})" if st.get("vetted") else "")
+                       + (f"; {st['also'][0].lower()}{st['also'][1:]}" if st.get("also") else ""))
         if h.get("workflow_match"):
             out.extend(format_diff(h["workflow_match"]))
         elif h.get("workflow"):
